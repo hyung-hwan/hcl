@@ -1,0 +1,10 @@
+project LibH2 is
+
+	for Library_Name use "h2";
+	for Library_Kind use "dynamic";
+	for Library_Dir use "@abs_builddir@";
+	for Source_Files use ();
+	for Externally_Built use "true";
+
+end LibH2;
+

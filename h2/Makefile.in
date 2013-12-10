@@ -1,0 +1,7 @@
+all:
+	cd @abs_builddir@/lib; make all
+	cd @abs_builddir@/cmd; make all
+
+clean:
+	cd @abs_builddir@/lib; make clean
+	cd @abs_builddir@/cmd; make clean

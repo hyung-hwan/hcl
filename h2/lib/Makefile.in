@@ -1,0 +1,24 @@
+all: @abs_builddir@/@ADA_OBJDIR@
+	#gnatmake -x -aP@abs_builddir@ -Plib
+	gprbuild @abs_builddir@/lib.gpr
+
+install: install-exec install-data
+
+install-data:
+
+install-exec:
+
+uninstall:
+
+@abs_builddir@/@ADA_OBJDIR@:
+	mkdir -p @abs_builddir@/@ADA_OBJDIR@
+
+clean:
+	rm -rf @abs_builddir@/@ADA_OBJDIR@
+	rm -f @abs_builddir@/*.ali
+	rm -f @abs_builddir@/*.so
+	rm -f @abs_builddir@/*.a
+	rm -f @abs_builddir@/*.cgpr
+	
+
+distclean: clean

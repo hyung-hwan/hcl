@@ -1,0 +1,35 @@
+
+with "@abs_builddir@/../lib/libh2";
+
+project H2_Scheme is
+
+	for Main use ("scheme");
+
+	for Exec_Dir use ".";
+
+	for Source_Dirs use (
+		"@abs_builddir@/../lib",
+		"@abs_builddir@",
+		"@abs_srcdir@"
+	);
+	for Source_Files use (
+		"storage.ads",
+		"storage.adb",
+		"scheme.adb"
+	);
+	for Object_Dir use "@ADA_OBJDIR@";
+
+	package Compiler is
+		for Default_Switches ("Ada") use (
+			"-gnata", "-gnato", "-gnatN",  "-gnatwl",
+			"-I@abs_srcdir@/../lib"
+		);
+	end Compiler;
+
+	package Builder is
+		for Executable ("scheme.adb") use "h2scm";
+	end Builder;
+
+end H2_Scheme;
+
+

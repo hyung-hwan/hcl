@@ -1,0 +1,33 @@
+project Lib is
+
+	for Source_Dirs use ("@abs_srcdir@");
+	for Library_Name use "h2";
+	for Library_Kind use "dynamic";
+	for Library_Dir use ".";
+	--for Library_Src_Dir use ".";
+	for Object_Dir use "@ADA_OBJDIR@";
+
+	for Source_Files use (
+		"h2.ads",
+		"h2-pool.adb",
+		"h2-pool.ads",
+		"h2-scheme.adb",
+		"h2-scheme.ads"
+	);
+	for Library_Interface use (
+		"h2",
+		"h2.pool",
+		"h2.scheme"
+	);
+
+	package Compiler is
+		for Default_Switches ("Ada") use (
+			"-gnata", "-gnato", "-gnatN",  "-gnatwl"
+		);
+	end Compiler;
+
+	--package Install is
+	--	for Prefix use "@prefix@";
+	--end Install;
+end Lib;
+
