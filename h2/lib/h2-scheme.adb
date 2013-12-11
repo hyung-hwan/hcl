@@ -412,10 +412,10 @@ package body H2.Scheme is
 		pragma Assert (Source.all'Size = Target_Object.all'Size);
 	end Copy_Object;
 
-	procedure Copy_Object (Source: in     Object_Pointer;
-	                       Target: in out Memory_Element_Pointer;
-	                       Bytes:  in     Memory_Size) is
-		pragma Inline (Copy_Object);
+	procedure Copy_Object_With_Size (Source: in     Object_Pointer;
+	                                 Target: in out Memory_Element_Pointer;
+	                                 Bytes:  in     Memory_Size) is
+		pragma Inline (Copy_Object_With_Size);
 		-- This procedure uses a more crude type for copying objects.
 		-- It's the result of an effort to work around some compiler
 		-- issues mentioned above.
@@ -428,7 +428,7 @@ package body H2.Scheme is
 		pragma Import (Ada, Src);
 	begin
 		Tgt(1..Bytes) := Src(1..Bytes);
-	end Copy_Object;
+	end Copy_Object_With_Size;
 
 	procedure Collect_Garbage (Interp: in out Interpreter_Record) is
 
@@ -488,7 +488,7 @@ Print_Object_Pointer ("Moving REALLY ...", Object);
 
 					-- Copy the payload to the new object
 					--Copy_Object (Object, Ptr); -- not reliable with some compilers
-					Copy_Object (Object, Ptr, Bytes); -- use this version instead
+					Copy_Object_With_Size (Object, Ptr, Bytes); -- use this instead
 					pragma Assert (Object.all'Size = New_Object.all'Size);
 					pragma Assert (Bytes = New_Object.all'Size / System.Storage_Unit);
 
