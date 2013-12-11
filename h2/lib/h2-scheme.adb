@@ -206,9 +206,10 @@ package body H2.Scheme is
 		--end;
 
 		-- Method 2.
-		-- ObjectAda complains that the member of Object_String is not aliased 
-		-- because Object_Character_Array is an array of aliased Object_Character.
-		-- It points to LRM 4.6(12); The component subtypes shall statically match. 
+		-- ObjectAda complains that the member of Object_String is not 
+		-- aliased because Object_Character_Array is an array of aliased 
+		-- Object_Character.It points to LRM 4.6(12); The component subtypes
+		-- shall statically match. 
 		-- ---------------------------------------------------------------------
 		--Target(Target'First .. Target'Last - 1) := Object_Character_Array (Source(Source'First .. Source'Last));
 		--Target(Target'Last) := Object_Character'First; -- Object_Character'Val(0);
@@ -239,10 +240,10 @@ package body H2.Scheme is
 
 	function To_String (Source: in Object_Character_Array) return Object_String is
 	begin
-		-- ObjectAda complains that the member of Object_String is not aliased 
-		-- because Object_Character_Array is an array of aliased Object_Character.
-		-- It points to LRM 4.6(12); The component subtypes shall statically match. 
-		-- So let me turn to unchecked conversion.
+		-- ObjectAda complains that the member of Object_String is not 
+		-- aliased because Object_Character_Array is an array of aliased
+		-- Object_Character. It points to LRM 4.6(12); The component subtypes
+		-- shall statically match. So let me turn to unchecked conversion.
 		declare
 			subtype Character_Array is Object_Character_Array (Source'First .. Source'Last - 1);
 			subtype String_Array is Object_String (1 .. Source'Length - 1);
@@ -937,6 +938,28 @@ Put_String (To_Thin_String_Pointer (Result));
 			Make_Syntax (Interp, SET_SYNTAX,    "set!",   Dummy);
 		end Make_Syntax_Objects;
 	begin
+		declare
+			Aliased_Interp: aliased Interpreter_Record;
+			for Aliased_Interp'Address use Interp'Address;
+			pragma Import (Ada, Aliased_Interp);
+		begin
+			-- Store a pointer to the interpreter record itself.
+			-- I use this pointer to call functions that accept the "access"
+			-- type to work around the ada95 limitation of no "in out" as
+			-- a function parameter. Accoring to Ada95 RM (6.2), both a 
+			-- non-private limited record type and a private type whose
+			-- full type is a by-reference type are by-rereference types.
+			-- So i assume that it's safe to create this aliased overlay 
+			-- to deceive the compiler. If Interpreter_Record is a tagged
+			-- limited record type, this overlay is not needed since the
+			-- type is considered aliased. Having this overlay, however,
+			-- should be safe for both "tagged" and "non-tagged".
+			-- Note: Making it a tagged limit record caused gnat 3.4.6 to
+			--       crash with an internal bug report.
+			--Interp.Self := Interp'Unchecked_Access; -- if tagged limited
+			Interp.Self := Aliased_Interp'Unchecked_Access;
+		end;
+
 		Interp.Storage_Pool := Storage_Pool;
 		Interp.Root_Table := Nil_Pointer;
 		Interp.Symbol_Table := Nil_Pointer;
@@ -976,12 +999,6 @@ Put_String (To_Thin_String_Pointer (Result));
 
 	procedure Print (Interp: in out Interpreter_Record; 
 	                 Source: in     Object_Pointer) is
-		Accessible_Interp: aliased Interpreter_Record;
-		for Accessible_Interp'Address use Interp'Address;
-		pragma Import (Ada, Accessible_Interp);
-
-		type Interpreter_Pointer is access all Interpreter_Record;
-		Interp_Pointer: Interpreter_Pointer := Accessible_Interp'Access;
 
 		procedure Print_Atom (Atom: in Object_Pointer) is
 			Ptr_Type: Object_Pointer_Type;
@@ -1119,7 +1136,7 @@ Put_String (To_Thin_String_Pointer (Result));
 				when 1 =>
 					if Is_Cons(Operand) then
 						-- push cdr
-						Stack := Make_Frame (Interp_Pointer, Stack, Integer_To_Pointer(2), Operand.Pointer_Slot(Cons_Cdr_Index)); -- push cdr
+						Stack := Make_Frame (Interp.Self, Stack, Integer_To_Pointer(2), Operand.Pointer_Slot(Cons_Cdr_Index)); -- push cdr
 						Text_IO.Put ("(");
 						Operand := Operand.Pointer_Slot(Cons_Car_Index); -- car
 						Opcode := 1;
@@ -1138,7 +1155,7 @@ Put_String (To_Thin_String_Pointer (Result));
 
 					if Is_Cons(Operand) then
 						-- push cdr
-						Stack := Make_Frame (Interp_Pointer, Stack, Integer_To_Pointer(2), Operand.Pointer_Slot(Cons_Cdr_Index)); -- push
+						Stack := Make_Frame (Interp.Self, Stack, Integer_To_Pointer(2), Operand.Pointer_Slot(Cons_Cdr_Index)); -- push
 						Text_IO.Put (" ");
 						Operand := Operand.Pointer_Slot(Cons_Car_Index); -- car
 						Opcode := 1;
@@ -1180,37 +1197,27 @@ Make_Symbol (Interp, "lambda", Interp.Root_Table);
 
 		Collect_Garbage (Interp);
 
-		declare
-			Y: aliased Interpreter_Record;
-			for Y'Address use Interp'Address;
-			pragma Import (Ada, Y);
+		-- (define x 10)
 
-			type Interpreter_Pointer is access all Interpreter_Record;
-			Z: Interpreter_Pointer := Y'Access;
-
-		begin
-			-- (define x 10)
-
-			X := Make_Cons (
-				Z,
-				Make_Symbol (Z, "define"),
+		X := Make_Cons (
+			Interp.Self,
+			Make_Symbol (Interp.Self, "define"),
+			Make_Cons (
+				Interp.Self,
+				Make_Symbol (Interp.Self, "x"),
 				Make_Cons (
-					Z,
-					Make_Symbol (Z, "x"),
-					Make_Cons (
-						Z,
-						Integer_To_Pointer (10),
-						--Nil_Pointer
-						Integer_To_Pointer (10)
-					)
+					Interp.Self,
+					Integer_To_Pointer (10),
+					--Nil_Pointer
+					Integer_To_Pointer (10)
 				)
-			);
-			X := Make_Cons (Z, X, Make_Cons (Z, X, Integer_To_Pointer(10)));
-	
-			--X := Make_Cons (Z, Nil_Pointer, Make_Cons (Z, Nil_Pointer, Integer_To_Pointer(TEN)));
-			--X := Make_Cons (Z, Nil_Pointer, Nil_Pointer);
-			Print (Interp, X);
-		end;
+			)
+		);
+		X := Make_Cons (Interp.Self, X, Make_Cons (Interp.Self, X, Integer_To_Pointer(10)));
+
+		--X := Make_Cons (Interp.Self, Nil_Pointer, Make_Cons (Interp.Self, Nil_Pointer, Integer_To_Pointer(TEN)));
+		--X := Make_Cons (Interp.Self, Nil_Pointer, Nil_Pointer);
+		Print (Interp, X);
 
 	end Evaluate;
 

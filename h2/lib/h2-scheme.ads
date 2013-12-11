@@ -245,8 +245,6 @@ package H2.Scheme is
 	type Memory_Element is mod 2 ** System.Storage_Unit;
 	type Memory_Size is range 0 .. (2 ** (System.Word_Size - 1)) - 1;
 
-	type Interpreter_Record is limited private;
-
 	type Trait_Mask is mod 2 ** System.Word_Size;
 	No_Garbage_Collection: constant Trait_Mask := 2 ** 0;
 
@@ -287,6 +285,10 @@ package H2.Scheme is
 
 	-- -----------------------------------------------------------------------------
 
+	type Interpreter_Record is limited private;
+
+	-- -----------------------------------------------------------------------------
+
 	procedure Open (Interp:           in out Interpreter_Record;
 	                Initial_Heap_Size:in     Memory_Size;
 	                Storage_Pool:     in     Storage_Pool_Pointer := null);
@@ -300,6 +302,7 @@ package H2.Scheme is
 
 	procedure Get_Option (Interp: in out Interpreter_Record;
 	                      Option: in out Option_Record);
+
 
 	-- -----------------------------------------------------------------------------
 
@@ -323,7 +326,9 @@ private
 		Next:  Object_Pointer := Nil_Pointer;
 	end record;
 
+	type Interpreter_Pointer is access all Interpreter_Record;
 	type Interpreter_Record is limited record
+		Self: Interpreter_Pointer := null;
 		Storage_Pool: Storage_Pool_Pointer := null;
 		Trait: Option_Record (Trait_Option);
 
