@@ -123,23 +123,32 @@ package H2.Scheme is
 	-- freely for management purpose. The Object_Flags type
 	-- represents the value that can be stored in this field.
 	type Object_Flags is mod 2 ** 4;
-	Syntax_Object: constant Object_Flags := Object_Flags'(2#0001#);
+	Syntax_Object: constant Object_Flags := Object_Flags'(2#0001#); 
 
 	type Syntax_Code is mod 2 ** 4;
-	AND_SYNTAX:    constant Syntax_Code := Syntax_Code'(0);
-	BEGIN_SYNTAX:  constant Syntax_Code := Syntax_Code'(0);
-	CASE_SYNTAX:   constant Syntax_Code := Syntax_Code'(0);
-	COND_SYNTAX:   constant Syntax_Code := Syntax_Code'(0);
-	DEFINE_SYNTAX: constant Syntax_Code := Syntax_Code'(0);
-	IF_SYNTAX:     constant Syntax_Code := Syntax_Code'(0);
-	LAMBDA_SYNTAX: constant Syntax_Code := Syntax_Code'(0);
-	LET_SYNTAX:    constant Syntax_Code := Syntax_Code'(0);
-	LETAST_SYNTAX: constant Syntax_Code := Syntax_Code'(0);
-	LETREC_SYNTAX: constant Syntax_Code := Syntax_Code'(0);
-	OR_SYNTAX:     constant Syntax_Code := Syntax_Code'(0);
-	QUOTE_SYNTAX:  constant Syntax_Code := Syntax_Code'(0);
-	SET_SYNTAX:    constant Syntax_Code := Syntax_Code'(0);
+	And_Syntax:    constant Syntax_Code := Syntax_Code'(0);
+	Begin_Syntax:  constant Syntax_Code := Syntax_Code'(1);
+	Case_Syntax:   constant Syntax_Code := Syntax_Code'(2);
+	Cond_Syntax:   constant Syntax_Code := Syntax_Code'(3);
+	Define_Syntax: constant Syntax_Code := Syntax_Code'(4);
+	If_Syntax:     constant Syntax_Code := Syntax_Code'(5);
+	Lambda_Syntax: constant Syntax_Code := Syntax_Code'(6);
+	Let_Syntax:    constant Syntax_Code := Syntax_Code'(7);
+	Letast_Syntax: constant Syntax_Code := Syntax_Code'(8);
+	Letrec_Syntax: constant Syntax_Code := Syntax_Code'(9);
+	Or_Syntax:     constant Syntax_Code := Syntax_Code'(10);
+	Quote_Syntax:  constant Syntax_Code := Syntax_Code'(11);
+	Set_Syntax:    constant Syntax_Code := Syntax_Code'(12);
 
+	subtype Procedure_Code is Object_Integer;
+	Car_Procedure:      constant Procedure_Code := Procedure_Code'(0);
+	Cdr_Procedure:      constant Procedure_Code := Procedure_Code'(1);
+	Setcar_Procedure:   constant Procedure_Code := Procedure_Code'(2);
+	Setcdr_Procedure:   constant Procedure_Code := Procedure_Code'(3);
+	Add_Procedure:      constant Procedure_Code := Procedure_Code'(4);
+	Subtract_Procedure: constant Procedure_Code := Procedure_Code'(5);
+	Multiply_Procedure: constant Procedure_Code := Procedure_Code'(6);
+	Divide_Procedure:   constant Procedure_Code := Procedure_Code'(7);
 
 	type Object_Tag is (
 		Unknown_Object, 
@@ -149,7 +158,8 @@ package H2.Scheme is
 		Number_Object,
 		Array_Object,
 		Table_Object,
-		Lambda_Object,
+		Procedure_Object,
+		Closure_Object,
 		Continuation_Object,
 		Frame_Object
 	);
@@ -287,7 +297,25 @@ package H2.Scheme is
 
 	type Interpreter_Record is limited private;
 
+	type Interpreter_Text_IO_Record is abstract tagged null record;
+
+	procedure Open (IO:   in out Interpreter_Text_IO_Record;
+	                Name: in     Object_String) is abstract;
+
+	procedure Close (IO: in out Interpreter_Text_IO_Record) is abstract;
+
+	procedure Read (IO:   in out Interpreter_Text_IO_Record;
+	                Data: in     Object_String;
+	                Last: in     Standard.Natural) is abstract;
+
+	procedure Write (IO:   in out Interpreter_Text_IO_Record;
+	                 Data: out    Object_String;
+	                 Last: out    Standard.Natural) is abstract;
+		
+	
 	-- -----------------------------------------------------------------------------
+
+procedure Make_Test_Object (Interp: in out Interpreter_Record; Result: out Object_Pointer);
 
 	procedure Open (Interp:           in out Interpreter_Record;
 	                Initial_Heap_Size:in     Memory_Size;
@@ -295,7 +323,12 @@ package H2.Scheme is
 
 	procedure Close (Interp: in out Interpreter_Record);
 
-	procedure Evaluate (Interp: in out Interpreter_Record);
+	procedure Evaluate (Interp: in out Interpreter_Record;
+	                    Source: in     Object_Pointer;
+	                    Result: out    Object_Pointer);
+
+	procedure Print (Interp: in out Interpreter_Record;
+	                 Source: in     Object_Pointer);
 
 	procedure Set_Option (Interp: in out Interpreter_Record;
 	                      Option: in     Option_Record);
@@ -310,7 +343,7 @@ private
 	type Heap_Array is array (Memory_Size range <>) of aliased Memory_Element;
 
 	type Heap_Record (Size: Memory_Size) is record
-		Space: Heap_Array (1 .. Size) := (others => 0);
+		Space: Heap_Array(1..Size) := (others => 0);
 		Bound: Memory_Size := 0;
 	end record;
 	for Heap_Record'Alignment use Object_Pointer_Bytes;
@@ -327,20 +360,26 @@ private
 	end record;
 
 	type Interpreter_Pointer is access all Interpreter_Record;
+	--type Interpreter_Record is tagged limited record
 	type Interpreter_Record is limited record
 		Self: Interpreter_Pointer := null;
 		Storage_Pool: Storage_Pool_Pointer := null;
-		Trait: Option_Record (Trait_Option);
+		Trait: Option_Record(Trait_Option);
 
 		Heap: Heap_Pointer_Array := (others => null);
 		Current_Heap: Heap_Number := Heap_Number'First;
 
 		Root_Table: Object_Pointer := Nil_Pointer;
 		Symbol_Table: Object_Pointer := Nil_Pointer;
+		Root_Environment: Object_Pointer := Nil_Pointer;
 		Environment: Object_Pointer := Nil_Pointer;
 		Stack: Object_Pointer := Nil_Pointer;
 
 		R: Register_Record;
+
+		Line: Object_String(1..1024);
+		Line_Last: Standard.Natural;
+		Line_Pos: Standard.Natural;
 	end record;
 
 end H2.Scheme;

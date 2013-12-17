@@ -8,12 +8,18 @@ procedure scheme is
 	Pool: aliased Storage.Global_Pool;
 	SI: S.Interpreter_Record;
 
+	I: S.Object_Pointer;
+	O: S.Object_Pointer;
 begin
 	Ada.Text_Io.Put_Line (S.Object_Word'Image(S.Object_Pointer_Bytes));
 
 	S.Open (SI, 2_000_000, Pool'Unchecked_Access);
 	--S.Open (SI, null);
-	S.Evaluate (SI);
+S.Make_Test_Object (SI, I);
+	S.Evaluate (SI, I, O);
+S.Print (SI, I);
+Ada.Text_IO.Put_Line ("-------------------------------------------");
+S.Print (SI, O);
 	S.Close (SI);
 
 	declare
