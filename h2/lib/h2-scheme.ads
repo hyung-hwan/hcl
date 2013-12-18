@@ -161,7 +161,8 @@ package H2.Scheme is
 		Procedure_Object,
 		Closure_Object,
 		Continuation_Object,
-		Frame_Object
+		Frame_Object,
+		Mark_Object
 	);
 
 	type Object_Record (Kind: Object_Kind; Size: Object_Size) is record
@@ -374,6 +375,7 @@ private
 		Root_Environment: Object_Pointer := Nil_Pointer;
 		Environment: Object_Pointer := Nil_Pointer;
 		Stack: Object_Pointer := Nil_Pointer;
+		Mark: Object_Pointer := Nil_Pointer;
 
 		R: Register_Record;
 

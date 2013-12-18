@@ -8,6 +8,7 @@ package body H2.Scheme is
 	----------------------------------------------------------------------------------
 	Allocation_Error: exception;
 	Size_Error: exception;
+	Evaluation_Error: exception;
 	Internal_Error: exception;
 
 	----------------------------------------------------------------------------------
@@ -20,13 +21,12 @@ package body H2.Scheme is
 	type Thin_Memory_Element_Array_Pointer is access all Thin_Memory_Element_Array;
 	for Thin_Memory_Element_Array_Pointer'Size use Object_Pointer_Bits;
 
-	subtype Opcode_Type is Object_Integer range 0 .. 5;
+	subtype Opcode_Type is Object_Integer range 0 .. 4;
 	Opcode_Exit:               constant Opcode_Type := Opcode_Type'(0);
 	Opcode_Evaluate_Object:    constant Opcode_Type := Opcode_Type'(1);
-	Opcode_Evaluate_Argument:  constant Opcode_Type := Opcode_Type'(2);
-	Opcode_Evaluate_Syntax:    constant Opcode_Type := Opcode_Type'(3);
-	Opcode_Evaluate_Procedure: constant Opcode_Type := Opcode_Type'(4);
-	Opcode_Apply:              constant Opcode_Type := Opcode_Type'(5);
+	Opcode_Evaluate_Syntax:    constant Opcode_Type := Opcode_Type'(2);
+	Opcode_Evaluate_Procedure: constant Opcode_Type := Opcode_Type'(3);
+	Opcode_Apply:              constant Opcode_Type := Opcode_Type'(4);
 
 	----------------------------------------------------------------------------------
 	-- COMMON OBJECTS
@@ -41,6 +41,9 @@ package body H2.Scheme is
 	Frame_Operand_Index: constant Pointer_Object_Size := 3;
 	Frame_Environment_Index: constant Pointer_Object_Size := 4;
 	Frame_Return_Index: constant Pointer_Object_Size := 5;
+
+	Mark_Object_Size: constant Pointer_Object_Size := 1;
+	Mark_Context_Index: constant Pointer_Object_Size := 1;
 
 	Procedure_Object_Size: constant Pointer_Object_Size := 1;
 	Procedure_Opcode_Index: constant Pointer_Object_Size := 1;
@@ -616,6 +619,7 @@ Text_IO.Put_Line ("COMPACT_SYMBOL_TABLE Unlinking " & To_String (Car.Character_S
 		-- Migrate objects in the root table
 Print_Object_Pointer ("Root_Table ...", Interp.Root_Table);
 		Interp.Root_Table := Move_One_Object (Interp.Root_Table);
+		Interp.Mark := Move_One_Object (Interp.Mark);
 
 		-- Scane the heap
 		Last_Pos := Scan_New_Heap (Interp.Heap(New_Heap).Space'First);
@@ -765,47 +769,6 @@ Text_IO.Put_Line (">>> [GC DONE]");
 
 	----------------------------------------------------------------------------------
 
-	function Is_Cons (Source: in Object_Pointer) return Standard.Boolean is
-		pragma Inline (Is_Cons);
-	begin
-		return Is_Normal_Pointer (Source) and then 
-		       Source.Tag = Cons_Object;
-	end Is_Cons;
-
-	function Get_Car (Source: in Object_Pointer) return Object_Pointer is
-		pragma Inline (Get_Car);
-	begin
-		pragma Assert (Is_Cons (Source));
-		pragma Assert (Source.Size = Cons_Object_Size);
-		return Source.Pointer_Slot(Cons_Car_Index);
-	end Get_Car;
-
-	procedure Set_Car (Source: in out Object_Pointer;
-	                   Value:  in     Object_Pointer) is
-		pragma Inline (Set_Car);
-	begin
-		pragma Assert (Is_Cons (Source));
-		pragma Assert (Source.Size = Cons_Object_Size);
-		Source.Pointer_Slot(Cons_Car_Index) := Value;
-	end Set_Car;
-
-	function Get_Cdr (Source: in Object_Pointer) return Object_Pointer is
-		pragma Inline (Get_Cdr);
-	begin
-		pragma Assert (Is_Cons (Source));
-		pragma Assert (Source.Size = Cons_Object_Size);
-		return Source.Pointer_Slot(Cons_Cdr_Index);
-	end Get_Cdr;
-
-	procedure Set_Cdr (Source: in out Object_Pointer;
-	                   Value:  in     Object_Pointer) is
-		pragma Inline (Set_Cdr);
-	begin
-		pragma Assert (Is_Cons (Source));
-		pragma Assert (Source.Size = Cons_Object_Size);
-		Source.Pointer_Slot(Cons_Cdr_Index) := Value;
-	end Set_Cdr;
-
 	procedure Make_Cons (Interp: in out Interpreter_Record;
 	                     Car:    in     Object_Pointer;
 	                     Cdr:    in     Object_Pointer;
@@ -815,7 +778,7 @@ Text_IO.Put_Line (">>> [GC DONE]");
 		Result.Pointer_Slot(Cons_Car_Index) := Car;
 		Result.Pointer_Slot(Cons_Cdr_Index) := Cdr;
 		Result.Tag := Cons_Object;
-Print_Object_Pointer ("Make_Cons Result - ", Result);
+--Print_Object_Pointer ("Make_Cons Result - ", Result);
 	end Make_Cons;
 
 	function Make_Cons (Interp: access Interpreter_Record;
@@ -827,6 +790,73 @@ Print_Object_Pointer ("Make_Cons Result - ", Result);
 		return Result;
 	end Make_Cons;
 
+	function Is_Cons (Source: in Object_Pointer) return Standard.Boolean is
+		pragma Inline (Is_Cons);
+	begin
+		return Is_Normal_Pointer(Source) and then 
+		       Source.Tag = Cons_Object;
+	end Is_Cons;
+
+	function Get_Car (Source: in Object_Pointer) return Object_Pointer is
+		pragma Inline (Get_Car);
+		pragma Assert (Is_Cons(Source));
+		pragma Assert (Source.Size = Cons_Object_Size);
+	begin
+		return Source.Pointer_Slot(Cons_Car_Index);
+	end Get_Car;
+
+	procedure Set_Car (Source: in out Object_Pointer;
+	                   Value:  in     Object_Pointer) is
+		pragma Inline (Set_Car);
+		pragma Assert (Is_Cons(Source));
+		pragma Assert (Source.Size = Cons_Object_Size);
+	begin
+		Source.Pointer_Slot(Cons_Car_Index) := Value;
+	end Set_Car;
+
+	function Get_Cdr (Source: in Object_Pointer) return Object_Pointer is
+		pragma Inline (Get_Cdr);
+		pragma Assert (Is_Cons(Source));
+		pragma Assert (Source.Size = Cons_Object_Size);
+	begin
+		return Source.Pointer_Slot(Cons_Cdr_Index);
+	end Get_Cdr;
+
+	procedure Set_Cdr (Source: in out Object_Pointer;
+	                   Value:  in     Object_Pointer) is
+		pragma Inline (Set_Cdr);
+		pragma Assert (Is_Cons(Source));
+		pragma Assert (Source.Size = Cons_Object_Size);
+	begin
+		Source.Pointer_Slot(Cons_Cdr_Index) := Value;
+	end Set_Cdr;
+
+
+	function Reverse_Cons (Source: in Object_Pointer) return Object_Pointer is
+		pragma Assert (Is_Cons(Source));
+		pragma Assert (Source.Size = Cons_Object_Size);
+
+		-- Note: The non-nil cdr in the last cons cell gets lost.
+		--       e.g.) Reversing (1 2 3 . 4) results in (3 2 1)
+		Ptr: Object_Pointer;
+		Next: Object_Pointer;
+		Prev: Object_Pointer;
+	begin
+		Prev := Nil_Pointer;
+		Ptr := Source;
+		loop
+			Next := Get_Cdr(Ptr);
+			Set_Cdr (Ptr, Prev);
+			Prev := Ptr;
+			if Is_Cons(Next) then
+				Ptr := Next;
+			else
+				exit;
+			end if;
+		end loop;
+
+		return Ptr;
+	end Reverse_Cons;
 	----------------------------------------------------------------------------------
 
 	procedure Make_String (Interp: in out Interpreter_Record;
@@ -965,10 +995,6 @@ Print_Object_Pointer ("Get_Environment Key => ", Key);
 
 	----------------------------------------------------------------------------------
 
-	function Is_Syntax (Source: in Object_Pointer) return Standard.Boolean is
-	begin
-		return Is_Symbol(Source) and then (Source.Flags and Syntax_Object) /= 0;
-	end Is_Syntax;
 
 	procedure Make_Syntax (Interp: in out Interpreter_Record;
 	                       Opcode: in     Syntax_Code;
@@ -981,6 +1007,12 @@ Print_Object_Pointer ("Get_Environment Key => ", Key);
 Text_IO.Put ("Creating Syntax Symbol ");
 Put_String (To_Thin_String_Pointer (Result));
 	end Make_Syntax;
+
+	function Is_Syntax (Source: in Object_Pointer) return Standard.Boolean is
+		pragma Inline (Is_Syntax);
+	begin
+		return Is_Symbol(Source) and then (Source.Flags and Syntax_Object) /= 0;
+	end Is_Syntax;
 
 	procedure Make_Procedure (Interp: in out Interpreter_Record;
 	                          Opcode: in     Procedure_Code;
@@ -1007,15 +1039,23 @@ Put_String (To_Thin_String_Pointer (Result));
 		Result := Proc;
 	end Make_Procedure;
 
+	function Is_Procedure (Source: in Object_Pointer) return Standard.Boolean is
+		pragma Inline (Is_Procedure);
+	begin
+		return Is_Normal_Pointer(Source) and then 
+		       Source.Tag = Procedure_Object;
+	end Is_Procedure;
+
+	function Get_Procedure_Opcode (Proc: in Object_Pointer) return Procedure_Code is
+		pragma Inline (Get_Procedure_Opcode);
+		pragma Assert (Is_Procedure(Proc));
+		pragma Assert (Proc.Size = Procedure_Object_Size);
+	begin
+		return Pointer_To_Integer(Proc.Pointer_Slot(Procedure_Opcode_Index));
+	end Get_Procedure_Opcode;
 	
 	----------------------------------------------------------------------------------
 
-	function Is_Frame (Source: in Object_Pointer) return Standard.Boolean is
-		pragma Inline (Is_Frame);
-	begin
-		return Is_Normal_Pointer (Source) and then 
-		       Source.Tag = Frame_Object;
-	end Is_Frame;
 
 	procedure Make_Frame (Interp:  in out Interpreter_Record;
 	                      Stack:   in     Object_Pointer; -- current stack pointer
@@ -1024,6 +1064,8 @@ Put_String (To_Thin_String_Pointer (Result));
 	                      Envir:   in     Object_Pointer;
 	                      Result:  out    Object_Pointer) is
 	begin
+-- TODO: create a Frame in a special memory rather than in Heap Memory.
+--       Since it's used for stack, it can be made special.
 		Allocate_Pointer_Object (Interp, Frame_Object_Size, Nil_Pointer, Result);
 		Result.Tag := Frame_Object;
 		Result.Pointer_Slot(Frame_Stack_Index) := Stack;
@@ -1044,57 +1086,102 @@ Put_String (To_Thin_String_Pointer (Result));
 		return Frame;
 	end Make_Frame;
 
+	function Is_Frame (Source: in Object_Pointer) return Standard.Boolean is
+		pragma Inline (Is_Frame);
+	begin
+		return Is_Normal_Pointer(Source) and then 
+		       Source.Tag = Frame_Object;
+	end Is_Frame;
+
 	function Get_Frame_Return (Frame: in Object_Pointer) return Object_Pointer is
 		pragma Inline (Get_Frame_Return);
-	begin
 		pragma Assert (Is_Frame(Frame));
+	begin
 		return Frame.Pointer_Slot(Frame_Return_Index);
 	end Get_Frame_Return;
 
 	procedure Set_Frame_Return (Frame: in out Object_Pointer;
 	                            Value: in     Object_Pointer) is
 		pragma Inline (Set_Frame_Return);
-	begin
 		pragma Assert (Is_Frame(Frame));
+	begin
 		Frame.Pointer_Slot(Frame_Return_Index) := Value;
 	end Set_Frame_Return;
 
+	procedure Chain_Frame_Return (Interp: in out Interpreter_Record;
+	                              Frame:  in out Object_Pointer;
+	                              Value:  in     Object_Pointer) is
+		pragma Inline (Chain_Frame_Return);
+		pragma Assert (Is_Frame(Frame));
+
+		Cons: Object_Pointer renames Frame.Pointer_Slot(Frame_Return_Index);
+	begin
+-- TODO: make it GC-aware
+
+		-- Add a new cons cell to the front
+		Cons :=  Make_Cons (Interp.Self, Value, Cons);
+	end Chain_Frame_Return;
+
+	procedure Clear_Frame_Return (Frame: in out Object_Pointer) is
+	begin
+		Frame.Pointer_Slot(Frame_Return_Index) := Nil_Pointer;
+	end Clear_Frame_Return;
+
 	function Get_Frame_Environment (Frame: in Object_Pointer) return Object_Pointer is
 		pragma Inline (Get_Frame_Environment);
-	begin
 		pragma Assert (Is_Frame(Frame));
+	begin
 		return Frame.Pointer_Slot(Frame_Environment_Index);
 	end Get_Frame_Environment;
 
 	function Get_Frame_Opcode (Frame: in Object_Pointer) return Opcode_Type is
 		pragma Inline (Get_Frame_Opcode);
-	begin
 		pragma Assert (Is_Frame(Frame));
+	begin
 		return Pointer_To_Integer(Frame.Pointer_Slot(Frame_Opcode_Index));
 	end Get_Frame_Opcode;
 
 	procedure Set_Frame_Opcode (Frame:  in Object_Pointer; 
 	                            OpcodE: in Opcode_Type) is
 		pragma Inline (Set_Frame_Opcode);
-	begin
 		pragma Assert (Is_Frame(Frame));
+	begin
 		Frame.Pointer_Slot(Frame_Opcode_Index) := Integer_To_Pointer(Opcode);
 	end Set_Frame_Opcode;
 
 	function Get_Frame_Operand (Frame: in Object_Pointer) return Object_Pointer is
 		pragma Inline (Get_Frame_Operand);
-	begin
 		pragma Assert (Is_Frame(Frame));
+	begin
 		return Frame.Pointer_Slot(Frame_Operand_Index);
 	end Get_Frame_Operand;
 
 	procedure Set_Frame_Operand (Frame: in out Object_Pointer;
-	                            Value: in     Object_Pointer) is
+	                             Value: in     Object_Pointer) is
 		pragma Inline (Set_Frame_Operand);
-	begin
 		pragma Assert (Is_Frame(Frame));
+	begin
 		Frame.Pointer_Slot(Frame_Operand_Index) := Value;
 	end Set_Frame_Operand;
+
+	----------------------------------------------------------------------------------
+
+	procedure Make_Mark (Interp:  in out Interpreter_Record;
+	                     Context: in     Object_Integer;
+	                     Result:  out    Object_Pointer) is
+	begin
+		Allocate_Pointer_Object (Interp, Mark_Object_Size, Nil_Pointer, Result);
+		Result.Pointer_Slot(Mark_Context_Index) := Integer_To_Pointer(Context);
+		Result.Tag := Mark_Object;
+	end Make_Mark;
+
+	function Make_Mark (Interp:  access Interpreter_Record;
+	                    Context: in     Object_Integer) return Object_Pointer is
+		Mark: Object_Pointer;
+	begin
+		Make_Mark (Interp.all, Context, Mark);
+		return Mark;
+	end Make_Mark;
 
 	----------------------------------------------------------------------------------
 
@@ -1118,6 +1205,27 @@ Put_String (To_Thin_String_Pointer (Result));
 		return Closure;
 	end Make_Closure;
 	
+	function Is_Closure (Source: in Object_Pointer) return Standard.Boolean is
+		pragma Inline (Is_Closure);
+	begin
+		return Is_Normal_Pointer(Source) and then 
+		       Source.Tag = Closure_Object;
+	end Is_Closure;
+
+	function Get_Closure_Code (Closure: in Object_Pointer) return Object_Pointer is
+		pragma Inline (Get_Closure_Code);
+		pragma Assert (Is_Closure(Closure));
+	begin
+		return Closure.Pointer_Slot(Closure_Code_Index);
+	end Get_Closure_Code;
+
+	function Get_Closure_Environment (Closure: in Object_Pointer) return Object_Pointer is
+		pragma Inline (Get_Closure_Environment);
+		pragma Assert (Is_Closure(Closure));
+	begin
+		return Closure.Pointer_Slot(Closure_Environment_Index);
+	end Get_Closure_Environment;
+
 	----------------------------------------------------------------------------------
 	procedure Deinitialize_Heap (Interp: in out Interpreter_Record) is
 	begin
@@ -1230,8 +1338,11 @@ Put_String (To_Thin_String_Pointer (Result));
 
 -- TODO: disallow garbage collecion during initialization.
 		Initialize_Heap (Initial_Heap_Size);
+		Interp.Mark := Make_Mark (Interp.Self, 0); -- to indicate the end of cons evluation
 		Make_Syntax_Objects;
 		Make_Procedure_Objects;
+
+
 	exception
 		when others =>
 			Deinitialize_Heap (Interp);
@@ -1537,6 +1648,8 @@ Make_Symbol (Interp, "lambda", Interp.Root_Table);
 	end Evaluatex;
 
 procedure Make_Test_Object (Interp: in out Interpreter_Record; Result: out Object_Pointer) is
+	Y: Object_Pointer;
+	Z: Object_Pointer;
 begin
 		--(define x 10)
 		--Result := Make_Cons (
@@ -1554,17 +1667,47 @@ begin
 		--	)
 		--);
 
-		-- (+ 1 2 . 2)
+		Z := Make_Cons (
+			Interp.Self,
+			Make_Symbol (Interp.Self, "+"),
+			Make_Cons (
+				Interp.Self,
+				Integer_To_Pointer (3),
+				Make_Cons (
+					Interp.Self,
+					Integer_To_Pointer (9),
+					Nil_Pointer
+				)
+			)
+		);
+		Y := Make_Cons (
+			Interp.Self,
+			Make_Symbol (Interp.Self, "+"),
+			Make_Cons (
+				Interp.Self,
+				Integer_To_Pointer (100),
+				Make_Cons (
+					Interp.Self,
+					Z,
+					Nil_Pointer
+				)
+			)
+		);
 		Result := Make_Cons (
 			Interp.Self,
 			Make_Symbol (Interp.Self, "+"),
 			Make_Cons (
 				Interp.Self,
-				Integer_To_Pointer (10),
+				--Integer_To_Pointer (10),
+				Y,
 				Make_Cons (
 					Interp.Self,
-					Integer_To_Pointer (20),
-					Integer_To_Pointer (2)
+					Integer_To_Pointer (-5),
+					Make_Cons (
+						Interp.Self,
+						Y,
+						Integer_To_Pointer (20)
+					)
 				)
 			)
 		);
@@ -1607,7 +1750,7 @@ end Make_Test_Object;
 		--	Stack := Stack.Pointer_Slot(Frame_Stack_Index); -- pop 
 		--end Pop_Frame;
 
-		procedure Pop_Frame (Stack:   out Object_Pointer) is
+		procedure Pop_Frame (Stack: out Object_Pointer) is
 			pragma Inline (Pop_Frame);
 		begin
 			pragma Assert (Stack /= Nil_Pointer);
@@ -1623,24 +1766,19 @@ end Make_Test_Object;
 
 			Tmp: Object_Pointer;
 		begin
-Text_IO.Put_Line ("Evaluate_Object...");
+		<<Start_Over>>
 			Operand := Get_Frame_Operand (Stack);
 
 			if Get_Pointer_Type(Operand) /= Object_Pointer_Type_Pointer then
-Text_IO.Put_Line ("NON_POINTER...");
 				goto Literal;
 			end if;
 
-Print_Object_Pointer ("Operand => ", Operand);
 			case Operand_Word is
 				when Nil_Word | True_Word | False_Word =>
 					-- special literal object
-Text_IO.Put_Line ("SPECIAL POINTER...");
 					goto Literal;
 
 				when others =>
-Text_IO.Put_Line ("OTHER BDONE.." & Object_Tag'Image(Operand.Tag));
-
 					case Operand.Tag is
 						when Symbol_Object => -- Is_Symbol(Operand)
 							Tmp := Get_Environment (Interp.Self, Get_Frame_Environment(Stack), Operand); -- TODO: use current environent
@@ -1649,7 +1787,6 @@ Text_IO.Put_Line ("OTHER BDONE.." & Object_Tag'Image(Operand.Tag));
 								Text_IO.Put_Line ("Unbound symbol....");
 							else
 								-- symbol found in the environment
-Text_IO.Put_Line ("SUMBOL BDONE..");
 								Operand := Tmp; 
 								goto Literal;  -- In fact, this is not a literal, but can be handled in the same way
 							end if;
@@ -1657,32 +1794,56 @@ Text_IO.Put_Line ("SUMBOL BDONE..");
 						when Cons_Object => -- Is_Cons(Operand)
 							Tmp := Get_Car(Operand);
 							if Is_Syntax(Tmp) then
-Text_IO.Put_Line ("SYNTAX ..");
 								-- special syntax symbol. normal evaluate rule doesn't 
 								-- apply for special syntax objects.
 								--Opcode := Syntax_To_Opcode(Operand);
 								Set_Frame_Opcode (Stack, Opcode_Evaluate_Syntax);  -- switch to syntax evaluation
 							else
-Text_IO.Put_Line ("NON_SYNTAX ..");
 								declare
 									Cdr: Object_Pointer := Get_Cdr(Operand);
 								begin
 									if Is_Cons(Cdr) then
-										Set_Frame_Operand (Stack, Cdr); -- change the operand for the next call
-										Push_Frame (Stack, Opcode_Evaluate_Object, Tmp, Get_Frame_Environment(Stack)); 
+										-- Not the last cons cell yet
+										Set_Frame_Operand (Stack, Cdr); -- change the operand for the next call 
 									else
+										-- Reached the last cons cell
 										if Cdr /= Nil_Pointer then
-											Text_IO.Put_Line ("..................FUCKING CDR.....................");
+											-- The last CDR is not NIL.
+											Text_IO.Put_Line ("$$$$..................FUCKING CDR.....................$$$$");
 										end if;
-										Operand := Get_Frame_Return(Stack);
-										Set_Frame_Opcode (Stack, Opcode_Apply); 
+
+										-- Change the operand to a mark object so that the call to this 
+										-- procedure after the evaluation of the last car goes to the 
+										-- Mark_Object case.
+										Set_Frame_Operand (Stack, Interp.Mark); 
 									end if;
+
+									-- Arrange to evaluate the car object
+									Push_Frame (Stack, Opcode_Evaluate_Object, Tmp, Get_Frame_Environment(Stack));  
+									goto Start_Over; -- for optimization only. not really needed.
 								end;
 							end if;
 
+						when Mark_Object =>
+							-- TODO: you can use the mark context to differentiate context
+
+							-- Get the evaluation result stored in the current stack frame by
+							-- various sub-Opcode_Evaluate_Object frames. the return value 
+							-- chain must be reversed Chain_Frame_Return reverse-chains values.
+							Operand := Reverse_Cons(Get_Frame_Return(Stack));
+
+							-- Refresh the current stack frame to Opcode_Apply.
+							-- This should be faster than Popping the current frame and pushing
+							-- a new frame.
+							--   Envir := Get_Frame_Environment(Stack);
+							--   Pop_Frame (Stack); -- done
+							--   Push_Frame (Stack, Opcode_Apply, Operand, Envir); 
+							Clear_Frame_Return (Stack);
+							Set_Frame_Opcode (Stack, Opcode_Apply); 
+							Set_Frame_Operand (Stack, Operand);
+
 						when others =>
 							-- normal literal object
-Text_IO.Put_Line ("nORMAL LITERAL POINTER...");
 							goto Literal;
 					end case;
 			end case;
@@ -1691,14 +1852,10 @@ Text_IO.Put_Line ("nORMAL LITERAL POINTER...");
 
 		<<Literal>>
 			Pop_Frame (Stack); -- done
-Print_Object_Pointer ("Return => ", Operand);
-			Set_Frame_Return (Stack, Operand);
+Text_IO.Put ("Return => ");
+Print (Interp, Operand);
+			Chain_Frame_Return (Interp, Stack, Operand);
 		end Evaluate_Object;
-
-		procedure Evaluate_Argument (Stack: in out Object_Pointer) is
-		begin
-			null;
-		end Evaluate_Argument;
 
 		procedure Evaluate_Syntax (Stack: in out Object_Pointer) is
 			Scode: Syntax_Code;
@@ -1718,9 +1875,139 @@ Print_Object_Pointer ("Return => ", Operand);
 		end Evaluate_Procedure;
 
 		procedure Apply (Stack: in out Object_Pointer) is
+			Operand: Object_Pointer;
+			Func: Object_Pointer;
+			Args: Object_Pointer;
+
+			procedure Apply_Car_Procedure is
+			begin
+				Pop_Frame (Stack); -- Done with the current frame
+				Chain_Frame_Return (Interp, Stack, Get_Car(Args));
+			end Apply_Car_Procedure;
+
+			procedure Apply_Cdr_Procedure is
+			begin
+				Pop_Frame (Stack); -- Done with the current frame
+				Chain_Frame_Return (Interp, Stack, Get_Cdr(Args));
+			end Apply_Cdr_Procedure;
+
+			procedure Apply_Add_Procedure is
+				Ptr: Object_Pointer := Args;
+				Num: Object_Integer := 0; -- TODO: support BIGNUM
+				Car: Object_Pointer;
+			begin
+				while Ptr /= Nil_Pointer loop
+					-- TODO: check if car is an integer or bignum or something else.
+					--       if something else, error
+					Car := Get_Car(Ptr);
+					if not Is_Integer(Car) then
+						raise Evaluation_Error;
+					end if;
+					Num := Num + Pointer_To_Integer(Car);
+					Ptr := Get_Cdr(Ptr);
+				end loop;
+
+				Pop_Frame (Stack); -- Done with the current frame
+				Chain_Frame_Return (Interp, Stack, Integer_To_Pointer(Num));
+			end Apply_Add_Procedure;
+
+			procedure Apply_Subtract_Procedure is
+				Ptr: Object_Pointer := Args;
+				Num: Object_Integer := 0; -- TODO: support BIGNUM
+				Car: Object_Pointer;
+			begin
+				if Ptr /= Nil_Pointer then
+					Car := Get_Car(Ptr);
+					if not Is_Integer(Car) then
+						raise Evaluation_Error;
+					end if;
+					Num := Pointer_To_Integer(Car);
+
+					while Ptr /= Nil_Pointer loop
+						-- TODO: check if car is an integer or bignum or something else.
+						--       if something else, error
+						Car := Get_Car(Ptr);
+						if not Is_Integer(Car) then
+							raise Evaluation_Error;
+						end if;
+						Num := Num - Pointer_To_Integer(Car);
+						Ptr := Get_Cdr(Ptr);
+					end loop;
+				end if;
+
+				Pop_Frame (Stack); --  Done with the current frame
+				Chain_Frame_Return (Interp, Stack, Integer_To_Pointer(Num));
+			end Apply_Subtract_Procedure;
+
+			procedure Apply_Closure is
+				Envir: Object_Pointer;
+				Param: Object_Pointer;
+				Arg: Object_Pointer;
+			begin
+				-- For a closure created of "(lambda (x y) (+ x y) (* x y))"
+				-- Get_Closure_Code(Func) returns "((x y) (+ x y) (* x y))"
+				Envir := Make_Cons (Interp.Self, Nil_Pointer, Get_Closure_Environment(Func));
+				Param := Get_Car(Get_Closure_Code(Func)); -- parameter list
+				Arg := Get_Car(Args);
+				while Is_Cons(Param) loop
+
+					-- Insert the parameter name/value pair into the environment
+					--Set_Car (Envir, Make_Cons (Interp.Self, 
+
+					Param := Get_Cdr(Param);
+					Arg := Get_Cdr(Arg);
+				end loop;
+					
+				--Push_Frame (....);
+			end Apply_Closure;
+
 		begin
-			null;
+			Operand := Get_Frame_Operand(Stack);
+			pragma Assert (Is_Cons(Operand));
+
+Print (Interp, Operand);
+			Func := Get_Car(Operand);
+			if not Is_Normal_Pointer(Func) then
+				Text_IO.Put_Line ("INVALID FUNCTION TYPE");
+				raise Evaluation_Error;
+			end if;
+	
+			Args := Get_Cdr(Operand);
+
+			-- No GC must be performed here.
+			-- Otherwise, Operand, Func, Args get invalidated
+			-- since GC doesn't update local variables.
+
+			case Func.Tag is
+				when Procedure_Object => 
+					case Get_Procedure_Opcode(Func) is
+						when Car_Procedure =>
+							Apply_Car_Procedure;
+						when Cdr_Procedure =>
+							Apply_Cdr_Procedure;
+
+						when Add_Procedure =>
+							Apply_Add_Procedure;
+						when Subtract_Procedure =>
+							Apply_Subtract_Procedure;
+
+						when others =>
+							raise Internal_Error;
+					end case;	
+
+				when Closure_Object =>
+					Apply_Closure;
+
+				when Continuation_Object =>
+					null;
+
+				when others =>
+					Text_IO.Put_Line ("INVALID FUNCTION TYPE");
+					raise Internal_Error;
+
+			end case;
 		end Apply;
+
 
 		Stack: Object_Pointer; -- TODO: make it into the interpreter_Record so that GC can workd
 
@@ -1738,9 +2025,6 @@ Print_Object_Pointer ("Return => ", Operand);
 				when Opcode_Evaluate_Object =>
 					Evaluate_Object (Stack);
 					
-				when Opcode_Evaluate_Argument =>
-					Evaluate_Argument (Stack);
-	
 				when Opcode_Evaluate_Syntax =>
 					Evaluate_Syntax (Stack);
 
@@ -1759,14 +2043,9 @@ Print_Object_Pointer ("Return => ", Operand);
 
 		-- the stack must be empty when the loop is terminated
 		pragma Assert (Stack = Nil_Pointer);
-
 	end Evaluate;
 
 end H2.Scheme;
 
-
-
---(+ (+ 1 2) (+ 1 2))
---push | eval | expr | result |
 
 
