@@ -1,6 +1,10 @@
 with H2.Pool;
 with System.Address_To_Access_Conversions;
 
+
+with Ada.Unchecked_Deallocation; -- for h2scm c interface. TOOD: move it to a separate file
+with Interfaces.C;
+
 package body H2.Scheme is
 
 	----------------------------------------------------------------------------------
@@ -1757,17 +1761,17 @@ begin
 			)
 		);
 
-	--	Z := Make_Cons (
-	--		Interp.Self,
-	--		Make_Symbol (Interp.Self, "begin"),
-	--		Y
-	--	);
+		Z := Make_Cons (
+			Interp.Self,
+			Make_Symbol (Interp.Self, "begin"),
+			Y
+		);
 
-	--	Result := Make_Cons (
-	--		Interp.Self,
-	--		Make_Symbol (Interp.Self, "begin"),
-	--		Make_Cons (Interp.Self, Z, Nil_Pointer)
-	--	);
+		Result := Make_Cons (
+			Interp.Self,
+			Make_Symbol (Interp.Self, "begin"),
+			Make_Cons (Interp.Self, Z, Nil_Pointer)
+		);
 
 
 Text_IO.PUt ("TEST OBJECT: ");
@@ -1900,8 +1904,7 @@ end Make_Test_Object;
 						case Car.Scode is
 							when Begin_Syntax =>
 
-								-- Skip begin
-								Operand := Cdr;
+								Operand := Cdr; -- Skip begin
 
 								if Operand = Nil_Pointer then
 									-- 'begin' is followed by nothing. i.e. (begin)
@@ -2268,6 +2271,55 @@ Print (Interp, Operand);
 		pragma Assert (Interp.Stack = Nil_Pointer);
 	end Evaluate;
 
+	----------------------------------------------------------------------------------
+
+	function h2scm_open return Interpreter_Pointer;
+	pragma Export (C, h2scm_open, "h2scm_open");
+
+	procedure h2scm_close (Interp: in out Interpreter_Pointer);
+	pragma Export (C, h2scm_close, "h2scm_close");
+
+	function h2scm_evaluate (Interp: access Interpreter_Record;
+	                         Source: in     Object_Pointer) return Interfaces.C.int;
+	pragma Export (C, h2scm_evaluate, "h2scm_evaluate");
+
+	procedure h2scm_dealloc is new 
+		Ada.Unchecked_Deallocation (Interpreter_Record, Interpreter_Pointer);
+
+	function h2scm_open return Interpreter_Pointer is
+		Interp: Interpreter_Pointer;	
+	begin
+		begin
+			Interp := new Interpreter_Record;
+		exception
+			when others =>
+				return null;
+		end;
+
+		begin
+			Open (Interp.all, 1_000_000, null);
+		exception
+			when others =>
+				h2scm_dealloc (Interp);
+				return null;
+		end;
+
+		return Interp;
+	end h2scm_open;
+
+	procedure h2scm_close (Interp: in out Interpreter_Pointer) is
+	begin
+Text_IO.Put_Line ("h2scm_close");
+		Close (Interp.all);	
+		h2scm_dealloc (Interp);
+	end h2scm_close;
+
+	function h2scm_evaluate (Interp: access Interpreter_Record;
+	                         Source: in     Object_Pointer) return Interfaces.C.int is
+	begin
+		return Interfaces.C.int(Interp.Heap(Interp.Current_Heap).Size);
+	end h2scm_evaluate;
+	
 end H2.Scheme;
 
 
