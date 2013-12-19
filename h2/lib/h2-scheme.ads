@@ -257,7 +257,8 @@ package H2.Scheme is
 	type Memory_Size is range 0 .. (2 ** (System.Word_Size - 1)) - 1;
 
 	type Trait_Mask is mod 2 ** System.Word_Size;
-	No_Garbage_Collection: constant Trait_Mask := 2 ** 0;
+	No_Garbage_Collection: constant Trait_Mask := 2#0000_0000_0000_0001#;
+	No_Optimization:       constant Trait_Mask := 2#0000_0000_0000_0010#;
 
 	type Option_Kind is (Trait_Option);
 	type Option_Record (Kind: Option_Kind) is record

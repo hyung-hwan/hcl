@@ -1925,12 +1925,15 @@ end Make_Test_Object;
 									Set_Frame_Opcode (Interp.Stack, Opcode_Evaluate_Group);
 									Set_Frame_Operand (Interp.Stack, Operand);
 
-									-- I call Evaluate_Group for optimizatio here.
-									Evaluate_Group; -- for optimization only. not really needed.
-									-- I can jump to Start_Over because Evaluate_Group called 
-									-- above pushes an Opcode_Evaluate_Object frame.
-									pragma Assert (Get_Frame_Opcode(Interp.Stack) = Opcode_Evaluate_Object);
-									goto Start_Over; -- for optimization only. not really needed.
+
+									if (Interp.Trait.Trait_Bits and No_Optimization) = 0 then
+										-- I call Evaluate_Group for optimization here.
+										Evaluate_Group; -- for optimization only. not really needed.
+										-- I can jump to Start_Over because Evaluate_Group called 
+										-- above pushes an Opcode_Evaluate_Object frame.
+										pragma Assert (Get_Frame_Opcode(Interp.Stack) = Opcode_Evaluate_Object);
+										goto Start_Over; -- for optimization only. not really needed.
+									end if;
 								end if;
 							when Define_Syntax =>
 								Text_IO.Put_Line ("define syntax");	
@@ -1940,27 +1943,29 @@ end Make_Test_Object;
 								Set_Frame_Opcode (Interp.Stack, Opcode_Evaluate_Syntax);  -- switch to syntax evaluation
 						end case;
 					else
-						while not Is_Normal_Pointer(Car) loop
-							-- This while block is for optimization only. It's not really needed.
-							-- If I know that the next object to evaluate is a literal object,
-							-- I can simply reverse-chain it to the return field of the current 
-							-- frame without pushing another frame dedicated for it.
-
-							-- TODO: some normal pointers may point to a literal object. e.g.) bignum
-							Chain_Frame_Return (Interp, Interp.Stack, Car);
-							if Is_Cons(Cdr) then
-								Operand := Cdr;
-								Car := Get_Car(Operand);
-								Cdr := Get_Cdr(Operand);
-							else
-								-- last cons 
-								Operand := Reverse_Cons(Get_Frame_Return(Interp.Stack));
-								Clear_Frame_Return (Interp.Stack);
-								Set_Frame_Opcode (Interp.Stack, Opcode_Apply); 
-								Set_Frame_Operand (Interp.Stack, Operand);
-								return;
-							end if;
-						end loop;
+						if (Interp.Trait.Trait_Bits and No_Optimization) = 0 then
+							while not Is_Normal_Pointer(Car) loop
+								-- This while block is for optimization only. It's not really needed.
+								-- If I know that the next object to evaluate is a literal object,
+								-- I can simply reverse-chain it to the return field of the current 
+								-- frame without pushing another frame dedicated for it.
+	
+								-- TODO: some normal pointers may point to a literal object. e.g.) bignum
+								Chain_Frame_Return (Interp, Interp.Stack, Car);
+								if Is_Cons(Cdr) then
+									Operand := Cdr;
+									Car := Get_Car(Operand);
+									Cdr := Get_Cdr(Operand);
+								else
+									-- last cons 
+									Operand := Reverse_Cons(Get_Frame_Return(Interp.Stack));
+									Clear_Frame_Return (Interp.Stack);
+									Set_Frame_Opcode (Interp.Stack, Opcode_Apply); 
+									Set_Frame_Operand (Interp.Stack, Operand);
+									return;
+								end if;
+							end loop;
+						end if;
 
 						if Is_Cons(Cdr) then
 							-- Not the last cons cell yet
@@ -1980,8 +1985,10 @@ end Make_Test_Object;
 						end if;
 
 						-- Arrange to evaluate the car object
-						Push_Frame (Opcode_Evaluate_Object, Car);
-						goto Start_Over; -- for optimization only. not really needed.
+						if (Interp.Trait.Trait_Bits and No_Optimization) = 0 then
+							Push_Frame (Opcode_Evaluate_Object, Car);
+							goto Start_Over; -- for optimization only. not really needed.
+						end if;
 					end if;
 
 				when Mark_Object =>
