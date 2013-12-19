@@ -8,6 +8,7 @@ package body H2.Scheme is
 	----------------------------------------------------------------------------------
 	Allocation_Error: exception;
 	Size_Error: exception;
+	Syntax_Error: exception;
 	Evaluation_Error: exception;
 	Internal_Error: exception;
 
@@ -21,12 +22,13 @@ package body H2.Scheme is
 	type Thin_Memory_Element_Array_Pointer is access all Thin_Memory_Element_Array;
 	for Thin_Memory_Element_Array_Pointer'Size use Object_Pointer_Bits;
 
-	subtype Opcode_Type is Object_Integer range 0 .. 4;
+	subtype Opcode_Type is Object_Integer range 0 .. 5;
 	Opcode_Exit:               constant Opcode_Type := Opcode_Type'(0);
 	Opcode_Evaluate_Object:    constant Opcode_Type := Opcode_Type'(1);
-	Opcode_Evaluate_Syntax:    constant Opcode_Type := Opcode_Type'(2);
-	Opcode_Evaluate_Procedure: constant Opcode_Type := Opcode_Type'(3);
-	Opcode_Apply:              constant Opcode_Type := Opcode_Type'(4);
+	Opcode_Evaluate_Group:     constant Opcode_Type := Opcode_Type'(2);
+	Opcode_Evaluate_Syntax:    constant Opcode_Type := Opcode_Type'(3);
+	Opcode_Evaluate_Procedure: constant Opcode_Type := Opcode_Type'(4);
+	Opcode_Apply:              constant Opcode_Type := Opcode_Type'(5);
 
 	----------------------------------------------------------------------------------
 	-- COMMON OBJECTS
@@ -51,6 +53,11 @@ package body H2.Scheme is
 	Closure_Object_Size: constant Pointer_Object_Size := 2;
 	Closure_Code_Index: constant Pointer_Object_Size := 1;
 	Closure_Environment_Index: constant Pointer_Object_Size := 2;
+
+	Pair_Object_Size: constant Pointer_Object_Size := 3;
+	Pair_Key_Size: constant Pointer_Object_Size := 1;
+	Pair_Value_Size: constant Pointer_Object_Size := 2;
+	Pair_Link_Size: constant Pointer_Object_Size := 3;
 
 	procedure Set_New_Location (Object: in Object_Pointer; Ptr: in Memory_Element_Pointer);
 	procedure Set_New_Location (Object: in Object_Pointer; Ptr: in Object_Pointer);
@@ -404,18 +411,19 @@ package body H2.Scheme is
 		return Object.New_Pointer;
 	end Get_New_Location;
 
-	procedure Allocate_Bytes_In_Heap (Heap:        in out Heap_Pointer; 
-	                                  Heap_Bytes:  in     Memory_Size;
-	                                  Heap_Result: out    Memory_Element_Pointer) is
+	function Allocate_Bytes_In_Heap (Heap:       access Heap_Record; 
+	                                 Heap_Bytes: in     Memory_Size) return Memory_Element_Pointer is
 		Avail: Memory_Size;
+		Result: Memory_Element_Pointer;
 	begin
 		Avail := Heap.Size - Heap.Bound;
 		if Heap_Bytes > Avail then
-			Heap_Result := null;
-		else
-			Heap_Result := Heap.Space(Heap.Bound + 1)'Unchecked_Access;
-			Heap.Bound := Heap.Bound + Heap_Bytes;
+			return null;
 		end if;
+		
+		Result := Heap.Space(Heap.Bound + 1)'Unchecked_Access;
+		Heap.Bound := Heap.Bound + Heap_Bytes;
+		return Result;
 	end Allocate_Bytes_In_Heap;
 
 	procedure Copy_Object (Source: in     Object_Pointer;
@@ -499,10 +507,9 @@ Print_Object_Pointer ("Moving REALLY ...", Object);
 					Bytes := Object.all'Size / System.Storage_Unit;
 
 					-- Allocate space in the new heap
-					Allocate_Bytes_In_Heap (
+					Ptr := Allocate_Bytes_In_Heap (
 						Heap => Interp.Heap(New_Heap),
-						Heap_Bytes => Bytes,
-						Heap_Result => Ptr
+						Heap_Bytes => Bytes
 					);
 
 					-- Allocation here must not fail because
@@ -647,9 +654,8 @@ Text_IO.Put_Line (">>> [SCANNING HEAP AGAIN AFTER SYMBOL TABLE MIGRATION]");
 Text_IO.Put_Line (">>> [GC DONE]");
 	end Collect_Garbage;
 
-	procedure Allocate_Bytes (Interp: in out Interpreter_Record;
-	                          Bytes:  in     Memory_Size;
-	                          Result: out    Memory_Element_Pointer) is
+	function Allocate_Bytes (Interp: access Interpreter_Record;
+	                         Bytes:  in     Memory_Size) return Memory_Element_Pointer is
 
 		-- I use this temporary variable not to change Result
 		-- if Allocation_Error should be raised.
@@ -657,37 +663,36 @@ Text_IO.Put_Line (">>> [GC DONE]");
 	begin
 		pragma Assert (Bytes > 0);
 
-		Allocate_Bytes_In_Heap (Interp.Heap(Interp.Current_Heap), Bytes, Tmp);
+		Tmp := Allocate_Bytes_In_Heap (Interp.Heap(Interp.Current_Heap), Bytes);
 		if Tmp = null and then (Interp.Trait.Trait_Bits and No_Garbage_Collection) = 0 then
-			Collect_Garbage (Interp);
-			Allocate_Bytes_In_Heap (Interp.Heap(Interp.Current_Heap), Bytes, Tmp);
+			Collect_Garbage (Interp.all);
+			Tmp := Allocate_Bytes_In_Heap (Interp.Heap(Interp.Current_Heap), Bytes);
 			if Tmp = null then
 				raise Allocation_Error;
 			end if;
 		end if;
 
-		Result := Tmp;
+		return Tmp;
 	end Allocate_Bytes;
 
-	procedure Allocate_Pointer_Object (Interp:  in out Interpreter_Record;
-	                                   Size:    in     Pointer_Object_Size;
-	                                   Initial: in     Object_Pointer;
-	                                   Result:  out    Object_Pointer) is
+	function Allocate_Pointer_Object (Interp:  access Interpreter_Record;
+	                                  Size:    in     Pointer_Object_Size;
+	                                  Initial: in     Object_Pointer) return Object_Pointer is
 
 		subtype Pointer_Object_Record is Object_Record (Pointer_Object, Size);
 		type Pointer_Object_Pointer is access all Pointer_Object_Record;
 
 		Ptr: Memory_Element_Pointer;
-		for Ptr'Address use Result'Address;
-		pragma Import (Ada, Ptr);
 		Obj_Ptr: Pointer_Object_Pointer;
-		for Obj_Ptr'Address use Result'Address;
+		for Obj_Ptr'Address use Ptr'Address;
 		pragma Import (Ada, Obj_Ptr);
+		Result: Object_Pointer;
+		for Result'Address use Ptr'Address;
+		pragma Import (Ada, Result);
 	begin
-		Allocate_Bytes (
+		Ptr := Allocate_Bytes (
 			Interp,
-			Memory_Size'(Pointer_Object_Record'Max_Size_In_Storage_Elements),
-			Ptr
+			Memory_Size'(Pointer_Object_Record'Max_Size_In_Storage_Elements)
 		);
 
 		Obj_Ptr.all := (
@@ -698,26 +703,27 @@ Text_IO.Put_Line (">>> [GC DONE]");
 			Tag => Unknown_Object,
 			Pointer_Slot => (others => Initial)
 		);
+
+		return Result;
 	end Allocate_Pointer_Object;
 
-	procedure Allocate_Character_Object (Interp: in out Interpreter_Record;
-	                                     Size:   in     Character_Object_Size;
-	                                     Result: out    Object_Pointer) is
+	function Allocate_Character_Object (Interp: access Interpreter_Record;
+	                                    Size:   in     Character_Object_Size) return Object_Pointer is
 
 		subtype Character_Object_Record is Object_Record (Character_Object, Size);
 		type Character_Object_Pointer is access all Character_Object_Record;
 
 		Ptr: Memory_Element_Pointer;
-		for Ptr'Address use Result'Address;
-		pragma Import (Ada, Ptr);
 		Obj_Ptr: Character_Object_Pointer;
-		for Obj_Ptr'Address use Result'Address;
+		for Obj_Ptr'Address use Ptr'Address;
 		pragma Import (Ada, Obj_Ptr);
+		Result: Object_Pointer;
+		for Result'Address use Ptr'Address;
+		pragma Import (Ada, Result);
 	begin
-		Allocate_Bytes (
-			Interp,
-			Memory_Size'(Character_Object_Record'Max_Size_In_Storage_Elements), 
-			Ptr
+		Ptr := Allocate_Bytes (
+			Interp.Self,
+			Memory_Size'(Character_Object_Record'Max_Size_In_Storage_Elements)
 		);
 
 		Obj_Ptr.all := (
@@ -728,35 +734,38 @@ Text_IO.Put_Line (">>> [GC DONE]");
 			Tag => Unknown_Object,
 			Character_Slot => (others => Object_Character'First)
 		);
+
+		return Result;
 	end Allocate_Character_Object;
 
-	procedure Allocate_Character_Object (Interp: in out Interpreter_Record;
-	                                     Source: in     Object_String;
-	                                     Result: out    Object_Pointer) is
+	function Allocate_Character_Object (Interp: access Interpreter_Record;
+	                                    Source: in     Object_String) return Object_Pointer is
+		Result: Object_Pointer;
 	begin
 		if Source'Length > Character_Object_Size'Last then
 			raise Size_Error;
 		end if;
 		
-		Allocate_Character_Object (Interp, Character_Object_Size'(Source'Length), Result);
+		Result := Allocate_Character_Object (Interp, Character_Object_Size'(Source'Length));
 		Copy_String (Source, Result.Character_Slot);
+		return Result;
 	end Allocate_Character_Object;
 
-	procedure Allocate_Byte_Object (Interp: in out Interpreter_Record;
-	                                Size:   in     Byte_Object_Size;
-	                                Result: out    Object_Pointer) is
+	function Allocate_Byte_Object (Interp: access Interpreter_Record;
+	                               Size:   in     Byte_Object_Size) return Object_Pointer is
 
 		subtype Byte_Object_Record is Object_Record (Byte_Object, Size);
 		type Byte_Object_Pointer is access all Byte_Object_Record;
 
 		Ptr: Memory_Element_Pointer;
-		for Ptr'Address use Result'Address;
-		pragma Import (Ada, Ptr);
 		Obj_Ptr: Byte_Object_Pointer;
-		for Obj_Ptr'Address use Result'Address;
+		for Obj_Ptr'Address use Ptr'Address;
 		pragma Import (Ada, Obj_Ptr);
+		Result: Object_Pointer;
+		for Result'Address use Ptr'Address;
+		pragma Import (Ada, Result);
 	begin
-		Allocate_Bytes (Interp, Memory_Size'(Byte_Object_Record'Max_Size_In_Storage_Elements), Ptr);
+		Ptr := Allocate_Bytes (Interp.Self, Memory_Size'(Byte_Object_Record'Max_Size_In_Storage_Elements));
 		Obj_Ptr.all := (
 			Kind => Byte_Object,
 			Size => Size,
@@ -765,29 +774,31 @@ Text_IO.Put_Line (">>> [GC DONE]");
 			Tag => Unknown_Object,
 			Byte_Slot => (others => 0)
 		);
+		return Result;
 	end Allocate_Byte_Object;
 
+	function Verify_Pointer (Source: in Object_Pointer) return Object_Pointer is
+		pragma Inline (Verify_Pointer);
+	begin
+		if not Is_Normal_Pointer(Source) or else
+		   Source.Kind /= Moved_Object then
+			return Source;
+		end if;	
+
+		return Get_New_Location(Source);
+	end Verify_Pointer;
 	----------------------------------------------------------------------------------
 
-	procedure Make_Cons (Interp: in out Interpreter_Record;
-	                     Car:    in     Object_Pointer;
-	                     Cdr:    in     Object_Pointer;
-	                     Result: out    Object_Pointer) is
+	function Make_Cons (Interp:  access Interpreter_Record;
+	                    Car:     in     Object_Pointer;
+	                    Cdr:     in     Object_Pointer) return Object_Pointer is
+		Cons: Object_Pointer;
 	begin
-		Allocate_Pointer_Object (Interp, Cons_Object_Size, Nil_Pointer, Result);
-		Result.Pointer_Slot(Cons_Car_Index) := Car;
-		Result.Pointer_Slot(Cons_Cdr_Index) := Cdr;
-		Result.Tag := Cons_Object;
---Print_Object_Pointer ("Make_Cons Result - ", Result);
-	end Make_Cons;
-
-	function Make_Cons (Interp: access Interpreter_Record;
-	                    Car:    in     Object_Pointer;
-	                    Cdr:    in     Object_Pointer) return Object_Pointer is
-		Result: Object_Pointer;
-	begin
-		Make_Cons (Interp.all, Car, Cdr, Result);
-		return Result;
+		Cons := Allocate_Pointer_Object (Interp, Cons_Object_Size, Nil_Pointer);
+		Cons.Pointer_Slot(Cons_Car_Index) := Verify_Pointer(Car); -- TODO: is this really a good idea? resise this...
+		Cons.Pointer_Slot(Cons_Cdr_Index) := Verify_Pointer(Cdr); --       If so, use Verify_pointer after Allocate_XXX
+		Cons.Tag := Cons_Object;
+		return Cons;
 	end Make_Cons;
 
 	function Is_Cons (Source: in Object_Pointer) return Standard.Boolean is
@@ -800,7 +811,6 @@ Text_IO.Put_Line (">>> [GC DONE]");
 	function Get_Car (Source: in Object_Pointer) return Object_Pointer is
 		pragma Inline (Get_Car);
 		pragma Assert (Is_Cons(Source));
-		pragma Assert (Source.Size = Cons_Object_Size);
 	begin
 		return Source.Pointer_Slot(Cons_Car_Index);
 	end Get_Car;
@@ -809,7 +819,6 @@ Text_IO.Put_Line (">>> [GC DONE]");
 	                   Value:  in     Object_Pointer) is
 		pragma Inline (Set_Car);
 		pragma Assert (Is_Cons(Source));
-		pragma Assert (Source.Size = Cons_Object_Size);
 	begin
 		Source.Pointer_Slot(Cons_Car_Index) := Value;
 	end Set_Car;
@@ -817,7 +826,6 @@ Text_IO.Put_Line (">>> [GC DONE]");
 	function Get_Cdr (Source: in Object_Pointer) return Object_Pointer is
 		pragma Inline (Get_Cdr);
 		pragma Assert (Is_Cons(Source));
-		pragma Assert (Source.Size = Cons_Object_Size);
 	begin
 		return Source.Pointer_Slot(Cons_Cdr_Index);
 	end Get_Cdr;
@@ -826,7 +834,6 @@ Text_IO.Put_Line (">>> [GC DONE]");
 	                   Value:  in     Object_Pointer) is
 		pragma Inline (Set_Cdr);
 		pragma Assert (Is_Cons(Source));
-		pragma Assert (Source.Size = Cons_Object_Size);
 	begin
 		Source.Pointer_Slot(Cons_Cdr_Index) := Value;
 	end Set_Cdr;
@@ -834,7 +841,6 @@ Text_IO.Put_Line (">>> [GC DONE]");
 
 	function Reverse_Cons (Source: in Object_Pointer) return Object_Pointer is
 		pragma Assert (Is_Cons(Source));
-		pragma Assert (Source.Size = Cons_Object_Size);
 
 		-- Note: The non-nil cdr in the last cons cell gets lost.
 		--       e.g.) Reversing (1 2 3 . 4) results in (3 2 1)
@@ -859,13 +865,14 @@ Text_IO.Put_Line (">>> [GC DONE]");
 	end Reverse_Cons;
 	----------------------------------------------------------------------------------
 
-	procedure Make_String (Interp: in out Interpreter_Record;
-	                       Source: in     Object_String;
-	                       Result: out    Object_Pointer) is
+	function Make_String (Interp: access  Interpreter_Record;
+	                      Source: in     Object_String) return Object_Pointer is
+		Result: Object_Pointer;
 	begin
-		Allocate_Character_Object (Interp, Source, Result);
+		Result := Allocate_Character_Object (Interp, Source);
 		Result.Tag := String_Object;
 Print_Object_Pointer ("Make_String Result - " & Source, Result);
+		return Result;
 	end Make_String;
 
 	function Is_Symbol (Source: in Object_Pointer) return Standard.Boolean is
@@ -875,137 +882,197 @@ Print_Object_Pointer ("Make_String Result - " & Source, Result);
 		       Source.Tag = Symbol_Object;
 	end Is_Symbol;
 
-	procedure Make_Symbol (Interp: in out Interpreter_Record;
-	                       Source: in     Object_String;
-	                       Result: out    Object_Pointer) is
-		Cons: Object_Pointer;
+	function Make_Symbol (Interp: access Interpreter_Record;
+	                      Source: in     Object_String) return Object_Pointer is
+		Ptr: Object_Pointer;
 	begin
 		-- TODO: the current linked list implementation isn't efficient.
 		--       change the symbol table to a hashable table.
 
 		-- Find an existing symbol in the symbol table.	
-		Cons := Interp.Symbol_Table;
-		while Cons /= Nil_Pointer loop
-			pragma Assert (Is_Normal_Pointer(Cons) and then Cons.Tag = Cons_Object);	
+		Ptr := Interp.Symbol_Table;
+		while Ptr /= Nil_Pointer loop
+			pragma Assert (Is_Cons(Ptr));
 
 			declare
-				Car: Object_Pointer renames Cons.Pointer_Slot(Cons_Car_Index);
-				Cdr: Object_Pointer renames Cons.Pointer_Slot(Cons_Cdr_Index);
+				Car: Object_Pointer renames Ptr.Pointer_Slot(Cons_Car_Index);
+				Cdr: Object_Pointer renames Ptr.Pointer_Slot(Cons_Cdr_Index);
 			begin
 --Text_IO.Put_Line (Car.Kind'Img & Car.Tag'Img & Object_Word'Image(Pointer_To_Word(Car)));
 				pragma Assert (Car.Tag = Symbol_Object);
 
-				if Match (Car, Source) then
-					Result := Car;
-Print_Object_Pointer ("Make_Symbol Result (Existing) - " & Source, Result);
-					return;
+				if Match(Car, Source) then
+					return Car;
+--Print_Object_Pointer ("Make_Symbol Result (Existing) - " & Source, Car);
 				end if;
 
-				Cons := Cdr;	
+				Ptr := Cdr;	
 			end;
 		end loop;
 
-Text_IO.Put_Line ("Creating a symbol .. " & Source);
+--Text_IO.Put_Line ("Creating a symbol .. " & Source);
 		-- Create a symbol object
-		Allocate_Character_Object (Interp, Source, Result);
-		Result.Tag := Symbol_Object;
+		Ptr := Allocate_Character_Object (Interp, Source);
+		Ptr.Tag := Symbol_Object;
 
 -- TODO: ensure that Result is not reclaimed by GC.
 
+-- Make it GC-aweare. Protect Ptr
 		-- Link the symbol to the symbol table. 
-		Make_Cons (Interp, Result, Interp.Symbol_Table, Interp.Symbol_Table);
-Print_Object_Pointer ("Make_Symbol Result - " & Source, Result);
-	end Make_Symbol;
-
-	function Make_Symbol (Interp: access Interpreter_Record;
-	                      Source: in     Object_String) return Object_Pointer is
-		Result: Object_Pointer;
-	begin
-		Make_Symbol (Interp.all, Source, Result);
-		return Result;
+		Interp.Symbol_Table := Make_Cons (Interp.Self, Ptr, Interp.Symbol_Table);
+--Print_Object_Pointer ("Make_Symbol Result - " & Source, Result);
+		return Ptr;
 	end Make_Symbol;
 
 	----------------------------------------------------------------------------------
 
-	-- TODO: change environment implementation to a table from a list
-	procedure Add_To_Environment (Interp: in out Interpreter_Record;
-	                              Envir:  in out Object_Pointer;
-	                              Key:    in     Object_Pointer;
-	                              Value:  in     Object_Pointer) is
-		-- This performs no duplicate key check.
-		-- TODO: make environemnt a table instead of a list.
-		Pair: Object_Pointer;
+	function Make_Array (Interp: access Interpreter_Record;
+	                     Size:   in     Pointer_Object_Size) return Object_Pointer is
+		Arr: Object_Pointer;
 	begin
-		pragma Assert (Is_Symbol(Key));
+		Arr := Allocate_Pointer_Object (Interp, Size, Nil_Pointer);
+		Arr.Tag := Array_Object;
+		return Arr;
+	end Make_Array;
 
-		-- TODO: make temporaries GC-aware
-		Pair := Make_Cons (Interp.Self, Key, Value);
-		Envir := Make_Cons (Interp.Self, Pair, Envir);
-	end Add_To_Environment;
-
-	function Get_Environment_Cons (Interp: access Interpreter_Record;
-	                               Envir:  in     Object_Pointer;
-	                               Key:    in     Object_Pointer) return Object_Pointer is
-		Ptr: Object_Pointer := Envir;
-		Cons: Object_Pointer;
+	function Is_Array (Source: in Object_Pointer) return Standard.Boolean is
+		pragma Inline (Is_Array);
 	begin
-Print_Object_Pointer ("Get_Environment Key => ", Key);
-		while Ptr /= Nil_Pointer loop
-			pragma Assert (Is_Cons(Ptr));
+		return Is_Normal_Pointer(Source) and then 
+		       Source.Tag = Array_Object;
+	end Is_Array;
+
+	----------------------------------------------------------------------------------
+
+	--
+	-- Environment is a cons cell whose slots represents:
+	--   Car: Point to the first key/value pair.
+	--   Cdr: Point to Parent environment
+	-- 
+	-- A key/value pair is held in an array object consisting of 3 slots.
+	--   #1: Key
+	--   #2: Value
+	--   #3: Link to the next key/value array.
+	--
+	-- Interp.Environment     Interp.Root_Environment
+     --   |                      |
+	--   |                      V
+	--   |     +----+----+    +----+----+
+	--   +---> | |  |   ----> | |  | Nil|
+	--         +-|--+-----    +-|--+-----
+	--           |              |
+	--           |              +--> another list
+	--           V
+	--         +----+----+----+   +----+----+----+   +----+----+----+   +----+----+----+
+	--   list: | |  | |  |  ----> | |  | |  | -----> | |  | |  | -----> | |  | |  | Nil|
+	--         +-|--+-|-------+   +-|--+-|-------+   +-|--+-|-------+   +-|--+-|-------+
+	--           |    |             |    |             |    |             |    |
+	--           V    V             V    V             V    V             V    V
+	--          Key  Value          Key  Value        Key  Value         Key  Value
+	--
+	-- Upon initialization, Interp.Environment is equal to Interp.Root_Environment.
+	-- CDR(Interp.Root_Environment) is Nil_Pointer.
+	--
+	-- TODO: Change environment implementation to a hash table or something similar
+
+	function Make_Environment (Interp: access Interpreter_Record;
+	                           Parent: in     Object_Pointer) return Object_Pointer is
+		pragma Inline (Make_Environment);
+	begin
+		return Make_Cons(Interp, Nil_Pointer, Parent);
+	end Make_Environment;
+
+	function Find_In_Environment_List (Interp: access Interpreter_Record;
+	                                   List:   in     Object_Pointer;
+	                                   Key:    in     Object_Pointer) return Object_Pointer is
+		Arr: Object_Pointer;
+	begin
+		Arr := List;
+		while Arr /= Nil_Pointer loop
+			pragma Assert (Is_Array(Arr));
+			pragma Assert (Arr.Size = 3);
 			
-			Cons := Get_Car(Ptr);
-			pragma Assert (Is_Cons(Cons));
-			if Get_Car(Cons) = Key then
-				return Cons;
+			if Arr.Pointer_Slot(1) = Key then
+				return Arr;
 			end if;
 
-			Ptr := Get_Cdr(Ptr);
+			Arr := Arr.Pointer_Slot(3);
 		end loop;	
 
 		return null; -- not found. note that it's not Nil_Pointer.
-	end Get_Environment_Cons;
-
-	function Get_Environment (Interp: access Interpreter_Record;
-	                          Envir:  in     Object_Pointer;
-	                          Key:    in     Object_Pointer) return Object_Pointer is
-		Cons: Object_Pointer;
-	begin
-		Cons := Get_Environment_Cons(Interp, Envir, Key);
-		if Cons = null then
-			return null;
-		end if;
-		return Get_Cdr(Cons);
-	end Get_Environment;
+	end Find_In_Environment_List;
 
 	procedure Set_Environment (Interp: in out Interpreter_Record;
-	                           Envir:  in out Object_Pointer;
 	                           Key:    in     Object_Pointer;
 	                           Value:  in     Object_Pointer) is
-		Cons: Object_Pointer;
+		Arr: Object_Pointer;
 	begin
-		Cons := Get_Environment_Cons (Interp.Self, Envir, Key);
-		if Cons = null then
-			-- add a new pair
-			Add_To_Environment (Interp, Envir, Key, Value);
+		pragma Assert (Is_Symbol(Key));
+
+		Arr := Find_In_Environment_List(Interp.Self, Get_Car(Interp.Environment), Key);
+		if Arr = null then
+			-- Add a new key/value pair
+			-- TODO: make it GC-aware - protect Key and Value
+			Arr := Make_Array (Interp.Self, 3);
+			Arr.Pointer_Slot(1) := Key;
+			Arr.Pointer_Slot(2) := Value;
+
+			-- Chain the pair to the head of the list
+			Arr.Pointer_Slot(3) := Get_Car(Interp.Environment);	
+			Set_Car (Interp.Environment, Arr);
 		else
 			-- overwrite an existing pair
-			Set_Cdr (Cons, Value);		
+			Arr.Pointer_Slot(2) := Value;
 		end if;
 	end Set_Environment;
 
+	function Get_Environment (Interp: access Interpreter_Record;
+	                          Key:    in     Object_Pointer) return Object_Pointer is
+		Envir: Object_Pointer;
+		Arr: Object_Pointer;
+	begin
+		Envir := Interp.Environment;	
+		while Envir /= Nil_Pointer loop
+			pragma Assert (Is_Cons(Envir));
+			Arr := Find_In_Environment_List(Interp, Get_Car(Envir), Key);
+			if Arr /= Nil_Pointer then
+				return Arr.Pointer_Slot(2);
+			end if;
+
+			-- Move on to the parent environment
+			Envir := Get_Cdr(Envir);
+		end loop;
+		return null; -- not found
+	end Get_Environment;
+
+	procedure Push_Environment (Interp: in out Interpreter_Record) is
+		pragma Inline (Push_Environment);
+		pragma Assert (Is_Cons(Interp.Environment));
+	begin
+		Interp.Environment := Make_Environment (Interp.Self, Interp.Environment);
+	end Push_Environment;
+
+	procedure Pop_Environment (Interp: in out Interpreter_Record) is
+		pragma Inline (Pop_Environment);
+		pragma Assert (Is_Cons(Interp.Environment));
+	begin
+		Interp.Environment := Get_Cdr(Interp.Environment);
+	end Pop_Environment;
+	                     
+		
 	----------------------------------------------------------------------------------
 
-
-	procedure Make_Syntax (Interp: in out Interpreter_Record;
-	                       Opcode: in     Syntax_Code;
-	                       Name:   in     Object_String;
-	                       Result: out    Object_Pointer) is
+	function Make_Syntax (Interp: access Interpreter_Record;
+	                      Opcode: in     Syntax_Code;
+	                      Name:   in     Object_String) return Object_Pointer is
+		Result: Object_Pointer;
 	begin
-		Make_Symbol (Interp, Name, Result);
+		Result := Make_Symbol (Interp, Name);
 		Result.Flags := Result.Flags or Syntax_Object;
 		Result.Scode := Opcode;
 Text_IO.Put ("Creating Syntax Symbol ");
 Put_String (To_Thin_String_Pointer (Result));
+		return Result;
 	end Make_Syntax;
 
 	function Is_Syntax (Source: in Object_Pointer) return Standard.Boolean is
@@ -1014,29 +1081,28 @@ Put_String (To_Thin_String_Pointer (Result));
 		return Is_Symbol(Source) and then (Source.Flags and Syntax_Object) /= 0;
 	end Is_Syntax;
 
-	procedure Make_Procedure (Interp: in out Interpreter_Record;
-	                          Opcode: in     Procedure_Code;
-	                          Name:   in     Object_String;
-	                          Result: out    Object_Pointer) is
+	function Make_Procedure (Interp: access Interpreter_Record;
+	                         Opcode: in     Procedure_Code;
+	                         Name:   in     Object_String) return Object_Pointer is
 		-- this procedure is for internal use only
 		Symbol: Object_Pointer;
 		Proc:   Object_Pointer;
 	begin
 -- TODO: make temporaries GC-aware
 		-- Make a symbol for the procedure
-		Make_Symbol (Interp, Name, Symbol);
+		Symbol := Make_Symbol (Interp, Name);
 
 		-- Make the actual procedure object
-		Allocate_Pointer_Object (Interp, Procedure_Object_Size, Nil_Pointer, Proc);
+		Proc := Allocate_Pointer_Object (Interp, Procedure_Object_Size, Nil_Pointer);
 		Proc.Tag := Procedure_Object;
 		Proc.Pointer_Slot(Procedure_Opcode_Index) := Integer_To_Pointer(Opcode);
 
 		-- Link it to the top environement
-		pragma Assert (Get_Environment (Interp.Self, Interp.Root_Environment, Symbol) = null);
-		Set_Environment (Interp, Interp.Root_Environment, Symbol, Proc);
+		pragma Assert (Interp.Environment = Interp.Root_Environment); 
+		pragma Assert (Get_Environment (Interp.Self, Symbol) = null);
+		Set_Environment (Interp.all, Symbol, Proc);
 
-		-- Set the procudure to the result.
-		Result := Proc;
+		return Proc;
 	end Make_Procedure;
 
 	function Is_Procedure (Source: in Object_Pointer) return Standard.Boolean is
@@ -1056,33 +1122,23 @@ Put_String (To_Thin_String_Pointer (Result));
 	
 	----------------------------------------------------------------------------------
 
-
-	procedure Make_Frame (Interp:  in out Interpreter_Record;
-	                      Stack:   in     Object_Pointer; -- current stack pointer
-	                      Opcode:  in     Object_Pointer;
-	                      Operand: in     Object_Pointer;
-	                      Envir:   in     Object_Pointer;
-	                      Result:  out    Object_Pointer) is
-	begin
--- TODO: create a Frame in a special memory rather than in Heap Memory.
---       Since it's used for stack, it can be made special.
-		Allocate_Pointer_Object (Interp, Frame_Object_Size, Nil_Pointer, Result);
-		Result.Tag := Frame_Object;
-		Result.Pointer_Slot(Frame_Stack_Index) := Stack;
-		Result.Pointer_Slot(Frame_Opcode_Index) := Opcode;
-		Result.Pointer_Slot(Frame_Operand_Index) := Operand;
-		Result.Pointer_Slot(Frame_Environment_Index) := Envir;
---Print_Object_Pointer ("Make_Frame Result - ", Result);
-	end Make_Frame;
-
-	function Make_Frame (Interp: access Interpreter_Record;
-	                     Stack:   in     Object_Pointer;
+	function Make_Frame (Interp:  access Interpreter_Record;
+	                     Stack:   in     Object_Pointer; -- current stack pointer
 	                     Opcode:  in     Object_Pointer;
 	                     Operand: in     Object_Pointer;
 	                     Envir:   in     Object_Pointer) return Object_Pointer is
 		Frame: Object_Pointer;
 	begin
-		Make_Frame (Interp.all, Stack, Opcode, Operand, Envir, Frame);
+-- TODO: create a Frame in a special memory rather than in Heap Memory.
+--       Since it's used for stack, it can be made special.
+		Frame := Allocate_Pointer_Object (Interp, Frame_Object_Size, Nil_Pointer);
+		Frame.Tag := Frame_Object;
+		Frame.Pointer_Slot(Frame_Stack_Index) := Stack;
+		Frame.Pointer_Slot(Frame_Opcode_Index) := Opcode;
+		Frame.Pointer_Slot(Frame_Operand_Index) := Operand;
+		Frame.Pointer_Slot(Frame_Environment_Index) := Envir;
+--Print_Object_Pointer ("Make_Frame Result - ", Result);
+
 		return Frame;
 	end Make_Frame;
 
@@ -1166,45 +1222,30 @@ Put_String (To_Thin_String_Pointer (Result));
 
 	----------------------------------------------------------------------------------
 
-	procedure Make_Mark (Interp:  in out Interpreter_Record;
-	                     Context: in     Object_Integer;
-	                     Result:  out    Object_Pointer) is
-	begin
-		Allocate_Pointer_Object (Interp, Mark_Object_Size, Nil_Pointer, Result);
-		Result.Pointer_Slot(Mark_Context_Index) := Integer_To_Pointer(Context);
-		Result.Tag := Mark_Object;
-	end Make_Mark;
-
 	function Make_Mark (Interp:  access Interpreter_Record;
 	                    Context: in     Object_Integer) return Object_Pointer is
 		Mark: Object_Pointer;
 	begin
-		Make_Mark (Interp.all, Context, Mark);
+		Mark := Allocate_Pointer_Object (Interp, Mark_Object_Size, Nil_Pointer);
+		Mark.Pointer_Slot(Mark_Context_Index) := Integer_To_Pointer(Context);
+		Mark.Tag := Mark_Object;
 		return Mark;
 	end Make_Mark;
 
 	----------------------------------------------------------------------------------
 
-	procedure Make_Closure (Interp:  in out Interpreter_Record;
-	                        Code:    in     Object_Pointer;
-	                        Envir:   in     Object_Pointer;
-	                        Result:  out    Object_Pointer) is
-	begin
-		Allocate_Pointer_Object (Interp, Closure_Object_Size, Nil_Pointer, Result);
-		Result.Tag := Closure_Object;
-		Result.Pointer_Slot(Closure_Code_Index) := Code;
-		Result.Pointer_Slot(Closure_Environment_Index) := Envir;
-	end Make_Closure;
-
-	function Make_Closure (Interp:  access Interpreter_Record;
-	                       Code:    in     Object_Pointer;
-	                       Envir:   in     Object_Pointer) return Object_Pointer is
+	function Make_Closure (Interp: access Interpreter_Record;
+	                       Code:   in     Object_Pointer;
+	                       Envir:  in     Object_Pointer) return Object_Pointer is
 		Closure: Object_Pointer;
 	begin
-		Make_Closure (Interp.all, Code, Envir, Closure);
+		Closure := Allocate_Pointer_Object (Interp, Closure_Object_Size, Nil_Pointer);
+		Closure.Tag := Closure_Object;
+		Closure.Pointer_Slot(Closure_Code_Index) := Code;
+		Closure.Pointer_Slot(Closure_Environment_Index) := Envir;
 		return Closure;
 	end Make_Closure;
-	
+
 	function Is_Closure (Source: in Object_Pointer) return Standard.Boolean is
 		pragma Inline (Is_Closure);
 	begin
@@ -1277,32 +1318,32 @@ Put_String (To_Thin_String_Pointer (Result));
 		procedure Make_Syntax_Objects is
 			Dummy: Object_Pointer;
 		begin
-			Make_Syntax (Interp, And_Syntax,    "and",    Dummy);
-			Make_Syntax (Interp, Begin_Syntax,  "begin",  Dummy);
-			Make_Syntax (Interp, Case_Syntax,   "case",   Dummy);
-			Make_Syntax (Interp, Cond_Syntax,   "cond",   Dummy);
-			Make_Syntax (Interp, Define_Syntax, "define", Dummy);
-			Make_Syntax (Interp, If_Syntax,     "if",     Dummy);
-			Make_Syntax (Interp, Lambda_Syntax, "lambda", Dummy);
-			Make_Syntax (Interp, Let_Syntax,    "let",    Dummy);
-			Make_Syntax (Interp, Letast_Syntax, "let*",   Dummy);
-			Make_Syntax (Interp, Letrec_Syntax, "letrec", Dummy);
-			Make_Syntax (Interp, Or_Syntax,     "or",     Dummy);
-			Make_Syntax (Interp, Quote_Syntax,  "quote",  Dummy);
-			Make_Syntax (Interp, Set_Syntax,    "set!",   Dummy);
+			Dummy := Make_Syntax (Interp.Self, And_Syntax,    "and");
+			Dummy := Make_Syntax (Interp.Self, Begin_Syntax,  "begin");
+			Dummy := Make_Syntax (Interp.Self, Case_Syntax,   "case");
+			Dummy := Make_Syntax (Interp.Self, Cond_Syntax,   "cond");
+			Dummy := Make_Syntax (Interp.Self, Define_Syntax, "define");
+			Dummy := Make_Syntax (Interp.Self, If_Syntax,     "if");
+			Dummy := Make_Syntax (Interp.Self, Lambda_Syntax, "lambda");
+			Dummy := Make_Syntax (Interp.Self, Let_Syntax,    "let");
+			Dummy := Make_Syntax (Interp.Self, Letast_Syntax, "let*");
+			Dummy := Make_Syntax (Interp.Self, Letrec_Syntax, "letrec");
+			Dummy := Make_Syntax (Interp.Self, Or_Syntax,     "or");
+			Dummy := Make_Syntax (Interp.Self, Quote_Syntax,  "quote");
+			Dummy := Make_Syntax (Interp.Self, Set_Syntax,    "set!");
 		end Make_Syntax_Objects;
 
 		procedure Make_Procedure_Objects is
 			Dummy: Object_Pointer;
 		begin
-			Make_Procedure (Interp, Car_Procedure,      "car",    Dummy);
-			Make_Procedure (Interp, Cdr_Procedure,      "cdr",    Dummy);
-			Make_Procedure (Interp, Setcar_Procedure,   "setcar", Dummy);
-			Make_Procedure (Interp, Setcdr_Procedure,   "setcdr", Dummy);
-			Make_Procedure (Interp, Add_Procedure,      "+",      Dummy);
-			Make_Procedure (Interp, Subtract_Procedure, "-",      Dummy);
-			Make_Procedure (Interp, Multiply_Procedure, "*",      Dummy);
-			Make_Procedure (Interp, Divide_Procedure,   "/",      Dummy);
+			Dummy := Make_Procedure (Interp.Self, Car_Procedure,      "car");
+			Dummy := Make_Procedure (Interp.Self, Cdr_Procedure,      "cdr");
+			Dummy := Make_Procedure (Interp.Self, Setcar_Procedure,   "setcar");
+			Dummy := Make_Procedure (Interp.Self, Setcdr_Procedure,   "setcdr");
+			Dummy := Make_Procedure (Interp.Self, Add_Procedure,      "+");
+			Dummy := Make_Procedure (Interp.Self, Subtract_Procedure, "-");
+			Dummy := Make_Procedure (Interp.Self, Multiply_Procedure, "*");
+			Dummy := Make_Procedure (Interp.Self, Divide_Procedure,   "/");
 		end Make_Procedure_Objects;
 	begin
 		declare
@@ -1330,8 +1371,6 @@ Put_String (To_Thin_String_Pointer (Result));
 		Interp.Storage_Pool := Storage_Pool;
 		Interp.Root_Table := Nil_Pointer;
 		Interp.Symbol_Table := Nil_Pointer;
-		Interp.Root_Environment := Nil_Pointer;
-		Interp.Environment := Interp.Root_Environment;
 
 		Interp.Line_Pos := Interp.Line'First - 1;
 		Interp.Line_Last := Interp.Line'First - 1;
@@ -1339,9 +1378,10 @@ Put_String (To_Thin_String_Pointer (Result));
 -- TODO: disallow garbage collecion during initialization.
 		Initialize_Heap (Initial_Heap_Size);
 		Interp.Mark := Make_Mark (Interp.Self, 0); -- to indicate the end of cons evluation
+		Interp.Root_Environment := Make_Environment (Interp.Self, Nil_Pointer);
+		Interp.Environment := Interp.Root_Environment;
 		Make_Syntax_Objects;
 		Make_Procedure_Objects;
-
 
 	exception
 		when others =>
@@ -1457,6 +1497,9 @@ Put_String (To_Thin_String_Pointer (Result));
 					when Procedure_Object =>
 						Text_IO.Put ("#Procedure");
 
+					when Array_Object =>
+						Text_IO.Put ("#Array");
+
 					when Others =>
 						if Atom.Kind = Character_Object then
 							Text_IO.Put (To_String (Atom.Character_Slot));
@@ -1550,7 +1593,9 @@ Put_String (To_Thin_String_Pointer (Result));
 		-- TODO: Let Make_Frame use a dedicated stack space that's apart from the heap.
 		--       This way, the stack frame doesn't have to be managed by GC.
 
-		Stack := Make_Frame (Interp.Self, Nil_Pointer, Integer_To_Pointer(0), Nil_Pointer, Interp.Root_Environment);  -- just for get_frame_environment...
+-- TODO: use a interp.Stack.
+-- TODO: use Push_Frame
+		Stack := Make_Frame (Interp.Self, Nil_Pointer, Integer_To_Pointer(0), Nil_Pointer, Nil_Pointer);  -- just for get_frame_environment...
 
 		Opcode := 1;
 		Operand := Source;
@@ -1560,7 +1605,7 @@ Put_String (To_Thin_String_Pointer (Result));
 			when 1 =>
 				if Is_Cons(Operand) then
 					-- push cdr
-					Stack := Make_Frame (Interp.Self, Stack, Integer_To_Pointer(2), Get_Cdr(Operand), Get_Frame_Environment(Stack)); -- push cdr
+					Stack := Make_Frame (Interp.Self, Stack, Integer_To_Pointer(2), Get_Cdr(Operand), Nil_Pointer); -- push cdr
 					Text_IO.Put ("(");
 					Operand := Get_Car(Operand);
 					Opcode := 1;
@@ -1580,7 +1625,7 @@ Put_String (To_Thin_String_Pointer (Result));
 
 				if Is_Cons(Operand) then
 					-- push cdr
-					Stack := Make_Frame (Interp.Self, Stack, Integer_To_Pointer(2), Get_Cdr(Operand), Get_Frame_Environment(Stack)); -- push
+					Stack := Make_Frame (Interp.Self, Stack, Integer_To_Pointer(2), Get_Cdr(Operand), Nil_Pointer); -- push
 					Text_IO.Put (" ");
 					Operand := Get_Car(Operand); -- car
 					Opcode := 1;
@@ -1617,7 +1662,7 @@ Put_String (To_Thin_String_Pointer (Result));
 		--Make_Cons (Interpreter, Nil_Pointer, X, X);
 		--Make_Cons (Interpreter, Nil_Pointer, X, X);
 		--Make_Cons (Interpreter, Nil_Pointer, X, X);
-Make_Symbol (Interp, "lambda", Interp.Root_Table);
+Interp.Root_Table := Make_Symbol (Interp.Self, "lambda");
 --Print_Object_Pointer (">>> Root_Table ...", Interp.Root_Table);
 
 		Collect_Garbage (Interp);
@@ -1711,6 +1756,22 @@ begin
 				)
 			)
 		);
+
+	--	Z := Make_Cons (
+	--		Interp.Self,
+	--		Make_Symbol (Interp.Self, "begin"),
+	--		Y
+	--	);
+
+	--	Result := Make_Cons (
+	--		Interp.Self,
+	--		Make_Symbol (Interp.Self, "begin"),
+	--		Make_Cons (Interp.Self, Z, Nil_Pointer)
+	--	);
+
+
+Text_IO.PUt ("TEST OBJECT: ");
+Print (Interp, Result);
 end Make_Test_Object;
 
 
@@ -1730,138 +1791,236 @@ end Make_Test_Object;
 	                    Source: in     Object_Pointer;
 	                    Result: out    Object_Pointer) is
 
-		procedure Push_Frame (Stack:   in out Object_Pointer;
-		                      Opcode:  in     Opcode_Type; 
-		                      Operand: in     Object_Pointer;
-		                      Envir:   in     Object_Pointer) is
+		procedure Push_Frame (Opcode:  in     Opcode_Type; 
+		                      Operand: in     Object_Pointer) is
 			pragma Inline (Push_Frame);
 		begin
-			Stack := Make_Frame (Interp.Self, Stack, Opcode_To_Pointer(Opcode), Operand, Envir);
+			Interp.Stack := Make_Frame (Interp.Self, Interp.Stack, Opcode_To_Pointer(Opcode), Operand, Interp.Environment);
 		end Push_Frame;
 
-		--procedure Pop_Frame (Stack:   out Object_Pointer;
+		--procedure Pop_Frame (Interp.Stack:   out Object_Pointer;
 		--                     Opcode:  out Opcode_Type;
 		--                     Operand: out Object_Pointer) is
 		--	pragma Inline (Pop_Frame);
 		--begin
-		--	pragma Assert (Stack /= Nil_Pointer);
-		--	Opcode := Pointer_To_Opcode(Stack.Pointer_Slot(Frame_Opcode_Index));
-		--	Operand := Stack.Pointer_Slot(Frame_Operand_Index);
-		--	Stack := Stack.Pointer_Slot(Frame_Stack_Index); -- pop 
+		--	pragma Assert (Interp.Stack /= Nil_Pointer);
+		--	Opcode := Pointer_To_Opcode(Interp.Stack.Pointer_Slot(Frame_Opcode_Index));
+		--	Operand := Interp.Stack.Pointer_Slot(Frame_Operand_Index);
+		--	Interp.Stack := Interp.Stack.Pointer_Slot(Frame_Stack_Index); -- pop 
 		--end Pop_Frame;
 
-		procedure Pop_Frame (Stack: out Object_Pointer) is
+		procedure Pop_Frame is
 			pragma Inline (Pop_Frame);
 		begin
-			pragma Assert (Stack /= Nil_Pointer);
-			Stack := Stack.Pointer_Slot(Frame_Stack_Index); -- pop 
+			pragma Assert (Interp.Stack /= Nil_Pointer);
+			Interp.Environment := Interp.Stack.Pointer_Slot(Frame_Environment_Index); -- restore environment
+			Interp.Stack := Interp.Stack.Pointer_Slot(Frame_Stack_Index); -- pop 
 		end Pop_Frame;
 
-		procedure Evaluate_Object (Stack: in out Object_Pointer) is
+		procedure Evaluate_Group is
+			pragma Inline (Evaluate_Group);
+
+			Operand: Object_Pointer;
+			Car: Object_Pointer;
+			Cdr: Object_Pointer;
+		begin
+			Operand := Get_Frame_Operand(Interp.Stack);
+			pragma Assert (Is_Normal_Pointer(Operand));
+
+			case Operand.Tag is
+				when Cons_Object =>
+					Car := Get_Car(Operand);
+					Cdr := Get_Cdr(Operand);
+
+					if Is_Cons(Cdr) then
+						-- Let the current frame remember the next expression list
+						Set_Frame_Operand (Interp.Stack, Cdr);
+					else
+						if Cdr /= Nil_Pointer then
+							-- The last CDR is not Nil.
+							Text_IO.Put_Line ("$$$$..................FUCKING CDR. FOR GROUP....................$$$$");
+							-- raise Syntax_Error;
+						end if;
+						Set_Frame_Operand (Interp.Stack, Interp.Mark); 
+					end if;
+
+					-- Clear the return value from the previous expression.
+					Clear_Frame_Return (Interp.Stack);
+
+					-- Arrange to evaluate the current expression
+					Push_Frame (Opcode_Evaluate_Object, Car);
+
+				when Mark_Object =>
+					Operand := Get_Frame_Return (Interp.Stack);
+					Pop_Frame; -- Done;
+					Set_Frame_Return (Interp.Stack, Operand);
+
+				when others =>
+					raise Internal_Error;
+			end case;
+		end Evaluate_Group;
+
+		procedure Evaluate_Object is
 			pragma Inline (Evaluate_Object);
 
 			Operand: Object_Pointer;
-			Operand_Word: Object_Word;
-			for Operand_Word'Address use Operand'Address;
-
-			Tmp: Object_Pointer;
+			Car: Object_Pointer;
+			Cdr: Object_Pointer;
 		begin
 		<<Start_Over>>
-			Operand := Get_Frame_Operand (Stack);
+			Operand := Get_Frame_Operand(Interp.Stack);
 
-			if Get_Pointer_Type(Operand) /= Object_Pointer_Type_Pointer then
+			if not Is_Normal_Pointer(Operand) then
+				-- integer, character, specal pointers
+				-- TODO: some normal pointers may point to literal objects. e.g.) bignum
 				goto Literal;
 			end if;
+		
+			case Operand.Tag is
+				when Symbol_Object => -- Is_Symbol(Operand)
+					-- TODO: find it in the Environment hierarchy.. not in the current environemnt.
+					Car := Get_Environment (Interp.Self, Operand);
+					if Car = null then
+						-- unbound
+						Text_IO.Put_Line ("Unbound symbol....");
+						raise Evaluation_Error;
+					else
+						-- symbol found in the environment
+						Operand := Car; 
+						goto Literal;  -- In fact, this is not a literal, but can be handled in the same way
+					end if;
 
-			case Operand_Word is
-				when Nil_Word | True_Word | False_Word =>
-					-- special literal object
-					goto Literal;
+				when Cons_Object => -- Is_Cons(Operand)
+					Car := Get_Car(Operand);
+					Cdr := Get_Cdr(Operand);
+					if Is_Syntax(Car) then
+						-- special syntax symbol. normal evaluate rule doesn't 
+						-- apply for special syntax objects.
+
+						case Car.Scode is
+							when Begin_Syntax =>
+
+								-- Skip begin
+								Operand := Cdr;
+
+								if Operand = Nil_Pointer then
+									-- 'begin' is followed by nothing. i.e. (begin)
+									Text_IO.Put_LINE ("NO EXPRESSIONS FOR BEGIN");
+									-- TODO: should i raise Syntax_Error? if so, i can combile this with the next elsif block
+									Pop_Frame;  -- Done
+
+								elsif not Is_Cons(Operand) then
+
+									-- 'begin' is in the last cons cell and the cdr field
+									-- is not nil.
+									-- e.g) (begin . 10)
+									Text_IO.Put_LINE ("FUCKNING CDR FOR BEGIN");
+									-- TODO: raise Syntax_Error
+									Pop_Frame;  -- Done
+
+								else
+									Set_Frame_Opcode (Interp.Stack, Opcode_Evaluate_Group);
+									Set_Frame_Operand (Interp.Stack, Operand);
+
+									-- I call Evaluate_Group for optimizatio here.
+									Evaluate_Group; -- for optimization only. not really needed.
+									-- I can jump to Start_Over because Evaluate_Group called 
+									-- above pushes an Opcode_Evaluate_Object frame.
+									pragma Assert (Get_Frame_Opcode(Interp.Stack) = Opcode_Evaluate_Object);
+									goto Start_Over; -- for optimization only. not really needed.
+								end if;
+							when Define_Syntax =>
+								Text_IO.Put_Line ("define syntax");	
+								Set_Frame_Opcode (Interp.Stack, Opcode_Evaluate_Syntax);  -- switch to syntax evaluation
+							when others =>
+								Text_IO.Put_Line ("Unknown syntax");	
+								Set_Frame_Opcode (Interp.Stack, Opcode_Evaluate_Syntax);  -- switch to syntax evaluation
+						end case;
+					else
+						while not Is_Normal_Pointer(Car) loop
+							-- This while block is for optimization only. It's not really needed.
+							-- If I know that the next object to evaluate is a literal object,
+							-- I can simply reverse-chain it to the return field of the current 
+							-- frame without pushing another frame dedicated for it.
+
+							-- TODO: some normal pointers may point to a literal object. e.g.) bignum
+							Chain_Frame_Return (Interp, Interp.Stack, Car);
+							if Is_Cons(Cdr) then
+								Operand := Cdr;
+								Car := Get_Car(Operand);
+								Cdr := Get_Cdr(Operand);
+							else
+								-- last cons 
+								Operand := Reverse_Cons(Get_Frame_Return(Interp.Stack));
+								Clear_Frame_Return (Interp.Stack);
+								Set_Frame_Opcode (Interp.Stack, Opcode_Apply); 
+								Set_Frame_Operand (Interp.Stack, Operand);
+								return;
+							end if;
+						end loop;
+
+						if Is_Cons(Cdr) then
+							-- Not the last cons cell yet
+							Set_Frame_Operand (Interp.Stack, Cdr); -- change the operand for the next call 
+						else
+							-- Reached the last cons cell
+							if Cdr /= Nil_Pointer then
+								-- The last CDR is not Nil.
+								Text_IO.Put_Line ("$$$$..................FUCKING CDR.....................$$$$");
+								-- raise Syntax_Error;
+							end if;
+
+							-- Change the operand to a mark object so that the call to this 
+							-- procedure after the evaluation of the last car goes to the 
+							-- Mark_Object case.
+							Set_Frame_Operand (Interp.Stack, Interp.Mark); 
+						end if;
+
+						-- Arrange to evaluate the car object
+						Push_Frame (Opcode_Evaluate_Object, Car);
+						goto Start_Over; -- for optimization only. not really needed.
+					end if;
+
+				when Mark_Object =>
+					-- TODO: you can use the mark context to differentiate context
+
+					-- Get the evaluation result stored in the current stack frame by
+					-- various sub-Opcode_Evaluate_Object frames. the return value 
+					-- chain must be reversed Chain_Frame_Return reverse-chains values.
+					Operand := Reverse_Cons(Get_Frame_Return(Interp.Stack));
+
+					-- Refresh the current stack frame to Opcode_Apply.
+					-- This should be faster than Popping the current frame and pushing
+					-- a new frame.
+					--   Envir := Get_Frame_Environment(Interp.Stack);
+					--   Pop_Frame (Interp.Stack); -- done
+					--   Push_Frame (Interp.Stack, Opcode_Apply, Operand, Envir); 
+					Clear_Frame_Return (Interp.Stack);
+					Set_Frame_Opcode (Interp.Stack, Opcode_Apply); 
+					Set_Frame_Operand (Interp.Stack, Operand);
 
 				when others =>
-					case Operand.Tag is
-						when Symbol_Object => -- Is_Symbol(Operand)
-							Tmp := Get_Environment (Interp.Self, Get_Frame_Environment(Stack), Operand); -- TODO: use current environent
-							if Tmp = null then
-								-- unbound
-								Text_IO.Put_Line ("Unbound symbol....");
-							else
-								-- symbol found in the environment
-								Operand := Tmp; 
-								goto Literal;  -- In fact, this is not a literal, but can be handled in the same way
-							end if;
-
-						when Cons_Object => -- Is_Cons(Operand)
-							Tmp := Get_Car(Operand);
-							if Is_Syntax(Tmp) then
-								-- special syntax symbol. normal evaluate rule doesn't 
-								-- apply for special syntax objects.
-								--Opcode := Syntax_To_Opcode(Operand);
-								Set_Frame_Opcode (Stack, Opcode_Evaluate_Syntax);  -- switch to syntax evaluation
-							else
-								declare
-									Cdr: Object_Pointer := Get_Cdr(Operand);
-								begin
-									if Is_Cons(Cdr) then
-										-- Not the last cons cell yet
-										Set_Frame_Operand (Stack, Cdr); -- change the operand for the next call 
-									else
-										-- Reached the last cons cell
-										if Cdr /= Nil_Pointer then
-											-- The last CDR is not NIL.
-											Text_IO.Put_Line ("$$$$..................FUCKING CDR.....................$$$$");
-										end if;
-
-										-- Change the operand to a mark object so that the call to this 
-										-- procedure after the evaluation of the last car goes to the 
-										-- Mark_Object case.
-										Set_Frame_Operand (Stack, Interp.Mark); 
-									end if;
-
-									-- Arrange to evaluate the car object
-									Push_Frame (Stack, Opcode_Evaluate_Object, Tmp, Get_Frame_Environment(Stack));  
-									goto Start_Over; -- for optimization only. not really needed.
-								end;
-							end if;
-
-						when Mark_Object =>
-							-- TODO: you can use the mark context to differentiate context
-
-							-- Get the evaluation result stored in the current stack frame by
-							-- various sub-Opcode_Evaluate_Object frames. the return value 
-							-- chain must be reversed Chain_Frame_Return reverse-chains values.
-							Operand := Reverse_Cons(Get_Frame_Return(Stack));
-
-							-- Refresh the current stack frame to Opcode_Apply.
-							-- This should be faster than Popping the current frame and pushing
-							-- a new frame.
-							--   Envir := Get_Frame_Environment(Stack);
-							--   Pop_Frame (Stack); -- done
-							--   Push_Frame (Stack, Opcode_Apply, Operand, Envir); 
-							Clear_Frame_Return (Stack);
-							Set_Frame_Opcode (Stack, Opcode_Apply); 
-							Set_Frame_Operand (Stack, Operand);
-
-						when others =>
-							-- normal literal object
-							goto Literal;
-					end case;
+					-- normal literal object
+					goto Literal;
 			end case;
-
 			return;
 
 		<<Literal>>
-			Pop_Frame (Stack); -- done
+			Pop_Frame; -- done
 Text_IO.Put ("Return => ");
 Print (Interp, Operand);
-			Chain_Frame_Return (Interp, Stack, Operand);
+			Chain_Frame_Return (Interp, Interp.Stack, Operand);
 		end Evaluate_Object;
 
-		procedure Evaluate_Syntax (Stack: in out Object_Pointer) is
+
+		procedure Evaluate_Syntax is
+			pragma Inline (Evaluate_Syntax);
 			Scode: Syntax_Code;
 		begin
-			Scode := Get_Car(Get_Frame_Operand(Stack)).Scode;
+			Scode := Get_Car(Get_Frame_Operand(Interp.Stack)).Scode;
 			case Scode is
+				when Begin_Syntax =>
+					null;	
 				when Define_Syntax =>
 					Text_IO.Put_Line ("define syntax");	
 				when others =>
@@ -1869,26 +2028,29 @@ Print (Interp, Operand);
 			end case;
 		end Evaluate_Syntax;
 
-		procedure Evaluate_Procedure (Stack: in out Object_Pointer) is
+		procedure Evaluate_Procedure is
+			pragma Inline (Evaluate_Procedure);
 		begin
 			null;
 		end Evaluate_Procedure;
 
-		procedure Apply (Stack: in out Object_Pointer) is
+		procedure Apply is
+			pragma Inline (Apply);
+
 			Operand: Object_Pointer;
 			Func: Object_Pointer;
 			Args: Object_Pointer;
 
 			procedure Apply_Car_Procedure is
 			begin
-				Pop_Frame (Stack); -- Done with the current frame
-				Chain_Frame_Return (Interp, Stack, Get_Car(Args));
+				Pop_Frame; -- Done with the current frame
+				Chain_Frame_Return (Interp, Interp.Stack, Get_Car(Args));
 			end Apply_Car_Procedure;
 
 			procedure Apply_Cdr_Procedure is
 			begin
-				Pop_Frame (Stack); -- Done with the current frame
-				Chain_Frame_Return (Interp, Stack, Get_Cdr(Args));
+				Pop_Frame; -- Done with the current frame
+				Chain_Frame_Return (Interp, Interp.Stack, Get_Cdr(Args));
 			end Apply_Cdr_Procedure;
 
 			procedure Apply_Add_Procedure is
@@ -1907,8 +2069,8 @@ Print (Interp, Operand);
 					Ptr := Get_Cdr(Ptr);
 				end loop;
 
-				Pop_Frame (Stack); -- Done with the current frame
-				Chain_Frame_Return (Interp, Stack, Integer_To_Pointer(Num));
+				Pop_Frame; -- Done with the current frame
+				Chain_Frame_Return (Interp, Interp.Stack, Integer_To_Pointer(Num));
 			end Apply_Add_Procedure;
 
 			procedure Apply_Subtract_Procedure is
@@ -1935,8 +2097,8 @@ Print (Interp, Operand);
 					end loop;
 				end if;
 
-				Pop_Frame (Stack); --  Done with the current frame
-				Chain_Frame_Return (Interp, Stack, Integer_To_Pointer(Num));
+				Pop_Frame; --  Done with the current frame
+				Chain_Frame_Return (Interp, Interp.Stack, Integer_To_Pointer(Num));
 			end Apply_Subtract_Procedure;
 
 			procedure Apply_Closure is
@@ -1962,7 +2124,7 @@ Print (Interp, Operand);
 			end Apply_Closure;
 
 		begin
-			Operand := Get_Frame_Operand(Stack);
+			Operand := Get_Frame_Operand(Interp.Stack);
 			pragma Assert (Is_Cons(Operand));
 
 Print (Interp, Operand);
@@ -2008,41 +2170,102 @@ Print (Interp, Operand);
 			end case;
 		end Apply;
 
-
-		Stack: Object_Pointer; -- TODO: make it into the interpreter_Record so that GC can workd
-
 	begin
-		Stack := Nil_Pointer;
+		
+		-- Stack frames looks like this upon initialization
+		-- 
+		--               | Opcode                 | Operand    | Return
+		--     -----------------------------------------------------------------
+		--     top       | Opcode_Evaluate_Object | Source     | Nil
+		--     bottom    | Opcode_Exit            | Nil        | Nil
+		--
+		-- For a source (+ 1 2), it should look like this.
+		--     -----------------------------------------------------------------
+		--     top       | Opcode_Evaluate_Object | Source       | Nil
+		--     bottom    | Opcode_Exit            | Nil          | Nil
+		-- 
+		-- The operand changes to the cdr of the source.
+		-- The symbol '+' is pushed to the stack with Opcode_Evaluate_Object.
+		--     -----------------------------------------------------------------
+		--     top       | Opcode_Evaluate_Object | +            | Nil
+		--               | Opcode_Evaluate_Object | (1 2)        | Nil
+		--     bottom    | Opcode_Exit            | Nil          | Nil
+		--
+		-- After the evaluation of the symbol, the pushed frame is removed
+		-- and the result is set to the return field.
+		--     -----------------------------------------------------------------
+		--     top       | Opcode_Evaluate_Object | (1 2)        | (#Proc+)
+		--     bottom    | Opcode_Exit            | Nil          | Nil
+		--
+		-- The same action is taken to evaluate the literal 1.
+		--     -----------------------------------------------------------------
+		--     top       | Opcode_Evaluate_Object | 1            | Nil
+		--               | Opcode_Evaluate_Object | (2)          | (#Proc+)
+		--     bottom    | Opcode_Exit            | Nil          | Nil
+		--
+		-- The result of the valuation is reverse-chained to the return field. 
+		--     -----------------------------------------------------------------
+		--     top       | Opcode_Evaluate_Object | (2)          | (1 #Proc+)
+		--     bottom    | Opcode_Exit            | Nil          | Nil
+		--
+		-- The same action is taken to evaluate the literal 2.
+		--     -----------------------------------------------------------------
+		--     top       | Opcode_Evaluate_Object | 2            | Nil
+		--               | Opcode_Evaluate_Object | Mark         | (1 #Proc+)
+		--     bottom    | Opcode_Exit            | Nil          | Nil
+		--
+		-- The result of the valuation is reverse-chained to the return field. 
+		--     -----------------------------------------------------------------
+		--     top       | Opcode_Evaluate_Object | Mark         | (2 1 #Proc+)
+		--     bottom    | Opcode_Exit            | Nil          | Nil
+		--
+		-- Once evluation of each cons cell is complete, switch the top frame
+		-- to 'Apply' reversing the result field into the operand field and
+		-- nullifying the result field afterwards.
+		--     -----------------------------------------------------------------
+		--     top       | Apply                  | (#Proc+ 1 2) | Nil
+		--     bottom    | Opcode_Exit            | Nil          | Nil
+		--
+		-- The apply operation produces the final result and sets it to the 
+		-- parent frame while removing the apply frame.
+		--     -----------------------------------------------------------------
+		--     top/bottom| Opcode_Exit            | Nil          | 3
+		
+
+		Interp.Stack := Nil_Pointer;
 
 		-- Push a pseudo-frame to terminate the evaluation loop
-		Push_Frame (Stack, Opcode_Exit, Nil_Pointer, Interp.Root_Environment); 
+		Push_Frame (Opcode_Exit, Nil_Pointer);
 
 		-- Push the actual frame for evaluation
-		Push_Frame (Stack, Opcode_Evaluate_Object, Source, Interp.Root_Environment);
+		Push_Frame (Opcode_Evaluate_Object, Source);
 
 		loop
-			case Get_Frame_Opcode(Stack) is
+			case Get_Frame_Opcode(Interp.Stack) is
 				when Opcode_Evaluate_Object =>
-					Evaluate_Object (Stack);
+					Evaluate_Object;
+
+				when Opcode_Evaluate_Group =>
+					Evaluate_Group;
 					
 				when Opcode_Evaluate_Syntax =>
-					Evaluate_Syntax (Stack);
+					Evaluate_Syntax;
 
 				when Opcode_Evaluate_Procedure =>
-					Evaluate_Procedure (Stack);
+					Evaluate_Procedure;
 
 				when Opcode_Apply =>
-					Apply (Stack);
+					Apply;
 
 				when Opcode_Exit =>
-					Result := Get_Frame_Return (Stack);
-					Pop_Frame (Stack);
+					Result := Get_Frame_Return (Interp.Stack);
+					Pop_Frame;
 					exit;
 			end case;
 		end loop;
 
 		-- the stack must be empty when the loop is terminated
-		pragma Assert (Stack = Nil_Pointer);
+		pragma Assert (Interp.Stack = Nil_Pointer);
 	end Evaluate;
 
 end H2.Scheme;
