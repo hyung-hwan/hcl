@@ -7,24 +7,24 @@ with Interfaces.C;
 
 package body H2.Scheme is
 
-	----------------------------------------------------------------------------------
+	-----------------------------------------------------------------------------
 	-- EXCEPTIONS
-	----------------------------------------------------------------------------------
+	-----------------------------------------------------------------------------
 	Allocation_Error: exception;
 	Size_Error: exception;
 	Syntax_Error: exception;
 	Evaluation_Error: exception;
 	Internal_Error: exception;
 
-	----------------------------------------------------------------------------------
+	-----------------------------------------------------------------------------
 	-- INTERNALLY-USED TYPES
-	----------------------------------------------------------------------------------
-	type Memory_Element_Pointer is access all Memory_Element;
-	for Memory_Element_Pointer'Size use Object_Pointer_Bits; -- ensure that it can be overlayed by an ObjectPointer
+	-----------------------------------------------------------------------------
+	type Heap_Element_Pointer is access all Heap_Element;
+	for Heap_Element_Pointer'Size use Object_Pointer_Bits; -- ensure that it can be overlayed by an ObjectPointer
 
-	type Thin_Memory_Element_Array is array (1 .. Memory_Size'Last) of Memory_Element;
-	type Thin_Memory_Element_Array_Pointer is access all Thin_Memory_Element_Array;
-	for Thin_Memory_Element_Array_Pointer'Size use Object_Pointer_Bits;
+	type Thin_Heap_Element_Array is array (1 .. Heap_Size'Last) of Heap_Element;
+	type Thin_Heap_Element_Array_Pointer is access all Thin_Heap_Element_Array;
+	for Thin_Heap_Element_Array_Pointer'Size use Object_Pointer_Bits;
 
 	subtype Opcode_Type is Object_Integer range 0 .. 5;
 	Opcode_Exit:               constant Opcode_Type := Opcode_Type'(0);
@@ -34,9 +34,9 @@ package body H2.Scheme is
 	Opcode_Evaluate_Procedure: constant Opcode_Type := Opcode_Type'(4);
 	Opcode_Apply:              constant Opcode_Type := Opcode_Type'(5);
 
-	----------------------------------------------------------------------------------
+	-----------------------------------------------------------------------------
 	-- COMMON OBJECTS
-	----------------------------------------------------------------------------------
+	-----------------------------------------------------------------------------
 	Cons_Object_Size: constant Pointer_Object_Size := 2;
 	Cons_Car_Index: constant Pointer_Object_Size := 1;
 	Cons_Cdr_Index: constant Pointer_Object_Size := 2;
@@ -63,16 +63,16 @@ package body H2.Scheme is
 	Pair_Value_Size: constant Pointer_Object_Size := 2;
 	Pair_Link_Size: constant Pointer_Object_Size := 3;
 
-	procedure Set_New_Location (Object: in Object_Pointer; Ptr: in Memory_Element_Pointer);
+	procedure Set_New_Location (Object: in Object_Pointer; Ptr: in Heap_Element_Pointer);
 	procedure Set_New_Location (Object: in Object_Pointer; Ptr: in Object_Pointer);
 	pragma Inline (Set_New_Location);
 
 	function Get_New_Location (Object: in Object_Pointer) return Object_Pointer;
 	pragma Inline (Get_New_Location);
 
-	----------------------------------------------------------------------------------
+	-----------------------------------------------------------------------------
 	-- POINTER AND DATA CONVERSION
-	----------------------------------------------------------------------------------
+	-----------------------------------------------------------------------------
 
 	function Get_Pointer_Type (Pointer: in Object_Pointer) return Object_Pointer_Type is
 		pragma Inline (Get_Pointer_Type);
@@ -346,9 +346,9 @@ package body H2.Scheme is
 		end if;
 	end Print_Object_Pointer;
 
-	----------------------------------------------------------------------------------
+	-----------------------------------------------------------------------------
 	-- MEMORY MANAGEMENT
-	----------------------------------------------------------------------------------
+	-----------------------------------------------------------------------------
 -- (define x ())
 -- (define x #())
 -- (define x $())
@@ -369,8 +369,8 @@ package body H2.Scheme is
 	-- the new location. GCC-GNAT 3.2.3 suffered from various constraint
 	-- check errors. So i gave up on this procedure.
 	--------------------------------------------------------------------
-	--procedure Set_New_Location (Object: in Object_Pointer; Ptr: in Memory_Element_Pointer) is
-		--New_Addr: Memory_Element_Pointer;
+	--procedure Set_New_Location (Object: in Object_Pointer; Ptr: in Heap_Element_Pointer) is
+		--New_Addr: Heap_Element_Pointer;
 		--for New_Addr'Address use Object.Size'Address;
 		--pragma Import (Ada, New_Addr); 
 	--begin
@@ -388,7 +388,7 @@ package body H2.Scheme is
 	-- The original object is replaced by this special object. this special 
 	-- object takes up the smallest space that a valid object can take. So
 	-- it is safe to overlay it on any normal objects.
-	procedure Set_New_Location (Object: in Object_Pointer; Ptr: in Memory_Element_Pointer) is
+	procedure Set_New_Location (Object: in Object_Pointer; Ptr: in Heap_Element_Pointer) is
 		subtype Moved_Object_Record is Object_Record (Moved_Object, 0);
 		Moved_Object: Moved_Object_Record;
 		for Moved_Object'Address use Object.all'Address;
@@ -396,7 +396,7 @@ package body H2.Scheme is
 		-- on the default initialization of Moved_Object to overwrite
 		-- the Kind discriminant in particular.
 		--pragma Import (Ada, Moved_Object); -- this must not be used.
-		function To_Object_Pointer is new Ada.Unchecked_Conversion (Memory_Element_Pointer, Object_Pointer);
+		function To_Object_Pointer is new Ada.Unchecked_Conversion (Heap_Element_Pointer, Object_Pointer);
 	begin
 		Moved_Object.New_Pointer := To_Object_Pointer (Ptr);
 	end Set_New_Location;
@@ -416,9 +416,9 @@ package body H2.Scheme is
 	end Get_New_Location;
 
 	function Allocate_Bytes_In_Heap (Heap:       access Heap_Record; 
-	                                 Heap_Bytes: in     Memory_Size) return Memory_Element_Pointer is
-		Avail: Memory_Size;
-		Result: Memory_Element_Pointer;
+	                                 Heap_Bytes: in     Heap_Size) return Heap_Element_Pointer is
+		Avail: Heap_Size;
+		Result: Heap_Element_Pointer;
 	begin
 		Avail := Heap.Size - Heap.Bound;
 		if Heap_Bytes > Avail then
@@ -431,7 +431,7 @@ package body H2.Scheme is
 	end Allocate_Bytes_In_Heap;
 
 	procedure Copy_Object (Source: in     Object_Pointer;
-	                       Target: in out Memory_Element_Pointer) is
+	                       Target: in out Heap_Element_Pointer) is
 		pragma Inline (Copy_Object);
 		subtype Target_Object_Record is Object_Record (Source.Kind, Source.Size);
 		type Target_Object_Pointer is access all Target_Object_Record;
@@ -452,17 +452,17 @@ package body H2.Scheme is
 	end Copy_Object;
 
 	procedure Copy_Object_With_Size (Source: in     Object_Pointer;
-	                                 Target: in out Memory_Element_Pointer;
-	                                 Bytes:  in     Memory_Size) is
+	                                 Target: in out Heap_Element_Pointer;
+	                                 Bytes:  in     Heap_Size) is
 		pragma Inline (Copy_Object_With_Size);
 		-- This procedure uses a more crude type for copying objects.
 		-- It's the result of an effort to work around some compiler
 		-- issues mentioned above.
-		Tgt: Thin_Memory_Element_Array_Pointer;
+		Tgt: Thin_Heap_Element_Array_Pointer;
 		for Tgt'Address use Target'Address;
 		pragma Import (Ada, Tgt);
 
-		Src: Thin_Memory_Element_Array_Pointer;
+		Src: Thin_Heap_Element_Array_Pointer;
 		for Src'Address use Source'Address;
 		pragma Import (Ada, Src);
 	begin
@@ -471,10 +471,10 @@ package body H2.Scheme is
 
 	procedure Collect_Garbage (Interp: in out Interpreter_Record) is
 
-		Last_Pos: Memory_Size;
+		Last_Pos: Heap_Size;
 		New_Heap: Heap_Number;
 
-		--function To_Object_Pointer is new Ada.Unchecked_Conversion (Memory_Element_Pointer, Object_Pointer);
+		--function To_Object_Pointer is new Ada.Unchecked_Conversion (Heap_Element_Pointer, Object_Pointer);
 
 		function Move_One_Object (Object: in Object_Pointer) return Object_Pointer is
 		begin
@@ -493,10 +493,10 @@ Print_Object_Pointer ("Moving NOT ...", Object);
 			else
 Print_Object_Pointer ("Moving REALLY ...", Object);
 				declare
-					Bytes: Memory_Size;
+					Bytes: Heap_Size;
 
 					-- This variable holds the allocation result
-					Ptr: Memory_Element_Pointer;
+					Ptr: Heap_Element_Pointer;
 
 					-- Create an overlay for type conversion
 					New_Object: Object_Pointer;
@@ -544,17 +544,17 @@ Text_IO.Put_Line ("  Flags....after " & Object_Kind'Image(Object.Kind) & " New S
 			end if;
 		end Move_One_Object;
 
-		function Scan_New_Heap (Start_Position: in Memory_Size) return Memory_Size is
-			Ptr: Memory_Element_Pointer;
+		function Scan_New_Heap (Start_Position: in Heap_Size) return Heap_Size is
+			Ptr: Heap_Element_Pointer;
 
-			Position: Memory_Size;
+			Position: Heap_Size;
 		begin
 			Position := Start_Position;
 
---Text_IO.Put_Line ("Start Scanning New Heap from " & Memory_Size'Image (Start_Position) & " Bound: " & Memory_Size'Image (Interp.Heap(New_Heap).Bound));
+--Text_IO.Put_Line ("Start Scanning New Heap from " & Heap_Size'Image (Start_Position) & " Bound: " & Heap_Size'Image (Interp.Heap(New_Heap).Bound));
 			while Position <= Interp.Heap(New_Heap).Bound loop
 
---Text_IO.Put_Line (">>> Scanning New Heap from " & Memory_Size'Image (Position) & " Bound: " & Memory_Size'Image (Interp.Heap(New_Heap).Bound));
+--Text_IO.Put_Line (">>> Scanning New Heap from " & Heap_Size'Image (Position) & " Bound: " & Heap_Size'Image (Interp.Heap(New_Heap).Bound));
 				Ptr := Interp.Heap(New_Heap).Space(Position)'Unchecked_Access;
 
 				declare
@@ -563,13 +563,13 @@ Text_IO.Put_Line ("  Flags....after " & Object_Kind'Image(Object.Kind) & " New S
 					pragma Import (Ada, Object); -- not really needed
 
 					--subtype Target_Object_Record is Object_Record (Object.Kind, Object.Size);
-					Bytes: Memory_Size;
+					Bytes: Heap_Size;
 
 				begin
 					--Bytes := Target_Object_Record'Max_Size_In_Storage_Elements;
 					Bytes := Object.all'Size / System.Storage_Unit;
 				
---Text_IO.Put_Line (">>> Scanning Obj " & Object_Kind'Image (Object.Kind) & " size " & Object_Size'Image(Object.Size) & " at " & Object_Word'Image(Pointer_To_Word(Object)) & " Bytes " & Memory_Size'Image(Bytes));
+--Text_IO.Put_Line (">>> Scanning Obj " & Object_Kind'Image (Object.Kind) & " size " & Object_Size'Image(Object.Size) & " at " & Object_Word'Image(Pointer_To_Word(Object)) & " Bytes " & Heap_Size'Image(Bytes));
 
 					if Object.Kind = Pointer_Object then
 						for i in Object.Pointer_Slot'Range loop
@@ -659,11 +659,11 @@ Text_IO.Put_Line (">>> [GC DONE]");
 	end Collect_Garbage;
 
 	function Allocate_Bytes (Interp: access Interpreter_Record;
-	                         Bytes:  in     Memory_Size) return Memory_Element_Pointer is
+	                         Bytes:  in     Heap_Size) return Heap_Element_Pointer is
 
 		-- I use this temporary variable not to change Result
 		-- if Allocation_Error should be raised.
-		Tmp: Memory_Element_Pointer;
+		Tmp: Heap_Element_Pointer;
 	begin
 		pragma Assert (Bytes > 0);
 
@@ -686,7 +686,7 @@ Text_IO.Put_Line (">>> [GC DONE]");
 		subtype Pointer_Object_Record is Object_Record (Pointer_Object, Size);
 		type Pointer_Object_Pointer is access all Pointer_Object_Record;
 
-		Ptr: Memory_Element_Pointer;
+		Ptr: Heap_Element_Pointer;
 		Obj_Ptr: Pointer_Object_Pointer;
 		for Obj_Ptr'Address use Ptr'Address;
 		pragma Import (Ada, Obj_Ptr);
@@ -696,7 +696,7 @@ Text_IO.Put_Line (">>> [GC DONE]");
 	begin
 		Ptr := Allocate_Bytes (
 			Interp,
-			Memory_Size'(Pointer_Object_Record'Max_Size_In_Storage_Elements)
+			Heap_Size'(Pointer_Object_Record'Max_Size_In_Storage_Elements)
 		);
 
 		Obj_Ptr.all := (
@@ -717,7 +717,7 @@ Text_IO.Put_Line (">>> [GC DONE]");
 		subtype Character_Object_Record is Object_Record (Character_Object, Size);
 		type Character_Object_Pointer is access all Character_Object_Record;
 
-		Ptr: Memory_Element_Pointer;
+		Ptr: Heap_Element_Pointer;
 		Obj_Ptr: Character_Object_Pointer;
 		for Obj_Ptr'Address use Ptr'Address;
 		pragma Import (Ada, Obj_Ptr);
@@ -727,7 +727,7 @@ Text_IO.Put_Line (">>> [GC DONE]");
 	begin
 		Ptr := Allocate_Bytes (
 			Interp.Self,
-			Memory_Size'(Character_Object_Record'Max_Size_In_Storage_Elements)
+			Heap_Size'(Character_Object_Record'Max_Size_In_Storage_Elements)
 		);
 
 		Obj_Ptr.all := (
@@ -761,7 +761,7 @@ Text_IO.Put_Line (">>> [GC DONE]");
 		subtype Byte_Object_Record is Object_Record (Byte_Object, Size);
 		type Byte_Object_Pointer is access all Byte_Object_Record;
 
-		Ptr: Memory_Element_Pointer;
+		Ptr: Heap_Element_Pointer;
 		Obj_Ptr: Byte_Object_Pointer;
 		for Obj_Ptr'Address use Ptr'Address;
 		pragma Import (Ada, Obj_Ptr);
@@ -769,7 +769,7 @@ Text_IO.Put_Line (">>> [GC DONE]");
 		for Result'Address use Ptr'Address;
 		pragma Import (Ada, Result);
 	begin
-		Ptr := Allocate_Bytes (Interp.Self, Memory_Size'(Byte_Object_Record'Max_Size_In_Storage_Elements));
+		Ptr := Allocate_Bytes (Interp.Self, Heap_Size'(Byte_Object_Record'Max_Size_In_Storage_Elements));
 		Obj_Ptr.all := (
 			Kind => Byte_Object,
 			Size => Size,
@@ -791,7 +791,7 @@ Text_IO.Put_Line (">>> [GC DONE]");
 
 		return Get_New_Location(Source);
 	end Verify_Pointer;
-	----------------------------------------------------------------------------------
+	-----------------------------------------------------------------------------
 
 	function Make_Cons (Interp:  access Interpreter_Record;
 	                    Car:     in     Object_Pointer;
@@ -867,7 +867,7 @@ Text_IO.Put_Line (">>> [GC DONE]");
 
 		return Ptr;
 	end Reverse_Cons;
-	----------------------------------------------------------------------------------
+	-----------------------------------------------------------------------------
 
 	function Make_String (Interp: access  Interpreter_Record;
 	                      Source: in     Object_String) return Object_Pointer is
@@ -928,7 +928,7 @@ Print_Object_Pointer ("Make_String Result - " & Source, Result);
 		return Ptr;
 	end Make_Symbol;
 
-	----------------------------------------------------------------------------------
+	-----------------------------------------------------------------------------
 
 	function Make_Array (Interp: access Interpreter_Record;
 	                     Size:   in     Pointer_Object_Size) return Object_Pointer is
@@ -946,7 +946,7 @@ Print_Object_Pointer ("Make_String Result - " & Source, Result);
 		       Source.Tag = Array_Object;
 	end Is_Array;
 
-	----------------------------------------------------------------------------------
+	-----------------------------------------------------------------------------
 
 	--
 	-- Environment is a cons cell whose slots represents:
@@ -1064,7 +1064,7 @@ Print_Object_Pointer ("Make_String Result - " & Source, Result);
 	end Pop_Environment;
 	                     
 		
-	----------------------------------------------------------------------------------
+	-----------------------------------------------------------------------------
 
 	function Make_Syntax (Interp: access Interpreter_Record;
 	                      Opcode: in     Syntax_Code;
@@ -1124,7 +1124,7 @@ Put_String (To_Thin_String_Pointer (Result));
 		return Pointer_To_Integer(Proc.Pointer_Slot(Procedure_Opcode_Index));
 	end Get_Procedure_Opcode;
 	
-	----------------------------------------------------------------------------------
+	-----------------------------------------------------------------------------
 
 	function Make_Frame (Interp:  access Interpreter_Record;
 	                     Stack:   in     Object_Pointer; -- current stack pointer
@@ -1224,7 +1224,7 @@ Put_String (To_Thin_String_Pointer (Result));
 		Frame.Pointer_Slot(Frame_Operand_Index) := Value;
 	end Set_Frame_Operand;
 
-	----------------------------------------------------------------------------------
+	-----------------------------------------------------------------------------
 
 	function Make_Mark (Interp:  access Interpreter_Record;
 	                    Context: in     Object_Integer) return Object_Pointer is
@@ -1236,7 +1236,7 @@ Put_String (To_Thin_String_Pointer (Result));
 		return Mark;
 	end Make_Mark;
 
-	----------------------------------------------------------------------------------
+	-----------------------------------------------------------------------------
 
 	function Make_Closure (Interp: access Interpreter_Record;
 	                       Code:   in     Object_Pointer;
@@ -1271,7 +1271,7 @@ Put_String (To_Thin_String_Pointer (Result));
 		return Closure.Pointer_Slot(Closure_Environment_Index);
 	end Get_Closure_Environment;
 
-	----------------------------------------------------------------------------------
+	-----------------------------------------------------------------------------
 	procedure Deinitialize_Heap (Interp: in out Interpreter_Record) is
 	begin
 		for I in Interp.Heap'Range loop
@@ -1292,10 +1292,10 @@ Put_String (To_Thin_String_Pointer (Result));
 	end Deinitialize_Heap;
 
 	procedure Open (Interp:            in out Interpreter_Record;
-	                Initial_Heap_Size: in     Memory_Size;
+	                Initial_Heap_Size: in     Heap_Size;
 	                Storage_Pool:      in     Storage_Pool_Pointer := null) is
 
-		procedure Initialize_Heap (Size: Memory_Size) is
+		procedure Initialize_Heap (Size: Heap_Size) is
 			subtype Target_Heap_Record is Heap_Record (Size);
 			type Target_Heap_Pointer is access all Target_Heap_Record;
 			package Pool is new H2.Pool (Target_Heap_Record, Target_Heap_Pointer, Interp.Storage_Pool);
@@ -1494,6 +1494,9 @@ Put_String (To_Thin_String_Pointer (Result));
 						Text_IO.Put ("""");	
 						Text_IO.Put (To_String (Atom.Character_Slot));
 						Text_IO.Put ("""");	
+
+					when Closure_Object =>
+						Text_IO.Put ("#Closure");
 
 					when Continuation_Object =>
 						Text_IO.Put ("#Continuation");
@@ -1699,6 +1702,9 @@ Interp.Root_Table := Make_Symbol (Interp.Self, "lambda");
 procedure Make_Test_Object (Interp: in out Interpreter_Record; Result: out Object_Pointer) is
 	Y: Object_Pointer;
 	Z: Object_Pointer;
+	P: Object_Pointer;
+	B: Object_Pointer;
+	L: Object_Pointer;
 begin
 		--(define x 10)
 		--Result := Make_Cons (
@@ -1772,6 +1778,59 @@ begin
 			Make_Symbol (Interp.Self, "begin"),
 			Make_Cons (Interp.Self, Z, Nil_Pointer)
 		);
+
+		-- (lambda (x y) (+ x y))
+		P := Make_Cons (
+			Interp.Self,
+			Make_Symbol (Interp.Self, "x"),
+			Make_Cons (
+				Interp.Self, 
+				Make_Symbol (Interp.Self, "y"),
+				Nil_Pointer
+			)
+		);
+		B := Make_Cons (
+			Interp.Self,
+			Make_Symbol (Interp.Self, "+"),
+			Make_Cons (
+				Interp.Self,
+				Make_Symbol (Interp.Self, "x"),
+				Make_Cons (
+					Interp.Self,
+					Make_Symbol (Interp.Self, "y"),
+					Nil_Pointer
+				)
+			)
+		);
+		L := Make_Cons (
+			Interp.Self,
+			Make_Symbol (Interp.Self, "lambda"),
+			Make_Cons (
+				Interp.Self, 
+				P,
+				Make_Cons (
+					Interp.Self,
+					B,
+					Nil_pointer
+				)
+			)
+		);
+
+		Result := Make_Cons (
+			Interp.Self,
+			L,
+			Make_Cons (
+				Interp.Self,
+				Integer_To_Pointer (9),
+				Make_Cons (
+					Interp.Self,
+					Integer_To_Pointer (7),
+					Nil_Pointer
+				)
+			)
+		);
+
+		
 
 
 Text_IO.PUt ("TEST OBJECT: ");
@@ -1904,22 +1963,14 @@ end Make_Test_Object;
 						case Car.Scode is
 							when Begin_Syntax =>
 
-								Operand := Cdr; -- Skip begin
+								Operand := Cdr; -- Skip "begin"
 
-								if Operand = Nil_Pointer then
-									-- 'begin' is followed by nothing. i.e. (begin)
-									Text_IO.Put_LINE ("NO EXPRESSIONS FOR BEGIN");
-									-- TODO: should i raise Syntax_Error? if so, i can combile this with the next elsif block
-									Pop_Frame;  -- Done
-
-								elsif not Is_Cons(Operand) then
-
-									-- 'begin' is in the last cons cell and the cdr field
-									-- is not nil.
-									-- e.g) (begin . 10)
+								if not Is_Cons(Operand) then
+									-- e.g) (begin)
+									--      (begin . 10)
 									Text_IO.Put_LINE ("FUCKNING CDR FOR BEGIN");
-									-- TODO: raise Syntax_Error
-									Pop_Frame;  -- Done
+									raise Syntax_Error;
+									--Pop_Frame;  -- Done
 
 								else
 									Set_Frame_Opcode (Interp.Stack, Opcode_Evaluate_Group);
@@ -1937,10 +1988,43 @@ end Make_Test_Object;
 								end if;
 							when Define_Syntax =>
 								Text_IO.Put_Line ("define syntax");	
-								Set_Frame_Opcode (Interp.Stack, Opcode_Evaluate_Syntax);  -- switch to syntax evaluation
+								Set_Frame_Opcode (Interp.Stack, Opcode_Evaluate_Syntax);  -- Switch to syntax evaluation
+
+							when Lambda_Syntax =>
+								-- (lambda (x y) (+ x y));
+								Operand := Cdr; -- Skip "lambda"
+								if not Is_Cons(Operand) then
+									-- e.g) (lambda)
+									--      (lambda . 10)
+									Text_IO.Put_LINE ("FUCKNING CDR FOR BEGIN");
+									raise Syntax_Error;
+									--Pop_Frame;  -- Done
+								else
+									if not Is_Cons(Get_Car(Operand)) then
+										Text_IO.Put_Line ("INVALID PARRAMETER LIST");
+										raise Syntax_Error;
+										--Pop_Frame;  -- Done
+									end if;
+
+--Print (Interp, Get_Cdr(Operand));
+									if not Is_Cons(Get_Cdr(Operand)) then
+										Text_IO.Put_Line ("NO BODY");
+										raise Syntax_Error;
+										--Pop_Frame;  -- Done
+									end if;
+
+									declare
+										Closure: Object_Pointer;
+									begin
+										Closure := Make_Closure (Interp.Self, Operand, Interp.Environment);
+										Pop_Frame;  -- Done
+										Chain_Frame_Return (Interp, Interp.Stack, Closure);
+									end;
+								end if;
+
 							when others =>
 								Text_IO.Put_Line ("Unknown syntax");	
-								Set_Frame_Opcode (Interp.Stack, Opcode_Evaluate_Syntax);  -- switch to syntax evaluation
+								Set_Frame_Opcode (Interp.Stack, Opcode_Evaluate_Syntax);  -- Switch to syntax evaluation
 						end case;
 					else
 						if (Interp.Trait.Trait_Bits and No_Optimization) = 0 then
@@ -2112,25 +2196,62 @@ Print (Interp, Operand);
 			end Apply_Subtract_Procedure;
 
 			procedure Apply_Closure is
-				Envir: Object_Pointer;
+				Fbody: Object_Pointer;
 				Param: Object_Pointer;
 				Arg: Object_Pointer;
 			begin
 				-- For a closure created of "(lambda (x y) (+ x y) (* x y))"
 				-- Get_Closure_Code(Func) returns "((x y) (+ x y) (* x y))"
-				Envir := Make_Cons (Interp.Self, Nil_Pointer, Get_Closure_Environment(Func));
-				Param := Get_Car(Get_Closure_Code(Func)); -- parameter list
-				Arg := Get_Car(Args);
+
+				-- Push a new environmen for the closure
+				Interp.Environment := Make_Environment (Interp.Self, Get_Closure_Environment(Func));
+-- TODO: GC. Func may be invalid if GC has been invoked.
+
+				Fbody := Get_Closure_Code(Func);
+				pragma Assert (Is_Cons(Fbody)); -- the reader must ensure this.
+
+				Param := Get_Car(Fbody); -- Parameter list
+				--Arg := Get_Car(Args); -- Actual argument list
+				Arg := Args; -- Actual argument list
+
+				Fbody := Get_Cdr (Fbody); -- Real function body
+				pragma Assert (Is_Cons(Fbody)); -- the reader must ensure this as wel..
+
 				while Is_Cons(Param) loop
 
-					-- Insert the parameter name/value pair into the environment
-					--Set_Car (Envir, Make_Cons (Interp.Self, 
+					if not Is_Cons(Arg) then
+Print (Interp, Arg);
+						Text_IO.Put_Line (">>>> Too few arguments <<<<");	
+						raise Evaluation_Error;
+					end if;
+
+					-- Insert the key/value pair into the environment
+					Set_Environment (Interp, Get_Car(Param), Get_Car(Arg));
 
 					Param := Get_Cdr(Param);
 					Arg := Get_Cdr(Arg);
 				end loop;
+
+				-- Perform cosmetic checks for the parameter list
+				if Param /= Nil_Pointer then
+					Text_IO.Put_Line (">>> GARBAGE IN PARAMETER LIST <<<");
+					raise Syntax_Error;
+				end if;
+
+				-- Perform cosmetic checks for the argument list
+				if Is_Cons(Arg) then
+						Text_IO.Put_Line (">>>> Two many arguments <<<<");	
+						raise Evaluation_Error;
+				elsif Arg /= Nil_Pointer then	
+					Text_IO.Put_Line (">>> GARBAGE IN ARGUMENT LIST <<<");
+					raise Syntax_Error;
+				end if;
 					
-				--Push_Frame (....);
+-- TODO: GC. the environment construction can cause GC. so Fbody here may be invalid.
+-- TODO: is it correct to keep the environement  in the frame?
+				Set_Frame_Opcode (Interp.Stack, Opcode_Evaluate_Group);
+				Set_Frame_Operand (Interp.Stack, Fbody);
+				Clear_Frame_Return (Interp.Stack);
 			end Apply_Closure;
 
 		begin
@@ -2276,9 +2397,15 @@ Print (Interp, Operand);
 
 		-- the stack must be empty when the loop is terminated
 		pragma Assert (Interp.Stack = Nil_Pointer);
+
+	exception
+		when others =>
+			Text_IO.Put_Line ("EXCEPTION OCCURRED");
+			-- TODO: restore stack frame???
+			-- TODO: restore envirronemtn frame???
 	end Evaluate;
 
-	----------------------------------------------------------------------------------
+	-----------------------------------------------------------------------------
 
 	function h2scm_open return Interpreter_Pointer;
 	pragma Export (C, h2scm_open, "h2scm_open");
@@ -2328,6 +2455,4 @@ Text_IO.Put_Line ("h2scm_close");
 	end h2scm_evaluate;
 	
 end H2.Scheme;
-
-
 

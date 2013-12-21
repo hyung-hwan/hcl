@@ -248,13 +248,13 @@ package H2.Scheme is
 	pragma Inline (Pointer_To_Byte);
 
 	-- -----------------------------------------------------------------------------
-	-- While I could define Memory_Element and Memory_Size to be
+	-- While I could define Heap_Element and Heap_Size to be
 	-- the subtype of Object_Byte and Object_Size each, they are not
 	-- logically the same thing.
 	-- subtype Storage_Element is Object_Byte;
 	-- subtype Storage_Count is Object_Size;
-	type Memory_Element is mod 2 ** System.Storage_Unit;
-	type Memory_Size is range 0 .. (2 ** (System.Word_Size - 1)) - 1;
+	type Heap_Element is mod 2 ** System.Storage_Unit;
+	type Heap_Size is range 0 .. (2 ** (System.Word_Size - 1)) - 1;
 
 	type Trait_Mask is mod 2 ** System.Word_Size;
 	No_Garbage_Collection: constant Trait_Mask := 2#0000_0000_0000_0001#;
@@ -320,7 +320,7 @@ package H2.Scheme is
 procedure Make_Test_Object (Interp: in out Interpreter_Record; Result: out Object_Pointer);
 
 	procedure Open (Interp:           in out Interpreter_Record;
-	                Initial_Heap_Size:in     Memory_Size;
+	                Initial_Heap_Size:in     Heap_Size;
 	                Storage_Pool:     in     Storage_Pool_Pointer := null);
 
 	procedure Close (Interp: in out Interpreter_Record);
@@ -342,11 +342,11 @@ procedure Make_Test_Object (Interp: in out Interpreter_Record; Result: out Objec
 	-- -----------------------------------------------------------------------------
 
 private
-	type Heap_Array is array (Memory_Size range <>) of aliased Memory_Element;
+	type Heap_Element_Array is array (Heap_Size range <>) of aliased Heap_Element;
 
-	type Heap_Record (Size: Memory_Size) is record
-		Space: Heap_Array(1..Size) := (others => 0);
-		Bound: Memory_Size := 0;
+	type Heap_Record (Size: Heap_Size) is record
+		Space: Heap_Element_Array(1..Size) := (others => 0);
+		Bound: Heap_Size := 0;
 	end record;
 	for Heap_Record'Alignment use Object_Pointer_Bytes;
 	type Heap_Pointer is access all Heap_Record;
