@@ -6,11 +6,37 @@
 --       # #      #    # #      #    # #            #     # #       
 -- #     # #    # #    # #      #    # #            #     # #       
 --  #####   ####  #    # ###### #    # ######       #     # ####### 
+--
+-- Literal
+--  Number: 1, 10
+--  String: "hello"
+--
+-- Environment
+--  The environment holds the key/value pairs.
+--
+-- Procedure
+--  Some builtin-procedure objects are registered to the top-level environment
+--  upon start-up. You can break the mapping between a name and a procedure
+--  as it's in the normal environment.
+--
+-- Syntax Object
+--  Some syntax objects are registered upon start-up. They are handled 
+--  very specially when the list containing one of them as the first argument
+--  is evaluated.
+--
+-- Evaluation Rule
+--   A literal object evaluates to itself. A Symbol object evaluates to 
+--   a value found in the environment. List evaluation is slightly more 
+--   complex. Each element of a list is evluated using the standard evaluation
+--   rule. The first argument acts as a function and the rest of the arguments
+--   are applied to the function. An element must evaluate to a closure to be
+--   a function. The syntax object bypasses the normal evaluation rule and is
+--   evaluated according to the object-specific rule.
+--
 ---------------------------------------------------------------------
 
 with System;
 with System.Storage_Pools;
-
 
 with Ada.Unchecked_Conversion;
 -- TODO: delete these after debugging
@@ -18,10 +44,23 @@ with ada.text_io;
 with ada.wide_text_io;
 with ada.integer_text_io;
 with ada.long_integer_text_io;
---with system.address_image;
 -- TODO: delete above after debugging
 
 package H2.Scheme is
+
+	type Interpreter_Record is limited private;
+	type Interpreter_Pointer is access all Interpreter_Record;
+
+	-- -----------------------------------------------------------------------------
+	-- While I could define Heap_Element and Heap_Size to be
+	-- the subtype of Object_Byte and Object_Size each, they are not
+	-- logically the same thing.
+	-- subtype Storage_Element is Object_Byte;
+	-- subtype Storage_Count is Object_Size;
+	type Heap_Element is mod 2 ** System.Storage_Unit;
+	type Heap_Size is range 0 .. (2 ** (System.Word_Size - 1)) - 1;
+
+	-- -----------------------------------------------------------------------
 
 	-- An object pointer takes up as many bytes as a system word.
 	Object_Pointer_Bits: constant := System.Word_Size;
@@ -173,8 +212,8 @@ package H2.Scheme is
 		-- Object payload:
 		--  I assume that the smallest payload is able to hold an 
 		--  object pointer by specifying the alignement attribute 
-		--  to Object_Pointer_Bytes. this implementation will break
-		--  severely if this assumption is not correct.
+		--  to Object_Pointer_Bytes and checking the minimum allocation
+		--  size in Allocate_Bytes_In_Heap().
 		case Kind is
 			when Moved_Object =>
 				New_Pointer: Object_Pointer := null;
@@ -248,25 +287,71 @@ package H2.Scheme is
 	pragma Inline (Pointer_To_Byte);
 
 	-- -----------------------------------------------------------------------------
-	-- While I could define Heap_Element and Heap_Size to be
-	-- the subtype of Object_Byte and Object_Size each, they are not
-	-- logically the same thing.
-	-- subtype Storage_Element is Object_Byte;
-	-- subtype Storage_Count is Object_Size;
-	type Heap_Element is mod 2 ** System.Storage_Unit;
-	type Heap_Size is range 0 .. (2 ** (System.Word_Size - 1)) - 1;
+
+
+	type Stream_Record is abstract tagged limited null record;
+
+	procedure Open (Stream: in out Stream_Record) is abstract;
+
+	procedure Close (Stream: in out Stream_Record) is abstract;
+
+	procedure Read (Stream: in out Stream_Record;
+	                Data:   out    Object_String;
+	                Last:   out    Standard.Natural) is abstract;
+
+	procedure Write (Stream: in out Stream_Record;
+	                 Data:   out    Object_String;
+	                 Last:   out    Standard.Natural) is abstract;
+
+	type Stream_Pointer is access all Stream_Record'Class;
+
+	type Stream_Allocator is access 
+		procedure (Interp: in out Interpreter_Record; 
+		           Name:   access Object_String;
+		           Result: out Stream_Pointer);
+
+	type Stream_Deallocator is access 
+		procedure (Interp: in out Interpreter_Record; 
+		           Source: in out Stream_Pointer);
+
+
+	type IO_Flags is mod 2 ** 4;
+	IO_End_Reached: constant IO_Flags := IO_Flags'(2#0001#); 
+	IO_Error_Occurred: constant IO_Flags := IO_Flags'(2#0001#); 
+
+	type IO_Record;
+	type IO_Pointer is access all IO_Record;
+
+	type IO_Record is record
+	--type IO_Record is limited record
+		Stream: Stream_Pointer := null;
+		--Data: Object_String(1..2048) := (others => ' ');
+		Data: Object_String(1..5) := (others => ' ');
+		Last: Standard.Natural := 0;
+		Pos: Standard.Natural := 0;
+		Flags: IO_Flags := 0; -- EOF, ERROR
+		Next: IO_Pointer;
+	end record;
+
+
+	-- -----------------------------------------------------------------------------
 
 	type Trait_Mask is mod 2 ** System.Word_Size;
 	No_Garbage_Collection: constant Trait_Mask := 2#0000_0000_0000_0001#;
 	No_Optimization:       constant Trait_Mask := 2#0000_0000_0000_0010#;
 
-	type Option_Kind is (Trait_Option);
+	type Option_Kind is (Trait_Option, Stream_Option);
 	type Option_Record (Kind: Option_Kind) is record
 		case Kind is
 			when Trait_Option =>
 				Trait_Bits: Trait_Mask := 0;
+
+			when Stream_Option =>
+				Allocate: Stream_Allocator := null;
+				Deallocate: Stream_Deallocator := null;
 		end case;
 	end record;  
+
 
 	-- -----------------------------------------------------------------------------
 
@@ -297,26 +382,6 @@ package H2.Scheme is
 
 	-- -----------------------------------------------------------------------------
 
-	type Interpreter_Record is limited private;
-
-	type Interpreter_Text_IO_Record is abstract tagged null record;
-
-	procedure Open (IO:   in out Interpreter_Text_IO_Record;
-	                Name: in     Object_String) is abstract;
-
-	procedure Close (IO: in out Interpreter_Text_IO_Record) is abstract;
-
-	procedure Read (IO:   in out Interpreter_Text_IO_Record;
-	                Data: in     Object_String;
-	                Last: in     Standard.Natural) is abstract;
-
-	procedure Write (IO:   in out Interpreter_Text_IO_Record;
-	                 Data: out    Object_String;
-	                 Last: out    Standard.Natural) is abstract;
-		
-	
-	-- -----------------------------------------------------------------------------
-
 procedure Make_Test_Object (Interp: in out Interpreter_Record; Result: out Object_Pointer);
 
 	procedure Open (Interp:           in out Interpreter_Record;
@@ -325,6 +390,21 @@ procedure Make_Test_Object (Interp: in out Interpreter_Record; Result: out Objec
 
 	procedure Close (Interp: in out Interpreter_Record);
 
+	function Get_Storage_Pool (Interp: in Interpreter_Record) return Storage_Pool_Pointer;
+
+	procedure Set_Option (Interp: in out Interpreter_Record;
+	                      Option: in     Option_Record);
+
+	procedure Get_Option (Interp: in out Interpreter_Record;
+	                      Option: in out Option_Record);
+	
+	procedure Set_Input_Stream  (Interp: in out Interpreter_Record;
+	                             Stream: in out Stream_Record'Class);
+
+	-- Source must be open for Read() to work.
+	procedure Read (Interp: in out Interpreter_Record;
+	                Result: out    Object_Pointer);
+
 	procedure Evaluate (Interp: in out Interpreter_Record;
 	                    Source: in     Object_Pointer;
 	                    Result: out    Object_Pointer);
@@ -332,12 +412,8 @@ procedure Make_Test_Object (Interp: in out Interpreter_Record; Result: out Objec
 	procedure Print (Interp: in out Interpreter_Record;
 	                 Source: in     Object_Pointer);
 
-	procedure Set_Option (Interp: in out Interpreter_Record;
-	                      Option: in     Option_Record);
-
-	procedure Get_Option (Interp: in out Interpreter_Record;
-	                      Option: in out Option_Record);
-
+	procedure Run_Loop (Interp: in out Interpreter_Record;
+	                    Result: out    Object_Pointer);
 
 	-- -----------------------------------------------------------------------------
 
@@ -361,12 +437,13 @@ private
 		Next:  Object_Pointer := Nil_Pointer;
 	end record;
 
-	type Interpreter_Pointer is access all Interpreter_Record;
 	--type Interpreter_Record is tagged limited record
 	type Interpreter_Record is limited record
-		Self: Interpreter_Pointer := null;
+		--Self: Interpreter_Pointer := null;
+		Self: Interpreter_Pointer := Interpreter_Record'Unchecked_Access; -- Current instance's pointer
 		Storage_Pool: Storage_Pool_Pointer := null;
 		Trait: Option_Record(Trait_Option);
+		Stream: Option_Record(Stream_Option);
 
 		Heap: Heap_Pointer_Array := (others => null);
 		Current_Heap: Heap_Number := Heap_Number'First;
@@ -380,9 +457,9 @@ private
 
 		R: Register_Record;
 
-		Line: Object_String(1..1024);
-		Line_Last: Standard.Natural;
-		Line_Pos: Standard.Natural;
+		-- TODO: Buffer_Record needs to be stacked to handle "load".
+		Input: aliased IO_Record;
+		IO: IO_Pointer := null;
 	end record;
 
 end H2.Scheme;

@@ -22,17 +22,21 @@ package body H2.Scheme is
 	type Heap_Element_Pointer is access all Heap_Element;
 	for Heap_Element_Pointer'Size use Object_Pointer_Bits; -- ensure that it can be overlayed by an ObjectPointer
 
+
 	type Thin_Heap_Element_Array is array (1 .. Heap_Size'Last) of Heap_Element;
 	type Thin_Heap_Element_Array_Pointer is access all Thin_Heap_Element_Array;
 	for Thin_Heap_Element_Array_Pointer'Size use Object_Pointer_Bits;
 
-	subtype Opcode_Type is Object_Integer range 0 .. 5;
+	subtype Moved_Object_Record is Object_Record (Moved_Object, 0);
+
+	subtype Opcode_Type is Object_Integer range 0 .. 6;
 	Opcode_Exit:               constant Opcode_Type := Opcode_Type'(0);
 	Opcode_Evaluate_Object:    constant Opcode_Type := Opcode_Type'(1);
 	Opcode_Evaluate_Group:     constant Opcode_Type := Opcode_Type'(2);
 	Opcode_Evaluate_Syntax:    constant Opcode_Type := Opcode_Type'(3);
 	Opcode_Evaluate_Procedure: constant Opcode_Type := Opcode_Type'(4);
 	Opcode_Apply:              constant Opcode_Type := Opcode_Type'(5);
+	Opcode_Read_Object:        constant Opcode_Type := Opcode_Type'(6);
 
 	-----------------------------------------------------------------------------
 	-- COMMON OBJECTS
@@ -58,13 +62,10 @@ package body H2.Scheme is
 	Closure_Code_Index: constant Pointer_Object_Size := 1;
 	Closure_Environment_Index: constant Pointer_Object_Size := 2;
 
-	Pair_Object_Size: constant Pointer_Object_Size := 3;
-	Pair_Key_Size: constant Pointer_Object_Size := 1;
-	Pair_Value_Size: constant Pointer_Object_Size := 2;
-	Pair_Link_Size: constant Pointer_Object_Size := 3;
-
-	procedure Set_New_Location (Object: in Object_Pointer; Ptr: in Heap_Element_Pointer);
-	procedure Set_New_Location (Object: in Object_Pointer; Ptr: in Object_Pointer);
+	procedure Set_New_Location (Object: in Object_Pointer;
+	                            Ptr:    in Heap_Element_Pointer);
+	procedure Set_New_Location (Object: in Object_Pointer;
+	                            Ptr:    in Object_Pointer);
 	pragma Inline (Set_New_Location);
 
 	function Get_New_Location (Object: in Object_Pointer) return Object_Pointer;
@@ -116,7 +117,6 @@ package body H2.Scheme is
 	begin
 		return Get_Pointer_Type(Pointer) = Object_Pointer_Type_Byte;
 	end Is_Byte;
-
 
 	function Integer_To_Pointer (Int: in Object_Integer) return Object_Pointer is
 		Pointer: Object_Pointer;
@@ -389,7 +389,6 @@ package body H2.Scheme is
 	-- object takes up the smallest space that a valid object can take. So
 	-- it is safe to overlay it on any normal objects.
 	procedure Set_New_Location (Object: in Object_Pointer; Ptr: in Heap_Element_Pointer) is
-		subtype Moved_Object_Record is Object_Record (Moved_Object, 0);
 		Moved_Object: Moved_Object_Record;
 		for Moved_Object'Address use Object.all'Address;
 		-- pramga Import must not be specified here as I'm counting
@@ -402,7 +401,6 @@ package body H2.Scheme is
 	end Set_New_Location;
 
 	procedure Set_New_Location (Object: in Object_Pointer; Ptr: in Object_Pointer) is
-		subtype Moved_Object_Record is Object_Record (Moved_Object, 0);
 		Moved_Object: Moved_Object_Record;
 		for Moved_Object'Address use Object.all'Address;
 		--pragma Import (Ada, Moved_Object); -- this must not be used.
@@ -419,14 +417,21 @@ package body H2.Scheme is
 	                                 Heap_Bytes: in     Heap_Size) return Heap_Element_Pointer is
 		Avail: Heap_Size;
 		Result: Heap_Element_Pointer;
+		Real_Bytes: Heap_Size := Heap_Bytes;
 	begin
+		if Real_Bytes < Moved_Object_Record'Max_Size_In_Storage_Elements then
+			-- Guarantee the minimum object size to be greater than or 
+			-- equal to the size of a moved object for GC to work.
+			Real_Bytes := Moved_Object_Record'Max_Size_In_Storage_Elements;	
+		end if;
+
 		Avail := Heap.Size - Heap.Bound;
-		if Heap_Bytes > Avail then
+		if Real_Bytes > Avail then
 			return null;
 		end if;
 		
 		Result := Heap.Space(Heap.Bound + 1)'Unchecked_Access;
-		Heap.Bound := Heap.Bound + Heap_Bytes;
+		Heap.Bound := Heap.Bound + Real_Bytes;
 		return Result;
 	end Allocate_Bytes_In_Heap;
 
@@ -446,7 +451,7 @@ package body H2.Scheme is
 		-- Target_Object_Record'Max_Size_In_Stroage_Elements were not
 		-- always correct. For example, for a character object containing
 		-- the string "lambda", Target_Object.all'Size returned 72 while
-		-- it's supposed to be 96. 
+		-- it's supposed to be 96. Use Copy_Object_With_Size() below instead.
 		Target_Object.all := Source.all;
 		pragma Assert (Source.all'Size = Target_Object.all'Size);
 	end Copy_Object;
@@ -1313,6 +1318,7 @@ Put_String (To_Thin_String_Pointer (Result));
 					Heap := Pool.Allocate;
 				end;
 			end loop;
+
 		exception
 			when others =>
 				Deinitialize_Heap (Interp);
@@ -1376,33 +1382,60 @@ Put_String (To_Thin_String_Pointer (Result));
 		Interp.Root_Table := Nil_Pointer;
 		Interp.Symbol_Table := Nil_Pointer;
 
-		Interp.Line_Pos := Interp.Line'First - 1;
-		Interp.Line_Last := Interp.Line'First - 1;
+		Interp.Input.Stream := null;
+		Interp.IO := Interp.Input'Unchecked_Access;
 
 -- TODO: disallow garbage collecion during initialization.
+Text_IO.Put_Line ("1111111111");
 		Initialize_Heap (Initial_Heap_Size);
 		Interp.Mark := Make_Mark (Interp.Self, 0); -- to indicate the end of cons evluation
 		Interp.Root_Environment := Make_Environment (Interp.Self, Nil_Pointer);
 		Interp.Environment := Interp.Root_Environment;
 		Make_Syntax_Objects;
 		Make_Procedure_Objects;
+Text_IO.Put_Line ("99999");
 
 	exception
 		when others =>
 			Deinitialize_Heap (Interp);
 	end Open;
 
+	procedure Close_Stream (Stream: in out Stream_Pointer) is
+	begin
+		Close (Stream.all);
+		Stream := null;
+	exception
+		when others =>
+			Stream := null; -- ignore exception
+	end Close_Stream;
+
+	procedure Close_All_Streams (Interp: in out Interpreter_Record) is
+	begin
+		-- TODO: close all cascaded streams if any.
+		if Interp.Input.Stream /= null then
+			Close_Stream (Interp.Input.Stream);
+		end if;
+	end Close_All_Streams;
+
 	procedure Close (Interp: in out Interpreter_Record) is
 	begin
+		Close_All_Streams (Interp);
 		Deinitialize_Heap (Interp);
 	end Close;
+
+	function Get_Storage_Pool (Interp: in Interpreter_Record) return Storage_Pool_Pointer is
+	begin
+		return Interp.Storage_Pool;	
+	end Get_Storage_Pool;
 
 	procedure Set_Option (Interp: in out Interpreter_Record;
 	                      Option: in     Option_Record) is
 	begin
 		case Option.Kind  is
-		when Trait_Option =>
+			when Trait_Option =>
 				Interp.Trait := Option;
+			when Stream_Option =>
+				Interp.Stream := Option;
 		end case;
 	end Set_Option;
 
@@ -1410,36 +1443,123 @@ Put_String (To_Thin_String_Pointer (Result));
 	                      Option: in out Option_Record) is
 	begin
 		case Option.Kind  is
-		when Trait_Option =>
+			when Trait_Option =>
 				Option := Interp.Trait;
+			when Stream_Option =>
+				Option := Interp.Stream;
 		end case;
 	end Get_Option;
+
+	procedure Set_Input_Stream  (Interp: in out Interpreter_Record;
+	                             Stream: in out Stream_Record'Class) is
+	begin
+		--Open (Stream, Interp);		
+		Open (Stream);
+
+		-- if Open raised an exception, it wouldn't reach here.
+		-- so the existing stream still remains intact.
+		if Interp.Input.Stream /= null then
+			Close_Stream (Interp.Input.Stream);
+		end if;
+
+		--Interp.Input := IO_Record'(
+		--	Stream => Stream'Unchecked_Access,
+		--	Data => (others => ' '),
+		--	Pos => Interp.Input.Data'First - 1,
+		--	Last => Interp.Input.Data'First - 1, 
+		--	Flags => 0
+		--);
+		Interp.Input.Stream := Stream'Unchecked_Access;
+		Interp.Input.Pos := Interp.Input.Data'First - 1; 
+		Interp.Input.Last := Interp.Input.Data'First - 1; 
+		Interp.Input.Flags := 0;
+	end Set_Input_Stream;
+
+	--procedure Set_Output_Stream (Interp: in out Interpreter_Record;
+	--                             Stream: in out Stream_Record'Class) is
+	--begin
+	--	
+	--end Set_Output_Stream;
+
+	procedure Start_Input_Stream (Interp: in out Interpreter_Record;
+	                        Name:   access Object_String) is
+		package IO_Pool is new H2.Pool (IO_Record, IO_Pointer, Interp.Storage_Pool);
+		IO: IO_Pointer;
+	begin
+		IO := IO_Pool.Allocate;
+		begin
+			Interp.Stream.Allocate (Interp, Name, IO.Stream);
+		exception
+			when others =>	
+				IO_Pool.Deallocate (IO);
+				raise;
+		end;
+
+		begin
+			Open (IO.Stream.all);
+		exception
+			when others =>
+				Interp.Stream.Deallocate (Interp, IO.Stream);
+				IO_Pool.Deallocate (IO);
+			raise;
+		end;
+		IO.Pos := IO.Data'First - 1;
+		IO.Last := IO.Data'First - 1;
+		IO.Flags := 0;
+
+		IO.Next := Interp.IO;
+		Interp.IO := IO;
+	end Start_Input_Stream;
+
+	procedure Stop_Input_Stream (Interp: in out Interpreter_Record) is
+		package IO_Pool is new H2.Pool (IO_Record, IO_Pointer, Interp.Storage_Pool);
+		IO: IO_Pointer;
+	begin
+		pragma Assert (Interp.IO /= Interp.Input'Unchecked_Access);
+		IO := Interp.IO;
+		Interp.IO := IO.Next;
+
+		Interp.Stream.Deallocate (Interp, IO.Stream);
+		IO_Pool.Deallocate (IO);
+	end Stop_Input_Stream;
 
 	procedure Read (Interp: in out Interpreter_Record;
 	                Result: out    Object_Pointer) is
 
-		EOF_Error: exception;
+		End_Error: exception;
 
 		function Get_Character return Object_Character is
 		begin
-			if Interp.Line_Pos >= Interp.Line_Last then
-				if Text_IO.End_Of_File then
-					raise EOF_Error;
+		-- TODO: calculate Interp.Input.Row, Interp.Input.Column
+			if Interp.Input.Pos >= Interp.Input.Last then
+				if Interp.Input.Flags /= 0 then
+					-- an error has occurred previously.
+					raise End_Error;
 				end if;
-				Text_IO.Get_Line (Interp.Line, Interp.Line_Last);
-				Interp.Line_Pos := Interp.Line'First - 1;
-			end if;
 
-			Interp.Line_Pos := Interp.Line_Pos + 1;
-			return Interp.Line(Interp.Line_Pos);
+				Interp.Input.Pos := Interp.Input.Data'First - 1;
+				begin
+					Read (Interp.Input.Stream.all, Interp.Input.Data, Interp.Input.Last);
+				exception
+					when others =>
+						Interp.Input.Flags := Interp.Input.Flags and IO_Error_Occurred;
+						raise End_Error; -- TODO: change the exception name
+				end;
+				if Interp.Input.Last < Interp.Input.Data'First then	
+					Interp.Input.Flags := Interp.Input.Flags and IO_End_Reached;
+					raise End_Error;
+				end if;
+			end if;
+			Interp.Input.Pos := Interp.Input.Pos + 1;
+			return Interp.Input.Data(Interp.Input.Pos);
 		end Get_Character;
 
 		procedure Skip_Space is
 		begin
 			null;
 		end Skip_Space;
-		
-		--function Get_Token is
+
+		--function Get_Token return Token_Type is
 		--begin
 		--	null;	
 		--end Get_Token;
@@ -1452,13 +1572,23 @@ Put_String (To_Thin_String_Pointer (Result));
 		Stack: Object_Pointer;
 		Opcode: Object_Integer;
 		Operand: Object_Pointer;
+
+		C: Object_Character;
 	begin
 		--Opcode := 1;
 		--loop
 		--	case Opcode is
 		--		when 1 =>
 		--end loop;
-		null;
+		loop
+			C := Get_Character;
+			Text_IO.Put (C);
+		end loop;
+
+	exception
+		when End_Error =>
+			TEXT_IO.New_Line;
+			Text_IO.Put_Line ("END OF INPUT...");
 	end Read;
 	          
 	procedure Print (Interp: in out Interpreter_Record; 
@@ -1694,7 +1824,7 @@ Interp.Root_Table := Make_Symbol (Interp.Self, "lambda");
 
 		--X := Make_Cons (Interp.Self, Nil_Pointer, Make_Cons (Interp.Self, Nil_Pointer, Integer_To_Pointer(TEN)));
 		--X := Make_Cons (Interp.Self, Nil_Pointer, Nil_Pointer);
-		Read (Interp, X);
+		--Read (Interp, X);
 		Print (Interp, X);
 
 	end Evaluatex;
@@ -2301,6 +2431,62 @@ Print (Interp, Operand);
 			end case;
 		end Apply;
 
+		procedure Read_Object is
+
+--			function Get_Character return Object_Character is
+--			begin
+--				if Interp.Line_Pos >= Interp.Line_Last then
+--					if Text_IO.End_Of_File then
+--						raise EOF_Error;
+--					end if;
+--					Text_IO.Get_Line (Interp.Line, Interp.Line_Last);
+--					Interp.Line_Pos := Interp.Line'First - 1;
+--				end if;
+--	
+--				Interp.Line_Pos := Interp.Line_Pos + 1;
+--				return Interp.Line(Interp.Line_Pos);
+--			end Get_Character;
+
+--			type Input_Object_Record is
+--			end record;
+--			Read (Input_Object_Record);
+--			Write (Input_Object_Record);
+--			Close (Input_Object_Record);
+--
+--			type Input_Object_Class_Pointer is access all Input_Object_Record'Class;
+--
+--			type Input_Record is record
+--				Pos: Standard.Natural;
+--				Last: Standard.Natural;
+--				Buffer: Object_String (1 .. 1024);
+--				Handle: Input_Object_Class_Pointer;
+--			end record;
+--			function Get_Character return Object_Character is
+--			begin
+--				if Interp.Input.Pos >= Interp.Input.Last then
+--					Read (Interp.Input.Handle, Interp.Input.Buffer, Interp.Input.Last);
+--					Interp.Input.Pos := Interp.Input.Buffer'First - 1;
+--				end if;
+--
+--				Interp.Input.Pos := Interp.Input.Pos + 1;
+--				return Interp.Input.Buffer(Interp.Input.Pos);
+--			end Get_Character;
+
+		begin
+			null;
+
+			--if Interp.Input.Handle = null then
+			--	Interp.Input.Handle := Interp.Tio ("");
+			--	Interp.Input.Pos := 0;
+			--	Interp.Input.Last := 0;
+			--end if;
+
+			-- In Interp.Close()
+			-- if Interp.Input.Handle /= null then
+			-- 	Close (Interp.Input.Handle);
+			--end if;
+		end Read_Object;
+
 	begin
 		
 		-- Stack frames looks like this upon initialization
@@ -2373,6 +2559,11 @@ Print (Interp, Operand);
 
 		loop
 			case Get_Frame_Opcode(Interp.Stack) is
+				when Opcode_Exit =>
+					Result := Get_Frame_Return (Interp.Stack);
+					Pop_Frame;
+					exit;
+
 				when Opcode_Evaluate_Object =>
 					Evaluate_Object;
 
@@ -2388,10 +2579,8 @@ Print (Interp, Operand);
 				when Opcode_Apply =>
 					Apply;
 
-				when Opcode_Exit =>
-					Result := Get_Frame_Return (Interp.Stack);
-					Pop_Frame;
-					exit;
+				when Opcode_Read_Object =>
+					Read_Object;
 			end case;
 		end loop;
 
@@ -2405,6 +2594,13 @@ Print (Interp, Operand);
 			-- TODO: restore envirronemtn frame???
 	end Evaluate;
 
+	procedure Run_Loop (Interp: in out Interpreter_Record;
+	                Result: out    Object_Pointer) is
+		-- standard read-eval-print loop
+	begin
+		null;
+	end Run_Loop;
+	
 	-----------------------------------------------------------------------------
 
 	function h2scm_open return Interpreter_Pointer;
