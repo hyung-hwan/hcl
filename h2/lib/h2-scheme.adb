@@ -5,7 +5,23 @@ with System.Address_To_Access_Conversions;
 with Ada.Unchecked_Deallocation; -- for h2scm c interface. TOOD: move it to a separate file
 with Interfaces.C;
 
+
+-- XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXx
+with Ada.Characters.Handling;
+with Ada.Characters.Conversions;
+with Ada.Wide_Characters.Handling;
+
+-- TODO: delete these after debugging
+with ada.text_io;
+with ada.wide_text_io;
+-- TODO: delete above after debugging
+
+-- XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXx
+
 package body H2.Scheme is
+
+	function To_Object_String (Item: in Standard.String) return Object_String renames Ada.Characters.Conversions.To_Wide_String;
+	package Text_IO renames ada.Wide_Text_IO;
 
 	-----------------------------------------------------------------------------
 	-- EXCEPTIONS
@@ -15,6 +31,7 @@ package body H2.Scheme is
 	Syntax_Error: exception;
 	Evaluation_Error: exception;
 	Internal_Error: exception;
+	IO_Error: exception;
 
 	-----------------------------------------------------------------------------
 	-- INTERNALLY-USED TYPES
@@ -158,7 +175,7 @@ package body H2.Scheme is
 		--   or short. In reality, the last Unicode code point assigned is far
 		--   less than #16#7FFFFFFF# as of this writing. So I should not be
 		--   worried about it for the time being.
-		Word := Object_Character'Pos (Char);
+		Word := Object_Character'Pos(Char);
 		Word := (Word * (2 ** Object_Pointer_Type_Bits)) or Object_Word(Object_Pointer_Type_Character);
 		--return Object_Word_To_Object_Pointer (Word);
 		return Pointer;
@@ -199,7 +216,7 @@ package body H2.Scheme is
 	function Pointer_To_Character (Pointer: in Object_Pointer) return Object_Character is
 		Word: Object_Word := Pointer_To_Word (Pointer);
 	begin
-		return Object_Character'Val (Word / (2 ** Object_Pointer_Type_Bits));
+		return Object_Character'Val(Word / (2 ** Object_Pointer_Type_Bits));
 	end Pointer_To_Character;
 
 	function Pointer_To_Byte (Pointer: in Object_Pointer) return Object_Byte is
@@ -269,7 +286,7 @@ package body H2.Scheme is
 		end;
 	end Copy_String;
 
-	function To_String (Source: in Object_Character_Array) return Object_String is
+	function Character_Array_To_String (Source: in Object_Character_Array) return Object_String is
 	begin
 		-- ObjectAda complains that the member of Object_String is not 
 		-- aliased because Object_Character_Array is an array of aliased
@@ -283,7 +300,7 @@ package body H2.Scheme is
 			return To_Character_Array (Source (Source'First .. Source'Last - 1));
 			--return String_Array (Source (Source'First .. Source'Last - 1));
 		end;
-	end To_String;
+	end Character_Array_To_String;
 
 	type Thin_String is new Object_String (Standard.Positive'Range);
 	type Thin_String_Pointer is access all Thin_String;
@@ -329,20 +346,22 @@ package body H2.Scheme is
 	begin
 		Ptr_Type := Get_Pointer_Type(Source);
 		if Ptr_Type = Object_Pointer_Type_Character then
-			Text_IO.Put_Line (Msg & Object_Character'Image(Pointer_To_Character(Source)));
+			Text_IO.Put_Line (Msg & To_Object_String(Object_Character'Image(Pointer_To_Character(Source))));
 		elsif Ptr_Type = Object_Pointer_Type_Integer then
-			Text_IO.Put_Line (Msg & Object_Integer'Image(Pointer_To_Integer(Source)));
+			Text_IO.Put_Line (Msg & To_Object_String(Object_Integer'Image(Pointer_To_Integer(Source))));
 		elsif Is_Special_Pointer (Source) then
-			Text_IO.Put_Line (Msg & " at " & Object_Word'Image(W));
+			Text_IO.Put_Line (Msg & " at " & To_Object_String(Object_Word'Image(W)));
 		elsif Source.Kind = Character_Object then
-			Text_IO.Put (Msg & " at " & Object_Word'Image(W) & " at " & Object_Kind'Image(Source.Kind) & " size " & Object_Size'Image(Source.Size) & " - ");
+			Text_IO.Put (Msg & " at " & To_Object_String(Object_Word'Image(W)) & 
+			                   " at " & To_Object_String(Object_Kind'Image(Source.Kind)) & 
+			                   " size " & To_Object_String(Object_Size'Image(Source.Size)) & " - ");
 			if Source.Kind = Moved_Object then
-				Text_IO.Put_Line (To_String (Get_New_Location(Source).Character_Slot));
+				Text_IO.Put_Line (Character_Array_To_String (Get_New_Location(Source).Character_Slot));
 			else
-				Text_IO.Put_Line (To_String (Source.Character_Slot));
+				Text_IO.Put_Line (Character_Array_To_String (Source.Character_Slot));
 			end if;
 		else
-			Text_IO.Put_Line (Msg & " at " & Object_Word'Image(W) & " at " & Object_Kind'Image(Source.Kind));
+			Text_IO.Put_Line (Msg & " at " & To_Object_String(Object_Word'Image(W)) & " at " & To_Object_String(Object_Kind'Image(Source.Kind)));
 		end if;
 	end Print_Object_Pointer;
 
@@ -541,8 +560,8 @@ Print_Object_Pointer ("Moving REALLY ...", Object);
 					-- if the object is marked with FLAG_MOVED;
 					Set_New_Location (Object, Ptr);
 
-Text_IO.Put_Line (Object_Word'Image(Pointer_To_Word(Object)) & Object_Word'Image(Pointer_To_Word(New_Object)));
-Text_IO.Put_Line ("  Flags....after " & Object_Kind'Image(Object.Kind) & " New Size " & Object_Size'Image(Object.Size) & " New Loc: " & Object_Word'Image(Pointer_To_Word(Object.New_Pointer)));
+Ada.Text_IO.Put_Line (Object_Word'Image(Pointer_To_Word(Object)) & Object_Word'Image(Pointer_To_Word(New_Object)));
+Ada.Text_IO.Put_Line ("  Flags....after " & Object_Kind'Image(Object.Kind) & " New Size " & Object_Size'Image(Object.Size) & " New Loc: " & Object_Word'Image(Pointer_To_Word(Object.New_Pointer)));
 					-- Return the new object
 					return New_Object;
 				end;
@@ -614,7 +633,7 @@ Text_IO.Put_Line ("  Flags....after " & Object_Kind'Image(Object.Kind) & " New S
 						-- A non-syntax symbol has not been moved. 
 						-- Unlink the cons cell from the symbol table.
 
-Text_IO.Put_Line ("COMPACT_SYMBOL_TABLE Unlinking " & To_String (Car.Character_Slot));
+Text_IO.Put_Line ("COMPACT_SYMBOL_TABLE Unlinking " & Character_Array_To_String (Car.Character_Slot));
 						if Pred = Nil_Pointer then
 							Interp.Symbol_Table := Cdr;
 						else
@@ -1296,6 +1315,70 @@ Put_String (To_Thin_String_Pointer (Result));
 		end loop;
 	end Deinitialize_Heap;
 
+	procedure Close_Stream (Stream: in out Stream_Pointer) is
+	begin
+		Close (Stream.all);
+		Stream := null;
+	exception
+		when others =>
+			Stream := null; -- ignore exception
+	end Close_Stream;
+
+	procedure Start_Named_Input_Stream (Interp: in out Interpreter_Record;
+	                                    Name:   in     Constant_Object_String_Pointer) is
+		package IO_Pool is new H2.Pool (IO_Record, IO_Pointer, Interp.Storage_Pool);
+
+		IO: IO_Pointer := null;
+		Stream: Stream_Pointer := null;
+	begin
+		begin
+			IO := IO_Pool.Allocate;
+			Interp.Stream.Allocate (Interp, Name, Stream);
+		exception
+			when others =>	
+				if IO /= null then
+					if Stream /= null then
+						Interp.Stream.Deallocate (Interp, Stream);
+					end if;
+					IO_Pool.Deallocate (IO);
+				end if;
+				raise;
+		end;
+
+		--IO.Stream := Stream;
+		--IO.Pos := IO.Data'First - 1;
+		--IO.Last := IO.Data'First - 1;
+		--IO.Flags := 0;
+		--IO.Next := Interp.Input;
+		--Interp.Input := IO;
+
+		IO.all := IO_Record'(
+			Stream => Stream,
+			Data => (others => ' '),
+			Pos | Last => IO.Data'First - 1,
+			Flags => 0,
+			Next => Interp.Input,
+			Iochar => IO_Character_Record'(End_Character, Object_Character'First)
+		);
+		Interp.Input := IO;
+	end Start_Named_Input_Stream;
+
+	procedure Stop_Named_Input_Stream (Interp: in out Interpreter_Record) is
+		package IO_Pool is new H2.Pool (IO_Record, IO_Pointer, Interp.Storage_Pool);
+		IO: IO_Pointer;
+	begin
+		pragma Assert (Interp.Input /= Interp.Base_Input'Unchecked_Access);
+		IO := Interp.Input;
+		Interp.Input := IO.Next;
+
+		pragma Assert (IO.Stream /= null);
+		Close_Stream (IO.Stream);
+		Interp.Stream.Deallocate (Interp, IO.Stream);
+		IO_Pool.Deallocate (IO);
+	end Stop_Named_Input_Stream;
+
+	-----------------------------------------------------------------------------
+
 	procedure Open (Interp:            in out Interpreter_Record;
 	                Initial_Heap_Size: in     Heap_Size;
 	                Storage_Pool:      in     Storage_Pool_Pointer := null) is
@@ -1382,8 +1465,8 @@ Put_String (To_Thin_String_Pointer (Result));
 		Interp.Root_Table := Nil_Pointer;
 		Interp.Symbol_Table := Nil_Pointer;
 
-		Interp.Input.Stream := null;
-		Interp.IO := Interp.Input'Unchecked_Access;
+		Interp.Base_Input.Stream := null;
+		Interp.Input := Interp.Base_Input'Unchecked_Access;
 
 -- TODO: disallow garbage collecion during initialization.
 Text_IO.Put_Line ("1111111111");
@@ -1395,31 +1478,25 @@ Text_IO.Put_Line ("1111111111");
 		Make_Procedure_Objects;
 Text_IO.Put_Line ("99999");
 
+Text_IO.Put_Line (To_Object_String(IO_Character_Record'Size'Img));
+Text_IO.Put_Line (To_Object_String(IO_Character_Record'Max_Size_In_Storage_Elements'Img));
 	exception
 		when others =>
 			Deinitialize_Heap (Interp);
 	end Open;
 
-	procedure Close_Stream (Stream: in out Stream_Pointer) is
-	begin
-		Close (Stream.all);
-		Stream := null;
-	exception
-		when others =>
-			Stream := null; -- ignore exception
-	end Close_Stream;
-
-	procedure Close_All_Streams (Interp: in out Interpreter_Record) is
-	begin
-		-- TODO: close all cascaded streams if any.
-		if Interp.Input.Stream /= null then
-			Close_Stream (Interp.Input.Stream);
-		end if;
-	end Close_All_Streams;
-
 	procedure Close (Interp: in out Interpreter_Record) is
 	begin
-		Close_All_Streams (Interp);
+		-- Destroy all unstacked named input streams 
+		while Interp.Input /= Interp.Base_Input'Unchecked_Access loop
+			Stop_Named_Input_Stream (Interp);
+		end loop;
+
+		if Interp.Base_Input.Stream /= null then
+			-- Close the main input stream.
+			Close_Stream (Interp.Base_Input.Stream);
+		end if;
+
 		Deinitialize_Heap (Interp);
 	end Close;
 
@@ -1458,21 +1535,18 @@ Text_IO.Put_Line ("99999");
 
 		-- if Open raised an exception, it wouldn't reach here.
 		-- so the existing stream still remains intact.
-		if Interp.Input.Stream /= null then
-			Close_Stream (Interp.Input.Stream);
+		if Interp.Base_Input.Stream /= null then
+			Close_Stream (Interp.Base_Input.Stream);
 		end if;
 
-		--Interp.Input := IO_Record'(
-		--	Stream => Stream'Unchecked_Access,
-		--	Data => (others => ' '),
-		--	Pos => Interp.Input.Data'First - 1,
-		--	Last => Interp.Input.Data'First - 1, 
-		--	Flags => 0
-		--);
-		Interp.Input.Stream := Stream'Unchecked_Access;
-		Interp.Input.Pos := Interp.Input.Data'First - 1; 
-		Interp.Input.Last := Interp.Input.Data'First - 1; 
-		Interp.Input.Flags := 0;
+		Interp.Base_Input := IO_Record'(
+			Stream => Stream'Unchecked_Access,
+			Data => (others => Object_Character'First),
+			Pos | Last => Interp.Base_Input.Data'First - 1,
+			Flags => 0,
+			Next => null,
+			Iochar => IO_Character_Record'(End_Character, Object_Character'First)
+		);
 	end Set_Input_Stream;
 
 	--procedure Set_Output_Stream (Interp: in out Interpreter_Record;
@@ -1481,60 +1555,19 @@ Text_IO.Put_Line ("99999");
 	--	
 	--end Set_Output_Stream;
 
-	procedure Start_Input_Stream (Interp: in out Interpreter_Record;
-	                        Name:   access Object_String) is
-		package IO_Pool is new H2.Pool (IO_Record, IO_Pointer, Interp.Storage_Pool);
-		IO: IO_Pointer;
-	begin
-		IO := IO_Pool.Allocate;
-		begin
-			Interp.Stream.Allocate (Interp, Name, IO.Stream);
-		exception
-			when others =>	
-				IO_Pool.Deallocate (IO);
-				raise;
-		end;
-
-		begin
-			Open (IO.Stream.all);
-		exception
-			when others =>
-				Interp.Stream.Deallocate (Interp, IO.Stream);
-				IO_Pool.Deallocate (IO);
-			raise;
-		end;
-		IO.Pos := IO.Data'First - 1;
-		IO.Last := IO.Data'First - 1;
-		IO.Flags := 0;
-
-		IO.Next := Interp.IO;
-		Interp.IO := IO;
-	end Start_Input_Stream;
-
-	procedure Stop_Input_Stream (Interp: in out Interpreter_Record) is
-		package IO_Pool is new H2.Pool (IO_Record, IO_Pointer, Interp.Storage_Pool);
-		IO: IO_Pointer;
-	begin
-		pragma Assert (Interp.IO /= Interp.Input'Unchecked_Access);
-		IO := Interp.IO;
-		Interp.IO := IO.Next;
-
-		Interp.Stream.Deallocate (Interp, IO.Stream);
-		IO_Pool.Deallocate (IO);
-	end Stop_Input_Stream;
-
 	procedure Read (Interp: in out Interpreter_Record;
 	                Result: out    Object_Pointer) is
 
-		End_Error: exception;
-
-		function Get_Character return Object_Character is
+		procedure Fetch_Character is
 		begin
 		-- TODO: calculate Interp.Input.Row, Interp.Input.Column
 			if Interp.Input.Pos >= Interp.Input.Last then
 				if Interp.Input.Flags /= 0 then
-					-- an error has occurred previously.
-					raise End_Error;
+					-- An error has occurred or EOF has been reached previously.
+					-- Note calling this procedure after EOF results in an error.
+					Interp.Input.Iochar := (Error_Character, Object_Character'First);
+					--return;
+					raise IO_Error;
 				end if;
 
 				Interp.Input.Pos := Interp.Input.Data'First - 1;
@@ -1542,27 +1575,80 @@ Text_IO.Put_Line ("99999");
 					Read (Interp.Input.Stream.all, Interp.Input.Data, Interp.Input.Last);
 				exception
 					when others =>
+						-- The callee can raise an exception upon errors.
+						-- If an exception is raised, data read into the buffer 
+						-- is also ignored.
 						Interp.Input.Flags := Interp.Input.Flags and IO_Error_Occurred;
-						raise End_Error; -- TODO: change the exception name
+						Interp.Input.Iochar := (Error_Character, Object_Character'First);
+						--return;
+						raise IO_Error;
 				end;
 				if Interp.Input.Last < Interp.Input.Data'First then	
+					-- The callee must read 0 bytes on EOF 
 					Interp.Input.Flags := Interp.Input.Flags and IO_End_Reached;
-					raise End_Error;
+					Interp.Input.Iochar := (End_Character, Object_Character'First);
+					return;
 				end if;
 			end if;
 			Interp.Input.Pos := Interp.Input.Pos + 1;
-			return Interp.Input.Data(Interp.Input.Pos);
-		end Get_Character;
+			Interp.Input.Iochar := (Normal_Character, Interp.Input.Data(Interp.Input.Pos));
+		end Fetch_Character;
 
-		procedure Skip_Space is
+		procedure Skip_Spaces is
+			C: IO_Character_Record renames Interp.Input.Iochar;
 		begin
-			null;
-		end Skip_Space;
+			loop
+				exit when C.Kind /= Normal_Character;
 
-		--function Get_Token return Token_Type is
-		--begin
-		--	null;	
-		--end Get_Token;
+				-- normal character
+				case C.Value is
+					when ' ' | 
+					     Object_Character'Val(Standard.Character'Pos(Standard.ASCII.HT))  |
+					     Object_Character'Val(Standard.Character'Pos(Standard.ASCII.VT))  |
+					     Object_Character'Val(Standard.Character'Pos(Standard.ASCII.CR))  |
+					     Object_Character'Val(Standard.Character'Pos(Standard.ASCII.LF))  |
+					     Object_Character'Val(Standard.Character'Pos(Standard.ASCII.FF))  =>
+						-- white space
+						Fetch_Character;
+
+					when ';' =>
+						-- comment. consume until EOL
+						loop
+							Fetch_Character;
+					     	exit when C.Kind = Normal_Character and then 
+							          C.Value = Object_Character'Val(Standard.Character'Pos(Standard.ASCII.LF));
+						end loop;
+
+					when others =>
+						exit;
+				end case;
+			end loop;
+		end Skip_Spaces;
+
+		procedure Fetch_Token is
+			C: IO_Character_Record renames Interp.Input.Iochar;
+		begin
+			Skip_Spaces;
+			if C.Kind /= Normal_Character then
+				Interp.Token.Kind := End_Token;
+				return;
+			end if;
+
+			case C.Value is
+				when '(' =>
+					Interp.Token := (Left_Parenthesis_Token, "(");
+
+				when ')' =>
+					Interp.Token := (Left_Parenthesis_Token, ")");
+
+				when ''' =>
+					Interp.Token := (Single_Quote_Token, ")");
+
+				when others =>
+					null;	
+			end case;
+			
+		end Fetch_Token;
 
 		procedure Read_Atom (Atom: out Object_Pointer) is
 		begin
@@ -1573,7 +1659,7 @@ Text_IO.Put_Line ("99999");
 		Opcode: Object_Integer;
 		Operand: Object_Pointer;
 
-		C: Object_Character;
+		C: IO_Character_Record renames Interp.Input.Iochar;
 	begin
 		--Opcode := 1;
 		--loop
@@ -1581,14 +1667,30 @@ Text_IO.Put_Line ("99999");
 		--		when 1 =>
 		--end loop;
 		loop
-			C := Get_Character;
-			Text_IO.Put (C);
-		end loop;
+			begin
+				Fetch_Character;
+			exception
+				when others =>
+					TEXT_IO.New_Line;
+					Text_IO.Put_Line ("INPUT ERROR...");
+					exit;
+			end;
 
-	exception
-		when End_Error =>
-			TEXT_IO.New_Line;
-			Text_IO.Put_Line ("END OF INPUT...");
+			case C.Kind is
+				when Normal_Character =>
+					Text_IO.Put (C.Value);
+
+				when End_Character =>
+					TEXT_IO.New_Line;
+					Text_IO.Put_Line ("END OF INPUT...");
+					exit;
+
+				when Error_Character =>
+					TEXT_IO.New_Line;
+					Text_IO.Put_Line ("INPUT ERROR...");
+					exit;
+			end case;
+		end loop;
 	end Read;
 	          
 	procedure Print (Interp: in out Interpreter_Record; 
@@ -1618,11 +1720,11 @@ Text_IO.Put_Line ("99999");
 						raise Internal_Error;
 
 					when Symbol_Object =>
-						Text_IO.Put (To_String (Atom.Character_Slot));
+						Text_IO.Put (Character_Array_To_String (Atom.Character_Slot));
 
 					when String_Object =>
 						Text_IO.Put ("""");	
-						Text_IO.Put (To_String (Atom.Character_Slot));
+						Text_IO.Put (Character_Array_To_String (Atom.Character_Slot));
 						Text_IO.Put ("""");	
 
 					when Closure_Object =>
@@ -1639,7 +1741,7 @@ Text_IO.Put_Line ("99999");
 
 					when Others =>
 						if Atom.Kind = Character_Object then
-							Text_IO.Put (To_String (Atom.Character_Slot));
+							Text_IO.Put (Character_Array_To_String (Atom.Character_Slot));
 						else
 							Text_IO.Put ("#NOIMPL#");
 						end if;
@@ -1650,19 +1752,19 @@ Text_IO.Put_Line ("99999");
 			procedure Print_Integer is
 				 X: constant Object_Integer := Pointer_To_Integer (Atom);
 			begin
-				Text_IO.Put (Object_Integer'Image (X));
+				Text_IO.Put (To_Object_String(Object_Integer'Image(X)));
 			end Print_Integer;
 
 			procedure Print_Character is
 				 X: constant Object_Character := Pointer_To_Character (Atom);
 			begin
-				Text_IO.Put (Object_Character'Image (X));
+				Text_IO.Put (To_OBject_String(Object_Character'Image(X)));
 			end Print_Character;
 
 			procedure Print_Byte is
 				 X: constant Object_Byte := Pointer_To_Byte (Atom);
 			begin
-				Text_IO.Put (Object_Byte'Image (X));
+				Text_IO.Put (To_Object_String(Object_Byte'Image(X)));
 			end Print_Byte;
 
 		begin
@@ -1934,7 +2036,7 @@ begin
 		);
 		L := Make_Cons (
 			Interp.Self,
-			Make_Symbol (Interp.Self, "lambda"),
+			Make_Symbol (Interp.Self, Object_String'("lambda")),
 			Make_Cons (
 				Interp.Self, 
 				P,
@@ -2432,59 +2534,8 @@ Print (Interp, Operand);
 		end Apply;
 
 		procedure Read_Object is
-
---			function Get_Character return Object_Character is
---			begin
---				if Interp.Line_Pos >= Interp.Line_Last then
---					if Text_IO.End_Of_File then
---						raise EOF_Error;
---					end if;
---					Text_IO.Get_Line (Interp.Line, Interp.Line_Last);
---					Interp.Line_Pos := Interp.Line'First - 1;
---				end if;
---	
---				Interp.Line_Pos := Interp.Line_Pos + 1;
---				return Interp.Line(Interp.Line_Pos);
---			end Get_Character;
-
---			type Input_Object_Record is
---			end record;
---			Read (Input_Object_Record);
---			Write (Input_Object_Record);
---			Close (Input_Object_Record);
---
---			type Input_Object_Class_Pointer is access all Input_Object_Record'Class;
---
---			type Input_Record is record
---				Pos: Standard.Natural;
---				Last: Standard.Natural;
---				Buffer: Object_String (1 .. 1024);
---				Handle: Input_Object_Class_Pointer;
---			end record;
---			function Get_Character return Object_Character is
---			begin
---				if Interp.Input.Pos >= Interp.Input.Last then
---					Read (Interp.Input.Handle, Interp.Input.Buffer, Interp.Input.Last);
---					Interp.Input.Pos := Interp.Input.Buffer'First - 1;
---				end if;
---
---				Interp.Input.Pos := Interp.Input.Pos + 1;
---				return Interp.Input.Buffer(Interp.Input.Pos);
---			end Get_Character;
-
 		begin
 			null;
-
-			--if Interp.Input.Handle = null then
-			--	Interp.Input.Handle := Interp.Tio ("");
-			--	Interp.Input.Pos := 0;
-			--	Interp.Input.Last := 0;
-			--end if;
-
-			-- In Interp.Close()
-			-- if Interp.Input.Handle /= null then
-			-- 	Close (Interp.Input.Handle);
-			--end if;
 		end Read_Object;
 
 	begin

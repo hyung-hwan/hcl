@@ -37,14 +37,7 @@
 
 with System;
 with System.Storage_Pools;
-
 with Ada.Unchecked_Conversion;
--- TODO: delete these after debugging
-with ada.text_io;
-with ada.wide_text_io;
-with ada.integer_text_io;
-with ada.long_integer_text_io;
--- TODO: delete above after debugging
 
 package H2.Scheme is
 
@@ -129,12 +122,11 @@ package H2.Scheme is
 	type Object_Byte is mod 2 ** System.Storage_Unit;
 	for Object_Byte'Size use System.Storage_Unit;
 
-	--subtype Object_Character is Standard.Wide_Character;
-	--subtype Object_String is Standard.Wide_String;
-	--package Text_IO renames Ada.Wide_Text_IO;
-	subtype Object_Character is Standard.Character;
-	subtype Object_String is Standard.String;
-	package Text_IO renames Ada.Text_IO;
+	subtype Object_Character is Standard.Wide_Character;
+	subtype Object_String is Standard.Wide_String;
+
+	type Object_String_Pointer is access all Object_String;
+	type Constant_Object_String_Pointer is access constant Object_String;
 
 	type Object_Byte_Array is array (Object_Size range <>) of Object_Byte;
 	type Object_Character_Array is array (Object_Size range <>) of Object_Character;
@@ -307,8 +299,8 @@ package H2.Scheme is
 
 	type Stream_Allocator is access 
 		procedure (Interp: in out Interpreter_Record; 
-		           Name:   access Object_String;
-		           Result: out Stream_Pointer);
+		           Name:          Constant_Object_String_Pointer;
+		           Result: out    Stream_Pointer);
 
 	type Stream_Deallocator is access 
 		procedure (Interp: in out Interpreter_Record; 
@@ -322,15 +314,23 @@ package H2.Scheme is
 	type IO_Record;
 	type IO_Pointer is access all IO_Record;
 
+	type Character_Kind is (End_Character, Normal_Character, Error_Character);
+	type IO_Character_Record is record
+		Kind: Character_Kind := End_Character;
+		Value: Object_Character := Object_Character'First;
+	end record;
+	--pragma Pack (IO_Character_Record);
+
 	type IO_Record is record
 	--type IO_Record is limited record
 		Stream: Stream_Pointer := null;
-		--Data: Object_String(1..2048) := (others => ' ');
-		Data: Object_String(1..5) := (others => ' ');
+		--Data: Object_String(1..2048) := (others => Object_Character'First);
+		Data: Object_String(1..5) := (others => Object_Character'First);
 		Last: Standard.Natural := 0;
 		Pos: Standard.Natural := 0;
 		Flags: IO_Flags := 0; -- EOF, ERROR
-		Next: IO_Pointer;
+		Next: IO_Pointer := null;
+		Iochar: IO_Character_Record; -- the last character read.	
 	end record;
 
 
@@ -437,6 +437,18 @@ private
 		Next:  Object_Pointer := Nil_Pointer;
 	end record;
 
+	type Token_Kind is (End_Token,
+	                    Identifier_Token,
+	                    Left_Parenthesis_Token,
+	                    Right_Parenthesis_Token,
+	                    Single_Quote_Token
+	);
+
+	type Token_Record is record
+		Kind: Token_Kind;
+		Value: Object_String;
+	end record;
+
 	--type Interpreter_Record is tagged limited record
 	type Interpreter_Record is limited record
 		--Self: Interpreter_Pointer := null;
@@ -457,9 +469,10 @@ private
 
 		R: Register_Record;
 
-		-- TODO: Buffer_Record needs to be stacked to handle "load".
-		Input: aliased IO_Record;
-		IO: IO_Pointer := null;
+		Base_Input: aliased IO_Record;
+		Input: IO_Pointer := null;
+
+		Token: Token_Record;
 	end record;
 
 end H2.Scheme;
