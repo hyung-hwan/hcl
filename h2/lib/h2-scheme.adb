@@ -302,15 +302,11 @@ package body H2.Scheme is
 		end;
 	end Character_Array_To_String;
 
-	type Thin_String is new Object_String (Standard.Positive'Range);
-	type Thin_String_Pointer is access all Thin_String;
-	for Thin_String_Pointer'Size use Object_Pointer_Bits;
-
 -- TODO: move away these utilities routines
 	--function To_Thin_String_Pointer (Source: in Object_Pointer) return Thin_String_Pointer is
 	--	type Character_Pointer is access all Object_Character;
 	--	Ptr: Thin_String_Pointer;
-
+		
 	--	X: Character_Pointer;
 	--	for X'Address use Ptr'Address;
 	--	pragma Import (Ada, X);
@@ -365,6 +361,114 @@ package body H2.Scheme is
 		end if;
 	end Print_Object_Pointer;
 
+	-----------------------------------------------------------------------------
+	-- BUFFER MANAGEMENT
+	-----------------------------------------------------------------------------
+	procedure Clear_Buffer (Buffer: in out Buffer_Record) is
+		pragma Inline (Clear_Buffer);
+	begin
+		Buffer.Last := 0;	
+	end Clear_Buffer;
+
+	procedure Purge_Buffer (Interp: in out Interpreter_Record;
+	                        Buffer: in out Buffer_Record) is
+	begin
+		if Buffer.Len > 0 then
+			declare
+				subtype New_String is Object_String (1 .. Buffer.Len);
+				type New_String_Pointer is access all New_String;
+				for New_String_Pointer'Size use Object_Pointer_Bits;
+
+				package Pool is new H2.Pool (New_String, New_String_Pointer, Interp.Storage_Pool);
+
+				Tmp: New_String_Pointer;
+				for Tmp'Address use Buffer.Ptr'Address;
+				pragma Import (Ada, Tmp);
+			begin
+				Pool.Deallocate (Tmp);
+			end;
+
+			Buffer := (null, 0, 0);
+		end if;
+	end Purge_Buffer;
+
+	procedure Append_Buffer (Interp: in out Interpreter_Record;
+	                         Buffer: in out Buffer_Record; 
+	                         Source: in Object_String) is
+		Incr: Standard.Natural;
+	begin
+		if Buffer.Last >= Buffer.Len then
+			if Buffer.Len <= 0 then
+				Incr := 1; -- TODO: increase to 128
+			else
+				Incr := Buffer.Len;	
+			end if;
+			if Incr < Source'Length then	
+				Incr := Source'Length;
+			end if;
+			
+			declare
+				subtype New_String is Object_String (1 .. Buffer.Len + Incr);
+				type New_String_Pointer is access all New_String;
+				for New_String_Pointer'Size use Object_Pointer_Bits;
+
+				package Pool is new H2.Pool (New_String, New_String_Pointer, Interp.Storage_Pool);
+
+				T1: New_String_Pointer;
+				T2: New_String_Pointer;
+				for T2'Address use Buffer.Ptr'Address;
+				pragma Import (Ada, T2);
+			begin
+				T1 := Pool.Allocate;
+				if Buffer.Last > 0 then
+					T1(1 .. Buffer.Last) := Buffer.Ptr(1 .. Buffer.Last);
+				end if;
+				Pool.Deallocate (T2);
+				T2 := T1;
+			end;
+
+			Buffer.Len := Buffer.Len + Incr;
+		end if;
+
+		Buffer.Ptr(Buffer.Last + 1 .. Buffer.Last + Source'Length) := Source;
+		Buffer.Last := Buffer.Last + Source'Length;
+	end Append_Buffer;
+	
+	procedure Purge_Token (Interp: in out Interpreter_Record) is
+	begin
+		Purge_Buffer (Interp, Interp.Token.Value);
+		Interp.Token := (End_Token, (null, 0, 0));
+	end Purge_Token;
+
+	procedure Set_Token (Interp: in out Interpreter_Record;
+	                     Kind:   in     Token_Kind;
+	                     Value:  in     Object_String) is
+	begin
+		Interp.Token.Kind := Kind;	
+		Clear_Buffer (Interp.Token.Value);
+		if Value'Length > 0 then
+			Append_Buffer (Interp, Interp.Token.Value, Value);
+		end if;
+	end Set_Token;
+
+	procedure Append_Token_String (Interp: in out Interpreter_Record;
+	                               Value:  in     Object_String) is
+		pragma Inline (Append_Token_String);
+	begin
+		if Value'Length > 0 then
+			Append_Buffer (Interp, Interp.Token.Value, Value);	
+		end if;
+	end Append_Token_String;
+
+	procedure Append_Token_Character (Interp: in out Interpreter_Record;
+	                                  Value:  in     Object_Character) is
+		pragma Inline (Append_Token_Character);
+		Tmp: Object_String(1..1) := (1 => Value);
+	begin
+		Append_Buffer (Interp, Interp.Token.Value, Tmp);
+	end Append_Token_Character;
+
+	
 	-----------------------------------------------------------------------------
 	-- MEMORY MANAGEMENT
 	-----------------------------------------------------------------------------
@@ -1467,6 +1571,7 @@ Put_String (To_Thin_String_Pointer (Result));
 
 		Interp.Base_Input.Stream := null;
 		Interp.Input := Interp.Base_Input'Unchecked_Access;
+		Interp.Token := (End_Token, (null, 0, 0));
 
 -- TODO: disallow garbage collecion during initialization.
 Text_IO.Put_Line ("1111111111");
@@ -1498,6 +1603,7 @@ Text_IO.Put_Line (To_Object_String(IO_Character_Record'Max_Size_In_Storage_Eleme
 		end if;
 
 		Deinitialize_Heap (Interp);
+		Purge_Token (Interp);
 	end Close;
 
 	function Get_Storage_Pool (Interp: in Interpreter_Record) return Storage_Pool_Pointer is
@@ -1594,34 +1700,41 @@ Text_IO.Put_Line (To_Object_String(IO_Character_Record'Max_Size_In_Storage_Eleme
 			Interp.Input.Iochar := (Normal_Character, Interp.Input.Data(Interp.Input.Pos));
 		end Fetch_Character;
 
+		function Is_White_Space (X: in Object_Character) return Standard.Boolean is
+		begin
+			return X = ' ' or else
+			       X = Object_Character'Val(Standard.Character'Pos(Standard.ASCII.HT)) or else
+			       X = Object_Character'Val(Standard.Character'Pos(Standard.ASCII.VT)) or else
+			       X = Object_Character'Val(Standard.Character'Pos(Standard.ASCII.CR)) or else
+			       X = Object_Character'Val(Standard.Character'Pos(Standard.ASCII.LF)) or else
+			       X = Object_Character'Val(Standard.Character'Pos(Standard.ASCII.FF));
+		end Is_White_Space;
+
 		procedure Skip_Spaces is
 			C: IO_Character_Record renames Interp.Input.Iochar;
 		begin
 			loop
 				exit when C.Kind /= Normal_Character;
 
-				-- normal character
-				case C.Value is
-					when ' ' | 
-					     Object_Character'Val(Standard.Character'Pos(Standard.ASCII.HT))  |
-					     Object_Character'Val(Standard.Character'Pos(Standard.ASCII.VT))  |
-					     Object_Character'Val(Standard.Character'Pos(Standard.ASCII.CR))  |
-					     Object_Character'Val(Standard.Character'Pos(Standard.ASCII.LF))  |
-					     Object_Character'Val(Standard.Character'Pos(Standard.ASCII.FF))  =>
-						-- white space
+				-- Normal character
+				if Is_White_Space(C.Value) then
+					Fetch_Character;
+				elsif C.Value = ';' then
+					-- Comment.
+					loop
 						Fetch_Character;
 
-					when ';' =>
-						-- comment. consume until EOL
-						loop
-							Fetch_Character;
-					     	exit when C.Kind = Normal_Character and then 
-							          C.Value = Object_Character'Val(Standard.Character'Pos(Standard.ASCII.LF));
-						end loop;
+						exit when C.Kind = End_Character; -- EOF before LF
 
-					when others =>
-						exit;
-				end case;
+						if C.Kind = Normal_Character and then 
+						   C.Value = Object_Character'Val(Standard.Character'Pos(Standard.ASCII.LF)) then
+							Fetch_Character; -- Consume LF
+							exit;
+						end if;
+					end loop;
+				else
+					exit;
+				end if;
 			end loop;
 		end Skip_Spaces;
 
@@ -1630,24 +1743,48 @@ Text_IO.Put_Line (To_Object_String(IO_Character_Record'Max_Size_In_Storage_Eleme
 		begin
 			Skip_Spaces;
 			if C.Kind /= Normal_Character then
-				Interp.Token.Kind := End_Token;
+				Set_Token (Interp, End_Token, "");
 				return;
 			end if;
 
 			case C.Value is
 				when '(' =>
-					Interp.Token := (Left_Parenthesis_Token, "(");
+					Set_Token (Interp, Left_Parenthesis_Token, "(");
+					Fetch_Character;
 
 				when ')' =>
-					Interp.Token := (Left_Parenthesis_Token, ")");
+					Set_Token (Interp, Right_Parenthesis_Token, ")");
+					Fetch_Character;
 
 				when ''' =>
-					Interp.Token := (Single_Quote_Token, ")");
+					Set_Token (Interp, Single_Quote_Token, "'");
+					Fetch_Character;
 
-				when others =>
-					null;	
+				when '"' =>
+					Set_Token (Interp, String_Token, "'");
+					Fetch_Character;
+					-- TODO:
+
+				when '#' =>
+					Fetch_Character;
+					-- TODO: t, false, etc
+
+				when others =>	
+					Set_Token (Interp, Identifier_Token, "");
+					loop
+						Append_Token_Character (Interp, C.Value);
+						Fetch_Character;
+						--exit when not Is_Ident_Char(C.Value);
+						if C.Value = '(' or else C.Value = ')' or else
+						   C.Value = ''' or else C.Value = '"' or else
+						   C.Value = '#' or else C.Value = ';' or else
+						   Is_White_Space(C.Value) then
+							exit;
+						end if;
+					end loop;
 			end case;
 			
+Text_IO.Put_Line (">>>>>>>>>>>>>>>>>>>>>>> Token: " & Interp.Token.Value.Ptr(1..Interp.Token.Value.Last));
 		end Fetch_Token;
 
 		procedure Read_Atom (Atom: out Object_Pointer) is
@@ -1659,38 +1796,16 @@ Text_IO.Put_Line (To_Object_String(IO_Character_Record'Max_Size_In_Storage_Eleme
 		Opcode: Object_Integer;
 		Operand: Object_Pointer;
 
-		C: IO_Character_Record renames Interp.Input.Iochar;
 	begin
-		--Opcode := 1;
-		--loop
-		--	case Opcode is
-		--		when 1 =>
-		--end loop;
+		Fetch_Character;
 		loop
-			begin
-				Fetch_Character;
-			exception
-				when others =>
-					TEXT_IO.New_Line;
-					Text_IO.Put_Line ("INPUT ERROR...");
-					exit;
-			end;
-
-			case C.Kind is
-				when Normal_Character =>
-					Text_IO.Put (C.Value);
-
-				when End_Character =>
-					TEXT_IO.New_Line;
-					Text_IO.Put_Line ("END OF INPUT...");
-					exit;
-
-				when Error_Character =>
-					TEXT_IO.New_Line;
-					Text_IO.Put_Line ("INPUT ERROR...");
-					exit;
-			end case;
+			Fetch_Token;
+			exit when Interp.Token.Kind = End_Token;
 		end loop;
+
+	exception
+		when IO_Error =>
+			Text_IO.Put_Line ("****************************** INPUT ERROR...");
 	end Read;
 	          
 	procedure Print (Interp: in out Interpreter_Record; 

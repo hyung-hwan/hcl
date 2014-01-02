@@ -21,7 +21,7 @@ procedure scheme is
 	
 
 	--File_Name: aliased S.Object_String := "test.adb";
-	File_Name: aliased constant S.Object_String := "test.adb";
+	File_Name: aliased constant S.Object_String := "test.scm";
 	--File_Stream: Stream.File_Stream_Record (File_Name'Unchecked_Access);
 	--File_Stream: Stream.File_Stream_Record := (Name => File_Name'Unchecked_Access);
 	File_Stream: Stream.File_Stream_Record;

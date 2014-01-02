@@ -430,23 +430,27 @@ private
 	type Heap_Number is mod 2 ** 1;
 	type Heap_Pointer_Array is Array (Heap_Number'First .. Heap_Number'Last) of Heap_Pointer;
 
-	type Register_Record is limited record
-		Code:  Object_Pointer := Nil_Pointer;
-		Envir: Object_Pointer := Nil_Pointer;
-		Args:  Object_Pointer := Nil_Pointer;
-		Next:  Object_Pointer := Nil_Pointer;
+	subtype Thin_String is Object_String (Standard.Positive'Range);
+	type Thin_String_Pointer is access all Thin_String;
+	for Thin_String_Pointer'Size use Object_Pointer_Bits;
+
+	type Buffer_Record is record
+		Ptr: Thin_String_Pointer := null;
+		Len: Standard.Natural := 0;
+		Last: Standard.Natural := 0;
 	end record;
 
 	type Token_Kind is (End_Token,
 	                    Identifier_Token,
 	                    Left_Parenthesis_Token,
 	                    Right_Parenthesis_Token,
-	                    Single_Quote_Token
+	                    Single_Quote_Token,
+	                    String_Token
 	);
 
 	type Token_Record is record
 		Kind: Token_Kind;
-		Value: Object_String;
+		Value: Buffer_Record;
 	end record;
 
 	--type Interpreter_Record is tagged limited record
@@ -466,8 +470,6 @@ private
 		Environment: Object_Pointer := Nil_Pointer;
 		Stack: Object_Pointer := Nil_Pointer;
 		Mark: Object_Pointer := Nil_Pointer;
-
-		R: Register_Record;
 
 		Base_Input: aliased IO_Record;
 		Input: IO_Pointer := null;
