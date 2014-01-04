@@ -12,7 +12,9 @@ project Lib is
 		"h2-pool.adb",
 		"h2-pool.ads",
 		"h2-scheme.adb",
-		"h2-scheme.ads"
+		"h2-scheme.ads",
+		"h2-scheme-token.adb",
+		"h2-scheme-token.ads"
 	);
 	for Library_Interface use (
 		"h2",

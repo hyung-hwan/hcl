@@ -417,6 +417,14 @@ procedure Make_Test_Object (Interp: in out Interpreter_Record; Result: out Objec
 
 	-- -----------------------------------------------------------------------------
 
+	subtype Thin_String is Object_String (Standard.Positive'Range);
+	type Thin_String_Pointer is access all Thin_String;
+	for Thin_String_Pointer'Size use Object_Pointer_Bits;
+	type Buffer_Record is record
+		Ptr: Thin_String_Pointer := null;
+		Len: Standard.Natural := 0;
+		Last: Standard.Natural := 0;
+	end record;
 private
 	type Heap_Element_Array is array (Heap_Size range <>) of aliased Heap_Element;
 
@@ -430,15 +438,7 @@ private
 	type Heap_Number is mod 2 ** 1;
 	type Heap_Pointer_Array is Array (Heap_Number'First .. Heap_Number'Last) of Heap_Pointer;
 
-	subtype Thin_String is Object_String (Standard.Positive'Range);
-	type Thin_String_Pointer is access all Thin_String;
-	for Thin_String_Pointer'Size use Object_Pointer_Bits;
 
-	type Buffer_Record is record
-		Ptr: Thin_String_Pointer := null;
-		Len: Standard.Natural := 0;
-		Last: Standard.Natural := 0;
-	end record;
 
 	type Token_Kind is (End_Token,
 	                    Identifier_Token,

@@ -1,5 +1,6 @@
 with H2.Pool;
 with System.Address_To_Access_Conversions;
+with H2.Scheme.Token;
 
 
 with Ada.Unchecked_Deallocation; -- for h2scm c interface. TOOD: move it to a separate file
@@ -361,114 +362,6 @@ package body H2.Scheme is
 		end if;
 	end Print_Object_Pointer;
 
-	-----------------------------------------------------------------------------
-	-- BUFFER MANAGEMENT
-	-----------------------------------------------------------------------------
-	procedure Clear_Buffer (Buffer: in out Buffer_Record) is
-		pragma Inline (Clear_Buffer);
-	begin
-		Buffer.Last := 0;	
-	end Clear_Buffer;
-
-	procedure Purge_Buffer (Interp: in out Interpreter_Record;
-	                        Buffer: in out Buffer_Record) is
-	begin
-		if Buffer.Len > 0 then
-			declare
-				subtype New_String is Object_String (1 .. Buffer.Len);
-				type New_String_Pointer is access all New_String;
-				for New_String_Pointer'Size use Object_Pointer_Bits;
-
-				package Pool is new H2.Pool (New_String, New_String_Pointer, Interp.Storage_Pool);
-
-				Tmp: New_String_Pointer;
-				for Tmp'Address use Buffer.Ptr'Address;
-				pragma Import (Ada, Tmp);
-			begin
-				Pool.Deallocate (Tmp);
-			end;
-
-			Buffer := (null, 0, 0);
-		end if;
-	end Purge_Buffer;
-
-	procedure Append_Buffer (Interp: in out Interpreter_Record;
-	                         Buffer: in out Buffer_Record; 
-	                         Source: in Object_String) is
-		Incr: Standard.Natural;
-	begin
-		if Buffer.Last >= Buffer.Len then
-			if Buffer.Len <= 0 then
-				Incr := 1; -- TODO: increase to 128
-			else
-				Incr := Buffer.Len;	
-			end if;
-			if Incr < Source'Length then	
-				Incr := Source'Length;
-			end if;
-			
-			declare
-				subtype New_String is Object_String (1 .. Buffer.Len + Incr);
-				type New_String_Pointer is access all New_String;
-				for New_String_Pointer'Size use Object_Pointer_Bits;
-
-				package Pool is new H2.Pool (New_String, New_String_Pointer, Interp.Storage_Pool);
-
-				T1: New_String_Pointer;
-				T2: New_String_Pointer;
-				for T2'Address use Buffer.Ptr'Address;
-				pragma Import (Ada, T2);
-			begin
-				T1 := Pool.Allocate;
-				if Buffer.Last > 0 then
-					T1(1 .. Buffer.Last) := Buffer.Ptr(1 .. Buffer.Last);
-				end if;
-				Pool.Deallocate (T2);
-				T2 := T1;
-			end;
-
-			Buffer.Len := Buffer.Len + Incr;
-		end if;
-
-		Buffer.Ptr(Buffer.Last + 1 .. Buffer.Last + Source'Length) := Source;
-		Buffer.Last := Buffer.Last + Source'Length;
-	end Append_Buffer;
-	
-	procedure Purge_Token (Interp: in out Interpreter_Record) is
-	begin
-		Purge_Buffer (Interp, Interp.Token.Value);
-		Interp.Token := (End_Token, (null, 0, 0));
-	end Purge_Token;
-
-	procedure Set_Token (Interp: in out Interpreter_Record;
-	                     Kind:   in     Token_Kind;
-	                     Value:  in     Object_String) is
-	begin
-		Interp.Token.Kind := Kind;	
-		Clear_Buffer (Interp.Token.Value);
-		if Value'Length > 0 then
-			Append_Buffer (Interp, Interp.Token.Value, Value);
-		end if;
-	end Set_Token;
-
-	procedure Append_Token_String (Interp: in out Interpreter_Record;
-	                               Value:  in     Object_String) is
-		pragma Inline (Append_Token_String);
-	begin
-		if Value'Length > 0 then
-			Append_Buffer (Interp, Interp.Token.Value, Value);	
-		end if;
-	end Append_Token_String;
-
-	procedure Append_Token_Character (Interp: in out Interpreter_Record;
-	                                  Value:  in     Object_Character) is
-		pragma Inline (Append_Token_Character);
-		Tmp: Object_String(1..1) := (1 => Value);
-	begin
-		Append_Buffer (Interp, Interp.Token.Value, Tmp);
-	end Append_Token_Character;
-
-	
 	-----------------------------------------------------------------------------
 	-- MEMORY MANAGEMENT
 	-----------------------------------------------------------------------------
@@ -1603,7 +1496,7 @@ Text_IO.Put_Line (To_Object_String(IO_Character_Record'Max_Size_In_Storage_Eleme
 		end if;
 
 		Deinitialize_Heap (Interp);
-		Purge_Token (Interp);
+		Token.Purge (Interp);
 	end Close;
 
 	function Get_Storage_Pool (Interp: in Interpreter_Record) return Storage_Pool_Pointer is
@@ -1743,25 +1636,25 @@ Text_IO.Put_Line (To_Object_String(IO_Character_Record'Max_Size_In_Storage_Eleme
 		begin
 			Skip_Spaces;
 			if C.Kind /= Normal_Character then
-				Set_Token (Interp, End_Token, "");
+				Token.Set (Interp, End_Token, "");
 				return;
 			end if;
 
 			case C.Value is
 				when '(' =>
-					Set_Token (Interp, Left_Parenthesis_Token, "(");
+					Token.Set (Interp, Left_Parenthesis_Token, "(");
 					Fetch_Character;
 
 				when ')' =>
-					Set_Token (Interp, Right_Parenthesis_Token, ")");
+					Token.Set (Interp, Right_Parenthesis_Token, ")");
 					Fetch_Character;
 
 				when ''' =>
-					Set_Token (Interp, Single_Quote_Token, "'");
+					Token.Set (Interp, Single_Quote_Token, "'");
 					Fetch_Character;
 
 				when '"' =>
-					Set_Token (Interp, String_Token, "'");
+					Token.Set (Interp, String_Token, "'");
 					Fetch_Character;
 					-- TODO:
 
@@ -1770,9 +1663,9 @@ Text_IO.Put_Line (To_Object_String(IO_Character_Record'Max_Size_In_Storage_Eleme
 					-- TODO: t, false, etc
 
 				when others =>	
-					Set_Token (Interp, Identifier_Token, "");
+					Token.Set (Interp, Identifier_Token, "");
 					loop
-						Append_Token_Character (Interp, C.Value);
+						Token.Append_Character (Interp, C.Value);
 						Fetch_Character;
 						--exit when not Is_Ident_Char(C.Value);
 						if C.Value = '(' or else C.Value = ')' or else
