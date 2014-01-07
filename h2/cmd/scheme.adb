@@ -43,13 +43,17 @@ begin
 	--S.Set_Input_Stream (SI, String_Stream);
 	--S.Set_Output_Stream (SI, Stream); -- specify main output stream.
 
-S.Read (SI, I);
+--S.Read (SI, I);
 S.Make_Test_Object (SI, I);
 
 	S.Evaluate (SI, I, O);
 S.Print (SI, I);
 Ada.Text_IO.Put_Line ("-------------------------------------------");
 S.Print (SI, O);
+
+Ada.Text_IO.Put_Line ("-------------------------------------------");
+S.Run_Loop (SI, I);
+S.Print (SI, I);
 	S.Close (SI);
 
 	declare

@@ -33,6 +33,7 @@ package body H2.Scheme is
 	Evaluation_Error: exception;
 	Internal_Error: exception;
 	IO_Error: exception;
+	Stream_End_Error: exception;
 
 	-----------------------------------------------------------------------------
 	-- INTERNALLY-USED TYPES
@@ -47,14 +48,16 @@ package body H2.Scheme is
 
 	subtype Moved_Object_Record is Object_Record (Moved_Object, 0);
 
-	subtype Opcode_Type is Object_Integer range 0 .. 6;
+	subtype Opcode_Type is Object_Integer range 0 .. 8;
 	Opcode_Exit:               constant Opcode_Type := Opcode_Type'(0);
 	Opcode_Evaluate_Object:    constant Opcode_Type := Opcode_Type'(1);
-	Opcode_Evaluate_Group:     constant Opcode_Type := Opcode_Type'(2);
+	Opcode_Evaluate_Group:     constant Opcode_Type := Opcode_Type'(2); -- (begin ...) and closure apply
 	Opcode_Evaluate_Syntax:    constant Opcode_Type := Opcode_Type'(3);
 	Opcode_Evaluate_Procedure: constant Opcode_Type := Opcode_Type'(4);
 	Opcode_Apply:              constant Opcode_Type := Opcode_Type'(5);
 	Opcode_Read_Object:        constant Opcode_Type := Opcode_Type'(6);
+	Opcode_Read_List:          constant Opcode_Type := Opcode_Type'(7);
+	Opcode_Close_List:         constant Opcode_Type := Opcode_Type'(8);
 
 	-----------------------------------------------------------------------------
 	-- COMMON OBJECTS
@@ -891,7 +894,7 @@ Text_IO.Put_Line (">>> [GC DONE]");
 	-----------------------------------------------------------------------------
 
 	function Make_String (Interp: access  Interpreter_Record;
-	                      Source: in     Object_String) return Object_Pointer is
+	                      Source: in      Object_String) return Object_Pointer is
 		Result: Object_Pointer;
 	begin
 		Result := Allocate_Character_Object (Interp, Source);
@@ -945,7 +948,6 @@ Print_Object_Pointer ("Make_String Result - " & Source, Result);
 -- Make it GC-aweare. Protect Ptr
 		-- Link the symbol to the symbol table. 
 		Interp.Symbol_Table := Make_Cons (Interp.Self, Ptr, Interp.Symbol_Table);
---Print_Object_Pointer ("Make_Symbol Result - " & Source, Result);
 		return Ptr;
 	end Make_Symbol;
 
@@ -1181,13 +1183,13 @@ Put_String (To_Thin_String_Pointer (Result));
 		return Frame.Pointer_Slot(Frame_Return_Index);
 	end Get_Frame_Return;
 
-	procedure Set_Frame_Return (Frame: in out Object_Pointer;
-	                            Value: in     Object_Pointer) is
-		pragma Inline (Set_Frame_Return);
-		pragma Assert (Is_Frame(Frame));
-	begin
-		Frame.Pointer_Slot(Frame_Return_Index) := Value;
-	end Set_Frame_Return;
+	--procedure Set_Frame_Return (Frame: in out Object_Pointer;
+	--                            Value: in     Object_Pointer) is
+	--	pragma Inline (Set_Frame_Return);
+	--	pragma Assert (Is_Frame(Frame));
+	--begin
+	--	Frame.Pointer_Slot(Frame_Return_Index) := Value;
+	--end Set_Frame_Return;
 
 	procedure Chain_Frame_Return (Interp: in out Interpreter_Record;
 	                              Frame:  in out Object_Pointer;
@@ -1195,12 +1197,12 @@ Put_String (To_Thin_String_Pointer (Result));
 		pragma Inline (Chain_Frame_Return);
 		pragma Assert (Is_Frame(Frame));
 
-		Cons: Object_Pointer renames Frame.Pointer_Slot(Frame_Return_Index);
+		Ret_Head: Object_Pointer renames Frame.Pointer_Slot(Frame_Return_Index);
 	begin
 -- TODO: make it GC-aware
 
 		-- Add a new cons cell to the front
-		Cons :=  Make_Cons (Interp.Self, Value, Cons);
+		Ret_Head :=  Make_Cons (Interp.Self, Value, Ret_Head);
 	end Chain_Frame_Return;
 
 	procedure Clear_Frame_Return (Frame: in out Object_Pointer) is
@@ -1554,153 +1556,6 @@ Text_IO.Put_Line (To_Object_String(IO_Character_Record'Max_Size_In_Storage_Eleme
 	--	
 	--end Set_Output_Stream;
 
-	procedure Read (Interp: in out Interpreter_Record;
-	                Result: out    Object_Pointer) is
-
-		procedure Fetch_Character is
-		begin
-		-- TODO: calculate Interp.Input.Row, Interp.Input.Column
-			if Interp.Input.Pos >= Interp.Input.Last then
-				if Interp.Input.Flags /= 0 then
-					-- An error has occurred or EOF has been reached previously.
-					-- Note calling this procedure after EOF results in an error.
-					Interp.Input.Iochar := (Error_Character, Object_Character'First);
-					--return;
-					raise IO_Error;
-				end if;
-
-				Interp.Input.Pos := Interp.Input.Data'First - 1;
-				begin
-					Read (Interp.Input.Stream.all, Interp.Input.Data, Interp.Input.Last);
-				exception
-					when others =>
-						-- The callee can raise an exception upon errors.
-						-- If an exception is raised, data read into the buffer 
-						-- is also ignored.
-						Interp.Input.Flags := Interp.Input.Flags and IO_Error_Occurred;
-						Interp.Input.Iochar := (Error_Character, Object_Character'First);
-						--return;
-						raise IO_Error;
-				end;
-				if Interp.Input.Last < Interp.Input.Data'First then	
-					-- The callee must read 0 bytes on EOF 
-					Interp.Input.Flags := Interp.Input.Flags and IO_End_Reached;
-					Interp.Input.Iochar := (End_Character, Object_Character'First);
-					return;
-				end if;
-			end if;
-			Interp.Input.Pos := Interp.Input.Pos + 1;
-			Interp.Input.Iochar := (Normal_Character, Interp.Input.Data(Interp.Input.Pos));
-		end Fetch_Character;
-
-		function Is_White_Space (X: in Object_Character) return Standard.Boolean is
-		begin
-			return X = ' ' or else
-			       X = Object_Character'Val(Standard.Character'Pos(Standard.ASCII.HT)) or else
-			       X = Object_Character'Val(Standard.Character'Pos(Standard.ASCII.VT)) or else
-			       X = Object_Character'Val(Standard.Character'Pos(Standard.ASCII.CR)) or else
-			       X = Object_Character'Val(Standard.Character'Pos(Standard.ASCII.LF)) or else
-			       X = Object_Character'Val(Standard.Character'Pos(Standard.ASCII.FF));
-		end Is_White_Space;
-
-		procedure Skip_Spaces is
-			C: IO_Character_Record renames Interp.Input.Iochar;
-		begin
-			loop
-				exit when C.Kind /= Normal_Character;
-
-				-- Normal character
-				if Is_White_Space(C.Value) then
-					Fetch_Character;
-				elsif C.Value = ';' then
-					-- Comment.
-					loop
-						Fetch_Character;
-
-						exit when C.Kind = End_Character; -- EOF before LF
-
-						if C.Kind = Normal_Character and then 
-						   C.Value = Object_Character'Val(Standard.Character'Pos(Standard.ASCII.LF)) then
-							Fetch_Character; -- Consume LF
-							exit;
-						end if;
-					end loop;
-				else
-					exit;
-				end if;
-			end loop;
-		end Skip_Spaces;
-
-		procedure Fetch_Token is
-			C: IO_Character_Record renames Interp.Input.Iochar;
-		begin
-			Skip_Spaces;
-			if C.Kind /= Normal_Character then
-				Token.Set (Interp, End_Token, "");
-				return;
-			end if;
-
-			case C.Value is
-				when '(' =>
-					Token.Set (Interp, Left_Parenthesis_Token, "(");
-					Fetch_Character;
-
-				when ')' =>
-					Token.Set (Interp, Right_Parenthesis_Token, ")");
-					Fetch_Character;
-
-				when ''' =>
-					Token.Set (Interp, Single_Quote_Token, "'");
-					Fetch_Character;
-
-				when '"' =>
-					Token.Set (Interp, String_Token, "'");
-					Fetch_Character;
-					-- TODO:
-
-				when '#' =>
-					Fetch_Character;
-					-- TODO: t, false, etc
-
-				when others =>	
-					Token.Set (Interp, Identifier_Token, "");
-					loop
-						Token.Append_Character (Interp, C.Value);
-						Fetch_Character;
-						--exit when not Is_Ident_Char(C.Value);
-						if C.Value = '(' or else C.Value = ')' or else
-						   C.Value = ''' or else C.Value = '"' or else
-						   C.Value = '#' or else C.Value = ';' or else
-						   Is_White_Space(C.Value) then
-							exit;
-						end if;
-					end loop;
-			end case;
-			
-Text_IO.Put_Line (">>>>>>>>>>>>>>>>>>>>>>> Token: " & Interp.Token.Value.Ptr(1..Interp.Token.Value.Last));
-		end Fetch_Token;
-
-		procedure Read_Atom (Atom: out Object_Pointer) is
-		begin
-			null;
-		end Read_Atom; 	
-
-		Stack: Object_Pointer;
-		Opcode: Object_Integer;
-		Operand: Object_Pointer;
-
-	begin
-		Fetch_Character;
-		loop
-			Fetch_Token;
-			exit when Interp.Token.Kind = End_Token;
-		end loop;
-
-	exception
-		when IO_Error =>
-			Text_IO.Put_Line ("****************************** INPUT ERROR...");
-	end Read;
-	          
 	procedure Print (Interp: in out Interpreter_Record; 
 	                 Source: in     Object_Pointer) is
 
@@ -1945,6 +1800,7 @@ procedure Make_Test_Object (Interp: in out Interpreter_Record; Result: out Objec
 	P: Object_Pointer;
 	B: Object_Pointer;
 	L: Object_Pointer;
+	Resultx: Object_Pointer;
 begin
 		--(define x 10)
 		--Result := Make_Cons (
@@ -2007,16 +1863,24 @@ begin
 			)
 		);
 
+
+
 		Z := Make_Cons (
 			Interp.Self,
 			Make_Symbol (Interp.Self, "begin"),
-			Y
+			Make_COns (Interp.Self, Y, Nil_Pointer)
+		);
+
+		B := Make_Cons (
+			Interp.Self,
+			Make_Symbol (Interp.Self, "begin"),
+			Make_Cons (Interp.Self, Z, Nil_Pointer)
 		);
 
 		Result := Make_Cons (
 			Interp.Self,
-			Make_Symbol (Interp.Self, "begin"),
-			Make_Cons (Interp.Self, Z, Nil_Pointer)
+			Make_Symbol (Interp.Self, "+"),
+			Make_Cons (Interp.Self, Integer_To_Pointer(88), Make_Cons (Interp.Self, B, Nil_Pointer))
 		);
 
 		-- (lambda (x y) (+ x y))
@@ -2090,35 +1954,36 @@ end Make_Test_Object;
 		return Integer_To_Pointer(Opcode);
 	end Opcode_To_Pointer;
 
-	procedure Evaluate (Interp: in out Interpreter_Record;
-	                    Source: in     Object_Pointer;
-	                    Result: out    Object_Pointer) is
+	procedure Push_Frame (Interp:  in out Interpreter_Record;
+	                      Opcode:  in     Opcode_Type; 
+	                      Operand: in     Object_Pointer) is
+		pragma Inline (Push_Frame);
+	begin
+		Interp.Stack := Make_Frame (Interp.Self, Interp.Stack, Opcode_To_Pointer(Opcode), Operand, Interp.Environment);
+	end Push_Frame;
 
-		procedure Push_Frame (Opcode:  in     Opcode_Type; 
-		                      Operand: in     Object_Pointer) is
-			pragma Inline (Push_Frame);
-		begin
-			Interp.Stack := Make_Frame (Interp.Self, Interp.Stack, Opcode_To_Pointer(Opcode), Operand, Interp.Environment);
-		end Push_Frame;
+	--procedure Pop_Frame (Interp.Stack: out Object_Pointer;
+	--                     Opcode:  out Opcode_Type;
+	--                     Operand: out Object_Pointer) is
+	--	pragma Inline (Pop_Frame);
+	--begin
+	--	pragma Assert (Interp.Stack /= Nil_Pointer);
+	--	Opcode := Pointer_To_Opcode(Interp.Stack.Pointer_Slot(Frame_Opcode_Index));
+	--	Operand := Interp.Stack.Pointer_Slot(Frame_Operand_Index);
+	--	Interp.Stack := Interp.Stack.Pointer_Slot(Frame_Stack_Index); -- pop 
+	--end Pop_Frame;
 
-		--procedure Pop_Frame (Interp.Stack:   out Object_Pointer;
-		--                     Opcode:  out Opcode_Type;
-		--                     Operand: out Object_Pointer) is
-		--	pragma Inline (Pop_Frame);
-		--begin
-		--	pragma Assert (Interp.Stack /= Nil_Pointer);
-		--	Opcode := Pointer_To_Opcode(Interp.Stack.Pointer_Slot(Frame_Opcode_Index));
-		--	Operand := Interp.Stack.Pointer_Slot(Frame_Operand_Index);
-		--	Interp.Stack := Interp.Stack.Pointer_Slot(Frame_Stack_Index); -- pop 
-		--end Pop_Frame;
+	procedure Pop_Frame (Interp: in out Interpreter_Record) is
+		pragma Inline (Pop_Frame);
+	begin
+		pragma Assert (Interp.Stack /= Nil_Pointer);
+		Interp.Environment := Interp.Stack.Pointer_Slot(Frame_Environment_Index); -- restore environment
+		Interp.Stack := Interp.Stack.Pointer_Slot(Frame_Stack_Index); -- pop 
+	end Pop_Frame;
 
-		procedure Pop_Frame is
-			pragma Inline (Pop_Frame);
-		begin
-			pragma Assert (Interp.Stack /= Nil_Pointer);
-			Interp.Environment := Interp.Stack.Pointer_Slot(Frame_Environment_Index); -- restore environment
-			Interp.Stack := Interp.Stack.Pointer_Slot(Frame_Stack_Index); -- pop 
-		end Pop_Frame;
+	procedure Execute (Interp: in out Interpreter_Record) is
+
+		LC: IO_Character_Record renames Interp.Input.Iochar;
 
 		procedure Evaluate_Group is
 			pragma Inline (Evaluate_Group);
@@ -2144,6 +2009,10 @@ end Make_Test_Object;
 							Text_IO.Put_Line ("$$$$..................FUCKING CDR. FOR GROUP....................$$$$");
 							-- raise Syntax_Error;
 						end if;
+
+						-- Change the operand to a mark object so that the call to this 
+						-- procedure after the evaluation of the last car goes to the 
+						-- Mark_Object case.
 						Set_Frame_Operand (Interp.Stack, Interp.Mark); 
 					end if;
 
@@ -2151,12 +2020,17 @@ end Make_Test_Object;
 					Clear_Frame_Return (Interp.Stack);
 
 					-- Arrange to evaluate the current expression
-					Push_Frame (Opcode_Evaluate_Object, Car);
+					Push_Frame (Interp, Opcode_Evaluate_Object, Car);
 
 				when Mark_Object =>
 					Operand := Get_Frame_Return (Interp.Stack);
-					Pop_Frame; -- Done;
-					Set_Frame_Return (Interp.Stack, Operand);
+					Pop_Frame (Interp); -- Done
+
+					-- There must be only 1 return value chained in the Group frame.
+					pragma Assert (Get_Cdr(Operand) = Nil_Pointer);
+
+					-- Transfer the only return value to the upper chain
+					Chain_Frame_Return (Interp, Interp.Stack, Get_Car(Operand));
 
 				when others =>
 					raise Internal_Error;
@@ -2186,6 +2060,7 @@ end Make_Test_Object;
 					if Car = null then
 						-- unbound
 						Text_IO.Put_Line ("Unbound symbol....");
+						Print (Interp, Operand);		
 						raise Evaluation_Error;
 					else
 						-- symbol found in the environment
@@ -2210,12 +2085,11 @@ end Make_Test_Object;
 									--      (begin . 10)
 									Text_IO.Put_LINE ("FUCKNING CDR FOR BEGIN");
 									raise Syntax_Error;
-									--Pop_Frame;  -- Done
+									--Pop_Frame (Interp);  -- Done
 
 								else
 									Set_Frame_Opcode (Interp.Stack, Opcode_Evaluate_Group);
 									Set_Frame_Operand (Interp.Stack, Operand);
-
 
 									if (Interp.Trait.Trait_Bits and No_Optimization) = 0 then
 										-- I call Evaluate_Group for optimization here.
@@ -2238,26 +2112,26 @@ end Make_Test_Object;
 									--      (lambda . 10)
 									Text_IO.Put_LINE ("FUCKNING CDR FOR BEGIN");
 									raise Syntax_Error;
-									--Pop_Frame;  -- Done
+									--Pop_Frame (Interp);  -- Done
 								else
 									if not Is_Cons(Get_Car(Operand)) then
 										Text_IO.Put_Line ("INVALID PARRAMETER LIST");
 										raise Syntax_Error;
-										--Pop_Frame;  -- Done
+										--Pop_Frame (Interp);  -- Done
 									end if;
 
 --Print (Interp, Get_Cdr(Operand));
 									if not Is_Cons(Get_Cdr(Operand)) then
 										Text_IO.Put_Line ("NO BODY");
 										raise Syntax_Error;
-										--Pop_Frame;  -- Done
+										--Pop_Frame (Interp);  -- Done
 									end if;
 
 									declare
 										Closure: Object_Pointer;
 									begin
 										Closure := Make_Closure (Interp.Self, Operand, Interp.Environment);
-										Pop_Frame;  -- Done
+										Pop_Frame (Interp);  -- Done
 										Chain_Frame_Return (Interp, Interp.Stack, Closure);
 									end;
 								end if;
@@ -2310,7 +2184,7 @@ end Make_Test_Object;
 
 						-- Arrange to evaluate the car object
 						if (Interp.Trait.Trait_Bits and No_Optimization) = 0 then
-							Push_Frame (Opcode_Evaluate_Object, Car);
+							Push_Frame (Interp, Opcode_Evaluate_Object, Car);
 							goto Start_Over; -- for optimization only. not really needed.
 						end if;
 					end if;
@@ -2327,8 +2201,8 @@ end Make_Test_Object;
 					-- This should be faster than Popping the current frame and pushing
 					-- a new frame.
 					--   Envir := Get_Frame_Environment(Interp.Stack);
-					--   Pop_Frame (Interp.Stack); -- done
-					--   Push_Frame (Interp.Stack, Opcode_Apply, Operand, Envir); 
+					--   Pop_Frame (Interp); -- done
+					--   Push_Frame (Interp, Opcode_Apply, Operand, Envir); 
 					Clear_Frame_Return (Interp.Stack);
 					Set_Frame_Opcode (Interp.Stack, Opcode_Apply); 
 					Set_Frame_Operand (Interp.Stack, Operand);
@@ -2340,12 +2214,11 @@ end Make_Test_Object;
 			return;
 
 		<<Literal>>
-			Pop_Frame; -- done
+			Pop_Frame (Interp); -- done
 Text_IO.Put ("Return => ");
 Print (Interp, Operand);
 			Chain_Frame_Return (Interp, Interp.Stack, Operand);
 		end Evaluate_Object;
-
 
 		procedure Evaluate_Syntax is
 			pragma Inline (Evaluate_Syntax);
@@ -2354,6 +2227,7 @@ Print (Interp, Operand);
 			Scode := Get_Car(Get_Frame_Operand(Interp.Stack)).Scode;
 			case Scode is
 				when Begin_Syntax =>
+					-- not used. Evaluate_Group is used instead.
 					null;	
 				when Define_Syntax =>
 					Text_IO.Put_Line ("define syntax");	
@@ -2377,13 +2251,13 @@ Print (Interp, Operand);
 
 			procedure Apply_Car_Procedure is
 			begin
-				Pop_Frame; -- Done with the current frame
+				Pop_Frame (Interp); -- Done with the current frame
 				Chain_Frame_Return (Interp, Interp.Stack, Get_Car(Args));
 			end Apply_Car_Procedure;
 
 			procedure Apply_Cdr_Procedure is
 			begin
-				Pop_Frame; -- Done with the current frame
+				Pop_Frame (Interp); -- Done with the current frame
 				Chain_Frame_Return (Interp, Interp.Stack, Get_Cdr(Args));
 			end Apply_Cdr_Procedure;
 
@@ -2397,13 +2271,14 @@ Print (Interp, Operand);
 					--       if something else, error
 					Car := Get_Car(Ptr);
 					if not Is_Integer(Car) then
+Ada.Text_IO.Put ("NOT INTEGER FOR ADD"); Print (Interp, Car);
 						raise Evaluation_Error;
 					end if;
 					Num := Num + Pointer_To_Integer(Car);
 					Ptr := Get_Cdr(Ptr);
 				end loop;
 
-				Pop_Frame; -- Done with the current frame
+				Pop_Frame (Interp); -- Done with the current frame
 				Chain_Frame_Return (Interp, Interp.Stack, Integer_To_Pointer(Num));
 			end Apply_Add_Procedure;
 
@@ -2431,7 +2306,7 @@ Print (Interp, Operand);
 					end loop;
 				end if;
 
-				Pop_Frame; --  Done with the current frame
+				Pop_Frame (Interp); --  Done with the current frame
 				Chain_Frame_Return (Interp, Interp.Stack, Integer_To_Pointer(Num));
 			end Apply_Subtract_Procedure;
 
@@ -2541,9 +2416,256 @@ Print (Interp, Operand);
 			end case;
 		end Apply;
 
-		procedure Read_Object is
+		procedure Fetch_Character is
 		begin
-			null;
+		-- TODO: calculate Interp.Input.Row, Interp.Input.Column
+			if Interp.Input.Pos >= Interp.Input.Last then
+				if Interp.Input.Flags /= 0 then
+					-- An error has occurred or EOF has been reached previously.
+					-- Note calling this procedure after EOF results in an error.
+					Interp.Input.Iochar := (Error_Character, Object_Character'First);
+					--return;
+					raise IO_Error;
+				end if;
+
+				Interp.Input.Pos := Interp.Input.Data'First - 1;
+				begin
+					Read (Interp.Input.Stream.all, Interp.Input.Data, Interp.Input.Last);
+				exception
+					when others =>
+						-- The callee can raise an exception upon errors.
+						-- If an exception is raised, data read into the buffer 
+						-- is also ignored.
+						Interp.Input.Flags := Interp.Input.Flags and IO_Error_Occurred;
+						Interp.Input.Iochar := (Error_Character, Object_Character'First);
+						--return;
+						raise IO_Error;
+				end;
+				if Interp.Input.Last < Interp.Input.Data'First then	
+					-- The callee must read 0 bytes on EOF 
+					Interp.Input.Flags := Interp.Input.Flags and IO_End_Reached;
+					Interp.Input.Iochar := (End_Character, Object_Character'First);
+					return;
+				end if;
+			end if;
+			Interp.Input.Pos := Interp.Input.Pos + 1;
+			Interp.Input.Iochar := (Normal_Character, Interp.Input.Data(Interp.Input.Pos));
+		end Fetch_Character;
+
+		function Is_White_Space (X: in Object_Character) return Standard.Boolean is
+		begin
+			return X = ' ' or else
+			       X = Object_Character'Val(Standard.Character'Pos(Standard.ASCII.HT)) or else
+			       X = Object_Character'Val(Standard.Character'Pos(Standard.ASCII.VT)) or else
+			       X = Object_Character'Val(Standard.Character'Pos(Standard.ASCII.CR)) or else
+			       X = Object_Character'Val(Standard.Character'Pos(Standard.ASCII.LF)) or else
+			       X = Object_Character'Val(Standard.Character'Pos(Standard.ASCII.FF));
+		end Is_White_Space;
+
+		procedure Skip_Spaces_And_Comments is
+		begin
+			loop
+				exit when LC.Kind /= Normal_Character;
+
+				-- Normal character
+				if Is_White_Space(LC.Value) then
+					Fetch_Character;
+				elsif LC.Value = ';' then
+					-- Comment.
+					loop
+						Fetch_Character;
+
+						exit when LC.Kind = End_Character; -- EOF before LF
+
+						if LC.Kind = Normal_Character and then 
+						   LC.Value = Object_Character'Val(Standard.Character'Pos(Standard.ASCII.LF)) then
+							Fetch_Character; -- Read the next character after LF
+							exit;
+						end if;
+					end loop;
+				else
+					exit;
+				end if;
+			end loop;
+		end Skip_Spaces_And_Comments;
+
+		procedure Fetch_Token is
+		begin
+			if not Interp.LC_Unfetched then
+				Fetch_Character;
+			else
+				-- Reuse the last character unfetched
+				Interp.LC_Unfetched := Standard.False;
+			end if;
+			Skip_Spaces_And_Comments;
+			if LC.Kind /= Normal_Character then
+				Token.Set (Interp, End_Token, "");
+				return;
+			end if;
+
+			-- TODO: Pass Token Location when calling Token.Set
+			case LC.Value is
+				when '(' =>
+					Token.Set (Interp, Left_Parenthesis_Token, "(");
+
+				when ')' =>
+					Token.Set (Interp, Right_Parenthesis_Token, ")");
+
+				when '.' =>
+					Token.Set (Interp, Period_Token, ".");
+
+				when ''' =>
+					Token.Set (Interp, Single_Quote_Token, "'");
+
+				when '"' =>
+					Fetch_Character;
+					Token.Set (Interp, String_Token, "");
+					loop
+						if LC.Kind /= Normal_Character then
+							-- String ended prematurely.
+							-- TODO: Set Error code, Error Number.... Error location
+							raise Syntax_Error;		
+						end if;
+
+						if LC.Value = '\' then
+							Fetch_Character;
+							if LC.Kind /= Normal_Character then
+								-- String ended prematurely.
+								-- TODO: Set Error code, Error Number.... Error location
+								raise Syntax_Error;		
+							end if;
+							-- TODO: escape letters??? \n \r \\ etc....
+							Token.Append_Character (Interp, LC.Value);
+						elsif LC.Value = '"' then
+							exit;
+						else
+							Token.Append_Character (Interp, LC.Value);
+							Fetch_Character;
+						end if;
+					end loop;
+				
+					-- TODO:
+
+				when '#' =>
+					Fetch_Character;
+					-- TODO: t, false, etc
+
+				when others =>	
+					Token.Set (Interp, Identifier_Token, "");
+					loop
+						Token.Append_Character (Interp, LC.Value);
+						Fetch_Character;
+						--exit when not Is_Ident_Char(C.Value);
+					-- TODO: more characters
+						if LC.Value = '(' or else LC.Value = ')' or else
+						   LC.Value = ''' or else LC.Value = '"' or else
+						   LC.Value = '#' or else LC.Value = ';' or else
+						   Is_White_Space(LC.Value) then
+							-- Unfetch the last character
+							Interp.LC_Unfetched := Standard.True;
+							exit;
+						end if;
+					end loop;
+			end case;
+			
+Text_IO.Put_Line (">>>>>>>>>>>>>>>>>>>>>>> Token: " & Interp.Token.Value.Ptr(1..Interp.Token.Value.Last));
+		end Fetch_Token;
+
+		procedure Read_List is
+			V: Object_Pointer;
+			Period: Standard.Boolean := Standard.False;
+		begin
+		<<Start_Over>>
+			Fetch_Token;
+		
+			case Interp.Token.Kind is
+				when End_Token =>
+Ada.Text_IO.Put_Line ("ERROR: PREMATURE LIST END");
+					raise Syntax_Error;
+
+				when Left_Parenthesis_Token =>
+					Push_Frame (Interp, Opcode_Read_List, Nil_Pointer);
+			
+				when Right_Parenthesis_Token =>
+					V := Get_Frame_Return(Interp.Stack);
+					if V /= Nil_Pointer then
+						V := Reverse_Cons(V); -- TODO: GC
+					end if;
+					Pop_Frame (Interp); 
+					Chain_Frame_Return (Interp, Interp.Stack, V);
+
+				when Period_Token =>
+					V := Get_Frame_Return(Interp.Stack);
+					if V = Nil_Pointer then
+						-- . immediately after (
+						raise Syntax_Error;
+					else
+						Period := Standard.True;
+						goto Start_Over;
+					end if;
+
+				when String_Token =>
+					V := Make_String (Interp.Self, Interp.Token.Value.Ptr.all(1..Interp.Token.Value.Last));
+					-- TODO: make V gc-aware
+					if Period then
+					
+					else
+						Chain_Frame_Return (Interp, Interp.Stack, V);
+					end if;
+
+				when Identifier_Token =>	
+					V := Make_Symbol (Interp.Self, Interp.Token.Value.Ptr.all(1..Interp.Token.Value.Last));
+					-- TODO: make V gc-aware
+					if Period then
+					else
+						Chain_Frame_Return (Interp, Interp.Stack, V);
+					end if
+
+				when others =>
+					-- TODO: set various error info
+					raise Syntax_Error;
+			end case;
+		end Read_List;
+
+		procedure Close_List is
+			V: Object_Pointer;
+		begin
+			V := Get_Frame_Return(Interp.Stack);
+			pragma Assert (Get_Cdr(V) = Nil_Pointer);
+			Pop_Frame (Interp); -- Done with the current frame
+			Chain_Frame_Return (Interp, Interp.Stack, Get_Car(V));
+		end Close_List;
+
+		procedure Read_Object is
+			V: Object_Pointer;
+		begin
+			Fetch_Token;
+
+			case Interp.Token.Kind is
+				when End_Token =>
+Ada.Text_IO.Put_Line ("INFO: NO MORE TOKEN ");
+					raise Stream_End_Error;
+
+				when Left_Parenthesis_Token =>
+					Set_Frame_Opcode (Interp.Stack, Opcode_Close_List);
+					Push_Frame (Interp, Opcode_Read_List, Nil_Pointer);
+
+				when String_Token =>
+					V := Make_String (Interp.Self, Interp.Token.Value.Ptr.all(1..Interp.Token.Value.Last));
+					-- TODO: make V gc-aware
+					Pop_Frame (Interp); -- Done with the current frame
+					Chain_Frame_Return (Interp, Interp.Stack, V);
+
+				when Identifier_Token =>	
+					V := Make_Symbol (Interp.Self, Interp.Token.Value.Ptr.all(1..Interp.Token.Value.Last));
+					-- TODO: make V gc-aware
+					Pop_Frame (Interp); -- Done with the current frame
+					Chain_Frame_Return (Interp, Interp.Stack, V);
+
+				when others =>
+					-- TODO: set various error info
+					raise Syntax_Error;
+			end case;
 		end Read_Object;
 
 	begin
@@ -2605,22 +2727,14 @@ Print (Interp, Operand);
 		-- The apply operation produces the final result and sets it to the 
 		-- parent frame while removing the apply frame.
 		--     -----------------------------------------------------------------
-		--     top/bottom| Opcode_Exit            | Nil          | 3
+		--     top/bottom| Opcode_Exit            | Nil          | (3)
 		
-
-		Interp.Stack := Nil_Pointer;
-
-		-- Push a pseudo-frame to terminate the evaluation loop
-		Push_Frame (Opcode_Exit, Nil_Pointer);
-
-		-- Push the actual frame for evaluation
-		Push_Frame (Opcode_Evaluate_Object, Source);
+		-- The caller must push some frames before calling this procedure
+		pragma Assert (Interp.Stack /= Nil_Pointer);
 
 		loop
 			case Get_Frame_Opcode(Interp.Stack) is
 				when Opcode_Exit =>
-					Result := Get_Frame_Return (Interp.Stack);
-					Pop_Frame;
 					exit;
 
 				when Opcode_Evaluate_Object =>
@@ -2640,24 +2754,98 @@ Print (Interp, Operand);
 
 				when Opcode_Read_Object =>
 					Read_Object;
+
+				when Opcode_Read_List =>
+					Read_List;
+
+				when Opcode_Close_List =>
+					Close_List;
 			end case;
 		end loop;
 
 		-- the stack must be empty when the loop is terminated
-		pragma Assert (Interp.Stack = Nil_Pointer);
+		--pragma Assert (Interp.Stack = Nil_Pointer);
 
 	exception
+		when Stream_End_Error =>
+			raise;
+
 		when others =>
 			Text_IO.Put_Line ("EXCEPTION OCCURRED");
 			-- TODO: restore stack frame???
 			-- TODO: restore envirronemtn frame???
+			raise;
+	end Execute;
+
+	procedure Evaluate (Interp: in out Interpreter_Record;
+	                    Source: in     Object_Pointer;
+	                    Result: out    Object_Pointer) is
+	begin
+		
+		pragma Assert (Interp.Stack = Nil_Pointer);
+		Interp.Stack := Nil_Pointer;
+
+		-- Push a pseudo-frame to terminate the evaluation loop
+		Push_Frame (Interp, Opcode_Exit, Nil_Pointer);
+
+		-- Push the actual frame for evaluation
+		Push_Frame (Interp, Opcode_Evaluate_Object, Source);
+
+		Execute (Interp);
+
+		pragma Assert (Get_Frame_Opcode(Interp.Stack) = Opcode_Exit);
+
+		Result := Get_Frame_Return (Interp.Stack);
+		-- There must be only 1 value chained to the top-level frame
+		-- once evaluation is over.
+		pragma Assert (Get_Cdr(Result) = Nil_Pointer);
+		-- Get the only value chained 
+		Result := Get_Car(Result);
+		Pop_Frame (Interp);
+
+		pragma Assert (Interp.Stack = Nil_Pointer);
+
 	end Evaluate;
 
 	procedure Run_Loop (Interp: in out Interpreter_Record;
-	                Result: out    Object_Pointer) is
+	                    Result: out    Object_Pointer) is
 		-- standard read-eval-print loop
 	begin
-		null;
+		Result := Nil_Pointer;
+
+		loop
+			pragma Assert (Interp.Stack = Nil_Pointer);
+			Interp.Stack := Nil_Pointer;
+
+			Push_Frame (Interp, Opcode_Exit, Nil_Pointer);
+			--Push_Frame (Interp, Opcode_Print, Nil_Pointer);
+			--Push_Frame (Interp, Opcode_Evaluate_Object, Nil_Pointer);
+			Push_Frame (Interp, Opcode_Read_Object, Nil_Pointer);
+
+			Execute (Interp);
+
+			pragma Assert (Get_Frame_Opcode(Interp.Stack) = Opcode_Exit);
+
+			-- TODO: this result must be kept at some where that GC dowsn't sweep.
+			Result := Get_Frame_Return (Interp.Stack); 
+			pragma Assert (Get_Cdr(Result) = Nil_Pointer);
+			Result := Get_Car(Result);
+			Pop_Frame (Interp);
+
+Ada.Text_IO.Put ("REsULT>>>>>");
+Print (Interp, Result);
+			pragma Assert (Interp.Stack = Nil_Pointer);
+Text_IO.Put_Line (">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> LOOP ITERATION XXXXXX CHECKPOINT"); 
+		end loop;
+
+	exception
+		when Stream_End_Error =>
+			-- this is not a real error. this indicates the end of input stream.
+			Text_IO.Put_LINE ("=== BYE ===");
+
+		when others =>
+			TEXT_IO.PUT_LINE ("ERROR ERROR ERROR");
+			raise;
 	end Run_Loop;
 	
 	-----------------------------------------------------------------------------

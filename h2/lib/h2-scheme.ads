@@ -333,7 +333,6 @@ package H2.Scheme is
 		Iochar: IO_Character_Record; -- the last character read.	
 	end record;
 
-
 	-- -----------------------------------------------------------------------------
 
 	type Trait_Mask is mod 2 ** System.Word_Size;
@@ -402,8 +401,8 @@ procedure Make_Test_Object (Interp: in out Interpreter_Record; Result: out Objec
 	                             Stream: in out Stream_Record'Class);
 
 	-- Source must be open for Read() to work.
-	procedure Read (Interp: in out Interpreter_Record;
-	                Result: out    Object_Pointer);
+	--procedure Read (Interp: in out Interpreter_Record;
+	--                Result: out    Object_Pointer);
 
 	procedure Evaluate (Interp: in out Interpreter_Record;
 	                    Source: in     Object_Pointer;
@@ -444,6 +443,7 @@ private
 	                    Identifier_Token,
 	                    Left_Parenthesis_Token,
 	                    Right_Parenthesis_Token,
+	                    Period_Token,
 	                    Single_Quote_Token,
 	                    String_Token
 	);
@@ -475,6 +475,7 @@ private
 		Input: IO_Pointer := null;
 
 		Token: Token_Record;
+		LC_Unfetched: Standard.Boolean := Standard.False;
 	end record;
 
 end H2.Scheme;
