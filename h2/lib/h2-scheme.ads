@@ -445,7 +445,8 @@ private
 	                    Right_Parenthesis_Token,
 	                    Period_Token,
 	                    Single_Quote_Token,
-	                    String_Token
+	                    String_Token,
+	                    Integer_Token
 	);
 
 	type Token_Record is record

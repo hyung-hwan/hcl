@@ -48,11 +48,11 @@ package body H2.Scheme is
 
 	subtype Moved_Object_Record is Object_Record (Moved_Object, 0);
 
-	subtype Opcode_Type is Object_Integer range 0 .. 10;
+	subtype Opcode_Type is Object_Integer range 0 .. 11;
 	Opcode_Exit:               constant Opcode_Type := Opcode_Type'(0);
-	Opcode_Evaluate_Object:    constant Opcode_Type := Opcode_Type'(1);
-	Opcode_Evaluate_Group:     constant Opcode_Type := Opcode_Type'(2); -- (begin ...) and closure apply
-	Opcode_Evaluate_Syntax:    constant Opcode_Type := Opcode_Type'(3);
+	Opcode_Evaluate_Result:    constant Opcode_Type := Opcode_Type'(1);
+	Opcode_Evaluate_Object:    constant Opcode_Type := Opcode_Type'(2);
+	Opcode_Evaluate_Group:     constant Opcode_Type := Opcode_Type'(3); -- (begin ...) and closure apply
 	Opcode_Evaluate_Procedure: constant Opcode_Type := Opcode_Type'(4);
 	Opcode_Apply:              constant Opcode_Type := Opcode_Type'(5);
 	Opcode_Read_Object:        constant Opcode_Type := Opcode_Type'(6);
@@ -60,6 +60,7 @@ package body H2.Scheme is
 	Opcode_Read_List_Cdr:      constant Opcode_Type := Opcode_Type'(8);
 	Opcode_Read_List_End:      constant Opcode_Type := Opcode_Type'(9);
 	Opcode_Close_List:         constant Opcode_Type := Opcode_Type'(10);
+	Opcode_Close_Quote:        constant Opcode_Type := Opcode_Type'(11);
 
 	-----------------------------------------------------------------------------
 	-- COMMON OBJECTS
@@ -73,7 +74,7 @@ package body H2.Scheme is
 	Frame_Opcode_Index: constant Pointer_Object_Size := 2;
 	Frame_Operand_Index: constant Pointer_Object_Size := 3;
 	Frame_Environment_Index: constant Pointer_Object_Size := 4;
-	Frame_Return_Index: constant Pointer_Object_Size := 5;
+	Frame_Result_Index: constant Pointer_Object_Size := 5;
 
 	Mark_Object_Size: constant Pointer_Object_Size := 1;
 	Mark_Context_Index: constant Pointer_Object_Size := 1;
@@ -366,6 +367,32 @@ package body H2.Scheme is
 			Text_IO.Put_Line (Msg & " at " & To_Object_String(Object_Word'Image(W)) & " at " & To_Object_String(Object_Kind'Image(Source.Kind)));
 		end if;
 	end Print_Object_Pointer;
+
+	function String_To_Integer_Pointer (Source: in Object_String) return Object_Pointer is
+		V: Object_Integer := 0;
+		Negative: Standard.Boolean := False;
+		First: Standard.Natural;
+	begin
+		-- TODO: BIGNUM, RANGE CHECK, ETC
+		pragma Assert (Source'Length > 0);
+
+		First := Source'First;
+		if Source(First) = '-' then
+			First := First + 1;
+			Negative := Standard.True;
+		elsif Source(First) = '+' then
+			First := First + 1;
+		end if;
+		for I in First .. Source'Last loop
+			V := V * 10 + Object_Character'Pos(Source(I)) - Object_Character'Pos('0');
+		end loop;	
+
+		if Negative then	
+			V := -V;
+		end if;
+
+		return Integer_To_Pointer(V);
+	end String_To_Integer_Pointer;
 
 	-----------------------------------------------------------------------------
 	-- MEMORY MANAGEMENT
@@ -1180,39 +1207,39 @@ Put_String (To_Thin_String_Pointer (Result));
 		       Source.Tag = Frame_Object;
 	end Is_Frame;
 
-	function Get_Frame_Return (Frame: in Object_Pointer) return Object_Pointer is
-		pragma Inline (Get_Frame_Return);
+	function Get_Frame_Result (Frame: in Object_Pointer) return Object_Pointer is
+		pragma Inline (Get_Frame_Result);
 		pragma Assert (Is_Frame(Frame));
 	begin
-		return Frame.Pointer_Slot(Frame_Return_Index);
-	end Get_Frame_Return;
+		return Frame.Pointer_Slot(Frame_Result_Index);
+	end Get_Frame_Result;
 
-	--procedure Set_Frame_Return (Frame: in out Object_Pointer;
+	--procedure Set_Frame_Result (Frame: in out Object_Pointer;
 	--                            Value: in     Object_Pointer) is
-	--	pragma Inline (Set_Frame_Return);
+	--	pragma Inline (Set_Frame_Result);
 	--	pragma Assert (Is_Frame(Frame));
 	--begin
-	--	Frame.Pointer_Slot(Frame_Return_Index) := Value;
-	--end Set_Frame_Return;
+	--	Frame.Pointer_Slot(Frame_Result_Index) := Value;
+	--end Set_Frame_Result;
 
-	procedure Chain_Frame_Return (Interp: in out Interpreter_Record;
+	procedure Chain_Frame_Result (Interp: in out Interpreter_Record;
 	                              Frame:  in out Object_Pointer;
 	                              Value:  in     Object_Pointer) is
-		pragma Inline (Chain_Frame_Return);
+		pragma Inline (Chain_Frame_Result);
 		pragma Assert (Is_Frame(Frame));
 
-		Ret_Head: Object_Pointer renames Frame.Pointer_Slot(Frame_Return_Index);
+		Ret_Head: Object_Pointer renames Frame.Pointer_Slot(Frame_Result_Index);
 	begin
 -- TODO: make it GC-aware
 
 		-- Add a new cons cell to the front
 		Ret_Head :=  Make_Cons (Interp.Self, Value, Ret_Head);
-	end Chain_Frame_Return;
+	end Chain_Frame_Result;
 
-	procedure Clear_Frame_Return (Frame: in out Object_Pointer) is
+	procedure Clear_Frame_Result (Frame: in out Object_Pointer) is
 	begin
-		Frame.Pointer_Slot(Frame_Return_Index) := Nil_Pointer;
-	end Clear_Frame_Return;
+		Frame.Pointer_Slot(Frame_Result_Index) := Nil_Pointer;
+	end Clear_Frame_Result;
 
 	function Get_Frame_Environment (Frame: in Object_Pointer) return Object_Pointer is
 		pragma Inline (Get_Frame_Environment);
@@ -1989,6 +2016,20 @@ end Make_Test_Object;
 
 		LC: IO_Character_Record renames Interp.Input.Iochar;
 
+		procedure Evaluate_Result is
+			pragma Inline (Evaluate_Result);
+		begin
+			-- The result from the previous frame is stored in the current frame.
+			-- This procedure takes the result and switch it to an operand and clears it.
+			-- It is used to evaluate the result of Read_Object in principle.
+			-- It takes only the head(car) element of the result chain. 
+			-- Calling this function to evaluate the result of any arbitrary frame 
+			-- other than 'Read_Object' is not recommended.
+			Set_Frame_Operand (Interp.Stack, Get_Car(Get_Frame_Result(Interp.Stack)));
+			Clear_Frame_Result (Interp.Stack);
+			Set_Frame_Opcode (Interp.Stack, Opcode_Evaluate_Object);
+		end Evaluate_Result;
+
 		procedure Evaluate_Group is
 			pragma Inline (Evaluate_Group);
 
@@ -2021,20 +2062,20 @@ end Make_Test_Object;
 					end if;
 
 					-- Clear the return value from the previous expression.
-					Clear_Frame_Return (Interp.Stack);
+					Clear_Frame_Result (Interp.Stack);
 
 					-- Arrange to evaluate the current expression
 					Push_Frame (Interp, Opcode_Evaluate_Object, Car);
 
 				when Mark_Object =>
-					Operand := Get_Frame_Return (Interp.Stack);
+					Operand := Get_Frame_Result (Interp.Stack);
 					Pop_Frame (Interp); -- Done
 
 					-- There must be only 1 return value chained in the Group frame.
 					pragma Assert (Get_Cdr(Operand) = Nil_Pointer);
 
 					-- Transfer the only return value to the upper chain
-					Chain_Frame_Return (Interp, Interp.Stack, Get_Car(Operand));
+					Chain_Frame_Result (Interp, Interp.Stack, Get_Car(Operand));
 
 				when others =>
 					raise Internal_Error;
@@ -2104,9 +2145,24 @@ end Make_Test_Object;
 										goto Start_Over; -- for optimization only. not really needed.
 									end if;
 								end if;
+
 							when Define_Syntax =>
-								Text_IO.Put_Line ("define syntax");	
-								Set_Frame_Opcode (Interp.Stack, Opcode_Evaluate_Syntax);  -- Switch to syntax evaluation
+								-- (define x 10) 
+								-- (define (add x y) (+ x y)) -> (define add (lambda (x y) (+ x y)))
+								Operand := Cdr; -- Skip "define"
+
+								if not Is_Cons(Operand) then
+									-- e.g) (define)
+									--      (define . 10)
+									Text_IO.Put_LINE ("FUCKNING CDR FOR DEFINE");
+									raise Syntax_Error;
+								elsif Get_Cdr(Operand) /= Nil_Pointer then
+									-- TODO: IMPLEMENT OTHER CHECK
+								end if;
+					
+								--Pop_Frame (Interp);	 -- Done
+								--Chain_Frame_Result (Interp, Interp.Stack,  Get_Car(Operand));
+								-- TODO: IMPLEMENT DEFINE.
 
 							when Lambda_Syntax =>
 								-- (lambda (x y) (+ x y));
@@ -2136,9 +2192,23 @@ end Make_Test_Object;
 									begin
 										Closure := Make_Closure (Interp.Self, Operand, Interp.Environment);
 										Pop_Frame (Interp);  -- Done
-										Chain_Frame_Return (Interp, Interp.Stack, Closure);
+										Chain_Frame_Result (Interp, Interp.Stack, Closure);
 									end;
 								end if;
+
+							when Quote_Syntax =>
+								Operand := Cdr; -- Skip "quote"
+								if not Is_Cons(Operand) then
+									-- e.g) (quote)
+									--      (quote . 10)
+									Text_IO.Put_LINE ("FUCKNING CDR FOR QUOTE");
+									raise Syntax_Error;
+								elsif Get_Cdr(Operand) /= Nil_Pointer then
+									Text_IO.Put_LINE ("WRONG NUMBER OF ARGUMENTS FOR QUOTE");
+									raise Syntax_Error;
+								end if;
+								Pop_Frame (Interp);	 -- Done
+								Chain_Frame_Result (Interp, Interp.Stack,  Get_Car(Operand));
 
 							when others =>
 								Text_IO.Put_Line ("Unknown syntax");	
@@ -2153,15 +2223,15 @@ end Make_Test_Object;
 								-- frame without pushing another frame dedicated for it.
 	
 								-- TODO: some normal pointers may point to a literal object. e.g.) bignum
-								Chain_Frame_Return (Interp, Interp.Stack, Car);
+								Chain_Frame_Result (Interp, Interp.Stack, Car);
 								if Is_Cons(Cdr) then
 									Operand := Cdr;
 									Car := Get_Car(Operand);
 									Cdr := Get_Cdr(Operand);
 								else
 									-- last cons 
-									Operand := Reverse_Cons(Get_Frame_Return(Interp.Stack));
-									Clear_Frame_Return (Interp.Stack);
+									Operand := Reverse_Cons(Get_Frame_Result(Interp.Stack));
+									Clear_Frame_Result (Interp.Stack);
 									Set_Frame_Opcode (Interp.Stack, Opcode_Apply); 
 									Set_Frame_Operand (Interp.Stack, Operand);
 									return;
@@ -2198,8 +2268,8 @@ end Make_Test_Object;
 
 					-- Get the evaluation result stored in the current stack frame by
 					-- various sub-Opcode_Evaluate_Object frames. the return value 
-					-- chain must be reversed Chain_Frame_Return reverse-chains values.
-					Operand := Reverse_Cons(Get_Frame_Return(Interp.Stack));
+					-- chain must be reversed Chain_Frame_Result reverse-chains values.
+					Operand := Reverse_Cons(Get_Frame_Result(Interp.Stack));
 
 					-- Refresh the current stack frame to Opcode_Apply.
 					-- This should be faster than Popping the current frame and pushing
@@ -2207,7 +2277,7 @@ end Make_Test_Object;
 					--   Envir := Get_Frame_Environment(Interp.Stack);
 					--   Pop_Frame (Interp); -- done
 					--   Push_Frame (Interp, Opcode_Apply, Operand, Envir); 
-					Clear_Frame_Return (Interp.Stack);
+					Clear_Frame_Result (Interp.Stack);
 					Set_Frame_Opcode (Interp.Stack, Opcode_Apply); 
 					Set_Frame_Operand (Interp.Stack, Operand);
 
@@ -2221,24 +2291,8 @@ end Make_Test_Object;
 			Pop_Frame (Interp); -- done
 Text_IO.Put ("Return => ");
 Print (Interp, Operand);
-			Chain_Frame_Return (Interp, Interp.Stack, Operand);
+			Chain_Frame_Result (Interp, Interp.Stack, Operand);
 		end Evaluate_Object;
-
-		procedure Evaluate_Syntax is
-			pragma Inline (Evaluate_Syntax);
-			Scode: Syntax_Code;
-		begin
-			Scode := Get_Car(Get_Frame_Operand(Interp.Stack)).Scode;
-			case Scode is
-				when Begin_Syntax =>
-					-- not used. Evaluate_Group is used instead.
-					null;	
-				when Define_Syntax =>
-					Text_IO.Put_Line ("define syntax");	
-				when others =>
-					Text_IO.Put_Line ("Unknown syntax");	
-			end case;
-		end Evaluate_Syntax;
 
 		procedure Evaluate_Procedure is
 			pragma Inline (Evaluate_Procedure);
@@ -2256,13 +2310,13 @@ Print (Interp, Operand);
 			procedure Apply_Car_Procedure is
 			begin
 				Pop_Frame (Interp); -- Done with the current frame
-				Chain_Frame_Return (Interp, Interp.Stack, Get_Car(Args));
+				Chain_Frame_Result (Interp, Interp.Stack, Get_Car(Args));
 			end Apply_Car_Procedure;
 
 			procedure Apply_Cdr_Procedure is
 			begin
 				Pop_Frame (Interp); -- Done with the current frame
-				Chain_Frame_Return (Interp, Interp.Stack, Get_Cdr(Args));
+				Chain_Frame_Result (Interp, Interp.Stack, Get_Cdr(Args));
 			end Apply_Cdr_Procedure;
 
 			procedure Apply_Add_Procedure is
@@ -2283,7 +2337,7 @@ Ada.Text_IO.Put ("NOT INTEGER FOR ADD"); Print (Interp, Car);
 				end loop;
 
 				Pop_Frame (Interp); -- Done with the current frame
-				Chain_Frame_Return (Interp, Interp.Stack, Integer_To_Pointer(Num));
+				Chain_Frame_Result (Interp, Interp.Stack, Integer_To_Pointer(Num));
 			end Apply_Add_Procedure;
 
 			procedure Apply_Subtract_Procedure is
@@ -2311,7 +2365,7 @@ Ada.Text_IO.Put ("NOT INTEGER FOR ADD"); Print (Interp, Car);
 				end if;
 
 				Pop_Frame (Interp); --  Done with the current frame
-				Chain_Frame_Return (Interp, Interp.Stack, Integer_To_Pointer(Num));
+				Chain_Frame_Result (Interp, Interp.Stack, Integer_To_Pointer(Num));
 			end Apply_Subtract_Procedure;
 
 			procedure Apply_Closure is
@@ -2370,7 +2424,7 @@ Print (Interp, Arg);
 -- TODO: is it correct to keep the environement  in the frame?
 				Set_Frame_Opcode (Interp.Stack, Opcode_Evaluate_Group);
 				Set_Frame_Operand (Interp.Stack, Fbody);
-				Clear_Frame_Return (Interp.Stack);
+				Clear_Frame_Result (Interp.Stack);
 			end Apply_Closure;
 
 		begin
@@ -2494,6 +2548,7 @@ Print (Interp, Operand);
 		end Skip_Spaces_And_Comments;
 
 		procedure Fetch_Token is
+			Tmp: Object_String(1..10); -- large enough???
 		begin
 			if not Interp.LC_Unfetched then
 				Fetch_Character;
@@ -2554,6 +2609,56 @@ Print (Interp, Operand);
 					Fetch_Character;
 					-- TODO: t, false, etc
 
+				when '0' .. '9' =>
+					-- TODO; negative number, floating-point number, bignum, hexdecimal, etc
+					Token.Set (Interp, Integer_Token, "");
+					loop
+						Token.Append_Character (Interp, LC.Value);
+						Fetch_Character;
+						if LC.Kind /= Normal_Character or else
+						   not (LC.Value in '0' .. '9')  then
+							-- Unfetch the last character
+							Interp.LC_Unfetched := Standard.True;
+							exit;
+						end if;
+					end loop;
+
+				when '-' | '+' =>
+					Tmp(1) := LC.Value;
+
+					Fetch_Character;
+					if LC.Kind = Normal_Character and then
+					   LC.Value in '0' .. '9' then
+						Token.Set (Interp, Integer_Token, Tmp(1..1));
+						loop
+							Token.Append_Character (Interp, LC.Value);
+							Fetch_Character;
+							if LC.Kind /= Normal_Character or else
+							   not (LC.Value in '0' .. '9')  then
+								-- Unfetch the last character
+								Interp.LC_Unfetched := Standard.True;
+								exit;
+							end if;
+						end loop;
+					else
+						Token.Set (Interp, Identifier_Token, Tmp(1..1));
+						loop
+					-- TODO: more characters
+							if LC.Kind /= Normal_Character or else
+							   LC.Value = '(' or else LC.Value = ')' or else
+							   LC.Value = ''' or else LC.Value = '"' or else
+							   LC.Value = '#' or else LC.Value = ';' or else
+							   Is_White_Space(LC.Value) then
+								-- Unfetch the last character
+								Interp.LC_Unfetched := Standard.True;
+								exit;
+							end if;
+
+							Token.Append_Character (Interp, LC.Value);
+							Fetch_Character;
+						end loop;
+					end if;
+
 				when others =>	
 					Token.Set (Interp, Identifier_Token, "");
 					loop
@@ -2561,7 +2666,8 @@ Print (Interp, Operand);
 						Fetch_Character;
 						--exit when not Is_Ident_Char(C.Value);
 					-- TODO: more characters
-						if LC.Value = '(' or else LC.Value = ')' or else
+						if LC.Kind /= Normal_Character or else
+						   LC.Value = '(' or else LC.Value = ')' or else
 						   LC.Value = ''' or else LC.Value = '"' or else
 						   LC.Value = '#' or else LC.Value = ';' or else
 						   Is_White_Space(LC.Value) then
@@ -2576,6 +2682,7 @@ Text_IO.Put_Line (">>>>>>>>>>>>>>>>>>>>>>> Token: " & Interp.Token.Value.Ptr(1..
 		end Fetch_Token;
 
 		procedure Read_List is
+			pragma Inline (Read_List);
 			V: Object_Pointer;
 		begin
 			-- This procedure reads each token in a list.
@@ -2592,17 +2699,17 @@ Ada.Text_IO.Put_Line ("ERROR: PREMATURE LIST END");
 
 				when Left_Parenthesis_Token =>
 					Push_Frame (Interp, Opcode_Read_List, Nil_Pointer);
-			
+
 				when Right_Parenthesis_Token =>
-					V := Get_Frame_Return(Interp.Stack);
+					V := Get_Frame_Result(Interp.Stack);
 					if V /= Nil_Pointer then
 						V := Reverse_Cons(V); -- TODO: GC
 					end if;
 					Pop_Frame (Interp); 
-					Chain_Frame_Return (Interp, Interp.Stack, V);
+					Chain_Frame_Result (Interp, Interp.Stack, V);
 
 				when Period_Token =>
-					V := Get_Frame_Return(Interp.Stack);
+					V := Get_Frame_Result(Interp.Stack);
 					if V = Nil_Pointer then
 						-- . immediately after (
 						raise Syntax_Error;
@@ -2610,15 +2717,24 @@ Ada.Text_IO.Put_Line ("ERROR: PREMATURE LIST END");
 						Set_Frame_Opcode (Interp.Stack, Opcode_Read_List_Cdr);
 					end if;
 
+				when Single_Quote_Token =>
+					Push_Frame (Interp, Opcode_Close_Quote, Nil_Pointer);
+					Push_Frame (Interp, Opcode_Read_Object, Nil_Pointer);
+
+				when Integer_Token =>
+					-- TODO: bignum
+					V := String_To_Integer_Pointer(Interp.Token.Value.Ptr.all(1..Interp.Token.Value.Last));
+					Chain_Frame_Result (Interp, Interp.Stack, V);
+
 				when String_Token =>
 					V := Make_String (Interp.Self, Interp.Token.Value.Ptr.all(1..Interp.Token.Value.Last));
 					-- TODO: make V gc-aware
-					Chain_Frame_Return (Interp, Interp.Stack, V);
+					Chain_Frame_Result (Interp, Interp.Stack, V);
 
 				when Identifier_Token =>	
 					V := Make_Symbol (Interp.Self, Interp.Token.Value.Ptr.all(1..Interp.Token.Value.Last));
 					-- TODO: make V gc-aware
-					Chain_Frame_Return (Interp, Interp.Stack, V);
+					Chain_Frame_Result (Interp, Interp.Stack, V);
 
 				when others =>
 					-- TODO: set various error info
@@ -2627,13 +2743,14 @@ Ada.Text_IO.Put_Line ("ERROR: PREMATURE LIST END");
 		end Read_List;
 
 		procedure Read_List_Cdr is
+			pragma Inline (Read_List_Cdr);
 			V: Object_Pointer;
 		begin
 			-- This procedure reads the first token after a period has been read.
 			-- It transfers the control over to Read_List_End once it has read 
 			-- and processed the token. It chains the value made of the token  
 			-- to the front of the frame's return value list expecting Read_List_End
-			-- to handle the first item specially.
+			-- to handle the head item specially.
 			Fetch_Token;
 		
 			case Interp.Token.Kind is
@@ -2644,18 +2761,30 @@ Ada.Text_IO.Put_Line ("ERROR: PREMATURE LIST END");
 				when Left_Parenthesis_Token =>
 					Set_Frame_Opcode (Interp.Stack, Opcode_Read_List_End);
 					Push_Frame (Interp, Opcode_Read_List, Nil_Pointer);
+
+				when Single_Quote_Token =>
+Ada.Text_IO.Put_Line ("ERROR: CDR QUOT LIST END");
+					Set_Frame_Opcode (Interp.Stack, Opcode_Read_List_End);
+					Push_Frame (Interp, Opcode_Close_Quote, Nil_Pointer);
+					Push_Frame (Interp, Opcode_Read_Object, Nil_Pointer);
+
+				when Integer_Token =>
+					-- TODO: bignum
+					V := String_To_Integer_Pointer(Interp.Token.Value.Ptr.all(1..Interp.Token.Value.Last));
+					Set_Frame_Opcode (Interp.Stack, Opcode_Read_List_End);
+					Chain_Frame_Result (Interp, Interp.Stack, V);
 			
 				when String_Token =>
 					V := Make_String (Interp.Self, Interp.Token.Value.Ptr.all(1..Interp.Token.Value.Last));
 					-- TODO: make V gc-aware
 					Set_Frame_Opcode (Interp.Stack, Opcode_Read_List_End);
-					Chain_Frame_Return (Interp, Interp.Stack, V);
+					Chain_Frame_Result (Interp, Interp.Stack, V);
 
 				when Identifier_Token =>	
 					V := Make_Symbol (Interp.Self, Interp.Token.Value.Ptr.all(1..Interp.Token.Value.Last));
 					-- TODO: make V gc-aware
 					Set_Frame_Opcode (Interp.Stack, Opcode_Read_List_End);
-					Chain_Frame_Return (Interp, Interp.Stack, V);
+					Chain_Frame_Result (Interp, Interp.Stack, V);
 
 				when others =>
 					-- TODO: set various error info
@@ -2665,6 +2794,7 @@ Ada.Text_IO.Put_Line ("ERROR: PREMATURE LIST END");
 		end Read_List_Cdr;
 
 		procedure Read_List_End is
+			pragma Inline (Read_List_End);
 			V: Object_Pointer;
 			A: Object_Pointer;
 		begin
@@ -2672,28 +2802,40 @@ Ada.Text_IO.Put_Line ("ERROR: PREMATURE LIST END");
 
 			case Interp.Token.Kind is
 				when Right_Parenthesis_Token =>
-					V := Get_Frame_Return(Interp.Stack);
+					V := Get_Frame_Result(Interp.Stack);
 					pragma Assert (V /= Nil_Pointer);
 					-- The first item in the chain is actually Cdr of the last cell.
 					V := Reverse_Cons(Get_Cdr(V), Get_Car(V)); -- TODO: GC
 					Pop_Frame (Interp); 
-					Chain_Frame_Return (Interp, Interp.Stack, V);
+					Chain_Frame_Result (Interp, Interp.Stack, V);
 				when others =>
 					raise Syntax_Error;
 			end case;
 		end Read_List_End;
 
-
 		procedure Close_List is
+			pragma Inline (Close_List);
 			V: Object_Pointer;
 		begin
-			V := Get_Frame_Return(Interp.Stack);
+			V := Get_Frame_Result(Interp.Stack);
 			pragma Assert (Get_Cdr(V) = Nil_Pointer);
 			Pop_Frame (Interp); -- Done with the current frame
-			Chain_Frame_Return (Interp, Interp.Stack, Get_Car(V));
+			Chain_Frame_Result (Interp, Interp.Stack, Get_Car(V));
 		end Close_List;
 
+		procedure Close_Quote is
+			pragma Inline (Close_Quote);
+			V: Object_Pointer;
+		begin
+-- TODO: use Interp.Quote_Syntax instead of Make_Symbol("quote")
+			Chain_Frame_Result (Interp, Interp.Stack, Make_Symbol(Interp.Self, "quote"));
+			V := Get_Frame_Result(Interp.Stack);
+			Pop_Frame (Interp); -- Done with the current frame
+			Chain_Frame_Result (Interp, Interp.Stack, V);
+		end Close_Quote;
+
 		procedure Read_Object is
+			pragma Inline (Read_Object);
 			V: Object_Pointer;
 		begin
 			Fetch_Token;
@@ -2707,17 +2849,27 @@ Ada.Text_IO.Put_Line ("INFO: NO MORE TOKEN ");
 					Set_Frame_Opcode (Interp.Stack, Opcode_Close_List);
 					Push_Frame (Interp, Opcode_Read_List, Nil_Pointer);
 
+				when Single_Quote_Token =>
+					Set_Frame_Opcode (Interp.Stack, Opcode_Close_Quote);
+					Push_Frame (Interp, Opcode_Read_Object, Nil_Pointer);
+
+				when Integer_Token =>
+					-- TODO: bignum
+					V := String_To_Integer_Pointer(Interp.Token.Value.Ptr.all(1..Interp.Token.Value.Last));
+					Pop_Frame (Interp); -- Done with the current frame
+					Chain_Frame_Result (Interp, Interp.Stack, V);
+
 				when String_Token =>
 					V := Make_String (Interp.Self, Interp.Token.Value.Ptr.all(1..Interp.Token.Value.Last));
 					-- TODO: make V gc-aware
 					Pop_Frame (Interp); -- Done with the current frame
-					Chain_Frame_Return (Interp, Interp.Stack, V);
+					Chain_Frame_Result (Interp, Interp.Stack, V);
 
 				when Identifier_Token =>	
 					V := Make_Symbol (Interp.Self, Interp.Token.Value.Ptr.all(1..Interp.Token.Value.Last));
 					-- TODO: make V gc-aware
 					Pop_Frame (Interp); -- Done with the current frame
-					Chain_Frame_Return (Interp, Interp.Stack, V);
+					Chain_Frame_Result (Interp, Interp.Stack, V);
 
 				when others =>
 					-- TODO: set various error info
@@ -2729,7 +2881,7 @@ Ada.Text_IO.Put_Line ("INFO: NO MORE TOKEN ");
 		
 		-- Stack frames looks like this upon initialization
 		-- 
-		--               | Opcode                 | Operand    | Return
+		--               | Opcode                 | Operand    | Result
 		--     -----------------------------------------------------------------
 		--     top       | Opcode_Evaluate_Object | Source     | Nil
 		--     bottom    | Opcode_Exit            | Nil        | Nil
@@ -2794,15 +2946,15 @@ Ada.Text_IO.Put_Line ("INFO: NO MORE TOKEN ");
 				when Opcode_Exit =>
 					exit;
 
+				when Opcode_Evaluate_Result =>
+					Evaluate_Result;
+
 				when Opcode_Evaluate_Object =>
 					Evaluate_Object;
 
 				when Opcode_Evaluate_Group =>
 					Evaluate_Group;
 					
-				when Opcode_Evaluate_Syntax =>
-					Evaluate_Syntax;
-
 				when Opcode_Evaluate_Procedure =>
 					Evaluate_Procedure;
 
@@ -2823,6 +2975,9 @@ Ada.Text_IO.Put_Line ("INFO: NO MORE TOKEN ");
 
 				when Opcode_Close_List =>
 					Close_List;
+
+				when Opcode_Close_Quote =>
+					Close_Quote;
 
 			end case;
 		end loop;
@@ -2859,7 +3014,7 @@ Ada.Text_IO.Put_Line ("INFO: NO MORE TOKEN ");
 
 		pragma Assert (Get_Frame_Opcode(Interp.Stack) = Opcode_Exit);
 
-		Result := Get_Frame_Return (Interp.Stack);
+		Result := Get_Frame_Result (Interp.Stack);
 		-- There must be only 1 value chained to the top-level frame
 		-- once evaluation is over.
 		pragma Assert (Get_Cdr(Result) = Nil_Pointer);
@@ -2882,8 +3037,8 @@ Ada.Text_IO.Put_Line ("INFO: NO MORE TOKEN ");
 			Interp.Stack := Nil_Pointer;
 
 			Push_Frame (Interp, Opcode_Exit, Nil_Pointer);
-			--Push_Frame (Interp, Opcode_Print, Nil_Pointer);
-			--Push_Frame (Interp, Opcode_Evaluate_Object, Nil_Pointer);
+			--Push_Frame (Interp, Opcode_Print_Result, Nil_Pointer);
+			Push_Frame (Interp, Opcode_Evaluate_Result, Nil_Pointer);
 			Push_Frame (Interp, Opcode_Read_Object, Nil_Pointer);
 
 			Execute (Interp);
@@ -2891,7 +3046,7 @@ Ada.Text_IO.Put_Line ("INFO: NO MORE TOKEN ");
 			pragma Assert (Get_Frame_Opcode(Interp.Stack) = Opcode_Exit);
 
 			-- TODO: this result must be kept at some where that GC dowsn't sweep.
-			Result := Get_Frame_Return (Interp.Stack); 
+			Result := Get_Frame_Result (Interp.Stack); 
 			pragma Assert (Get_Cdr(Result) = Nil_Pointer);
 			Result := Get_Car(Result);
 			Pop_Frame (Interp);
