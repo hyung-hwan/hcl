@@ -48,7 +48,7 @@ package body H2.Scheme is
 
 	subtype Moved_Object_Record is Object_Record (Moved_Object, 0);
 
-	subtype Opcode_Type is Object_Integer range 0 .. 8;
+	subtype Opcode_Type is Object_Integer range 0 .. 10;
 	Opcode_Exit:               constant Opcode_Type := Opcode_Type'(0);
 	Opcode_Evaluate_Object:    constant Opcode_Type := Opcode_Type'(1);
 	Opcode_Evaluate_Group:     constant Opcode_Type := Opcode_Type'(2); -- (begin ...) and closure apply
@@ -57,7 +57,9 @@ package body H2.Scheme is
 	Opcode_Apply:              constant Opcode_Type := Opcode_Type'(5);
 	Opcode_Read_Object:        constant Opcode_Type := Opcode_Type'(6);
 	Opcode_Read_List:          constant Opcode_Type := Opcode_Type'(7);
-	Opcode_Close_List:         constant Opcode_Type := Opcode_Type'(8);
+	Opcode_Read_List_Cdr:      constant Opcode_Type := Opcode_Type'(8);
+	Opcode_Read_List_End:      constant Opcode_Type := Opcode_Type'(9);
+	Opcode_Close_List:         constant Opcode_Type := Opcode_Type'(10);
 
 	-----------------------------------------------------------------------------
 	-- COMMON OBJECTS
@@ -867,7 +869,8 @@ Text_IO.Put_Line (">>> [GC DONE]");
 	end Set_Cdr;
 
 
-	function Reverse_Cons (Source: in Object_Pointer) return Object_Pointer is
+	function Reverse_Cons (Source:   in Object_Pointer; 
+	                       Last_Cdr: in Object_Pointer := Nil_Pointer) return Object_Pointer is
 		pragma Assert (Is_Cons(Source));
 
 		-- Note: The non-nil cdr in the last cons cell gets lost.
@@ -876,7 +879,8 @@ Text_IO.Put_Line (">>> [GC DONE]");
 		Next: Object_Pointer;
 		Prev: Object_Pointer;
 	begin
-		Prev := Nil_Pointer;
+		--Prev := Nil_Pointer;
+		Prev := Last_Cdr;
 		Ptr := Source;
 		loop
 			Next := Get_Cdr(Ptr);
@@ -2573,9 +2577,12 @@ Text_IO.Put_Line (">>>>>>>>>>>>>>>>>>>>>>> Token: " & Interp.Token.Value.Ptr(1..
 
 		procedure Read_List is
 			V: Object_Pointer;
-			Period: Standard.Boolean := Standard.False;
 		begin
-		<<Start_Over>>
+			-- This procedure reads each token in a list.
+			-- If the list contains no period, this procedure reads up to the 
+			-- closing right paranthesis; If a period is contained, it transfers
+			-- the control over to Read_List_Cdr.
+			
 			Fetch_Token;
 		
 			case Interp.Token.Kind is
@@ -2600,32 +2607,82 @@ Ada.Text_IO.Put_Line ("ERROR: PREMATURE LIST END");
 						-- . immediately after (
 						raise Syntax_Error;
 					else
-						Period := Standard.True;
-						goto Start_Over;
+						Set_Frame_Opcode (Interp.Stack, Opcode_Read_List_Cdr);
 					end if;
 
 				when String_Token =>
 					V := Make_String (Interp.Self, Interp.Token.Value.Ptr.all(1..Interp.Token.Value.Last));
 					-- TODO: make V gc-aware
-					if Period then
-					
-					else
-						Chain_Frame_Return (Interp, Interp.Stack, V);
-					end if;
+					Chain_Frame_Return (Interp, Interp.Stack, V);
 
 				when Identifier_Token =>	
 					V := Make_Symbol (Interp.Self, Interp.Token.Value.Ptr.all(1..Interp.Token.Value.Last));
 					-- TODO: make V gc-aware
-					if Period then
-					else
-						Chain_Frame_Return (Interp, Interp.Stack, V);
-					end if
+					Chain_Frame_Return (Interp, Interp.Stack, V);
 
 				when others =>
 					-- TODO: set various error info
 					raise Syntax_Error;
 			end case;
 		end Read_List;
+
+		procedure Read_List_Cdr is
+			V: Object_Pointer;
+		begin
+			-- This procedure reads the first token after a period has been read.
+			-- It transfers the control over to Read_List_End once it has read 
+			-- and processed the token. It chains the value made of the token  
+			-- to the front of the frame's return value list expecting Read_List_End
+			-- to handle the first item specially.
+			Fetch_Token;
+		
+			case Interp.Token.Kind is
+				when End_Token =>
+Ada.Text_IO.Put_Line ("ERROR: PREMATURE LIST END");
+					raise Syntax_Error;
+
+				when Left_Parenthesis_Token =>
+					Set_Frame_Opcode (Interp.Stack, Opcode_Read_List_End);
+					Push_Frame (Interp, Opcode_Read_List, Nil_Pointer);
+			
+				when String_Token =>
+					V := Make_String (Interp.Self, Interp.Token.Value.Ptr.all(1..Interp.Token.Value.Last));
+					-- TODO: make V gc-aware
+					Set_Frame_Opcode (Interp.Stack, Opcode_Read_List_End);
+					Chain_Frame_Return (Interp, Interp.Stack, V);
+
+				when Identifier_Token =>	
+					V := Make_Symbol (Interp.Self, Interp.Token.Value.Ptr.all(1..Interp.Token.Value.Last));
+					-- TODO: make V gc-aware
+					Set_Frame_Opcode (Interp.Stack, Opcode_Read_List_End);
+					Chain_Frame_Return (Interp, Interp.Stack, V);
+
+				when others =>
+					-- TODO: set various error info
+					raise Syntax_Error;
+			end case;
+
+		end Read_List_Cdr;
+
+		procedure Read_List_End is
+			V: Object_Pointer;
+			A: Object_Pointer;
+		begin
+			Fetch_Token;
+
+			case Interp.Token.Kind is
+				when Right_Parenthesis_Token =>
+					V := Get_Frame_Return(Interp.Stack);
+					pragma Assert (V /= Nil_Pointer);
+					-- The first item in the chain is actually Cdr of the last cell.
+					V := Reverse_Cons(Get_Cdr(V), Get_Car(V)); -- TODO: GC
+					Pop_Frame (Interp); 
+					Chain_Frame_Return (Interp, Interp.Stack, V);
+				when others =>
+					raise Syntax_Error;
+			end case;
+		end Read_List_End;
+
 
 		procedure Close_List is
 			V: Object_Pointer;
@@ -2758,8 +2815,15 @@ Ada.Text_IO.Put_Line ("INFO: NO MORE TOKEN ");
 				when Opcode_Read_List =>
 					Read_List;
 
+				when Opcode_Read_List_Cdr =>
+					Read_List_Cdr;
+
+				when Opcode_Read_List_End =>
+					Read_List_End;
+
 				when Opcode_Close_List =>
 					Close_List;
+
 			end case;
 		end loop;
 
