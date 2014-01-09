@@ -6,7 +6,9 @@ with Ada.Text_IO;
 with Ada.Unchecked_Deallocation;
 
 procedure scheme is
-	package S renames H2.Scheme;
+	--package S renames H2.Scheme;
+	--package S is new  H2.Scheme (Wide_Character, Wide_String);
+	package S renames Stream.S;
 
 	Pool: aliased Storage.Global_Pool;
 	SI: S.Interpreter_Record;
@@ -42,14 +44,6 @@ begin
 	S.Set_Input_Stream (SI, File_Stream); -- specify main input stream
 	--S.Set_Input_Stream (SI, String_Stream);
 	--S.Set_Output_Stream (SI, Stream); -- specify main output stream.
-
---S.Read (SI, I);
-S.Make_Test_Object (SI, I);
-
-	S.Evaluate (SI, I, O);
-S.Print (SI, I);
-Ada.Text_IO.Put_Line ("-------------------------------------------");
-S.Print (SI, O);
 
 Ada.Text_IO.Put_Line ("-------------------------------------------");
 S.Run_Loop (SI, I);

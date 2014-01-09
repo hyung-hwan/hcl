@@ -3,7 +3,8 @@ with Ada.Wide_Text_IO;
 
 package Stream is
 
-	package S renames H2.Scheme;
+	--package S renames H2.Scheme;
+	package S is new  H2.Scheme (Standard.Wide_Character, Standard.Wide_String);
 
 	------------------------------------------------------------
 	--type Object_String_Pointer is access all S.Object_String;

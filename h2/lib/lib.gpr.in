@@ -9,15 +9,16 @@ project Lib is
 
 	for Source_Files use (
 		"h2.ads",
+		"h2-ascii.ads",
 		"h2-pool.adb",
 		"h2-pool.ads",
 		"h2-scheme.adb",
 		"h2-scheme.ads",
-		"h2-scheme-token.adb",
-		"h2-scheme-token.ads"
+		"h2-scheme-token.adb"
 	);
 	for Library_Interface use (
 		"h2",
+		"h2.ascii",
 		"h2.pool",
 		"h2.scheme"
 	);

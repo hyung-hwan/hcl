@@ -1,7 +1,6 @@
+with H2.Ascii;
 with H2.Pool;
 with System.Address_To_Access_Conversions;
-with H2.Scheme.Token;
-
 
 with Ada.Unchecked_Deallocation; -- for h2scm c interface. TOOD: move it to a separate file
 with Interfaces.C;
@@ -9,7 +8,6 @@ with Interfaces.C;
 
 -- XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXx
 with Ada.Characters.Handling;
-with Ada.Characters.Conversions;
 with Ada.Wide_Characters.Handling;
 
 -- TODO: delete these after debugging
@@ -21,8 +19,40 @@ with ada.wide_text_io;
 
 package body H2.Scheme is
 
-	function To_Object_String (Item: in Standard.String) return Object_String renames Ada.Characters.Conversions.To_Wide_String;
-	package Text_IO renames ada.Wide_Text_IO;
+	package body Token is separate;
+	package Ch is new Ascii(Object_Character);
+
+	-----------------------------------------------------------------------------
+	-- PRIMITIVE DEFINITIONS
+	-----------------------------------------------------------------------------
+
+	-- I define these constants to word around the limitation of not being
+	-- able to use a string literal when the string type is a generic parameter.
+	-- Why doesn't ada include a formal type support for different character
+	-- and string types? This limitation is caused because the generic 
+	-- type I chosed to use to represent a character type is a discrete type.
+	Label_And:      constant Object_String := (Ch.LC_A, Ch.LC_N, Ch.LC_D); -- "and"
+	Label_Begin:    constant Object_String := (Ch.LC_B, Ch.LC_E, Ch.LC_G, Ch.LC_I, Ch.LC_N); -- "begin"
+	Label_Case:     constant Object_String := (Ch.LC_C, Ch.LC_A, Ch.LC_S, Ch.LC_E); -- "case"
+	Label_Cond:     constant Object_String := (Ch.LC_C, Ch.LC_O, Ch.LC_N, Ch.LC_D); -- "cond"
+	Label_Define:   constant Object_String := (Ch.LC_D, Ch.LC_E, Ch.LC_F, Ch.LC_I, Ch.LC_N, Ch.LC_E); -- "define"
+	Label_If:       constant Object_String := (Ch.LC_I, Ch.LC_F); -- "if"
+	Label_Lambda:   constant Object_String := (Ch.LC_L, Ch.LC_A, Ch.LC_M, Ch.LC_B, Ch.LC_D, Ch.LC_A); -- "lambda"
+	Label_Let:      constant Object_String := (Ch.LC_L, Ch.LC_E, Ch.LC_T); -- "let"
+	Label_Letast:   constant Object_String := (Ch.LC_L, Ch.LC_E, Ch.LC_T, Ch.Asterisk); -- "let*"
+	Label_Letrec:   constant Object_String := (Ch.LC_L, Ch.LC_E, Ch.LC_T, Ch.LC_R, Ch.LC_E, Ch.LC_C); -- "letrec"
+	Label_Or:       constant Object_String := (Ch.LC_O, Ch.LC_R); -- "or"
+	Label_Quote:    constant Object_String := (Ch.LC_Q, Ch.LC_U, Ch.LC_O, Ch.LC_T, Ch.LC_E); -- "quote"
+	Label_Set:      constant Object_String := (Ch.LC_S, Ch.LC_E, Ch.LC_T, Ch.Exclamation); -- "set!"
+
+	Label_Car:      constant Object_String := (Ch.LC_C, Ch.LC_A, Ch.LC_R); -- "car"
+	Label_Cdr:      constant Object_String := (Ch.LC_C, Ch.LC_D, Ch.LC_R); -- "cdr"
+	Label_Setcar:   constant Object_String := (Ch.LC_S, Ch.LC_E, Ch.LC_T, Ch.LC_C, Ch.LC_A, Ch.LC_R); -- "setcar"
+	Label_Setcdr:   constant Object_String := (Ch.LC_S, Ch.LC_E, Ch.LC_T, Ch.LC_C, Ch.LC_D, Ch.LC_R); -- "setcar"
+	Label_Plus:     constant Object_String := (1 => Ch.Plus_Sign); -- "+"
+	Label_Minus:    constant Object_String := (1 => Ch.Minus_Sign); -- "-"
+	Label_Multiply: constant Object_String := (1 => Ch.Asterisk); -- "*"
+	Label_Divide:   constant Object_String := (1 => Ch.Slash); -- "/"
 
 	-----------------------------------------------------------------------------
 	-- EXCEPTIONS
@@ -167,7 +197,7 @@ package body H2.Scheme is
 			Word := (Word * (2 ** Object_Pointer_Type_Bits)) or Object_Word(Object_Pointer_Type_Integer);
 		end if;
 
-		--return Object_Word_To_Object_Pointer (Word);
+		--return Object_Label_To_Object_Pointer (Word);
 		return Pointer;
 	end Integer_To_Pointer;
 
@@ -184,7 +214,7 @@ package body H2.Scheme is
 		--   worried about it for the time being.
 		Word := Object_Character'Pos(Char);
 		Word := (Word * (2 ** Object_Pointer_Type_Bits)) or Object_Word(Object_Pointer_Type_Character);
-		--return Object_Word_To_Object_Pointer (Word);
+		--return Object_Label_To_Object_Pointer (Word);
 		return Pointer;
 	end Character_To_Pointer;
 
@@ -250,14 +280,14 @@ package body H2.Scheme is
 		-- Method 1. Naive. It doesn't look Adaish.
 		-- ---------------------------------------------------------------------
 		--declare
-		--	x: Storage_Count;
+		--	X: Object_Size;
 		--begin	
-		--	x := Target'First;
-		--	for index in Source'Range loop
-		--		Target(x) := Source(index);
-		--		x := x + 1;
+		--	X := Target'First;
+		--	for I in Source'Range loop
+		--		Target(X) := Source(I);
+		--		X := X + 1;
 		--	end loop;
-		--	Target(x) := Object_Character'First; -- Object_Character'Val(0);
+		--	Target(X) := Object_Character'First; -- Object_Character'Val(0);
 		--end;
 
 		-- Method 2.
@@ -274,7 +304,7 @@ package body H2.Scheme is
 			subtype Character_Array is Object_Character_Array (Target'First .. Target'Last - 1);
 			function To_Character_Array is new Ada.Unchecked_Conversion (Object_String, Character_Array);
 		begin
-			Target(Target'First .. Target'Last - 1) := To_Character_Array (Source);
+			Target(Target'First .. Target'Last - 1) := To_Character_Array(Source);
 			Target(Target'Last) := Object_Character'First; -- Object_Character'Val(0);
 		end;
 	end Copy_String;
@@ -284,10 +314,20 @@ package body H2.Scheme is
 	begin
 		pragma Assert (Source'Length = Target'Length + 1); 
 
+		--declare
+		--	X: Standard.Natural;
+		--begin	
+		--	X := Target'First;
+		--	for I in Source'First .. Source'Last - 1 loop
+		--		Target(X) := Source(I);
+		--		X := X + 1;
+		--	end loop;
+		--end;
+
 		declare
 			subtype Character_Array is Object_Character_Array (Source'First .. Source'Last - 1);
 			subtype String_Array is Object_String (Target'Range);
-			function To_Character_Array is new Ada.Unchecked_Conversion (Character_Array, String_Array);
+			function To_Character_Array is new Ada.Unchecked_Conversion(Character_Array, String_Array);
 		begin
 			Target := To_Character_Array (Source (Source'First .. Source'Last - 1));
 		end;
@@ -308,6 +348,17 @@ package body H2.Scheme is
 			--return String_Array (Source (Source'First .. Source'Last - 1));
 		end;
 	end Character_Array_To_String;
+
+						--Text_IO.Put (Character_Array_To_String (Atom.Character_Slot));
+	procedure Output_Character_Array (Source: in Object_Character_Array) is
+		-- for debugging only.
+	begin
+		for I in Source'First .. Source'Last loop
+			--Ada.Text_IO.Put (Source(I));
+-- TODO: note this is a hack for quick printing.
+			Ada.Text_IO.Put (Standard.Character'Val(Object_Character'Pos(Source(I))));
+		end loop;
+	end Output_Character_Array;
 
 -- TODO: move away these utilities routines
 	--function To_Thin_String_Pointer (Source: in Object_Pointer) return Thin_String_Pointer is
@@ -341,7 +392,7 @@ package body H2.Scheme is
 	pragma Import (C, Put_String, "puts");
 
 	-- TODO: delete this procedure 
-	procedure Print_Object_Pointer (Msg: in Object_String; Source: in Object_Pointer) is
+	procedure Print_Object_Pointer (Msg: in Standard.String; Source: in Object_Pointer) is
 		W: Object_Word;
 		for W'Address use Source'Address;
 
@@ -349,22 +400,24 @@ package body H2.Scheme is
 	begin
 		Ptr_Type := Get_Pointer_Type(Source);
 		if Ptr_Type = Object_Pointer_Type_Character then
-			Text_IO.Put_Line (Msg & To_Object_String(Object_Character'Image(Pointer_To_Character(Source))));
+			Ada.Text_IO.Put_Line (Msg & Object_Character'Image(Pointer_To_Character(Source)));
 		elsif Ptr_Type = Object_Pointer_Type_Integer then
-			Text_IO.Put_Line (Msg & To_Object_String(Object_Integer'Image(Pointer_To_Integer(Source))));
+			Ada.Text_IO.Put_Line (Msg & Object_Integer'Image(Pointer_To_Integer(Source)));
 		elsif Is_Special_Pointer (Source) then
-			Text_IO.Put_Line (Msg & " at " & To_Object_String(Object_Word'Image(W)));
+			Ada.Text_IO.Put_Line (Msg & " at " & Object_Word'Image(W));
 		elsif Source.Kind = Character_Object then
-			Text_IO.Put (Msg & " at " & To_Object_String(Object_Word'Image(W)) & 
-			                   " at " & To_Object_String(Object_Kind'Image(Source.Kind)) & 
-			                   " size " & To_Object_String(Object_Size'Image(Source.Size)) & " - ");
+			Ada.Text_IO.Put (Msg & " at " & Object_Word'Image(W) & 
+			                   " at " & Object_Kind'Image(Source.Kind) & 
+			                   " size " & Object_Size'Image(Source.Size) & " - ");
 			if Source.Kind = Moved_Object then
-				Text_IO.Put_Line (Character_Array_To_String (Get_New_Location(Source).Character_Slot));
+				--Text_IO.Put_Line (Character_Array_To_String (Get_New_Location(Source).Character_Slot));
+				null;
 			else
-				Text_IO.Put_Line (Character_Array_To_String (Source.Character_Slot));
+				--Text_IO.Put_Line (Character_Array_To_String (Source.Character_Slot));
+				null;
 			end if;
 		else
-			Text_IO.Put_Line (Msg & " at " & To_Object_String(Object_Word'Image(W)) & " at " & To_Object_String(Object_Kind'Image(Source.Kind)));
+			Ada.Text_IO.Put_Line (Msg & " at " & Object_Word'Image(W) & " at " & Object_Kind'Image(Source.Kind));
 		end if;
 	end Print_Object_Pointer;
 
@@ -377,14 +430,14 @@ package body H2.Scheme is
 		pragma Assert (Source'Length > 0);
 
 		First := Source'First;
-		if Source(First) = '-' then
+		if Source(First) = Ch.Minus_Sign then
 			First := First + 1;
 			Negative := Standard.True;
-		elsif Source(First) = '+' then
+		elsif Source(First) = Ch.Plus_Sign then
 			First := First + 1;
 		end if;
 		for I in First .. Source'Last loop
-			V := V * 10 + Object_Character'Pos(Source(I)) - Object_Character'Pos('0');
+			V := V * 10 + Object_Character'Pos(Source(I)) - Object_Character'Pos(Ch.Zero);
 		end loop;	
 
 		if Negative then	
@@ -662,7 +715,7 @@ Ada.Text_IO.Put_Line ("  Flags....after " & Object_Kind'Image(Object.Kind) & " N
 						-- A non-syntax symbol has not been moved. 
 						-- Unlink the cons cell from the symbol table.
 
-Text_IO.Put_Line ("COMPACT_SYMBOL_TABLE Unlinking " & Character_Array_To_String (Car.Character_Slot));
+--Text_IO.Put_Line ("COMPACT_SYMBOL_TABLE Unlinking " & Character_Array_To_String (Car.Character_Slot));
 						if Pred = Nil_Pointer then
 							Interp.Symbol_Table := Cdr;
 						else
@@ -692,14 +745,14 @@ Print_Object_Pointer ("Root_Table ...", Interp.Root_Table);
 		-- If the symbol has not moved to the new heap, the symbol
 		-- is not referenced by any other objects than the symbol 
 		-- table itself 
-Text_IO.Put_Line (">>> [COMPACTING SYMBOL TABLE]");
+Ada.Text_IO.Put_Line (">>> [COMPACTING SYMBOL TABLE]");
 		Compact_Symbol_Table;
 
 Print_Object_Pointer (">>> [MOVING SYMBOL TABLE]", Interp.Symbol_Table);
 		-- Migrate the symbol table itself
 		Interp.Symbol_Table := Move_One_Object (Interp.Symbol_Table);
 
-Text_IO.Put_Line (">>> [SCANNING HEAP AGAIN AFTER SYMBOL TABLE MIGRATION]");
+Ada.Text_IO.Put_Line (">>> [SCANNING HEAP AGAIN AFTER SYMBOL TABLE MIGRATION]");
 		-- Scan the new heap again from the end position of
 		-- the previous scan to move referenced objects by 
 		-- the symbol table. 
@@ -708,7 +761,7 @@ Text_IO.Put_Line (">>> [SCANNING HEAP AGAIN AFTER SYMBOL TABLE MIGRATION]");
 		-- Swap the current heap and the new heap
 		Interp.Heap(Interp.Current_Heap).Bound := 0;
 		Interp.Current_Heap := New_Heap;
-Text_IO.Put_Line (">>> [GC DONE]");
+Ada.Text_IO.Put_Line (">>> [GC DONE]");
 	end Collect_Garbage;
 
 	function Allocate_Bytes (Interp: access Interpreter_Record;
@@ -930,7 +983,7 @@ Text_IO.Put_Line (">>> [GC DONE]");
 	begin
 		Result := Allocate_Character_Object (Interp, Source);
 		Result.Tag := String_Object;
-Print_Object_Pointer ("Make_String Result - " & Source, Result);
+--Print_Object_Pointer ("Make_String Result - " & Source, Result);
 		return Result;
 	end Make_String;
 
@@ -1128,8 +1181,8 @@ Print_Object_Pointer ("Make_String Result - " & Source, Result);
 		Result := Make_Symbol (Interp, Name);
 		Result.Flags := Result.Flags or Syntax_Object;
 		Result.Scode := Opcode;
-Text_IO.Put ("Creating Syntax Symbol ");
-Put_String (To_Thin_String_Pointer (Result));
+--Ada.Text_IO.Put ("Creating Syntax Symbol ");
+--Put_String (To_Thin_String_Pointer (Result));
 		return Result;
 	end Make_Syntax;
 
@@ -1384,7 +1437,7 @@ Put_String (To_Thin_String_Pointer (Result));
 
 		IO.all := IO_Record'(
 			Stream => Stream,
-			Data => (others => ' '),
+			Data => (others => Object_Character'First),
 			Pos | Last => IO.Data'First - 1,
 			Flags => 0,
 			Next => Interp.Input,
@@ -1441,32 +1494,32 @@ Put_String (To_Thin_String_Pointer (Result));
 		procedure Make_Syntax_Objects is
 			Dummy: Object_Pointer;
 		begin
-			Dummy := Make_Syntax (Interp.Self, And_Syntax,    "and");
-			Dummy := Make_Syntax (Interp.Self, Begin_Syntax,  "begin");
-			Dummy := Make_Syntax (Interp.Self, Case_Syntax,   "case");
-			Dummy := Make_Syntax (Interp.Self, Cond_Syntax,   "cond");
-			Dummy := Make_Syntax (Interp.Self, Define_Syntax, "define");
-			Dummy := Make_Syntax (Interp.Self, If_Syntax,     "if");
-			Dummy := Make_Syntax (Interp.Self, Lambda_Syntax, "lambda");
-			Dummy := Make_Syntax (Interp.Self, Let_Syntax,    "let");
-			Dummy := Make_Syntax (Interp.Self, Letast_Syntax, "let*");
-			Dummy := Make_Syntax (Interp.Self, Letrec_Syntax, "letrec");
-			Dummy := Make_Syntax (Interp.Self, Or_Syntax,     "or");
-			Dummy := Make_Syntax (Interp.Self, Quote_Syntax,  "quote");
-			Dummy := Make_Syntax (Interp.Self, Set_Syntax,    "set!");
+			Dummy := Make_Syntax (Interp.Self, And_Syntax,    Label_And); -- "and"
+			Dummy := Make_Syntax (Interp.Self, Begin_Syntax,  Label_Begin); -- "begin"
+			Dummy := Make_Syntax (Interp.Self, Case_Syntax,   Label_Case); -- "case"
+			Dummy := Make_Syntax (Interp.Self, Cond_Syntax,   Label_Cond); -- "cond"
+			Dummy := Make_Syntax (Interp.Self, Define_Syntax, Label_Define); -- "define"
+			Dummy := Make_Syntax (Interp.Self, If_Syntax,     Label_If); -- "if"
+			Dummy := Make_Syntax (Interp.Self, Lambda_Syntax, Label_Lambda); -- "lamba"
+			Dummy := Make_Syntax (Interp.Self, Let_Syntax,    Label_Let); -- "let"
+			Dummy := Make_Syntax (Interp.Self, Letast_Syntax, Label_Letast); -- "let*"
+			Dummy := Make_Syntax (Interp.Self, Letrec_Syntax, Label_Letrec); -- "letrc"
+			Dummy := Make_Syntax (Interp.Self, Or_Syntax,     Label_Or); -- "or"
+			Dummy := Make_Syntax (Interp.Self, Quote_Syntax,  Label_Quote); -- "quote"
+			Dummy := Make_Syntax (Interp.Self, Set_Syntax,    Label_Set); -- "set!"
 		end Make_Syntax_Objects;
 
 		procedure Make_Procedure_Objects is
 			Dummy: Object_Pointer;
 		begin
-			Dummy := Make_Procedure (Interp.Self, Car_Procedure,      "car");
-			Dummy := Make_Procedure (Interp.Self, Cdr_Procedure,      "cdr");
-			Dummy := Make_Procedure (Interp.Self, Setcar_Procedure,   "setcar");
-			Dummy := Make_Procedure (Interp.Self, Setcdr_Procedure,   "setcdr");
-			Dummy := Make_Procedure (Interp.Self, Add_Procedure,      "+");
-			Dummy := Make_Procedure (Interp.Self, Subtract_Procedure, "-");
-			Dummy := Make_Procedure (Interp.Self, Multiply_Procedure, "*");
-			Dummy := Make_Procedure (Interp.Self, Divide_Procedure,   "/");
+			Dummy := Make_Procedure (Interp.Self, Car_Procedure,      Label_Car); -- "car"
+			Dummy := Make_Procedure (Interp.Self, Cdr_Procedure,      Label_Cdr); -- "cdr"
+			Dummy := Make_Procedure (Interp.Self, Setcar_Procedure,   Label_Setcar); -- "setcar"
+			Dummy := Make_Procedure (Interp.Self, Setcdr_Procedure,   Label_Setcdr); -- "setcdr"
+			Dummy := Make_Procedure (Interp.Self, Add_Procedure,      Label_Plus); -- "+"
+			Dummy := Make_Procedure (Interp.Self, Subtract_Procedure, Label_Minus); -- "-"
+			Dummy := Make_Procedure (Interp.Self, Multiply_Procedure, Label_Multiply); -- "*"
+			Dummy := Make_Procedure (Interp.Self, Divide_Procedure,   Label_Divide); -- "/"
 		end Make_Procedure_Objects;
 	begin
 		declare
@@ -1500,17 +1553,17 @@ Put_String (To_Thin_String_Pointer (Result));
 		Interp.Token := (End_Token, (null, 0, 0));
 
 -- TODO: disallow garbage collecion during initialization.
-Text_IO.Put_Line ("1111111111");
+Ada.Text_IO.Put_Line ("1111111111");
 		Initialize_Heap (Initial_Heap_Size);
 		Interp.Mark := Make_Mark (Interp.Self, 0); -- to indicate the end of cons evluation
 		Interp.Root_Environment := Make_Environment (Interp.Self, Nil_Pointer);
 		Interp.Environment := Interp.Root_Environment;
 		Make_Syntax_Objects;
 		Make_Procedure_Objects;
-Text_IO.Put_Line ("99999");
+Ada.Text_IO.Put_Line ("99999");
 
-Text_IO.Put_Line (To_Object_String(IO_Character_Record'Size'Img));
-Text_IO.Put_Line (To_Object_String(IO_Character_Record'Max_Size_In_Storage_Elements'Img));
+Ada.Text_IO.Put_Line (IO_Character_Record'Size'Img);
+Ada.Text_IO.Put_Line (IO_Character_Record'Max_Size_In_Storage_Elements'Img);
 	exception
 		when others =>
 			Deinitialize_Heap (Interp);
@@ -1599,13 +1652,13 @@ Text_IO.Put_Line (To_Object_String(IO_Character_Record'Max_Size_In_Storage_Eleme
 			begin
 				case W is
 				when Nil_Word =>
-					Text_IO.Put ("()");
+					Ada.Text_IO.Put ("()");
 
 				when True_Word =>
-					Text_IO.Put ("#t");
+					Ada.Text_IO.Put ("#t");
 
 				when False_Word =>
-					Text_IO.Put ("#f");
+					Ada.Text_IO.Put ("#f");
 
 				when others => 
 					case Atom.Tag is
@@ -1614,30 +1667,30 @@ Text_IO.Put_Line (To_Object_String(IO_Character_Record'Max_Size_In_Storage_Eleme
 						raise Internal_Error;
 
 					when Symbol_Object =>
-						Text_IO.Put (Character_Array_To_String (Atom.Character_Slot));
+						Output_Character_Array (Atom.Character_Slot);
 
 					when String_Object =>
-						Text_IO.Put ("""");	
-						Text_IO.Put (Character_Array_To_String (Atom.Character_Slot));
-						Text_IO.Put ("""");	
+						Ada.Text_IO.Put ("""");	
+						Output_Character_Array (Atom.Character_Slot);
+						Ada.Text_IO.Put ("""");	
 
 					when Closure_Object =>
-						Text_IO.Put ("#Closure");
+						Ada.Text_IO.Put ("#Closure");
 
 					when Continuation_Object =>
-						Text_IO.Put ("#Continuation");
+						Ada.Text_IO.Put ("#Continuation");
 
 					when Procedure_Object =>
-						Text_IO.Put ("#Procedure");
+						Ada.Text_IO.Put ("#Procedure");
 
 					when Array_Object =>
-						Text_IO.Put ("#Array");
+						Ada.Text_IO.Put ("#Array");
 
 					when Others =>
 						if Atom.Kind = Character_Object then
-							Text_IO.Put (Character_Array_To_String (Atom.Character_Slot));
+							Output_Character_Array (Atom.Character_Slot);
 						else
-							Text_IO.Put ("#NOIMPL#");
+							Ada.Text_IO.Put ("#NOIMPL#");
 						end if;
 					end case;
 				end case;
@@ -1646,19 +1699,19 @@ Text_IO.Put_Line (To_Object_String(IO_Character_Record'Max_Size_In_Storage_Eleme
 			procedure Print_Integer is
 				 X: constant Object_Integer := Pointer_To_Integer (Atom);
 			begin
-				Text_IO.Put (To_Object_String(Object_Integer'Image(X)));
+				Ada.Text_IO.Put (Object_Integer'Image(X));
 			end Print_Integer;
 
 			procedure Print_Character is
 				 X: constant Object_Character := Pointer_To_Character (Atom);
 			begin
-				Text_IO.Put (To_OBject_String(Object_Character'Image(X)));
+				Ada.Text_IO.Put (Object_Character'Image(X));
 			end Print_Character;
 
 			procedure Print_Byte is
 				 X: constant Object_Byte := Pointer_To_Byte (Atom);
 			begin
-				Text_IO.Put (To_Object_String(Object_Byte'Image(X)));
+				Ada.Text_IO.Put (Object_Byte'Image(X));
 			end Print_Byte;
 
 		begin
@@ -1686,7 +1739,7 @@ Text_IO.Put_Line (To_Object_String(IO_Character_Record'Max_Size_In_Storage_Eleme
 		begin
 			if Is_Cons (Obj) then
 				Cons := Obj;
-				Text_IO.Put ("(");
+				Ada.Text_IO.Put ("(");
 
 				loop
 					Car := Get_Car(Cons);
@@ -1699,19 +1752,19 @@ Text_IO.Put_Line (To_Object_String(IO_Character_Record'Max_Size_In_Storage_Eleme
 
 					Cdr := Get_Cdr(Cons);
 					if Is_Cons (Cdr) then
-						Text_IO.Put (" ");
+						Ada.Text_IO.Put (" ");
 						Cons := Cdr;
 						exit when Cons = Nil_Pointer;
 					else
 						if Cdr /= Nil_Pointer then
-							Text_IO.Put (" . ");
+							Ada.Text_IO.Put (" . ");
 							Print_Atom (Cdr);
 						end if;
 						exit;
 					end if;
 				end loop;
 
-				Text_IO.Put (")");
+				Ada.Text_IO.Put (")");
 			else
 				Print_Atom (Obj);
 			end if;
@@ -1739,7 +1792,7 @@ Text_IO.Put_Line (To_Object_String(IO_Character_Record'Max_Size_In_Storage_Eleme
 				if Is_Cons(Operand) then
 					-- push cdr
 					Stack := Make_Frame (Interp.Self, Stack, Integer_To_Pointer(2), Get_Cdr(Operand), Nil_Pointer); -- push cdr
-					Text_IO.Put ("(");
+					Ada.Text_IO.Put ("(");
 					Operand := Get_Car(Operand);
 					Opcode := 1;
 				else
@@ -1759,16 +1812,16 @@ Text_IO.Put_Line (To_Object_String(IO_Character_Record'Max_Size_In_Storage_Eleme
 				if Is_Cons(Operand) then
 					-- push cdr
 					Stack := Make_Frame (Interp.Self, Stack, Integer_To_Pointer(2), Get_Cdr(Operand), Nil_Pointer); -- push
-					Text_IO.Put (" ");
+					Ada.Text_IO.Put (" ");
 					Operand := Get_Car(Operand); -- car
 					Opcode := 1;
 				else
 					if Operand /= Nil_Pointer then
 						-- cdr of the last cons cell is not null.
-						Text_IO.Put (" . ");
+						Ada.Text_IO.Put (" . ");
 						Print_Atom (Operand);
 					end if;
-					Text_IO.Put (")");
+					Ada.Text_IO.Put (")");
 
 					if Stack = Nil_Pointer then
 						Opcode := 0; -- stack empty. arrange to exit
@@ -1785,193 +1838,8 @@ Text_IO.Put_Line (To_Object_String(IO_Character_Record'Max_Size_In_Storage_Eleme
 		end loop;
 
 		--Print_Object (Source);
-		Text_IO.New_Line;
+		Ada.Text_IO.New_Line;
 	end Print;
-
-	procedure Evaluatex (Interp: in out Interpreter_Record) is
-		X: Object_Pointer;
-	begin
-		--Make_Cons (Interpreter, Nil_Pointer, Nil_Pointer, X);
-		--Make_Cons (Interpreter, Nil_Pointer, X, X);
-		--Make_Cons (Interpreter, Nil_Pointer, X, X);
-		--Make_Cons (Interpreter, Nil_Pointer, X, X);
-Interp.Root_Table := Make_Symbol (Interp.Self, "lambda");
---Print_Object_Pointer (">>> Root_Table ...", Interp.Root_Table);
-
-		Collect_Garbage (Interp);
-
-		-- (define x 10)
-
-		X := Make_Cons (
-			Interp.Self,
-			Make_Symbol (Interp.Self, "define"),
-			Make_Cons (
-				Interp.Self,
-				Make_Symbol (Interp.Self, "x"),
-				Make_Cons (
-					Interp.Self,
-					Integer_To_Pointer (10),
-					--Nil_Pointer
-					Integer_To_Pointer (10)
-				)
-			)
-		);
-		X := Make_Cons (Interp.Self, X, Make_Cons (Interp.Self, X, Integer_To_Pointer(10)));
-
-		--X := Make_Cons (Interp.Self, Nil_Pointer, Make_Cons (Interp.Self, Nil_Pointer, Integer_To_Pointer(TEN)));
-		--X := Make_Cons (Interp.Self, Nil_Pointer, Nil_Pointer);
-		--Read (Interp, X);
-		Print (Interp, X);
-
-	end Evaluatex;
-
-procedure Make_Test_Object (Interp: in out Interpreter_Record; Result: out Object_Pointer) is
-	Y: Object_Pointer;
-	Z: Object_Pointer;
-	P: Object_Pointer;
-	B: Object_Pointer;
-	L: Object_Pointer;
-	Resultx: Object_Pointer;
-begin
-		--(define x 10)
-		--Result := Make_Cons (
-		--	Interp.Self,
-		--	Make_Symbol (Interp.Self, "define"),
-		--	Make_Cons (
-		--		Interp.Self,
-		--		Make_Symbol (Interp.Self, "x"),
-		--		Make_Cons (
-		--			Interp.Self,
-		--			Integer_To_Pointer (10),
-		--			--Nil_Pointer
-		--			Integer_To_Pointer (10)
-		--		)
-		--	)
-		--);
-
-		Z := Make_Cons (
-			Interp.Self,
-			Make_Symbol (Interp.Self, "+"),
-			Make_Cons (
-				Interp.Self,
-				Integer_To_Pointer (3),
-				Make_Cons (
-					Interp.Self,
-					Integer_To_Pointer (9),
-					Nil_Pointer
-				)
-			)
-		);
-		Y := Make_Cons (
-			Interp.Self,
-			Make_Symbol (Interp.Self, "+"),
-			Make_Cons (
-				Interp.Self,
-				Integer_To_Pointer (100),
-				Make_Cons (
-					Interp.Self,
-					Z,
-					Nil_Pointer
-				)
-			)
-		);
-		Result := Make_Cons (
-			Interp.Self,
-			Make_Symbol (Interp.Self, "+"),
-			Make_Cons (
-				Interp.Self,
-				--Integer_To_Pointer (10),
-				Y,
-				Make_Cons (
-					Interp.Self,
-					Integer_To_Pointer (-5),
-					Make_Cons (
-						Interp.Self,
-						Y,
-						Integer_To_Pointer (20)
-					)
-				)
-			)
-		);
-
-
-
-		Z := Make_Cons (
-			Interp.Self,
-			Make_Symbol (Interp.Self, "begin"),
-			Make_COns (Interp.Self, Y, Nil_Pointer)
-		);
-
-		B := Make_Cons (
-			Interp.Self,
-			Make_Symbol (Interp.Self, "begin"),
-			Make_Cons (Interp.Self, Z, Nil_Pointer)
-		);
-
-		Result := Make_Cons (
-			Interp.Self,
-			Make_Symbol (Interp.Self, "+"),
-			Make_Cons (Interp.Self, Integer_To_Pointer(88), Make_Cons (Interp.Self, B, Nil_Pointer))
-		);
-
-		-- (lambda (x y) (+ x y))
-		P := Make_Cons (
-			Interp.Self,
-			Make_Symbol (Interp.Self, "x"),
-			Make_Cons (
-				Interp.Self, 
-				Make_Symbol (Interp.Self, "y"),
-				Nil_Pointer
-			)
-		);
-		B := Make_Cons (
-			Interp.Self,
-			Make_Symbol (Interp.Self, "+"),
-			Make_Cons (
-				Interp.Self,
-				Make_Symbol (Interp.Self, "x"),
-				Make_Cons (
-					Interp.Self,
-					Make_Symbol (Interp.Self, "y"),
-					Nil_Pointer
-				)
-			)
-		);
-		L := Make_Cons (
-			Interp.Self,
-			Make_Symbol (Interp.Self, Object_String'("lambda")),
-			Make_Cons (
-				Interp.Self, 
-				P,
-				Make_Cons (
-					Interp.Self,
-					B,
-					Nil_pointer
-				)
-			)
-		);
-
-		Result := Make_Cons (
-			Interp.Self,
-			L,
-			Make_Cons (
-				Interp.Self,
-				Integer_To_Pointer (9),
-				Make_Cons (
-					Interp.Self,
-					Integer_To_Pointer (7),
-					Nil_Pointer
-				)
-			)
-		);
-
-		
-
-
-Text_IO.PUt ("TEST OBJECT: ");
-Print (Interp, Result);
-end Make_Test_Object;
-
 
 	function Pointer_To_Opcode (Pointer: in Object_Pointer) return Opcode_Type is
 		pragma Inline (Pointer_To_Opcode);
@@ -2051,7 +1919,7 @@ end Make_Test_Object;
 					else
 						if Cdr /= Nil_Pointer then
 							-- The last CDR is not Nil.
-							Text_IO.Put_Line ("$$$$..................FUCKING CDR. FOR GROUP....................$$$$");
+							Ada.Text_IO.Put_Line ("$$$$..................FUCKING CDR. FOR GROUP....................$$$$");
 							-- raise Syntax_Error;
 						end if;
 
@@ -2104,7 +1972,7 @@ end Make_Test_Object;
 					Car := Get_Environment (Interp.Self, Operand);
 					if Car = null then
 						-- unbound
-						Text_IO.Put_Line ("Unbound symbol....");
+						Ada.Text_IO.Put_Line ("Unbound symbol....");
 						Print (Interp, Operand);		
 						raise Evaluation_Error;
 					else
@@ -2128,7 +1996,7 @@ end Make_Test_Object;
 								if not Is_Cons(Operand) then
 									-- e.g) (begin)
 									--      (begin . 10)
-									Text_IO.Put_LINE ("FUCKNING CDR FOR BEGIN");
+									Ada.Text_IO.Put_LINE ("FUCKNING CDR FOR BEGIN");
 									raise Syntax_Error;
 									--Pop_Frame (Interp);  -- Done
 
@@ -2154,10 +2022,11 @@ end Make_Test_Object;
 								if not Is_Cons(Operand) then
 									-- e.g) (define)
 									--      (define . 10)
-									Text_IO.Put_LINE ("FUCKNING CDR FOR DEFINE");
+									Ada.Text_IO.Put_LINE ("FUCKNING CDR FOR DEFINE");
 									raise Syntax_Error;
 								elsif Get_Cdr(Operand) /= Nil_Pointer then
 									-- TODO: IMPLEMENT OTHER CHECK
+									null;
 								end if;
 					
 								--Pop_Frame (Interp);	 -- Done
@@ -2170,19 +2039,19 @@ end Make_Test_Object;
 								if not Is_Cons(Operand) then
 									-- e.g) (lambda)
 									--      (lambda . 10)
-									Text_IO.Put_LINE ("FUCKNING CDR FOR BEGIN");
+									Ada.Text_IO.Put_LINE ("FUCKNING CDR FOR BEGIN");
 									raise Syntax_Error;
 									--Pop_Frame (Interp);  -- Done
 								else
 									if not Is_Cons(Get_Car(Operand)) then
-										Text_IO.Put_Line ("INVALID PARRAMETER LIST");
+										Ada.Text_IO.Put_Line ("INVALID PARRAMETER LIST");
 										raise Syntax_Error;
 										--Pop_Frame (Interp);  -- Done
 									end if;
 
 --Print (Interp, Get_Cdr(Operand));
 									if not Is_Cons(Get_Cdr(Operand)) then
-										Text_IO.Put_Line ("NO BODY");
+										Ada.Text_IO.Put_Line ("NO BODY");
 										raise Syntax_Error;
 										--Pop_Frame (Interp);  -- Done
 									end if;
@@ -2201,18 +2070,19 @@ end Make_Test_Object;
 								if not Is_Cons(Operand) then
 									-- e.g) (quote)
 									--      (quote . 10)
-									Text_IO.Put_LINE ("FUCKNING CDR FOR QUOTE");
+									Ada.Text_IO.Put_LINE ("FUCKNING CDR FOR QUOTE");
 									raise Syntax_Error;
 								elsif Get_Cdr(Operand) /= Nil_Pointer then
-									Text_IO.Put_LINE ("WRONG NUMBER OF ARGUMENTS FOR QUOTE");
+									Ada.Text_IO.Put_LINE ("WRONG NUMBER OF ARGUMENTS FOR QUOTE");
 									raise Syntax_Error;
 								end if;
 								Pop_Frame (Interp);	 -- Done
 								Chain_Frame_Result (Interp, Interp.Stack,  Get_Car(Operand));
 
 							when others =>
-								Text_IO.Put_Line ("Unknown syntax");	
-								Set_Frame_Opcode (Interp.Stack, Opcode_Evaluate_Syntax);  -- Switch to syntax evaluation
+								Ada.Text_IO.Put_Line ("Unknown syntax");	
+								--Set_Frame_Opcode (Interp.Stack, Opcode_Evaluate_Syntax);  -- Switch to syntax evaluation
+								raise Internal_Error;
 						end case;
 					else
 						if (Interp.Trait.Trait_Bits and No_Optimization) = 0 then
@@ -2246,7 +2116,7 @@ end Make_Test_Object;
 							-- Reached the last cons cell
 							if Cdr /= Nil_Pointer then
 								-- The last CDR is not Nil.
-								Text_IO.Put_Line ("$$$$..................FUCKING CDR.....................$$$$");
+								Ada.Text_IO.Put_Line ("$$$$..................FUCKING CDR.....................$$$$");
 								-- raise Syntax_Error;
 							end if;
 
@@ -2289,7 +2159,7 @@ end Make_Test_Object;
 
 		<<Literal>>
 			Pop_Frame (Interp); -- done
-Text_IO.Put ("Return => ");
+Ada.Text_IO.Put ("Return => ");
 Print (Interp, Operand);
 			Chain_Frame_Result (Interp, Interp.Stack, Operand);
 		end Evaluate_Object;
@@ -2394,7 +2264,7 @@ Ada.Text_IO.Put ("NOT INTEGER FOR ADD"); Print (Interp, Car);
 
 					if not Is_Cons(Arg) then
 Print (Interp, Arg);
-						Text_IO.Put_Line (">>>> Too few arguments <<<<");	
+						Ada.Text_IO.Put_Line (">>>> Too few arguments <<<<");	
 						raise Evaluation_Error;
 					end if;
 
@@ -2407,16 +2277,16 @@ Print (Interp, Arg);
 
 				-- Perform cosmetic checks for the parameter list
 				if Param /= Nil_Pointer then
-					Text_IO.Put_Line (">>> GARBAGE IN PARAMETER LIST <<<");
+					Ada.Text_IO.Put_Line (">>> GARBAGE IN PARAMETER LIST <<<");
 					raise Syntax_Error;
 				end if;
 
 				-- Perform cosmetic checks for the argument list
 				if Is_Cons(Arg) then
-						Text_IO.Put_Line (">>>> Two many arguments <<<<");	
+						Ada.Text_IO.Put_Line (">>>> Two many arguments <<<<");	
 						raise Evaluation_Error;
 				elsif Arg /= Nil_Pointer then	
-					Text_IO.Put_Line (">>> GARBAGE IN ARGUMENT LIST <<<");
+					Ada.Text_IO.Put_Line (">>> GARBAGE IN ARGUMENT LIST <<<");
 					raise Syntax_Error;
 				end if;
 					
@@ -2434,7 +2304,7 @@ Print (Interp, Arg);
 Print (Interp, Operand);
 			Func := Get_Car(Operand);
 			if not Is_Normal_Pointer(Func) then
-				Text_IO.Put_Line ("INVALID FUNCTION TYPE");
+				Ada.Text_IO.Put_Line ("INVALID FUNCTION TYPE");
 				raise Evaluation_Error;
 			end if;
 	
@@ -2468,7 +2338,7 @@ Print (Interp, Operand);
 					null;
 
 				when others =>
-					Text_IO.Put_Line ("INVALID FUNCTION TYPE");
+					Ada.Text_IO.Put_Line ("INVALID FUNCTION TYPE");
 					raise Internal_Error;
 
 			end case;
@@ -2512,13 +2382,17 @@ Print (Interp, Operand);
 
 		function Is_White_Space (X: in Object_Character) return Standard.Boolean is
 		begin
-			return X = ' ' or else
-			       X = Object_Character'Val(Standard.Character'Pos(Standard.ASCII.HT)) or else
-			       X = Object_Character'Val(Standard.Character'Pos(Standard.ASCII.VT)) or else
-			       X = Object_Character'Val(Standard.Character'Pos(Standard.ASCII.CR)) or else
-			       X = Object_Character'Val(Standard.Character'Pos(Standard.ASCII.LF)) or else
-			       X = Object_Character'Val(Standard.Character'Pos(Standard.ASCII.FF));
+			return X = Ch.Space or else X = Ch.HT or else X = Ch.VT or else 
+			       X = Ch.CR or else X = Ch.LF or else X = Ch.FF;
 		end Is_White_Space;
+
+		function Is_Identifier_Stopper (X: in Object_Character) return  Standard.Boolean is
+		begin
+			return X = Ch.Left_Parenthesis or else X = Ch.Right_Parenthesis or else
+			       X = Ch.Apostrophe or else LC.Value = Ch.Quotation or else
+			       X = Ch.Number_Sign or else LC.Value = Ch.Semicolon or else 
+		            Is_White_Space(X);
+		end Is_Identifier_Stopper;
 
 		procedure Skip_Spaces_And_Comments is
 		begin
@@ -2528,7 +2402,7 @@ Print (Interp, Operand);
 				-- Normal character
 				if Is_White_Space(LC.Value) then
 					Fetch_Character;
-				elsif LC.Value = ';' then
+				elsif LC.Value = Ch.Semicolon then
 					-- Comment.
 					loop
 						Fetch_Character;
@@ -2558,127 +2432,117 @@ Print (Interp, Operand);
 			end if;
 			Skip_Spaces_And_Comments;
 			if LC.Kind /= Normal_Character then
-				Token.Set (Interp, End_Token, "");
+				Token.Set (Interp, End_Token);
 				return;
 			end if;
 
 			-- TODO: Pass Token Location when calling Token.Set
-			case LC.Value is
-				when '(' =>
-					Token.Set (Interp, Left_Parenthesis_Token, "(");
 
-				when ')' =>
-					Token.Set (Interp, Right_Parenthesis_Token, ")");
+			-- Pity that "case .. end case" can't be used instead of "if .. end if" 
+			-- because Ch.XXX values are not static. This is a pain to take
+			-- for making this package generic.
+			if LC.Value = Ch.Left_Parenthesis then
+				Token.Set (Interp, Left_Parenthesis_Token, LC.Value);
+			elsif LC.Value = Ch.Right_Parenthesis then
+				Token.Set (Interp, Right_Parenthesis_Token, LC.Value);
+			elsif LC.Value = Ch.Period then
+				Token.Set (Interp, Period_Token, LC.Value);
+			elsif LC.Value = Ch.Apostrophe then
+					Token.Set (Interp, Single_Quote_Token, LC.Value);
+			elsif LC.Value = Ch.Quotation then
+				Fetch_Character;
+				Token.Set (Interp, String_Token);
+				loop
+					if LC.Kind /= Normal_Character then
+						-- String ended prematurely.
+						-- TODO: Set Error code, Error Number.... Error location
+						raise Syntax_Error;		
+					end if;
 
-				when '.' =>
-					Token.Set (Interp, Period_Token, ".");
-
-				when ''' =>
-					Token.Set (Interp, Single_Quote_Token, "'");
-
-				when '"' =>
-					Fetch_Character;
-					Token.Set (Interp, String_Token, "");
-					loop
+					if LC.Value = Ch.Backslash then
+						Fetch_Character;
 						if LC.Kind /= Normal_Character then
 							-- String ended prematurely.
 							-- TODO: Set Error code, Error Number.... Error location
 							raise Syntax_Error;		
 						end if;
-
-						if LC.Value = '\' then
-							Fetch_Character;
-							if LC.Kind /= Normal_Character then
-								-- String ended prematurely.
-								-- TODO: Set Error code, Error Number.... Error location
-								raise Syntax_Error;		
-							end if;
-							-- TODO: escape letters??? \n \r \\ etc....
-							Token.Append_Character (Interp, LC.Value);
-						elsif LC.Value = '"' then
-							exit;
-						else
-							Token.Append_Character (Interp, LC.Value);
-							Fetch_Character;
-						end if;
-					end loop;
-				
-					-- TODO:
-
-				when '#' =>
-					Fetch_Character;
-					-- TODO: t, false, etc
-
-				when '0' .. '9' =>
-					-- TODO; negative number, floating-point number, bignum, hexdecimal, etc
-					Token.Set (Interp, Integer_Token, "");
-					loop
+						-- TODO: escape letters??? \n \r \\ etc....
 						Token.Append_Character (Interp, LC.Value);
-						Fetch_Character;
-						if LC.Kind /= Normal_Character or else
-						   not (LC.Value in '0' .. '9')  then
-							-- Unfetch the last character
-							Interp.LC_Unfetched := Standard.True;
-							exit;
-						end if;
-					end loop;
-
-				when '-' | '+' =>
-					Tmp(1) := LC.Value;
-
-					Fetch_Character;
-					if LC.Kind = Normal_Character and then
-					   LC.Value in '0' .. '9' then
-						Token.Set (Interp, Integer_Token, Tmp(1..1));
-						loop
-							Token.Append_Character (Interp, LC.Value);
-							Fetch_Character;
-							if LC.Kind /= Normal_Character or else
-							   not (LC.Value in '0' .. '9')  then
-								-- Unfetch the last character
-								Interp.LC_Unfetched := Standard.True;
-								exit;
-							end if;
-						end loop;
+					elsif LC.Value = Ch.Quotation then
+						exit;
 					else
-						Token.Set (Interp, Identifier_Token, Tmp(1..1));
-						loop
-					-- TODO: more characters
-							if LC.Kind /= Normal_Character or else
-							   LC.Value = '(' or else LC.Value = ')' or else
-							   LC.Value = ''' or else LC.Value = '"' or else
-							   LC.Value = '#' or else LC.Value = ';' or else
-							   Is_White_Space(LC.Value) then
-								-- Unfetch the last character
-								Interp.LC_Unfetched := Standard.True;
-								exit;
-							end if;
-
-							Token.Append_Character (Interp, LC.Value);
-							Fetch_Character;
-						end loop;
+						Token.Append_Character (Interp, LC.Value);
+						Fetch_Character;
 					end if;
+				end loop;
+			
+			elsif LC.Value = Ch.Number_Sign then
+				Fetch_Character;
+				-- TODO: t, false, etc
+			elsif LC.Value in Ch.Zero .. Ch.Nine then
+				-- TODO; negative number, floating-point number, bignum, hexdecimal, etc
+				Token.Set (Interp, Integer_Token);
+				loop
+					Token.Append_Character (Interp, LC.Value);
+					Fetch_Character;
+					if LC.Kind /= Normal_Character or else
+					   LC.Value not in Ch.Zero .. Ch.Nine  then
+						-- Unfetch the last character
+						Interp.LC_Unfetched := Standard.True;
+						exit;
+					end if;
+				end loop;
 
-				when others =>	
-					Token.Set (Interp, Identifier_Token, "");
+			elsif LC.Value = Ch.Plus_Sign or else LC.Value = Ch.Minus_Sign then
+				Tmp(1) := LC.Value;
+
+				Fetch_Character;
+				if LC.Kind = Normal_Character and then
+				   LC.Value in Ch.Zero .. Ch.Nine then
+					Token.Set (Interp, Integer_Token, Tmp(1..1));
 					loop
 						Token.Append_Character (Interp, LC.Value);
 						Fetch_Character;
-						--exit when not Is_Ident_Char(C.Value);
-					-- TODO: more characters
 						if LC.Kind /= Normal_Character or else
-						   LC.Value = '(' or else LC.Value = ')' or else
-						   LC.Value = ''' or else LC.Value = '"' or else
-						   LC.Value = '#' or else LC.Value = ';' or else
-						   Is_White_Space(LC.Value) then
+						   LC.Value not in Ch.Zero .. Ch.Nine  then
 							-- Unfetch the last character
 							Interp.LC_Unfetched := Standard.True;
 							exit;
 						end if;
 					end loop;
-			end case;
+				else
+					Token.Set (Interp, Identifier_Token, Tmp(1..1));
+					loop
+				-- TODO: more characters
+						if LC.Kind /= Normal_Character or else
+						   Is_Identifier_Stopper(LC.Value) then
+							-- Unfetch the last character
+							Interp.LC_Unfetched := Standard.True;
+							exit;
+						end if;
+
+						Token.Append_Character (Interp, LC.Value);
+						Fetch_Character;
+					end loop;
+				end if;
+
+			else
+				Token.Set (Interp, Identifier_Token);
+				loop
+					Token.Append_Character (Interp, LC.Value);
+					Fetch_Character;
+					--exit when not Is_Ident_Char(C.Value);
+				-- TODO: more characters
+					if LC.Kind /= Normal_Character or else
+					   Is_Identifier_Stopper(LC.Value) then
+						-- Unfetch the last character
+						Interp.LC_Unfetched := Standard.True;
+						exit;
+					end if;
+				end loop;
+			end if;
 			
-Text_IO.Put_Line (">>>>>>>>>>>>>>>>>>>>>>> Token: " & Interp.Token.Value.Ptr(1..Interp.Token.Value.Last));
+--Ada.Text_IO.Put (">>>>>>>>>>>>>>>>>>>>>>> Token: " & Interp.Token.Value.Ptr(1..Interp.Token.Value.Last));
 		end Fetch_Token;
 
 		procedure Read_List is
@@ -2796,7 +2660,6 @@ Ada.Text_IO.Put_Line ("ERROR: CDR QUOT LIST END");
 		procedure Read_List_End is
 			pragma Inline (Read_List_End);
 			V: Object_Pointer;
-			A: Object_Pointer;
 		begin
 			Fetch_Token;
 
@@ -2828,7 +2691,7 @@ Ada.Text_IO.Put_Line ("ERROR: CDR QUOT LIST END");
 			V: Object_Pointer;
 		begin
 -- TODO: use Interp.Quote_Syntax instead of Make_Symbol("quote")
-			Chain_Frame_Result (Interp, Interp.Stack, Make_Symbol(Interp.Self, "quote"));
+			Chain_Frame_Result (Interp, Interp.Stack, Make_Symbol(Interp.Self, Label_Quote));
 			V := Get_Frame_Result(Interp.Stack);
 			Pop_Frame (Interp); -- Done with the current frame
 			Chain_Frame_Result (Interp, Interp.Stack, V);
@@ -2990,7 +2853,7 @@ Ada.Text_IO.Put_Line ("INFO: NO MORE TOKEN ");
 			raise;
 
 		when others =>
-			Text_IO.Put_Line ("EXCEPTION OCCURRED");
+			Ada.Text_IO.Put_Line ("EXCEPTION OCCURRED");
 			-- TODO: restore stack frame???
 			-- TODO: restore envirronemtn frame???
 			raise;
@@ -3054,67 +2917,66 @@ Ada.Text_IO.Put_Line ("INFO: NO MORE TOKEN ");
 Ada.Text_IO.Put ("REsULT>>>>>");
 Print (Interp, Result);
 			pragma Assert (Interp.Stack = Nil_Pointer);
-Text_IO.Put_Line (">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> LOOP ITERATION XXXXXX CHECKPOINT"); 
+Ada.Text_IO.Put_Line (">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> LOOP ITERATION XXXXXX CHECKPOINT"); 
 		end loop;
 
 	exception
 		when Stream_End_Error =>
 			-- this is not a real error. this indicates the end of input stream.
-			Text_IO.Put_LINE ("=== BYE ===");
+			Ada.Text_IO.Put_LINE ("=== BYE ===");
 
 		when others =>
-			TEXT_IO.PUT_LINE ("ERROR ERROR ERROR");
+			Ada.TEXT_IO.PUT_LINE ("ERROR ERROR ERROR");
 			raise;
 	end Run_Loop;
 	
 	-----------------------------------------------------------------------------
-
-	function h2scm_open return Interpreter_Pointer;
-	pragma Export (C, h2scm_open, "h2scm_open");
-
-	procedure h2scm_close (Interp: in out Interpreter_Pointer);
-	pragma Export (C, h2scm_close, "h2scm_close");
-
-	function h2scm_evaluate (Interp: access Interpreter_Record;
-	                         Source: in     Object_Pointer) return Interfaces.C.int;
-	pragma Export (C, h2scm_evaluate, "h2scm_evaluate");
-
-	procedure h2scm_dealloc is new 
-		Ada.Unchecked_Deallocation (Interpreter_Record, Interpreter_Pointer);
-
-	function h2scm_open return Interpreter_Pointer is
-		Interp: Interpreter_Pointer;	
-	begin
-		begin
-			Interp := new Interpreter_Record;
-		exception
-			when others =>
-				return null;
-		end;
-
-		begin
-			Open (Interp.all, 1_000_000, null);
-		exception
-			when others =>
-				h2scm_dealloc (Interp);
-				return null;
-		end;
-
-		return Interp;
-	end h2scm_open;
-
-	procedure h2scm_close (Interp: in out Interpreter_Pointer) is
-	begin
-Text_IO.Put_Line ("h2scm_close");
-		Close (Interp.all);	
-		h2scm_dealloc (Interp);
-	end h2scm_close;
-
-	function h2scm_evaluate (Interp: access Interpreter_Record;
-	                         Source: in     Object_Pointer) return Interfaces.C.int is
-	begin
-		return Interfaces.C.int(Interp.Heap(Interp.Current_Heap).Size);
-	end h2scm_evaluate;
+--
+--	function h2scm_open return Interpreter_Pointer;
+--	pragma Export (C, h2scm_open, "h2scm_open");
+--
+--	procedure h2scm_close (Interp: in out Interpreter_Pointer);
+--	pragma Export (C, h2scm_close, "h2scm_close");
+--
+--	function h2scm_evaluate (Interp: access Interpreter_Record;
+--	                         Source: in     Object_Pointer) return Interfaces.C.int;
+--	pragma Export (C, h2scm_evaluate, "h2scm_evaluate");
+--
+--	procedure h2scm_dealloc is new 
+--		Ada.Unchecked_Deallocation (Interpreter_Record, Interpreter_Pointer);
+--
+--	function h2scm_open return Interpreter_Pointer is
+--		Interp: Interpreter_Pointer;	
+--	begin
+--		begin
+--			Interp := new Interpreter_Record;
+--		exception
+--			when others =>
+--				return null;
+--		end;
+--
+--		begin
+--			Open (Interp.all, 1_000_000, null);
+--		exception
+--			when others =>
+--				h2scm_dealloc (Interp);
+--				return null;
+--		end;
+--
+--		return Interp;
+--	end h2scm_open;
+--
+--	procedure h2scm_close (Interp: in out Interpreter_Pointer) is
+--	begin
+--Text_IO.Put_Line ("h2scm_close");
+--		Close (Interp.all);	
+--		h2scm_dealloc (Interp);
+--	end h2scm_close;
+--
+--	function h2scm_evaluate (Interp: access Interpreter_Record;
+--	                         Source: in     Object_Pointer) return Interfaces.C.int is
+--	begin
+--		return Interfaces.C.int(Interp.Heap(Interp.Current_Heap).Size);
+--	end h2scm_evaluate;
 	
 end H2.Scheme;
-

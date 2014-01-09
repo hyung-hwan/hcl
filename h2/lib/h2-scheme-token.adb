@@ -1,6 +1,8 @@
 with H2.Pool;
 
-package body H2.Scheme.Token is
+separate (H2.Scheme)
+
+package body Token is
 
 	-----------------------------------------------------------------------------
 	-- BUFFER MANAGEMENT
@@ -85,8 +87,26 @@ package body H2.Scheme.Token is
 	end Purge;
 
 	procedure Set (Interp: in out Interpreter_Record;
-	                     Kind:   in     Token_Kind;
-	                     Value:  in     Object_String) is
+	               Kind:   in     Token_Kind) is
+	begin
+		Interp.Token.Kind := Kind;	
+		Clear_Buffer (Interp.Token.Value);
+	end Set;
+
+	procedure Set (Interp: in out Interpreter_Record;
+	               Kind:   in     Token_Kind;
+	               Value:  in     Object_Character) is
+		Tmp: Object_String(1..1);
+	begin
+		Interp.Token.Kind := Kind;	
+		Clear_Buffer (Interp.Token.Value);
+		Tmp(1) := Value;
+		Append_Buffer (Interp, Interp.Token.Value, Tmp);
+	end Set;
+
+	procedure Set (Interp: in out Interpreter_Record;
+	               Kind:   in     Token_Kind;
+	               Value:  in     Object_String) is
 	begin
 		Interp.Token.Kind := Kind;	
 		Clear_Buffer (Interp.Token.Value);
@@ -111,4 +131,4 @@ package body H2.Scheme.Token is
 	end Append_Character;
 
 
-end H2.Scheme.Token;
+end Token;

@@ -39,6 +39,9 @@ with System;
 with System.Storage_Pools;
 with Ada.Unchecked_Conversion;
 
+generic
+	type Character_Type is (<>);
+	type String_Type is array (Standard.Positive range<>) of Character_Type;
 package H2.Scheme is
 
 	type Interpreter_Record is limited private;
@@ -122,8 +125,10 @@ package H2.Scheme is
 	type Object_Byte is mod 2 ** System.Storage_Unit;
 	for Object_Byte'Size use System.Storage_Unit;
 
-	subtype Object_Character is Standard.Wide_Character;
-	subtype Object_String is Standard.Wide_String;
+	--subtype Object_Character is Standard.Wide_Character;
+	--subtype Object_String is Standard.Wide_String;
+	subtype Object_Character is Character_Type;
+	subtype Object_String is String_Type;
 
 	type Object_String_Pointer is access all Object_String;
 	type Constant_Object_String_Pointer is access constant Object_String;
@@ -381,8 +386,6 @@ package H2.Scheme is
 
 	-- -----------------------------------------------------------------------------
 
-procedure Make_Test_Object (Interp: in out Interpreter_Record; Result: out Object_Pointer);
-
 	procedure Open (Interp:           in out Interpreter_Record;
 	                Initial_Heap_Size:in     Heap_Size;
 	                Storage_Pool:     in     Storage_Pool_Pointer := null);
@@ -437,8 +440,6 @@ private
 	type Heap_Number is mod 2 ** 1;
 	type Heap_Pointer_Array is Array (Heap_Number'First .. Heap_Number'Last) of Heap_Pointer;
 
-
-
 	type Token_Kind is (End_Token,
 	                    Identifier_Token,
 	                    Left_Parenthesis_Token,
@@ -478,5 +479,31 @@ private
 		Token: Token_Record;
 		LC_Unfetched: Standard.Boolean := Standard.False;
 	end record;
+
+	package Token is
+
+		procedure Purge (Interp: in out Interpreter_Record);
+		pragma Inline (Purge);
+
+		procedure Set (Interp: in out Interpreter_Record;
+		               Kind:   in     Token_Kind);
+
+		procedure Set (Interp:  in out Interpreter_Record;
+		               Kind:    in     Token_Kind;
+		               Value:   in     Object_Character);
+
+		procedure Set (Interp:  in out Interpreter_Record;
+		               Kind:    in     Token_Kind;
+		               Value:   in     Object_String);
+	
+		procedure Append_String (Interp: in out Interpreter_Record;
+		                         Value:  in     Object_String);
+		pragma Inline (Append_String);
+	
+		procedure Append_Character (Interp: in out Interpreter_Record;
+		                            Value:  in     Object_Character);
+		pragma Inline (Append_Character);
+	end Token;
+
 
 end H2.Scheme;
