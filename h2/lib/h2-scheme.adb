@@ -2438,68 +2438,57 @@ Print (Interp, Operand);
 
 			-- TODO: Pass Token Location when calling Token.Set
 
-			-- Pity that "case .. end case" can't be used instead of "if .. end if" 
-			-- because Ch.XXX values are not static. This is a pain to take
-			-- for making this package generic.
-			if LC.Value = Ch.Left_Parenthesis then
-				Token.Set (Interp, Left_Parenthesis_Token, LC.Value);
-			elsif LC.Value = Ch.Right_Parenthesis then
-				Token.Set (Interp, Right_Parenthesis_Token, LC.Value);
-			elsif LC.Value = Ch.Period then
-				Token.Set (Interp, Period_Token, LC.Value);
-			elsif LC.Value = Ch.Apostrophe then
-					Token.Set (Interp, Single_Quote_Token, LC.Value);
-			elsif LC.Value = Ch.Quotation then
-				Fetch_Character;
-				Token.Set (Interp, String_Token);
-				loop
-					if LC.Kind /= Normal_Character then
-						-- String ended prematurely.
-						-- TODO: Set Error code, Error Number.... Error location
-						raise Syntax_Error;		
-					end if;
+			-- Use Ch.Pos.XXX values instead of Ch.XXX values as gnat complained that 
+			-- Ch.XXX values are not static. For this reason, "case LC.Value is ..."
+			-- changed to use Object_Character'Pos(LC.Value).
+			case Object_Character'Pos(LC.Value) is
 
-					if LC.Value = Ch.Backslash then
-						Fetch_Character;
+				when Ch.Pos.Left_Parenthesis =>
+					Token.Set (Interp, Left_Parenthesis_Token, LC.Value);
+
+				when Ch.Pos.Right_Parenthesis =>
+					Token.Set (Interp, Right_Parenthesis_Token, LC.Value);
+
+				when Ch.Pos.Period =>
+					Token.Set (Interp, Period_Token, LC.Value);
+
+				when Ch.Pos.Apostrophe =>
+					Token.Set (Interp, Single_Quote_Token, LC.Value);
+
+				when Ch.Pos.Quotation =>
+					Fetch_Character;
+					Token.Set (Interp, String_Token);
+					loop
 						if LC.Kind /= Normal_Character then
 							-- String ended prematurely.
 							-- TODO: Set Error code, Error Number.... Error location
 							raise Syntax_Error;		
 						end if;
-						-- TODO: escape letters??? \n \r \\ etc....
-						Token.Append_Character (Interp, LC.Value);
-					elsif LC.Value = Ch.Quotation then
-						exit;
-					else
-						Token.Append_Character (Interp, LC.Value);
-						Fetch_Character;
-					end if;
-				end loop;
-			
-			elsif LC.Value = Ch.Number_Sign then
-				Fetch_Character;
-				-- TODO: t, false, etc
-			elsif LC.Value in Ch.Zero .. Ch.Nine then
-				-- TODO; negative number, floating-point number, bignum, hexdecimal, etc
-				Token.Set (Interp, Integer_Token);
-				loop
-					Token.Append_Character (Interp, LC.Value);
+	
+						if LC.Value = Ch.Backslash then
+							Fetch_Character;
+							if LC.Kind /= Normal_Character then
+								-- String ended prematurely.
+								-- TODO: Set Error code, Error Number.... Error location
+								raise Syntax_Error;		
+							end if;
+							-- TODO: escape letters??? \n \r \\ etc....
+							Token.Append_Character (Interp, LC.Value);
+						elsif LC.Value = Ch.Quotation then
+							exit;
+						else
+							Token.Append_Character (Interp, LC.Value);
+							Fetch_Character;
+						end if;
+					end loop;
+
+				when Ch.Pos.Number_Sign =>
 					Fetch_Character;
-					if LC.Kind /= Normal_Character or else
-					   LC.Value not in Ch.Zero .. Ch.Nine  then
-						-- Unfetch the last character
-						Interp.LC_Unfetched := Standard.True;
-						exit;
-					end if;
-				end loop;
+					-- TODO: t, false, etc
 
-			elsif LC.Value = Ch.Plus_Sign or else LC.Value = Ch.Minus_Sign then
-				Tmp(1) := LC.Value;
-
-				Fetch_Character;
-				if LC.Kind = Normal_Character and then
-				   LC.Value in Ch.Zero .. Ch.Nine then
-					Token.Set (Interp, Integer_Token, Tmp(1..1));
+				when Ch.Pos.Zero .. Ch.Pos.Nine =>
+					-- TODO; negative number, floating-point number, bignum, hexdecimal, etc
+					Token.Set (Interp, Integer_Token);
 					loop
 						Token.Append_Character (Interp, LC.Value);
 						Fetch_Character;
@@ -2510,37 +2499,56 @@ Print (Interp, Operand);
 							exit;
 						end if;
 					end loop;
-				else
-					Token.Set (Interp, Identifier_Token, Tmp(1..1));
+
+				when Ch.Pos.Plus_Sign | Ch.Pos.Minus_Sign =>
+
+					Tmp(1) := LC.Value;
+	
+					Fetch_Character;
+					if LC.Kind = Normal_Character and then
+					   LC.Value in Ch.Zero .. Ch.Nine then
+						Token.Set (Interp, Integer_Token, Tmp(1..1));
+						loop
+							Token.Append_Character (Interp, LC.Value);
+							Fetch_Character;
+							if LC.Kind /= Normal_Character or else
+							   LC.Value not in Ch.Zero .. Ch.Nine  then
+								-- Unfetch the last character
+								Interp.LC_Unfetched := Standard.True;
+								exit;
+							end if;
+						end loop;
+					else
+						Token.Set (Interp, Identifier_Token, Tmp(1..1));
+						loop
+					-- TODO: more characters
+							if LC.Kind /= Normal_Character or else
+							   Is_Identifier_Stopper(LC.Value) then
+								-- Unfetch the last character
+								Interp.LC_Unfetched := Standard.True;
+								exit;
+							end if;
+	
+							Token.Append_Character (Interp, LC.Value);
+							Fetch_Character;
+						end loop;
+					end if;
+
+				when others =>
+					Token.Set (Interp, Identifier_Token);
 					loop
-				-- TODO: more characters
+						Token.Append_Character (Interp, LC.Value);
+						Fetch_Character;
+						--exit when not Is_Ident_Char(C.Value);
+					-- TODO: more characters
 						if LC.Kind /= Normal_Character or else
 						   Is_Identifier_Stopper(LC.Value) then
 							-- Unfetch the last character
 							Interp.LC_Unfetched := Standard.True;
 							exit;
 						end if;
-
-						Token.Append_Character (Interp, LC.Value);
-						Fetch_Character;
 					end loop;
-				end if;
-
-			else
-				Token.Set (Interp, Identifier_Token);
-				loop
-					Token.Append_Character (Interp, LC.Value);
-					Fetch_Character;
-					--exit when not Is_Ident_Char(C.Value);
-				-- TODO: more characters
-					if LC.Kind /= Normal_Character or else
-					   Is_Identifier_Stopper(LC.Value) then
-						-- Unfetch the last character
-						Interp.LC_Unfetched := Standard.True;
-						exit;
-					end if;
-				end loop;
-			end if;
+			end case;
 			
 --Ada.Text_IO.Put (">>>>>>>>>>>>>>>>>>>>>>> Token: " & Interp.Token.Value.Ptr(1..Interp.Token.Value.Last));
 		end Fetch_Token;
