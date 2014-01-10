@@ -1,9 +1,11 @@
 with H2.Pool;
 with Ada.Characters.Conversions;
+with Ada.Unchecked_Conversion;
 
 package body Stream is
 
 	------------------------------------------------------------------
+	use type S.Object_String_Size;
 
 	procedure Open (Stream: in out String_Input_Stream_Record) is
 	begin
@@ -19,8 +21,8 @@ Ada.Wide_Text_IO.Put_Line ("****** CLOSE STRING STREAM ******");
 
 	procedure Read (Stream: in out String_Input_Stream_Record;
 	                Data:   out    S.Object_String;
-	                Last:   out    Standard.Natural) is
-		Avail: Standard.Natural;
+	                Last:   out    S.Object_String_Size) is
+		Avail: S.Object_String_Size;
 	begin
 		Avail := Stream.Str'Last - Stream.Pos;
 		if Avail <= 0 then
@@ -39,7 +41,7 @@ Ada.Wide_Text_IO.Put_Line ("****** CLOSE STRING STREAM ******");
 
 	procedure Write (Stream: in out String_Input_Stream_Record;
 	                 Data:   out    S.Object_String;
-	                 Last:   out    Standard.Natural) is
+	                 Last:   out    S.Object_String_Size) is
 	begin
 		--raise S.Stream_Error;
 		Last := Data'First - 1;
@@ -48,20 +50,24 @@ Ada.Wide_Text_IO.Put_Line ("****** CLOSE STRING STREAM ******");
 	------------------------------------------------------------------
 
 	procedure Open (Stream: in out File_Stream_Record) is
+		subtype Wide_String is Standard.Wide_String(1 .. Standard.Natural(Stream.Name'Length));
+		function To_Wide_String is new Ada.Unchecked_Conversion (S.Object_String, Wide_String);
 	begin
-Ada.Wide_Text_IO.Put_Line (">>>>> OPEN File STREAM <<<<<");
-		Ada.Wide_Text_IO.Open (Stream.Handle, Ada.Wide_Text_IO.In_File, Ada.Characters.Conversions.To_String(Stream.Name.all));
+Ada.Wide_Text_IO.Put_Line (">>>>> OPEN File STREAM <<<<< " & To_Wide_String(Stream.Name.all));
+		Ada.Wide_Text_IO.Open (Stream.Handle, Ada.Wide_Text_IO.In_File, Ada.Characters.Conversions.To_String(To_Wide_String(Stream.Name.all)));
 	end Open;
 
 	procedure Close (Stream: in out File_Stream_Record) is
+		subtype Wide_String is Standard.Wide_String(1 .. Standard.Natural(Stream.Name'Length));
+		function To_Wide_String is new Ada.Unchecked_Conversion (S.Object_String, Wide_String);
 	begin
-Ada.Wide_Text_IO.Put_Line (">>>>> CLOSE File STREAM <<<<<");
+Ada.Wide_Text_IO.Put_Line (">>>>> CLOSE File STREAM <<<<< " & To_Wide_String(Stream.Name.all));
 		Ada.Wide_Text_IO.Close (Stream.Handle);
 	end Close;
 
 	procedure Read (Stream: in out File_Stream_Record;
 	                Data:   out    S.Object_String;
-	                Last:   out    Standard.Natural) is
+	                Last:   out    S.Object_String_Size) is
 	begin
 		for I in Data'First .. Data'Last loop
 			begin
@@ -78,7 +84,7 @@ Ada.Wide_Text_IO.Put_Line (">>>>> CLOSE File STREAM <<<<<");
 
 	procedure Write (Stream: in out File_Stream_Record;
 	                 Data:   out    S.Object_String;
-	                 Last:   out    Standard.Natural) is
+	                 Last:   out    S.Object_String_Size) is
 	begin
 		--raise S.Stream_Error;
 		Last := Data'First - 1;

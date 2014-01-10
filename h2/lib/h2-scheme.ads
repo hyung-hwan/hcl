@@ -41,7 +41,6 @@ with Ada.Unchecked_Conversion;
 
 generic
 	type Character_Type is (<>);
-	type String_Type is array (Standard.Positive range<>) of Character_Type;
 package H2.Scheme is
 
 	type Interpreter_Record is limited private;
@@ -125,16 +124,16 @@ package H2.Scheme is
 	type Object_Byte is mod 2 ** System.Storage_Unit;
 	for Object_Byte'Size use System.Storage_Unit;
 
-	--subtype Object_Character is Standard.Wide_Character;
-	--subtype Object_String is Standard.Wide_String;
 	subtype Object_Character is Character_Type;
-	subtype Object_String is String_Type;
+	subtype Object_String_Size is Object_Size range 0 .. Object_Size'Last - 1;
+	subtype Object_String_Range is Object_Size range 1 .. Object_Size'Last - 1;
+	type Object_String is array (Object_String_Range range <>) of Object_Character;
 
 	type Object_String_Pointer is access all Object_String;
 	type Constant_Object_String_Pointer is access constant Object_String;
 
 	type Object_Byte_Array is array (Object_Size range <>) of Object_Byte;
-	type Object_Character_Array is array (Object_Size range <>) of Object_Character;
+	subtype Object_Character_Array is Object_String;
 	type Object_Pointer_Array is array (Object_Size range <>) of Object_Pointer;
 	type Object_Word_Array is array (Object_Size range <>) of Object_Word;
 
@@ -201,7 +200,7 @@ package H2.Scheme is
 		Mark_Object
 	);
 
-	type Object_Record (Kind: Object_Kind; Size: Object_Size) is record
+	type Object_Record(Kind: Object_Kind; Size: Object_Size) is record
 		Flags: Object_Flags := 0;
 		Scode: Syntax_Code := 0;
 		Tag: Object_Tag := Unknown_Object;
@@ -215,13 +214,14 @@ package H2.Scheme is
 			when Moved_Object =>
 				New_Pointer: Object_Pointer := null;
 			when Pointer_Object =>
-				Pointer_Slot: Object_Pointer_Array (1 .. Size) := (others => null);
+				Pointer_Slot: Object_Pointer_Array(1 .. Size) := (others => null);
 			when Character_Object =>
-				Character_Slot: Object_Character_Array (0 .. Size) := (others => Object_Character'First);
+				Character_Slot: Object_Character_Array(1 .. Size) := (others => Object_Character'First);
+				Character_Terminator: Object_Character := Object_Character'First; -- TODO: can this guarantee termining NULL? require some attribute for it to work?
 			when Byte_Object =>
-				Byte_Slot: Object_Byte_Array (1 .. Size) := (others => 0);
+				Byte_Slot: Object_Byte_Array(1 .. Size) := (others => 0);
 			when Word_Object =>
-				Word_Slot: Object_Word_Array (1 .. Size) := (others => 0);
+				Word_Slot: Object_Word_Array(1 .. Size) := (others => 0);
 		end case;
 	end record;
 	for Object_Record use record
@@ -294,11 +294,11 @@ package H2.Scheme is
 
 	procedure Read (Stream: in out Stream_Record;
 	                Data:   out    Object_String;
-	                Last:   out    Standard.Natural) is abstract;
+	                Last:   out    Object_String_Size) is abstract;
 
 	procedure Write (Stream: in out Stream_Record;
 	                 Data:   out    Object_String;
-	                 Last:   out    Standard.Natural) is abstract;
+	                 Last:   out    Object_String_Size) is abstract;
 
 	type Stream_Pointer is access all Stream_Record'Class;
 
@@ -331,8 +331,8 @@ package H2.Scheme is
 		Stream: Stream_Pointer := null;
 		--Data: Object_String(1..2048) := (others => Object_Character'First);
 		Data: Object_String(1..5) := (others => Object_Character'First);
-		Last: Standard.Natural := 0;
-		Pos: Standard.Natural := 0;
+		Last: Object_String_Size := 0;
+		Pos: Object_String_Size := 0;
 		Flags: IO_Flags := 0; -- EOF, ERROR
 		Next: IO_Pointer := null;
 		Iochar: IO_Character_Record; -- the last character read.	
@@ -419,14 +419,16 @@ package H2.Scheme is
 
 	-- -----------------------------------------------------------------------------
 
-	subtype Thin_String is Object_String (Standard.Positive'Range);
+	subtype Thin_String is Object_String (Object_String_Range'Range);
 	type Thin_String_Pointer is access all Thin_String;
 	for Thin_String_Pointer'Size use Object_Pointer_Bits;
+
 	type Buffer_Record is record
 		Ptr: Thin_String_Pointer := null;
-		Len: Standard.Natural := 0;
-		Last: Standard.Natural := 0;
+		Len: Object_String_Size := 0;
+		Last: Object_String_Size := 0;
 	end record;
+
 private
 	type Heap_Element_Array is array (Heap_Size range <>) of aliased Heap_Element;
 

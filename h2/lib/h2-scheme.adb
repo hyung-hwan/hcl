@@ -126,6 +126,19 @@ package body H2.Scheme is
 	pragma Inline (Get_New_Location);
 
 	-----------------------------------------------------------------------------
+	-- FOR DEBUGGING. REMVOE THESE LATER
+	-----------------------------------------------------------------------------
+	procedure Output_Character_Array (Source: in Object_Character_Array) is
+		-- for debugging only.
+	begin
+		for I in Source'Range loop
+			--Ada.Text_IO.Put (Source(I));
+-- TODO: note this is a hack for quick printing.
+			Ada.Text_IO.Put (Standard.Character'Val(Object_Character'Pos(Source(I))));
+		end loop;
+	end Output_Character_Array;
+
+	-----------------------------------------------------------------------------
 	-- POINTER AND DATA CONVERSION
 	-----------------------------------------------------------------------------
 
@@ -262,104 +275,6 @@ package body H2.Scheme is
 		return Object_Byte(Word / (2 ** Object_Pointer_Type_Bits));
 	end Pointer_To_Byte;
 
-	-- Check if a character object contains a given string in the payload.
-	function Match (Object: in Object_Pointer; 
-	                Data:   in Object_String) return Standard.Boolean is
-		Slot: Object_Character_Array renames Object.Character_Slot;
-	begin
-		return Slot(Slot'First .. Slot'Last - 1) = Object_Character_Array(Data);
-	end;
-
-	procedure Copy_String (Source: in  Object_String;
-	                       Target: out Object_Character_Array) is
-	begin
-		-- This procedure is not generic. The size of the Source 
-		-- and Target must be in the expected length.
-		pragma Assert (Source'Length + 1 = Target'Length); 
-
-		-- Method 1. Naive. It doesn't look Adaish.
-		-- ---------------------------------------------------------------------
-		--declare
-		--	X: Object_Size;
-		--begin	
-		--	X := Target'First;
-		--	for I in Source'Range loop
-		--		Target(X) := Source(I);
-		--		X := X + 1;
-		--	end loop;
-		--	Target(X) := Object_Character'First; -- Object_Character'Val(0);
-		--end;
-
-		-- Method 2.
-		-- ObjectAda complains that the member of Object_String is not 
-		-- aliased because Object_Character_Array is an array of aliased 
-		-- Object_Character.It points to LRM 4.6(12); The component subtypes
-		-- shall statically match. 
-		-- ---------------------------------------------------------------------
-		--Target(Target'First .. Target'Last - 1) := Object_Character_Array (Source(Source'First .. Source'Last));
-		--Target(Target'Last) := Object_Character'First; -- Object_Character'Val(0);
-
-		-- Method 3. Use unchecked conversion
-		declare
-			subtype Character_Array is Object_Character_Array (Target'First .. Target'Last - 1);
-			function To_Character_Array is new Ada.Unchecked_Conversion (Object_String, Character_Array);
-		begin
-			Target(Target'First .. Target'Last - 1) := To_Character_Array(Source);
-			Target(Target'Last) := Object_Character'First; -- Object_Character'Val(0);
-		end;
-	end Copy_String;
-
-	procedure Copy_String (Source: in  Object_Character_Array;
-	                       Target: out Object_String) is
-	begin
-		pragma Assert (Source'Length = Target'Length + 1); 
-
-		--declare
-		--	X: Standard.Natural;
-		--begin	
-		--	X := Target'First;
-		--	for I in Source'First .. Source'Last - 1 loop
-		--		Target(X) := Source(I);
-		--		X := X + 1;
-		--	end loop;
-		--end;
-
-		declare
-			subtype Character_Array is Object_Character_Array (Source'First .. Source'Last - 1);
-			subtype String_Array is Object_String (Target'Range);
-			function To_Character_Array is new Ada.Unchecked_Conversion(Character_Array, String_Array);
-		begin
-			Target := To_Character_Array (Source (Source'First .. Source'Last - 1));
-		end;
-	end Copy_String;
-
-	function Character_Array_To_String (Source: in Object_Character_Array) return Object_String is
-	begin
-		-- ObjectAda complains that the member of Object_String is not 
-		-- aliased because Object_Character_Array is an array of aliased
-		-- Object_Character. It points to LRM 4.6(12); The component subtypes
-		-- shall statically match. So let me turn to unchecked conversion.
-		declare
-			subtype Character_Array is Object_Character_Array (Source'First .. Source'Last - 1);
-			subtype String_Array is Object_String (1 .. Source'Length - 1);
-			function To_Character_Array is new Ada.Unchecked_Conversion (Character_Array, String_Array);
-		begin
-			return To_Character_Array (Source (Source'First .. Source'Last - 1));
-			--return String_Array (Source (Source'First .. Source'Last - 1));
-		end;
-	end Character_Array_To_String;
-
-						--Text_IO.Put (Character_Array_To_String (Atom.Character_Slot));
-	procedure Output_Character_Array (Source: in Object_Character_Array) is
-		-- for debugging only.
-	begin
-		for I in Source'First .. Source'Last loop
-			--Ada.Text_IO.Put (Source(I));
--- TODO: note this is a hack for quick printing.
-			Ada.Text_IO.Put (Standard.Character'Val(Object_Character'Pos(Source(I))));
-		end loop;
-	end Output_Character_Array;
-
 -- TODO: move away these utilities routines
 	--function To_Thin_String_Pointer (Source: in Object_Pointer) return Thin_String_Pointer is
 	--	type Character_Pointer is access all Object_Character;
@@ -410,11 +325,9 @@ package body H2.Scheme is
 			                   " at " & Object_Kind'Image(Source.Kind) & 
 			                   " size " & Object_Size'Image(Source.Size) & " - ");
 			if Source.Kind = Moved_Object then
-				--Text_IO.Put_Line (Character_Array_To_String (Get_New_Location(Source).Character_Slot));
-				null;
+				Output_Character_Array (Get_New_Location(Source).Character_Slot);
 			else
-				--Text_IO.Put_Line (Character_Array_To_String (Source.Character_Slot));
-				null;
+				Output_Character_Array (Source.Character_Slot);
 			end if;
 		else
 			Ada.Text_IO.Put_Line (Msg & " at " & Object_Word'Image(W) & " at " & Object_Kind'Image(Source.Kind));
@@ -424,7 +337,7 @@ package body H2.Scheme is
 	function String_To_Integer_Pointer (Source: in Object_String) return Object_Pointer is
 		V: Object_Integer := 0;
 		Negative: Standard.Boolean := False;
-		First: Standard.Natural;
+		First: Object_String_Size;
 	begin
 		-- TODO: BIGNUM, RANGE CHECK, ETC
 		pragma Assert (Source'Length > 0);
@@ -842,7 +755,8 @@ Ada.Text_IO.Put_Line (">>> [GC DONE]");
 			Flags => 0,
 			Scode => 0,
 			Tag => Unknown_Object,
-			Character_Slot => (others => Object_Character'First)
+			Character_Slot => (others => Ch.NUL),
+			Character_Terminator => Ch.NUL
 		);
 
 		return Result;
@@ -857,7 +771,7 @@ Ada.Text_IO.Put_Line (">>> [GC DONE]");
 		end if;
 		
 		Result := Allocate_Character_Object (Interp, Character_Object_Size'(Source'Length));
-		Copy_String (Source, Result.Character_Slot);
+		Result.Character_Slot := Source;
 		return Result;
 	end Allocate_Character_Object;
 
@@ -981,6 +895,7 @@ Ada.Text_IO.Put_Line (">>> [GC DONE]");
 	                      Source: in      Object_String) return Object_Pointer is
 		Result: Object_Pointer;
 	begin
+Ada.Text_IO.Put_Line ("Make_String...");
 		Result := Allocate_Character_Object (Interp, Source);
 		Result.Tag := String_Object;
 --Print_Object_Pointer ("Make_String Result - " & Source, Result);
@@ -1013,7 +928,8 @@ Ada.Text_IO.Put_Line (">>> [GC DONE]");
 --Text_IO.Put_Line (Car.Kind'Img & Car.Tag'Img & Object_Word'Image(Pointer_To_Word(Car)));
 				pragma Assert (Car.Tag = Symbol_Object);
 
-				if Match(Car, Source) then
+	 			--if Match_Character_Object(Car, Source) then
+				if Car.Character_Slot = Source then
 					return Car;
 --Print_Object_Pointer ("Make_Symbol Result (Existing) - " & Source, Car);
 				end if;
@@ -1124,7 +1040,7 @@ Ada.Text_IO.Put_Line (">>> [GC DONE]");
 		if Arr = null then
 			-- Add a new key/value pair
 			-- TODO: make it GC-aware - protect Key and Value
-			Arr := Make_Array (Interp.Self, 3);
+			Arr := Make_Array(Interp.Self, 3);
 			Arr.Pointer_Slot(1) := Key;
 			Arr.Pointer_Slot(2) := Value;
 
@@ -1558,7 +1474,9 @@ Ada.Text_IO.Put_Line ("1111111111");
 		Interp.Mark := Make_Mark (Interp.Self, 0); -- to indicate the end of cons evluation
 		Interp.Root_Environment := Make_Environment (Interp.Self, Nil_Pointer);
 		Interp.Environment := Interp.Root_Environment;
+Ada.Text_IO.Put_Line ("11111111111111111111111111111111111111");
 		Make_Syntax_Objects;
+Ada.Text_IO.Put_Line ("2222222222222222222222222");
 		Make_Procedure_Objects;
 Ada.Text_IO.Put_Line ("99999");
 
@@ -1662,37 +1580,37 @@ Ada.Text_IO.Put_Line (IO_Character_Record'Max_Size_In_Storage_Elements'Img);
 
 				when others => 
 					case Atom.Tag is
-					when Cons_Object =>
-						-- Cons_Object must not reach here.
-						raise Internal_Error;
+						when Cons_Object =>
+							-- Cons_Object must not reach here.
+							raise Internal_Error;
 
-					when Symbol_Object =>
-						Output_Character_Array (Atom.Character_Slot);
-
-					when String_Object =>
-						Ada.Text_IO.Put ("""");	
-						Output_Character_Array (Atom.Character_Slot);
-						Ada.Text_IO.Put ("""");	
-
-					when Closure_Object =>
-						Ada.Text_IO.Put ("#Closure");
-
-					when Continuation_Object =>
-						Ada.Text_IO.Put ("#Continuation");
-
-					when Procedure_Object =>
-						Ada.Text_IO.Put ("#Procedure");
-
-					when Array_Object =>
-						Ada.Text_IO.Put ("#Array");
-
-					when Others =>
-						if Atom.Kind = Character_Object then
+						when Symbol_Object =>
 							Output_Character_Array (Atom.Character_Slot);
-						else
-							Ada.Text_IO.Put ("#NOIMPL#");
-						end if;
-					end case;
+
+						when String_Object =>
+							Ada.Text_IO.Put ("""");	
+							Output_Character_Array (Atom.Character_Slot);
+							Ada.Text_IO.Put ("""");	
+	
+						when Closure_Object =>
+							Ada.Text_IO.Put ("#Closure");
+	
+						when Continuation_Object =>
+							Ada.Text_IO.Put ("#Continuation");
+	
+						when Procedure_Object =>
+							Ada.Text_IO.Put ("#Procedure");
+	
+						when Array_Object =>
+							Ada.Text_IO.Put ("#Array");
+
+						when Others =>
+							if Atom.Kind = Character_Object then
+								Output_Character_Array (Atom.Character_Slot);
+							else
+								Ada.Text_IO.Put ("#NOIMPL#");
+							end if;
+						end case;
 				end case;
 			end Print_Pointee;
 

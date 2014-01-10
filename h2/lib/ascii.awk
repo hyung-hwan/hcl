@@ -1,3 +1,5 @@
+# This script requires QSEAWK.
+
 BEGIN {
 	printf ("-- Generated with ascii.txt and ascii.awk\n");
 	printf ("-- Run qseawk -f ascii.awk ascii.txt > h2-ascii.ads for regeneration\n\n");

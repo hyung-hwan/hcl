@@ -10,7 +10,7 @@ package body Token is
 	procedure Clear_Buffer (Buffer: in out Buffer_Record) is
 		pragma Inline (Clear_Buffer);
 	begin
-		Buffer.Last := 0;	
+		Buffer.Last := 0;
 	end Clear_Buffer;
 
 	procedure Purge_Buffer (Interp: in out Interpreter_Record;
@@ -31,14 +31,14 @@ package body Token is
 				Pool.Deallocate (Tmp);
 			end;
 
-			Buffer := (null, 0, 0);
+			Buffer := ( Ptr => null, Len => 0, Last => 0);
 		end if;
 	end Purge_Buffer;
 
 	procedure Append_Buffer (Interp: in out Interpreter_Record;
 	                         Buffer: in out Buffer_Record; 
 	                         Source: in     Object_String) is
-		Incr: Standard.Natural;
+		Incr: Object_String_Size;
 	begin
 		if Buffer.Last >= Buffer.Len then
 			if Buffer.Len <= 0 then
