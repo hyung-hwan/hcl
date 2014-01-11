@@ -276,9 +276,9 @@ package body H2.Scheme is
 	end Pointer_To_Byte;
 
 -- TODO: move away these utilities routines
-	--function To_Thin_String_Pointer (Source: in Object_Pointer) return Thin_String_Pointer is
+	--function To_Thin_Object_String_Pointer (Source: in Object_Pointer) return Thin_Object_String_Pointer is
 	--	type Character_Pointer is access all Object_Character;
-	--	Ptr: Thin_String_Pointer;
+	--	Ptr: Thin_Object_String_Pointer;
 		
 	--	X: Character_Pointer;
 	--	for X'Address use Ptr'Address;
@@ -288,22 +288,22 @@ package body H2.Scheme is
 		-- So i've commented out this function and turn to a different method below.
 	--	X := Source.Character_Slot(Source.Character_Slot'First)'Access; 
 	--	return Ptr;
-	--end To_Thin_String_Pointer;	
+	--end To_Thin_Object_String_Pointer;	
 
-	--function To_Thin_String_Pointer (Source: in Object_Pointer) return Thin_String_Pointer is
-	--	function To_Thin_Pointer is new Ada.Unchecked_Conversion (System.Address, Thin_String_Pointer);
+	--function To_Thin_Object_String_Pointer (Source: in Object_Pointer) return Thin_Object_String_Pointer is
+	--	function To_Thin_Pointer is new Ada.Unchecked_Conversion (System.Address, Thin_Object_String_Pointer);
 	--begin
 	--	return To_Thin_Pointer(Source.Character_Slot'Address);
-	--end To_Thin_String_Pointer;	
+	--end To_Thin_Object_String_Pointer;	
 
-	function To_Thin_String_Pointer (Source: in Object_Pointer) return Thin_String_Pointer is
-		X: aliased Thin_String;
+	function To_Thin_Object_String_Pointer (Source: in Object_Pointer) return Thin_Object_String_Pointer is
+		X: aliased Thin_Object_String;
 		for X'Address use Source.Character_Slot'Address;
 	begin
 		return X'Unchecked_Access;
-	end To_Thin_String_Pointer;	
+	end To_Thin_Object_String_Pointer;	
 
-	procedure Put_String (TS: in Thin_String_Pointer);
+	procedure Put_String (TS: in Thin_Object_String_Pointer);
 	pragma Import (C, Put_String, "puts");
 
 	-- TODO: delete this procedure 
@@ -1098,7 +1098,7 @@ Ada.Text_IO.Put_Line ("Make_String...");
 		Result.Flags := Result.Flags or Syntax_Object;
 		Result.Scode := Opcode;
 --Ada.Text_IO.Put ("Creating Syntax Symbol ");
---Put_String (To_Thin_String_Pointer (Result));
+--Put_String (To_Thin_Object_String_Pointer (Result));
 		return Result;
 	end Make_Syntax;
 

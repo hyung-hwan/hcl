@@ -130,7 +130,14 @@ package H2.Scheme is
 	type Object_String is array (Object_String_Range range <>) of Object_Character;
 
 	type Object_String_Pointer is access all Object_String;
+	for Object_String_Pointer'Size use Object_Pointer_Bits;
 	type Constant_Object_String_Pointer is access constant Object_String;
+	for Constant_Object_String_Pointer'Size use Object_Pointer_Bits;
+
+-- TODO: are these Thin_XXXX necessary?
+	subtype Thin_Object_String is Object_String (Object_String_Range'Range);
+	type Thin_Object_String_Pointer is access all Thin_Object_String;
+	for Thin_Object_String_Pointer'Size use Object_Pointer_Bits;
 
 	type Object_Byte_Array is array (Object_Size range <>) of Object_Byte;
 	subtype Object_Character_Array is Object_String;
@@ -419,12 +426,9 @@ package H2.Scheme is
 
 	-- -----------------------------------------------------------------------------
 
-	subtype Thin_String is Object_String (Object_String_Range'Range);
-	type Thin_String_Pointer is access all Thin_String;
-	for Thin_String_Pointer'Size use Object_Pointer_Bits;
 
 	type Buffer_Record is record
-		Ptr: Thin_String_Pointer := null;
+		Ptr: Thin_Object_String_Pointer := null;
 		Len: Object_String_Size := 0;
 		Last: Object_String_Size := 0;
 	end record;
