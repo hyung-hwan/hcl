@@ -1,6 +1,7 @@
 with H2.Pool;
-with Ada.Characters.Conversions;
 with Ada.Unchecked_Conversion;
+
+with Ada.Text_IO; -- for debugging
 
 package body Stream is
 
@@ -9,13 +10,13 @@ package body Stream is
 
 	procedure Open (Stream: in out String_Input_Stream_Record) is
 	begin
-Ada.Wide_Text_IO.Put_Line ("****** OPEN STRING STREAM ******");
+Ada.Text_IO.Put_Line ("****** OPEN STRING STREAM ******");
 		Stream.Pos := 0;
 	end Open;
 
 	procedure Close (Stream: in out String_Input_Stream_Record) is
 	begin
-Ada.Wide_Text_IO.Put_Line ("****** CLOSE STRING STREAM ******");
+Ada.Text_IO.Put_Line ("****** CLOSE STRING STREAM ******");
 		Stream.Pos := Stream.Str'Last;
 	end Close;
 
@@ -50,18 +51,18 @@ Ada.Wide_Text_IO.Put_Line ("****** CLOSE STRING STREAM ******");
 	------------------------------------------------------------------
 
 	procedure Open (Stream: in out File_Stream_Record) is
-		subtype Wide_String is Standard.Wide_String(1 .. Standard.Natural(Stream.Name'Length));
-		function To_Wide_String is new Ada.Unchecked_Conversion (S.Object_String, Wide_String);
 	begin
-Ada.Wide_Text_IO.Put_Line (">>>>> OPEN File STREAM <<<<< " & To_Wide_String(Stream.Name.all));
-		Ada.Wide_Text_IO.Open (Stream.Handle, Ada.Wide_Text_IO.In_File, Ada.Characters.Conversions.To_String(To_Wide_String(Stream.Name.all)));
+Ada.Text_IO.Put_Line (">>>>> OPEN File STREAM <<<<< " & Standard.String(UTF8.Unicode_To_Utf8(UTF8.Unicode_String(Stream.Name.all))));
+		--Ada.Wide_Text_IO.Open (Stream.Handle, Ada.Wide_Text_IO.In_File, Ada.Characters.Conversions.To_String(Standard.Wide_String(Stream.Name.all)));
+		Ada.Wide_Text_IO.Open (Stream.Handle, Ada.Wide_Text_IO.In_File, Standard.String(UTF8.Unicode_To_Utf8(UTF8.Unicode_String(Stream.Name.all))));
 	end Open;
 
 	procedure Close (Stream: in out File_Stream_Record) is
 		subtype Wide_String is Standard.Wide_String(1 .. Standard.Natural(Stream.Name'Length));
 		function To_Wide_String is new Ada.Unchecked_Conversion (S.Object_String, Wide_String);
 	begin
-Ada.Wide_Text_IO.Put_Line (">>>>> CLOSE File STREAM <<<<< " & To_Wide_String(Stream.Name.all));
+--Ada.Wide_Text_IO.Put_Line (">>>>> CLOSE File STREAM <<<<< " & Standard.Wide_String(Stream.Name.all));
+Ada.Text_IO.Put_Line (">>>>> CLOSE File STREAM <<<<< " & Standard.String(UTF8.Unicode_To_Utf8(UTF8.Unicode_String(Stream.Name.all))));
 		Ada.Wide_Text_IO.Close (Stream.Handle);
 	end Close;
 
@@ -71,6 +72,10 @@ Ada.Wide_Text_IO.Put_Line (">>>>> CLOSE File STREAM <<<<< " & To_Wide_String(Str
 	begin
 		for I in Data'First .. Data'Last loop
 			begin
+				if Ada.Wide_Text_IO.End_Of_File (Stream.Handle) then
+					Last := I - 1;
+					return;
+				end if;
 				Ada.Wide_Text_IO.Get_Immediate (Stream.Handle, Data(I));
 			exception
 				when Ada.Wide_Text_IO.End_Error =>

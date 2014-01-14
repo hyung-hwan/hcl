@@ -6,7 +6,6 @@ with Stream;
 with Ada.Text_IO;
 with Ada.Unchecked_Deallocation;
 
-
 procedure scheme is
 	--package S renames H2.Scheme;
 	--package S is new  H2.Scheme (Wide_Character, Wide_String);
@@ -43,8 +42,13 @@ begin
 	);
 
 	File_Stream.Name := File_Name'Unchecked_Access;
-	S.Set_Input_Stream (SI, File_Stream); -- specify main input stream
-	--S.Set_Input_Stream (SI, String_Stream);
+	begin
+		S.Set_Input_Stream (SI, File_Stream); -- specify main input stream
+		--S.Set_Input_Stream (SI, String_Stream);
+	exception
+		when others =>
+			Ada.Text_IO.Put_Line ("Cannot open Input Stream");
+	end;
 	--S.Set_Output_Stream (SI, Stream); -- specify main output stream.
 
 Ada.Text_IO.Put_Line ("-------------------------------------------");

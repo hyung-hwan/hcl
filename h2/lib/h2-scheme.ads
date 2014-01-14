@@ -117,17 +117,20 @@ package H2.Scheme is
 	-- The Object_Size type defines the size of object payload.
 	-- It is the number of payload items for each object kind.
 	--type Object_Size is new Object_Word range 0 .. (2 ** (System.Word_Size - 1)) - 1;
-	--type Object_Size is new Object_Word range 0 .. 1000; -- TODO: remove this line and uncommect the live above
-	type Object_Size is new Object_Word;
+	--type Object_Size is new Object_Word range 0 .. 1000;
+	--type Object_Size is new Object_Word;
+	type Object_Size is new System_Size;
 	for Object_Size'Size use Object_Pointer_Bits; -- for GC
+	subtype Object_Index is Object_Size range Object_Size(System_Index'First) .. Object_Size(System_Index'Last);
 
 	type Object_Byte is mod 2 ** System.Storage_Unit;
 	for Object_Byte'Size use System.Storage_Unit;
 
 	subtype Object_Character is Character_Type;
-	subtype Object_String_Size is Object_Size range 0 .. Object_Size'Last - 1;
-	subtype Object_String_Range is Object_Size range 1 .. Object_Size'Last - 1;
-	type Object_String is array (Object_String_Range range <>) of Object_Character;
+
+	subtype Object_String_Size is Object_Size;
+	subtype Object_String_Index is Object_Index;
+	type Object_String is array (Object_String_Index range <>) of Object_Character;
 
 	type Object_String_Pointer is access all Object_String;
 	for Object_String_Pointer'Size use Object_Pointer_Bits;
@@ -135,14 +138,14 @@ package H2.Scheme is
 	for Constant_Object_String_Pointer'Size use Object_Pointer_Bits;
 
 -- TODO: are these Thin_XXXX necessary?
-	subtype Thin_Object_String is Object_String (Object_String_Range'Range);
+	subtype Thin_Object_String is Object_String(Object_Index'Range);
 	type Thin_Object_String_Pointer is access all Thin_Object_String;
 	for Thin_Object_String_Pointer'Size use Object_Pointer_Bits;
 
-	type Object_Byte_Array is array (Object_Size range <>) of Object_Byte;
+	type Object_Byte_Array is array (Object_Index range <>) of Object_Byte;
 	subtype Object_Character_Array is Object_String;
-	type Object_Pointer_Array is array (Object_Size range <>) of Object_Pointer;
-	type Object_Word_Array is array (Object_Size range <>) of Object_Word;
+	type Object_Pointer_Array is array (Object_Index range <>) of Object_Pointer;
+	type Object_Word_Array is array (Object_Index range <>) of Object_Word;
 
 	type Object_Kind is (
 		Moved_Object, -- internal use only

@@ -14,18 +14,21 @@ project Lib is
 		"h2-pool.ads",
 		"h2-scheme.adb",
 		"h2-scheme.ads",
-		"h2-scheme-token.adb"
+		"h2-scheme-token.adb",
+		"h2-utf8.adb",
+		"h2-utf8.ads"
 	);
 	for Library_Interface use (
 		"h2",
 		"h2.ascii",
 		"h2.pool",
-		"h2.scheme"
+		"h2.scheme",
+		"h2.utf8"
 	);
 
 	package Compiler is
 		for Default_Switches ("Ada") use (
-			"-gnata", "-gnato", "-gnatN",  "-gnatwl", "-gnat95"
+			"-gnata", "-gnato", "-gnatN",  "-gnatwl", "-gnat95", "-gnatW8"
 		);
 	end Compiler;
 

@@ -23,7 +23,7 @@ project Scheme is
 
 	package Compiler is
 		for Default_Switches ("Ada") use (
-			"-gnata", "-gnato", "-gnatN",  "-gnatwl", "-gnat95",
+			"-gnata", "-gnato", "-gnatN",  "-gnatwl", "-gnat95", "-gnatW8",
 			"-I@abs_srcdir@/../lib"
 		);
 	end Compiler;

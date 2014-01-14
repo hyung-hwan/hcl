@@ -1,20 +1,13 @@
 with H2.Ascii;
 with H2.Pool;
-with System.Address_To_Access_Conversions;
-
-with Ada.Unchecked_Deallocation; -- for h2scm c interface. TOOD: move it to a separate file
-with Interfaces.C;
-
 
 -- XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXx
-with Ada.Characters.Handling;
-with Ada.Wide_Characters.Handling;
-
 -- TODO: delete these after debugging
+with Ada.Unchecked_Deallocation; -- for h2scm c interface. TOOD: move it to a separate file
+with Interfaces.C;
 with ada.text_io;
 with ada.wide_text_io;
 -- TODO: delete above after debugging
-
 -- XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXx
 
 package body H2.Scheme is
@@ -1480,8 +1473,8 @@ Ada.Text_IO.Put_Line ("2222222222222222222222222");
 		Make_Procedure_Objects;
 Ada.Text_IO.Put_Line ("99999");
 
-Ada.Text_IO.Put_Line (IO_Character_Record'Size'Img);
-Ada.Text_IO.Put_Line (IO_Character_Record'Max_Size_In_Storage_Elements'Img);
+Ada.Text_IO.Put_Line (Object_Size'Image(IO_Character_Record'Size));
+Ada.Text_IO.Put_Line (Object_Size'Image(IO_Character_Record'Max_Size_In_Storage_Elements));
 	exception
 		when others =>
 			Deinitialize_Heap (Interp);
@@ -2819,6 +2812,8 @@ Ada.Text_IO.Put_Line ("INFO: NO MORE TOKEN ");
 	                    Result: out    Object_Pointer) is
 		-- standard read-eval-print loop
 	begin
+		pragma Assert (Interp.Base_Input.Stream /= null);
+
 		Result := Nil_Pointer;
 
 		loop
