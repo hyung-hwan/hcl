@@ -130,7 +130,7 @@ package H2.Scheme is
 
 	subtype Object_String_Size is Object_Size;
 	subtype Object_String_Index is Object_Index;
-	type Object_String is array (Object_String_Index range <>) of Object_Character;
+	type Object_String is array(Object_String_Index range <>) of Object_Character;
 
 	type Object_String_Pointer is access all Object_String;
 	for Object_String_Pointer'Size use Object_Pointer_Bits;
@@ -142,10 +142,10 @@ package H2.Scheme is
 	type Thin_Object_String_Pointer is access all Thin_Object_String;
 	for Thin_Object_String_Pointer'Size use Object_Pointer_Bits;
 
-	type Object_Byte_Array is array (Object_Index range <>) of Object_Byte;
+	type Object_Byte_Array is array(Object_Index range <>) of Object_Byte;
 	subtype Object_Character_Array is Object_String;
-	type Object_Pointer_Array is array (Object_Index range <>) of Object_Pointer;
-	type Object_Word_Array is array (Object_Index range <>) of Object_Word;
+	type Object_Pointer_Array is array(Object_Index range <>) of Object_Pointer;
+	type Object_Word_Array is array(Object_Index range <>) of Object_Word;
 
 	type Object_Kind is (
 		Moved_Object, -- internal use only
@@ -437,9 +437,9 @@ package H2.Scheme is
 	end record;
 
 private
-	type Heap_Element_Array is array (Heap_Size range <>) of aliased Heap_Element;
+	type Heap_Element_Array is array(Heap_Size range <>) of aliased Heap_Element;
 
-	type Heap_Record (Size: Heap_Size) is record
+	type Heap_Record(Size: Heap_Size) is record
 		Space: Heap_Element_Array(1..Size) := (others => 0);
 		Bound: Heap_Size := 0;
 	end record;
@@ -447,7 +447,7 @@ private
 	type Heap_Pointer is access all Heap_Record;
 
 	type Heap_Number is mod 2 ** 1;
-	type Heap_Pointer_Array is Array (Heap_Number'First .. Heap_Number'Last) of Heap_Pointer;
+	type Heap_Pointer_Array is array(Heap_Number'First .. Heap_Number'Last) of Heap_Pointer;
 
 	type Token_Kind is (End_Token,
 	                    Identifier_Token,
@@ -462,6 +462,14 @@ private
 	type Token_Record is record
 		Kind: Token_Kind;
 		Value: Buffer_Record;
+	end record;
+	
+	-- Temporary Object Pointer to preserve during GC
+	type Top_Datum is access all Object_Pointer;
+	type Top_Array is array(Object_Index range<>) of Top_Datum;
+	type Top_Record is record
+		Last: Object_Size := 0;
+		Data: Top_Array(1 .. 100) := (others => null);
 	end record;
 
 	--type Interpreter_Record is tagged limited record
@@ -487,6 +495,8 @@ private
 
 		Token: Token_Record;
 		LC_Unfetched: Standard.Boolean := Standard.False;
+
+		Top: Top_Record;
 	end record;
 
 	package Token is

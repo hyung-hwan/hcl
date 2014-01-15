@@ -641,11 +641,18 @@ Ada.Text_IO.Put_Line ("  Flags....after " & Object_Kind'Image(Object.Kind) & " N
 
 		-- Migrate objects in the root table
 Print_Object_Pointer ("Root_Table ...", Interp.Root_Table);
-		Interp.Root_Table := Move_One_Object (Interp.Root_Table);
-		Interp.Mark := Move_One_Object (Interp.Mark);
+		Interp.Root_Table := Move_One_Object(Interp.Root_Table);
+		Interp.Mark := Move_One_Object(Interp.Mark);
 
-		-- Scane the heap
-		Last_Pos := Scan_New_Heap (Interp.Heap(New_Heap).Space'First);
+		-- Migrate temporary object pointers
+		for I in Interp.Top.Data'First .. Interp.Top.Last loop
+			if Interp.Top.Data(I).all /= null then
+				Interp.Top.Data(I).all := Move_One_Object(Interp.Top.Data(I).all);
+			end if;
+		end loop;
+
+		-- Scan the heap
+		Last_Pos := Scan_New_Heap(Interp.Heap(New_Heap).Space'First);
 
 		-- Traverse the symbol table for unreferenced symbols.
 		-- If the symbol has not moved to the new heap, the symbol
@@ -656,13 +663,13 @@ Ada.Text_IO.Put_Line (">>> [COMPACTING SYMBOL TABLE]");
 
 Print_Object_Pointer (">>> [MOVING SYMBOL TABLE]", Interp.Symbol_Table);
 		-- Migrate the symbol table itself
-		Interp.Symbol_Table := Move_One_Object (Interp.Symbol_Table);
+		Interp.Symbol_Table := Move_One_Object(Interp.Symbol_Table);
 
 Ada.Text_IO.Put_Line (">>> [SCANNING HEAP AGAIN AFTER SYMBOL TABLE MIGRATION]");
 		-- Scan the new heap again from the end position of
 		-- the previous scan to move referenced objects by 
 		-- the symbol table. 
-		Last_Pos := Scan_New_Heap (Last_Pos);
+		Last_Pos := Scan_New_Heap(Last_Pos);
 
 		-- Swap the current heap and the new heap
 		Interp.Heap(Interp.Current_Heap).Bound := 0;
@@ -1460,6 +1467,7 @@ Ada.Text_IO.Put_Line ("Make_String...");
 		Interp.Base_Input.Stream := null;
 		Interp.Input := Interp.Base_Input'Unchecked_Access;
 		Interp.Token := (End_Token, (null, 0, 0));
+		Interp.Top := (Interp.Top.Data'First - 1, (others => null));
 
 -- TODO: disallow garbage collecion during initialization.
 Ada.Text_IO.Put_Line ("1111111111");
@@ -1791,6 +1799,37 @@ Ada.Text_IO.Put_Line (Object_Size'Image(IO_Character_Record'Max_Size_In_Storage_
 		Interp.Stack := Interp.Stack.Pointer_Slot(Frame_Stack_Index); -- pop 
 	end Pop_Frame;
 
+	procedure Push_Top (Interp: in out Interpreter_Record;
+	                    Source: access Object_Pointer) is
+		Top: Top_Record renames Interp.Top;
+	begin
+		if Top.Last >= Top.Data'Last then
+			-- Something is wrong. Too many temporary object pointers
+			raise Internal_Error; -- TODO: change the exception to something else.
+		end if; 
+
+		Top.Last := Top.Last + 1;
+		Top.Data(Top.Last) := Top_Datum(Source);
+	end Push_Top;
+
+	procedure Pop_Tops (Interp: in out Interpreter_Record; 
+	                    Count:  in     Object_Size) is
+		Top: Top_Record renames Interp.Top;
+	begin
+		if Top.Last < Count then
+			-- Something is wrong. Too few temporary object pointers
+			raise Internal_Error; -- TODO: change the exception to something else.
+		end if;
+		Top.Last := Top.Last - Count;
+	end Pop_Tops;
+
+	procedure Clear_Tops (Interp: in out Interpreter_Record) is
+		pragma Inline (Clear_Tops);
+		Top: Top_Record renames Interp.Top;
+	begin
+		Top.Last := Top.Data'First - 1;
+	end Clear_Tops;
+
 	procedure Execute (Interp: in out Interpreter_Record) is
 
 		LC: IO_Character_Record renames Interp.Input.Iochar;
@@ -1864,10 +1903,14 @@ Ada.Text_IO.Put_Line (Object_Size'Image(IO_Character_Record'Max_Size_In_Storage_
 		procedure Evaluate_Object is
 			pragma Inline (Evaluate_Object);
 
-			Operand: Object_Pointer;
-			Car: Object_Pointer;
-			Cdr: Object_Pointer;
+			Operand: aliased Object_Pointer;
+			Car: aliased Object_Pointer;
+			Cdr: aliased Object_Pointer;
 		begin
+			Push_Top (Interp, Operand'Unchecked_Access);
+			Push_Top (Interp, Car'Unchecked_Access);
+			Push_Top (Interp, Cdr'Unchecked_Access);
+
 		<<Start_Over>>
 			Operand := Get_Frame_Operand(Interp.Stack);
 
@@ -2015,7 +2058,7 @@ Ada.Text_IO.Put_Line (Object_Size'Image(IO_Character_Record'Max_Size_In_Storage_
 									Clear_Frame_Result (Interp.Stack);
 									Set_Frame_Opcode (Interp.Stack, Opcode_Apply); 
 									Set_Frame_Operand (Interp.Stack, Operand);
-									return;
+									goto Done;
 								end if;
 							end loop;
 						end if;
@@ -2066,13 +2109,17 @@ Ada.Text_IO.Put_Line (Object_Size'Image(IO_Character_Record'Max_Size_In_Storage_
 					-- normal literal object
 					goto Literal;
 			end case;
-			return;
+			goto Done;
 
 		<<Literal>>
 			Pop_Frame (Interp); -- done
 Ada.Text_IO.Put ("Return => ");
 Print (Interp, Operand);
 			Chain_Frame_Result (Interp, Interp.Stack, Operand);
+			goto Done;
+
+		<<Done>>
+			Pop_Tops (Interp, 3);
 		end Evaluate_Object;
 
 		procedure Evaluate_Procedure is
@@ -2084,9 +2131,9 @@ Print (Interp, Operand);
 		procedure Apply is
 			pragma Inline (Apply);
 
-			Operand: Object_Pointer;
-			Func: Object_Pointer;
-			Args: Object_Pointer;
+			Operand: aliased Object_Pointer;
+			Func: aliased Object_Pointer;
+			Args: aliased Object_Pointer;
 
 			procedure Apply_Car_Procedure is
 			begin
@@ -2209,6 +2256,10 @@ Print (Interp, Arg);
 			end Apply_Closure;
 
 		begin
+			Push_Top (Interp, Operand'Unchecked_Access);
+			Push_Top (Interp, Func'Unchecked_Access);
+			Push_Top (Interp, Args'Unchecked_Access);
+
 			Operand := Get_Frame_Operand(Interp.Stack);
 			pragma Assert (Is_Cons(Operand));
 
@@ -2253,6 +2304,8 @@ Print (Interp, Operand);
 					raise Internal_Error;
 
 			end case;
+
+			Pop_Tops (Interp, 3);
 		end Apply;
 
 		procedure Fetch_Character is
@@ -2723,6 +2776,9 @@ Ada.Text_IO.Put_Line ("INFO: NO MORE TOKEN ");
 		-- The caller must push some frames before calling this procedure
 		pragma Assert (Interp.Stack /= Nil_Pointer);
 
+		-- The caller must ensure there are no temporary object pointers.
+		pragma Assert (Interp.Top.Last < Interp.Top.Data'First);
+
 		loop
 			case Get_Frame_Opcode(Interp.Stack) is
 				when Opcode_Exit =>
@@ -2814,6 +2870,7 @@ Ada.Text_IO.Put_Line ("INFO: NO MORE TOKEN ");
 	begin
 		pragma Assert (Interp.Base_Input.Stream /= null);
 
+		Clear_Tops (Interp);
 		Result := Nil_Pointer;
 
 		loop

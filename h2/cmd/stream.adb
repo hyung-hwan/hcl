@@ -52,9 +52,9 @@ Ada.Text_IO.Put_Line ("****** CLOSE STRING STREAM ******");
 
 	procedure Open (Stream: in out File_Stream_Record) is
 	begin
-Ada.Text_IO.Put_Line (">>>>> OPEN File STREAM <<<<< " & Standard.String(UTF8.Unicode_To_Utf8(UTF8.Unicode_String(Stream.Name.all))));
+Ada.Text_IO.Put_Line (">>>>> OPEN File STREAM <<<<< " & Standard.String(Utf8.Unicode_To_Utf8(Utf8.Unicode_String(Stream.Name.all))));
 		--Ada.Wide_Text_IO.Open (Stream.Handle, Ada.Wide_Text_IO.In_File, Ada.Characters.Conversions.To_String(Standard.Wide_String(Stream.Name.all)));
-		Ada.Wide_Text_IO.Open (Stream.Handle, Ada.Wide_Text_IO.In_File, Standard.String(UTF8.Unicode_To_Utf8(UTF8.Unicode_String(Stream.Name.all))));
+		Ada.Wide_Text_IO.Open (Stream.Handle, Ada.Wide_Text_IO.In_File, Standard.String(Utf8.Unicode_To_Utf8(Utf8.Unicode_String(Stream.Name.all))));
 	end Open;
 
 	procedure Close (Stream: in out File_Stream_Record) is
@@ -62,7 +62,7 @@ Ada.Text_IO.Put_Line (">>>>> OPEN File STREAM <<<<< " & Standard.String(UTF8.Uni
 		function To_Wide_String is new Ada.Unchecked_Conversion (S.Object_String, Wide_String);
 	begin
 --Ada.Wide_Text_IO.Put_Line (">>>>> CLOSE File STREAM <<<<< " & Standard.Wide_String(Stream.Name.all));
-Ada.Text_IO.Put_Line (">>>>> CLOSE File STREAM <<<<< " & Standard.String(UTF8.Unicode_To_Utf8(UTF8.Unicode_String(Stream.Name.all))));
+Ada.Text_IO.Put_Line (">>>>> CLOSE File STREAM <<<<< " & Standard.String(Utf8.Unicode_To_Utf8(Utf8.Unicode_String(Stream.Name.all))));
 		Ada.Wide_Text_IO.Close (Stream.Handle);
 	end Close;
 
