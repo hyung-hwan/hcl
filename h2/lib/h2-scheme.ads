@@ -128,24 +128,18 @@ package H2.Scheme is
 
 	subtype Object_Character is Character_Type;
 
-	subtype Object_String_Size is Object_Size;
-	subtype Object_String_Index is Object_Index;
-	type Object_String is array(Object_String_Index range <>) of Object_Character;
-
-	type Object_String_Pointer is access all Object_String;
-	for Object_String_Pointer'Size use Object_Pointer_Bits;
-	type Constant_Object_String_Pointer is access constant Object_String;
-	for Constant_Object_String_Pointer'Size use Object_Pointer_Bits;
-
--- TODO: are these Thin_XXXX necessary?
-	subtype Thin_Object_String is Object_String(Object_Index'Range);
-	type Thin_Object_String_Pointer is access all Thin_Object_String;
-	for Thin_Object_String_Pointer'Size use Object_Pointer_Bits;
-
-	type Object_Byte_Array is array(Object_Index range <>) of Object_Byte;
-	subtype Object_Character_Array is Object_String;
 	type Object_Pointer_Array is array(Object_Index range <>) of Object_Pointer;
+	type Object_Character_Array is array(Object_Index range <>) of Object_Character;
+	type Object_Byte_Array is array(Object_Index range <>) of Object_Byte;
 	type Object_Word_Array is array(Object_Index range <>) of Object_Word;
+
+	type Object_Character_Array_Pointer is access all Object_Character_Array;
+	for Object_Character_Array_Pointer'Size use Object_Pointer_Bits;
+	type Constant_Object_Character_Array_Pointer is access constant Object_Character_Array;
+	for Constant_Object_Character_Array_Pointer'Size use Object_Pointer_Bits;
+	subtype Thin_Object_Character_Array is Object_Character_Array(Object_Index'Range);
+	type Thin_Object_Character_Array_Pointer is access all Thin_Object_Character_Array;
+	for Thin_Object_Character_Array_Pointer'Size use Object_Pointer_Bits;
 
 	type Object_Kind is (
 		Moved_Object, -- internal use only
@@ -303,18 +297,18 @@ package H2.Scheme is
 	procedure Close (Stream: in out Stream_Record) is abstract;
 
 	procedure Read (Stream: in out Stream_Record;
-	                Data:   out    Object_String;
-	                Last:   out    Object_String_Size) is abstract;
+	                Data:   out    Object_Character_Array;
+	                Last:   out    Object_Size) is abstract;
 
 	procedure Write (Stream: in out Stream_Record;
-	                 Data:   out    Object_String;
-	                 Last:   out    Object_String_Size) is abstract;
+	                 Data:   out    Object_Character_Array;
+	                 Last:   out    Object_Size) is abstract;
 
 	type Stream_Pointer is access all Stream_Record'Class;
 
 	type Stream_Allocator is access 
 		procedure (Interp: in out Interpreter_Record; 
-		           Name:          Constant_Object_String_Pointer;
+		           Name:   access Object_Character_Array;
 		           Result: out    Stream_Pointer);
 
 	type Stream_Deallocator is access 
@@ -339,10 +333,10 @@ package H2.Scheme is
 	type IO_Record is record
 	--type IO_Record is limited record
 		Stream: Stream_Pointer := null;
-		--Data: Object_String(1..2048) := (others => Object_Character'First);
-		Data: Object_String(1..5) := (others => Object_Character'First);
-		Last: Object_String_Size := 0;
-		Pos: Object_String_Size := 0;
+		--Data: Object_Character_Array(1..2048) := (others => Object_Character'First);
+		Data: Object_Character_Array(1..5) := (others => Object_Character'First);
+		Last: Object_Size := 0;
+		Pos: Object_Size := 0;
 		Flags: IO_Flags := 0; -- EOF, ERROR
 		Next: IO_Pointer := null;
 		Iochar: IO_Character_Record; -- the last character read.	
@@ -430,12 +424,6 @@ package H2.Scheme is
 	-- -----------------------------------------------------------------------------
 
 
-	type Buffer_Record is record
-		Ptr: Thin_Object_String_Pointer := null;
-		Len: Object_String_Size := 0;
-		Last: Object_String_Size := 0;
-	end record;
-
 private
 	type Heap_Element_Array is array(Heap_Size range <>) of aliased Heap_Element;
 
@@ -448,6 +436,12 @@ private
 
 	type Heap_Number is mod 2 ** 1;
 	type Heap_Pointer_Array is array(Heap_Number'First .. Heap_Number'Last) of Heap_Pointer;
+
+	type Buffer_Record is record
+		Ptr: Thin_Object_Character_Array_Pointer := null;
+		Len: Object_Size := 0;
+		Last: Object_Size := 0;
+	end record;
 
 	type Token_Kind is (End_Token,
 	                    Identifier_Token,
@@ -474,8 +468,8 @@ private
 
 	--type Interpreter_Record is tagged limited record
 	type Interpreter_Record is limited record
-		--Self: Interpreter_Pointer := null;
 		Self: Interpreter_Pointer := Interpreter_Record'Unchecked_Access; -- Current instance's pointer
+
 		Storage_Pool: Storage_Pool_Pointer := null;
 		Trait: Option_Record(Trait_Option);
 		Stream: Option_Record(Stream_Option);
@@ -483,12 +477,13 @@ private
 		Heap: Heap_Pointer_Array := (others => null);
 		Current_Heap: Heap_Number := Heap_Number'First;
 
-		Root_Table: Object_Pointer := Nil_Pointer;
 		Symbol_Table: Object_Pointer := Nil_Pointer;
 		Root_Environment: Object_Pointer := Nil_Pointer;
 		Environment: Object_Pointer := Nil_Pointer;
-		Stack: Object_Pointer := Nil_Pointer;
+		Stack: aliased Object_Pointer := Nil_Pointer;
 		Mark: Object_Pointer := Nil_Pointer;
+
+		Top: Top_Record; -- temporary object pointers
 
 		Base_Input: aliased IO_Record;
 		Input: IO_Pointer := null;
@@ -496,7 +491,7 @@ private
 		Token: Token_Record;
 		LC_Unfetched: Standard.Boolean := Standard.False;
 
-		Top: Top_Record;
+		STACK_XXX: aliased Object_Pointer := Nil_Pointer;
 	end record;
 
 	package Token is
@@ -513,10 +508,10 @@ private
 
 		procedure Set (Interp:  in out Interpreter_Record;
 		               Kind:    in     Token_Kind;
-		               Value:   in     Object_String);
+		               Value:   in     Object_Character_Array);
 	
 		procedure Append_String (Interp: in out Interpreter_Record;
-		                         Value:  in     Object_String);
+		                         Value:  in     Object_Character_Array);
 		pragma Inline (Append_String);
 	
 		procedure Append_Character (Interp: in out Interpreter_Record;

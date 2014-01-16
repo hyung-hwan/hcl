@@ -18,13 +18,13 @@ procedure scheme is
 	O: S.Object_Pointer;
 
 	--String: aliased S.Object_String := "(car '(1 2 3))";
-	String: aliased constant S.Object_String := "((lambda (x y) (+ x y))  9  7)";
+	String: aliased constant S.Object_Character_Array := "((lambda (x y) (+ x y))  9  7)";
 	String_Stream: Stream.String_Input_Stream_Record (String'Unchecked_Access);
 	--String_Stream: Stream.String_Input_Stream_Record := (Len => String'Length, Str => String, Pos => 0);
 	
 
-	--File_Name: aliased S.Object_String := "test.adb";
-	File_Name: aliased constant S.Object_String := "test.scm";
+	--File_Name: aliased S.Object_Character_Array := "test.adb";
+	File_Name: aliased constant S.Object_Character_Array := "test.scm";
 	--File_Stream: Stream.File_Stream_Record (File_Name'Unchecked_Access);
 	--File_Stream: Stream.File_Stream_Record := (Name => File_Name'Unchecked_Access);
 	File_Stream: Stream.File_Stream_Record;

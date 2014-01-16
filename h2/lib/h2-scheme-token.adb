@@ -18,7 +18,7 @@ package body Token is
 	begin
 		if Buffer.Len > 0 then
 			declare
-				subtype New_String is Object_String (1 .. Buffer.Len);
+				subtype New_String is Object_Character_Array (1 .. Buffer.Len);
 				type New_String_Pointer is access all New_String;
 				for New_String_Pointer'Size use Object_Pointer_Bits;
 
@@ -37,8 +37,8 @@ package body Token is
 
 	procedure Append_Buffer (Interp: in out Interpreter_Record;
 	                         Buffer: in out Buffer_Record; 
-	                         Source: in     Object_String) is
-		Incr: Object_String_Size;
+	                         Source: in     Object_Character_Array) is
+		Incr: Object_Size;
 	begin
 		if Buffer.Last >= Buffer.Len then
 			if Buffer.Len <= 0 then
@@ -51,7 +51,7 @@ package body Token is
 			end if;
 			
 			declare
-				subtype New_String is Object_String (1 .. Buffer.Len + Incr);
+				subtype New_String is Object_Character_Array (1 .. Buffer.Len + Incr);
 				type New_String_Pointer is access all New_String;
 				for New_String_Pointer'Size use Object_Pointer_Bits;
 
@@ -96,7 +96,7 @@ package body Token is
 	procedure Set (Interp: in out Interpreter_Record;
 	               Kind:   in     Token_Kind;
 	               Value:  in     Object_Character) is
-		Tmp: Object_String(1..1);
+		Tmp: Object_Character_Array(1..1);
 	begin
 		Interp.Token.Kind := Kind;	
 		Clear_Buffer (Interp.Token.Value);
@@ -106,7 +106,7 @@ package body Token is
 
 	procedure Set (Interp: in out Interpreter_Record;
 	               Kind:   in     Token_Kind;
-	               Value:  in     Object_String) is
+	               Value:  in     Object_Character_Array) is
 	begin
 		Interp.Token.Kind := Kind;	
 		Clear_Buffer (Interp.Token.Value);
@@ -116,7 +116,7 @@ package body Token is
 	end Set;
 
 	procedure Append_String (Interp: in out Interpreter_Record;
-	                               Value:  in     Object_String) is
+	                         Value:  in     Object_Character_Array) is
 	begin
 		if Value'Length > 0 then
 			Append_Buffer (Interp, Interp.Token.Value, Value);	
@@ -124,8 +124,8 @@ package body Token is
 	end Append_String;
 
 	procedure Append_Character (Interp: in out Interpreter_Record;
-	                                  Value:  in     Object_Character) is
-		Tmp: Object_String(1..1) := (1 => Value);
+	                            Value:  in     Object_Character) is
+		Tmp: Object_Character_Array(1..1) := (1 => Value);
 	begin
 		Append_Buffer (Interp, Interp.Token.Value, Tmp);
 	end Append_Character;

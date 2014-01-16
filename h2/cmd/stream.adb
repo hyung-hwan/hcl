@@ -6,7 +6,7 @@ with Ada.Text_IO; -- for debugging
 package body Stream is
 
 	------------------------------------------------------------------
-	use type S.Object_String_Size;
+	use type S.Object_Size;
 
 	procedure Open (Stream: in out String_Input_Stream_Record) is
 	begin
@@ -21,9 +21,9 @@ Ada.Text_IO.Put_Line ("****** CLOSE STRING STREAM ******");
 	end Close;
 
 	procedure Read (Stream: in out String_Input_Stream_Record;
-	                Data:   out    S.Object_String;
-	                Last:   out    S.Object_String_Size) is
-		Avail: S.Object_String_Size;
+	                Data:   out    S.Object_Character_Array;
+	                Last:   out    S.Object_Size) is
+		Avail: S.Object_Size;
 	begin
 		Avail := Stream.Str'Last - Stream.Pos;
 		if Avail <= 0 then
@@ -41,8 +41,8 @@ Ada.Text_IO.Put_Line ("****** CLOSE STRING STREAM ******");
 	end Read;
 
 	procedure Write (Stream: in out String_Input_Stream_Record;
-	                 Data:   out    S.Object_String;
-	                 Last:   out    S.Object_String_Size) is
+	                 Data:   out    S.Object_Character_Array;
+	                 Last:   out    S.Object_Size) is
 	begin
 		--raise S.Stream_Error;
 		Last := Data'First - 1;
@@ -59,7 +59,7 @@ Ada.Text_IO.Put_Line (">>>>> OPEN File STREAM <<<<< " & Standard.String(Utf8.Uni
 
 	procedure Close (Stream: in out File_Stream_Record) is
 		subtype Wide_String is Standard.Wide_String(1 .. Standard.Natural(Stream.Name'Length));
-		function To_Wide_String is new Ada.Unchecked_Conversion (S.Object_String, Wide_String);
+		function To_Wide_String is new Ada.Unchecked_Conversion (S.Object_Character_Array, Wide_String);
 	begin
 --Ada.Wide_Text_IO.Put_Line (">>>>> CLOSE File STREAM <<<<< " & Standard.Wide_String(Stream.Name.all));
 Ada.Text_IO.Put_Line (">>>>> CLOSE File STREAM <<<<< " & Standard.String(Utf8.Unicode_To_Utf8(Utf8.Unicode_String(Stream.Name.all))));
@@ -67,8 +67,8 @@ Ada.Text_IO.Put_Line (">>>>> CLOSE File STREAM <<<<< " & Standard.String(Utf8.Un
 	end Close;
 
 	procedure Read (Stream: in out File_Stream_Record;
-	                Data:   out    S.Object_String;
-	                Last:   out    S.Object_String_Size) is
+	                Data:   out    S.Object_Character_Array;
+	                Last:   out    S.Object_Size) is
 	begin
 		for I in Data'First .. Data'Last loop
 			begin
@@ -88,8 +88,8 @@ Ada.Text_IO.Put_Line (">>>>> CLOSE File STREAM <<<<< " & Standard.String(Utf8.Un
 	end Read;
 
 	procedure Write (Stream: in out File_Stream_Record;
-	                 Data:   out    S.Object_String;
-	                 Last:   out    S.Object_String_Size) is
+	                 Data:   out    S.Object_Character_Array;
+	                 Last:   out    S.Object_Size) is
 	begin
 		--raise S.Stream_Error;
 		Last := Data'First - 1;
@@ -98,7 +98,7 @@ Ada.Text_IO.Put_Line (">>>>> CLOSE File STREAM <<<<< " & Standard.String(Utf8.Un
 	------------------------------------------------------------------
 
 	procedure Allocate_Stream (Interp: in out S.Interpreter_Record;
-	                           Name:   in     S.Constant_Object_String_Pointer;
+	                           Name:   access S.Object_Character_Array;
 	                           Result: out    S.Stream_Pointer) is
 		subtype FSR is Stream.File_Stream_Record;
 		type FSP is access all FSR;
@@ -109,7 +109,7 @@ Ada.Text_IO.Put_Line (">>>>> CLOSE File STREAM <<<<< " & Standard.String(Utf8.Un
 		pragma Import (Ada, X);
 	begin
 		X := P.Allocate (S.Get_Storage_Pool(Interp));
-		X.Name := Name;
+		X.Name := S.Constant_Object_Character_Array_Pointer(Name);
 	end Allocate_Stream;
 
 	procedure Deallocate_Stream (Interp: in out S.Interpreter_Record;

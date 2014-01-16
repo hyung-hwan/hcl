@@ -14,6 +14,7 @@ project Lib is
 		"h2-pool.ads",
 		"h2-scheme.adb",
 		"h2-scheme.ads",
+		"h2-scheme-execute.adb",
 		"h2-scheme-token.adb",
 		"h2-utf8.adb",
 		"h2-utf8.ads"
@@ -28,7 +29,7 @@ project Lib is
 
 	package Compiler is
 		for Default_Switches ("Ada") use (
-			"-gnata", "-gnato", "-gnatN",  "-gnatwl", "-gnat95", "-gnatW8"
+			"-gnata", "-gnato", "-gnatN",  "-gnatwl", "-gnat95", "-gnatW8", "-g"
 		);
 	end Compiler;
 
