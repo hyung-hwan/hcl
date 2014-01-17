@@ -188,13 +188,11 @@ procedure Execute (Interp: in out Interpreter_Record) is
 								end if;
 
 								declare
-									Closure: aliased Object_Pointer;
+									Closure: Object_Pointer;
 								begin
-Push_Top (Interp, Closure'Unchecked_Access); -- not necessary
 									Closure := Make_Closure (Interp.Self, Operand, Interp.Environment);
 									Pop_Frame (Interp);  -- Done
 									Chain_Frame_Result (Interp, Interp.Stack, Closure);
-Pop_Tops (Interp, 1); -- not necessary 
 								end;
 							end if;
 
@@ -389,7 +387,6 @@ Ada.Text_IO.Put ("NOT INTEGER FOR ADD"); Print (Interp, Car);
 
 			-- Push a new environmen for the closure
 			Interp.Environment := Make_Environment (Interp.Self, Get_Closure_Environment(Func));
--- TODO: GC. Func may be invalid if GC has been invoked.
 
 			Fbody := Get_Closure_Code(Func);
 			pragma Assert (Is_Cons(Fbody)); -- the reader must ensure this.
@@ -430,8 +427,7 @@ Ada.Text_IO.Put ("NOT INTEGER FOR ADD"); Print (Interp, Car);
 				raise Syntax_Error;
 			end if;
 				
--- TODO: GC. the environment construction can cause GC. so Fbody here may be invalid.
--- TODO: is it correct to keep the environement  in the frame?
+-- TODO: is it correct to keep the environement in the frame?
 			Set_Frame_Opcode (Interp.Stack, Opcode_Evaluate_Group);
 			Set_Frame_Operand (Interp.Stack, Fbody);
 			Clear_Frame_Result (Interp.Stack);
@@ -455,10 +451,6 @@ Print (Interp, Operand);
 		end if;
 
 		Args := Get_Cdr(Operand);
-
-		-- No GC must be performed here.
-		-- Otherwise, Operand, Func, Args get invalidated
-		-- since GC doesn't update local variables.
 
 		case Func.Tag is
 			when Procedure_Object => 
@@ -700,7 +692,7 @@ Print (Interp, Operand);
 	end Fetch_Token;
 
 	procedure Read_List is
-		--pragma Inline (Read_List);
+		pragma Inline (Read_List);
 		V: aliased Object_Pointer;
 	begin
 		-- This procedure reads each token in a list.
@@ -710,7 +702,7 @@ Print (Interp, Operand);
 		
 		Fetch_Token;
 	
-		Push_Top (Interp, V'Unchecked_Access);
+		--Push_Top (Interp, V'Unchecked_Access);
 
 		case Interp.Token.Kind is
 			when End_Token =>
@@ -751,18 +743,15 @@ Ada.Text_IO.Put_Line ("ERROR: PREMATURE LIST END");
 				Chain_Frame_Result (Interp, Interp.Stack, V);
 
 			when Identifier_Token =>	
-Print_Object_Pointer ("000 Identifier => Stack => ", Interp.Stack);
 				V := Make_Symbol (Interp.Self, Interp.Token.Value.Ptr.all(1..Interp.Token.Value.Last));
-Print_Object_Pointer ("111 Identifier => Stack => ", Interp.Stack);
 				Chain_Frame_Result (Interp, Interp.Stack, V);
-Print_Object_Pointer ("222 Identifier => Stack => ", Interp.Stack);
 
 			when others =>
 				-- TODO: set various error info
 				raise Syntax_Error;
 		end case;
 
-		Pop_Tops (Interp, 1);
+		--Pop_Tops (Interp, 1);
 	end Read_List;
 
 	procedure Read_List_Cdr is
@@ -776,7 +765,7 @@ Print_Object_Pointer ("222 Identifier => Stack => ", Interp.Stack);
 		-- to handle the head item specially.
 		Fetch_Token;
 	
-		Push_Top (Interp, V'Unchecked_Access);
+		--Push_Top (Interp, V'Unchecked_Access);
 
 		case Interp.Token.Kind is
 			when End_Token =>
@@ -801,13 +790,11 @@ Ada.Text_IO.Put_Line ("ERROR: CDR QUOT LIST END");
 		
 			when String_Token =>
 				V := Make_String (Interp.Self, Interp.Token.Value.Ptr.all(1..Interp.Token.Value.Last));
-				-- TODO: make V gc-aware
 				Set_Frame_Opcode (Interp.Stack, Opcode_Read_List_End);
 				Chain_Frame_Result (Interp, Interp.Stack, V);
 
 			when Identifier_Token =>	
 				V := Make_Symbol (Interp.Self, Interp.Token.Value.Ptr.all(1..Interp.Token.Value.Last));
-				-- TODO: make V gc-aware
 				Set_Frame_Opcode (Interp.Stack, Opcode_Read_List_End);
 				Chain_Frame_Result (Interp, Interp.Stack, V);
 
@@ -816,7 +803,7 @@ Ada.Text_IO.Put_Line ("ERROR: CDR QUOT LIST END");
 				raise Syntax_Error;
 		end case;
 
-		Pop_Tops (Interp, 1);
+		--Pop_Tops (Interp, 1);
 	end Read_List_Cdr;
 
 	procedure Read_List_End is
@@ -825,42 +812,42 @@ Ada.Text_IO.Put_Line ("ERROR: CDR QUOT LIST END");
 	begin
 		Fetch_Token;
 
-		Push_Top (Interp, V'Unchecked_Access);
+		--Push_Top (Interp, V'Unchecked_Access);
 
 		case Interp.Token.Kind is
 			when Right_Parenthesis_Token =>
 				V := Get_Frame_Result(Interp.Stack);
 				pragma Assert (V /= Nil_Pointer);
 				-- The first item in the chain is actually Cdr of the last cell.
-				V := Reverse_Cons(Get_Cdr(V), Get_Car(V)); -- TODO: GC
+				V := Reverse_Cons(Get_Cdr(V), Get_Car(V)); 
 				Pop_Frame (Interp); 
 				Chain_Frame_Result (Interp, Interp.Stack, V);
 			when others =>
 				raise Syntax_Error;
 		end case;
 
-		Pop_Tops (Interp, 1);
+		--Pop_Tops (Interp, 1);
 	end Read_List_End;
 
 	procedure Close_List is
 		pragma Inline (Close_List);
 		V: aliased Object_Pointer;
 	begin
-		Push_Top (Interp, V'Unchecked_Access);
+		--Push_Top (Interp, V'Unchecked_Access);
 
 		V := Get_Frame_Result(Interp.Stack);
 		pragma Assert (Get_Cdr(V) = Nil_Pointer);
 		Pop_Frame (Interp); -- Done with the current frame
 		Chain_Frame_Result (Interp, Interp.Stack, Get_Car(V));
 
-		Pop_Tops (Interp, 1);
+		--Pop_Tops (Interp, 1);
 	end Close_List;
 
 	procedure Close_Quote is
 		pragma Inline (Close_Quote);
 		V: aliased Object_Pointer;
 	begin
-		Push_Top (Interp, V'Unchecked_Access);
+		--Push_Top (Interp, V'Unchecked_Access);
 
 -- TODO: use Interp.Quote_Syntax instead of Make_Symbol("quote")
 		Chain_Frame_Result (Interp, Interp.Stack, Make_Symbol(Interp.Self, Label_Quote));
@@ -868,7 +855,7 @@ Ada.Text_IO.Put_Line ("ERROR: CDR QUOT LIST END");
 		Pop_Frame (Interp); -- Done with the current frame
 		Chain_Frame_Result (Interp, Interp.Stack, V);
 
-		Pop_Tops (Interp, 1);
+		--Pop_Tops (Interp, 1);
 	end Close_Quote;
 
 	procedure Read_Object is
@@ -877,7 +864,7 @@ Ada.Text_IO.Put_Line ("ERROR: CDR QUOT LIST END");
 	begin
 		Fetch_Token;
 
-		Push_Top (Interp, V'Unchecked_Access);
+		--Push_Top (Interp, V'Unchecked_Access);
 
 		case Interp.Token.Kind is
 			when End_Token =>
@@ -900,13 +887,11 @@ Ada.Text_IO.Put_Line ("INFO: NO MORE TOKEN ");
 
 			when String_Token =>
 				V := Make_String (Interp.Self, Interp.Token.Value.Ptr.all(1..Interp.Token.Value.Last));
-				-- TODO: make V gc-aware
 				Pop_Frame (Interp); -- Done with the current frame
 				Chain_Frame_Result (Interp, Interp.Stack, V);
 
 			when Identifier_Token =>	
 				V := Make_Symbol (Interp.Self, Interp.Token.Value.Ptr.all(1..Interp.Token.Value.Last));
-				-- TODO: make V gc-aware
 				Pop_Frame (Interp); -- Done with the current frame
 				Chain_Frame_Result (Interp, Interp.Stack, V);
 
@@ -915,7 +900,7 @@ Ada.Text_IO.Put_Line ("INFO: NO MORE TOKEN ");
 				raise Syntax_Error;
 		end case;
 
-		Pop_Tops (Interp, 1);
+		--Pop_Tops (Interp, 1);
 	end Read_Object;
 
 begin
@@ -986,27 +971,6 @@ begin
 	pragma Assert (Interp.Top.Last < Interp.Top.Data'First);
 
 	loop
-
---if Is_Normal_Pointer(Interp.Stack) then
---declare
---     X: Heap_Number := Get_Heap_Number(Interp.Self, Interp.Stack);
---	type XX is access all object_pointer;
---	t: xx := Interp.Stack'Unchecked_access;
---	w: object_word;
---	for w'address use t'address;
---
---	ww: object_word;
---	for ww'address use interp.stack'address;
---
---	www: object_word;
---	for www'address use interp.stack'address;
---begin
---    Ada.Text_IO.Put_Line ("$$$$$ [XXXXX] Stack in HEAP: " & Heap_Number'Image(X) & " FROM: " &object_word'image(w) & " VALUE: " & object_word'image(ww) & " VALUE2: " & object_word'image(www));
---	Print_Object_Pointer ("   ====> t", t.all);
---end;
---Print_Object_Pointer ("   ====> Stack", Interp.Stack);
---end if;
-
 		case Get_Frame_Opcode(Interp.Stack) is
 			when Opcode_Exit =>
 				exit;
@@ -1046,9 +1010,6 @@ begin
 
 		end case;
 	end loop;
-
-	-- the stack must be empty when the loop is terminated
-	--pragma Assert (Interp.Stack = Nil_Pointer);
 
 exception
 	when Stream_End_Error =>

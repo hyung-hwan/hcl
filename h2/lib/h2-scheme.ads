@@ -490,8 +490,6 @@ private
 
 		Token: Token_Record;
 		LC_Unfetched: Standard.Boolean := Standard.False;
-
-		STACK_XXX: aliased Object_Pointer := Nil_Pointer;
 	end record;
 
 	package Token is

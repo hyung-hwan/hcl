@@ -325,7 +325,10 @@ package body H2.Scheme is
 				Output_Character_Array (Source.Character_Slot);
 			end if;
 		else
-			Ada.Text_IO.Put_Line (Msg & " at " & Object_Word'Image(W) & " kind: " & Object_Kind'Image(Source.Kind) & " size: " & Object_Size'Image(Source.Size));
+			Ada.Text_IO.Put_Line (Msg & " at " & Object_Word'Image(W) & 
+			                            " kind: " & Object_Kind'Image(Source.Kind) &
+			                            " size: " & Object_Size'Image(Source.Size) &
+			                            " tag: " & Object_Tag'Image(Source.Tag));
 		end if;
 	end Print_Object_Pointer;
 
@@ -422,6 +425,17 @@ package body H2.Scheme is
 		return Object.New_Pointer;
 	end Get_New_Location;
 
+	function Verify_Pointer (Source: in Object_Pointer) return Object_Pointer is
+		pragma Inline (Verify_Pointer);
+	begin
+		if not Is_Normal_Pointer(Source) or else
+		   Source.Kind /= Moved_Object then
+			return Source;
+		else
+			return Get_New_Location(Source);
+		end if;
+	end Verify_Pointer;
+
 	function Allocate_Bytes_In_Heap (Heap:       access Heap_Record; 
 	                                 Heap_Bytes: in     Heap_Size) return Heap_Element_Pointer is
 		Avail: Heap_Size;
@@ -436,7 +450,6 @@ package body H2.Scheme is
 
 		Avail := Heap.Size - Heap.Bound;
 		if Real_Bytes > Avail then
-Ada.Text_IO.PUt_Line ("Avail: " & Heap_Size'Image(Avail) & " Requested: " & Heap_Size'Image(Real_Bytes));
 			return null;
 		end if;
 		
@@ -465,6 +478,11 @@ Ada.Text_IO.PUt_Line ("Avail: " & Heap_Size'Image(Avail) & " Requested: " & Heap
 		end if;
 		if SW >= HW2 and then SW < HW2 + Object_Word(Interp.Heap(1).Size) then
 			return 1;	
+		end if;
+
+		if Source = Nil_Pointer then
+ada.text_io.put_line ("HEAP SOURCE IS NIL");
+			return 0;
 		end if;
 
 		raise Internal_Error;
@@ -514,6 +532,7 @@ Ada.Text_IO.PUt_Line ("Avail: " & Heap_Size'Image(Avail) & " Requested: " & Heap
 
 		Last_Pos: Heap_Size;
 		New_Heap: Heap_Number;
+		Original_Symbol_Table: Object_Pointer;
 
 		--function To_Object_Pointer is new Ada.Unchecked_Conversion (Heap_Element_Pointer, Object_Pointer);
 
@@ -627,6 +646,8 @@ Ada.Text_IO.PUt_Line ("Avail: " & Heap_Size'Image(Avail) & " Requested: " & Heap
 		procedure Compact_Symbol_Table is
 			Pred: Object_Pointer;
 			Cons: Object_Pointer;
+			Car: Object_Pointer;
+			Cdr: Object_Pointer;
 		begin
 -- TODO: Change code here if the symbol table structure is changed to a hash table.
 
@@ -635,78 +656,66 @@ Ada.Text_IO.PUt_Line ("Avail: " & Heap_Size'Image(Avail) & " Requested: " & Heap
 			while Cons /= Nil_Pointer loop
 				pragma Assert (Cons.Tag = Cons_Object);	
 
-				declare
-					Car: Object_Pointer renames Cons.Pointer_Slot(Cons_Car_Index);
-					Cdr: Object_Pointer renames Cons.Pointer_Slot(Cons_Cdr_Index);
-				begin
-					pragma Assert (Car.Kind = Moved_Object or else Car.Tag = Symbol_Object);
+				Car := Cons.Pointer_Slot(Cons_Car_Index);
+				Cdr := Cons.Pointer_Slot(Cons_Cdr_Index);
+				pragma Assert (Car.Kind = Moved_Object or else Car.Tag = Symbol_Object);
 
-					if Car.Kind /= Moved_Object and then
-					   (Car.Flags and Syntax_Object) = 0 then
-						-- A non-syntax symbol has not been moved. 
-						-- Unlink the cons cell from the symbol table.
-
---Text_IO.Put_Line ("COMPACT_SYMBOL_TABLE Unlinking " & Character_Array_To_String (Car.Character_Slot));
-						if Pred = Nil_Pointer then
-							Interp.Symbol_Table := Cdr;
-						else
-							Pred.Pointer_Slot(Cons_Cdr_Index) := Cdr;
-						end if;
+				if Car.Kind /= Moved_Object and then
+				   (Car.Flags and Syntax_Object) = 0 then
+					-- A non-syntax symbol has not been moved. 
+					-- Unlink the cons cell from the symbol table.
+					if Pred = Nil_Pointer then
+						Interp.Symbol_Table := Cdr;
+					else
+						Pred.Pointer_Slot(Cons_Cdr_Index) := Cdr;
 					end if;
-					
-					Cons := Cdr;	
-				end;
+				else
+					Pred := Cons;
+				end if;
+				
+				Cons := Cdr;	
 			end loop;
 		end Compact_Symbol_Table;
 
 	begin
 
-declare
-Avail: Heap_Size;
-begin
-Avail := Interp.Heap(Interp.Current_Heap).Size - Interp.Heap(Interp.Current_Heap).Bound;
-Ada.Text_IO.Put_Line (">>> [GC BEGIN] BOUND: " & Heap_Size'Image(Interp.Heap(Interp.Current_Heap).Bound) & " AVAIL: " & Heap_Size'Image(Avail));
-end;
+--declare
+--Avail: Heap_Size;
+--begin
+--Avail := Interp.Heap(Interp.Current_Heap).Size - Interp.Heap(Interp.Current_Heap).Bound;
+--Ada.Text_IO.Put_Line (">>> [GC BEGIN] BOUND: " & Heap_Size'Image(Interp.Heap(Interp.Current_Heap).Bound) & " AVAIL: " & Heap_Size'Image(Avail));
+--end;
 
 		-- As the Heap_Number type is a modular type that can 
 		-- represent 0 and 1, incrementing it gives the next value.
 		New_Heap := Interp.Current_Heap + 1;
 
 		-- Migrate some root objects
-Print_Object_Pointer (">>> [GC] ROOT OBJECTS ...", Interp.Mark);
-Print_Object_Pointer (">>> [GC] Stack BEFORE ...", Interp.Stack);
+--Print_Object_Pointer (">>> [GC] ROOT OBJECTS ...", Interp.Mark);
+--Print_Object_Pointer (">>> [GC] Stack BEFORE ...", Interp.Stack);
 		if Is_Normal_Pointer(Interp.Stack) then
 			Interp.Stack := Move_One_Object(Interp.Stack);
-
-		Interp.Stack_XXX := Interp.Stack;
-declare
-	X: Heap_Number := Get_Heap_Number(Interp.Self, Interp.Stack);
-
-     type XX is access all object_pointer;
-     t: xx := Interp.Stack'Unchecked_access;
-     w: object_word;
-     for w'address use t'address;
-
-begin
-	Ada.Text_IO.Put_Line (">>> [GC MOVE] Stack in HEAP: " & Heap_Number'Image(X) & " FROM: " & Object_word'Image(w));
-end;
 		end if;
-Print_Object_Pointer (">>> [GC] Stack AFTER ...", Interp.Stack);
+
 		Interp.Root_Environment := Move_One_Object(Interp.Root_Environment);
 		Interp.Environment := Move_One_Object(Interp.Environment);
 		Interp.Mark := Move_One_Object(Interp.Mark);
 
 		-- Migrate temporary object pointers
-ADa.TEXT_IO.PUT_LINE (">>> [GC] TOP BEGIN: " & Interp.Top.Data'First'Img & ":" & Interp.Top.Last'Img);
 		for I in Interp.Top.Data'First .. Interp.Top.Last loop
-			if Interp.Top.Data(I).all /= null and then
-			   Is_Normal_Pointer(Interp.Top.Data(I).all) then
+			if Interp.Top.Data(I).all = Interp.Symbol_Table then 
+				-- The symbol table must stay before compaction.
+				-- Skip migrating a temporary object pointer if it 
+				-- is pointing to the symbol table. Remember that
+				-- such skipping has happened.
+				Original_Symbol_Table := Interp.Symbol_Table;	
+			elsif Interp.Top.Data(I).all /= null and then
+			      Is_Normal_Pointer(Interp.Top.Data(I).all) then
 				Interp.Top.Data(I).all := Move_One_Object(Interp.Top.Data(I).all);
 			end if;
 		end loop;
-ADa.TEXT_IO.PUT_LINE (">>> [GC] TOP END");
 
-Ada.Text_IO.Put_Line (">>> [GC SCANNING NEW HEAP]");
+--Ada.Text_IO.Put_Line (">>> [GC SCANNING NEW HEAP]");
 		-- Scan the heap
 		Last_Pos := Scan_New_Heap(Interp.Heap(New_Heap).Space'First);
 
@@ -714,14 +723,24 @@ Ada.Text_IO.Put_Line (">>> [GC SCANNING NEW HEAP]");
 		-- If the symbol has not moved to the new heap, the symbol
 		-- is not referenced by any other objects than the symbol 
 		-- table itself 
-Ada.Text_IO.Put_Line (">>> [GC COMPACTING SYMBOL TABLE]");
+--Ada.Text_IO.Put_Line (">>> [GC COMPACTING SYMBOL TABLE]");
 		Compact_Symbol_Table;
 
-Print_Object_Pointer (">>> [GC MOVING SYMBOL TABLE]", Interp.Symbol_Table);
+--Print_Object_Pointer (">>> [GC MOVING SYMBOL TABLE]", Interp.Symbol_Table);
 		-- Migrate the symbol table itself
 		Interp.Symbol_Table := Move_One_Object(Interp.Symbol_Table);
 
-Ada.Text_IO.Put_Line (">>> [GC SCANNING HEAP AGAIN AFTER SYMBOL TABLE MIGRATION]");
+		-- Update temporary object pointers that were pointing to the symbol table
+		if Original_Symbol_Table /= null then
+			for I in Interp.Top.Data'First .. Interp.Top.Last loop
+				if Interp.Top.Data(I).all = Original_Symbol_Table then 
+					-- update to the new symbol table
+					Interp.Top.Data(I).all := Interp.Symbol_Table; 
+				end if;
+			end loop;
+		end if;
+
+--Ada.Text_IO.Put_Line (">>> [GC SCANNING HEAP AGAIN AFTER SYMBOL TABLE MIGRATION]");
 		-- Scan the new heap again from the end position of
 		-- the previous scan to move referenced objects by 
 		-- the symbol table. 
@@ -730,25 +749,14 @@ Ada.Text_IO.Put_Line (">>> [GC SCANNING HEAP AGAIN AFTER SYMBOL TABLE MIGRATION]
 		-- Swap the current heap and the new heap
 		Interp.Heap(Interp.Current_Heap).Bound := 0;
 		Interp.Current_Heap := New_Heap;
-declare
-Avail: Heap_Size;
-begin
-Avail := Interp.Heap(Interp.Current_Heap).Size - Interp.Heap(Interp.Current_Heap).Bound;
-Print_Object_Pointer (">>> [GC DONE] Stack ...", Interp.Stack);
-if Is_Normal_Pointer(Interp.Stack) then
-declare
-	X: Heap_Number := Get_Heap_Number(Interp.Self, Interp.Stack);
-     type XX is access all object_pointer;
-     t: xx := Interp.Stack'Unchecked_access;
-     w: object_word;
-     for w'address use t'address;
-begin
-	Ada.Text_IO.Put_Line (">>> [GC DONE] Stack in HEAP: " & Heap_Number'Image(X) & " FROM: " & Object_word'Image(w));
-end;
-end if;
-Ada.Text_IO.Put_Line (">>> [GC DONE] BOUND: " & Heap_Size'Image(Interp.Heap(Interp.Current_Heap).Bound) & " AVAIL: " & Heap_Size'Image(Avail));
-Ada.Text_IO.Put_Line (">>> [GC DONE] ----------------------------------------------------------");
-end;
+--declare
+--Avail: Heap_Size;
+--begin
+--Avail := Interp.Heap(Interp.Current_Heap).Size - Interp.Heap(Interp.Current_Heap).Bound;
+--Print_Object_Pointer (">>> [GC DONE] Stack ...", Interp.Stack);
+--Ada.Text_IO.Put_Line (">>> [GC DONE] BOUND: " & Heap_Size'Image(Interp.Heap(Interp.Current_Heap).Bound) & " AVAIL: " & Heap_Size'Image(Avail));
+--Ada.Text_IO.Put_Line (">>> [GC DONE] ----------------------------------------------------------");
+--end;
 	end Collect_Garbage;
 
 	function Allocate_Bytes (Interp: access Interpreter_Record;
@@ -881,28 +889,12 @@ end if;
 		return Result;
 	end Allocate_Byte_Object;
 
-	function Verify_Pointer (Source: in Object_Pointer) return Object_Pointer is
-		pragma Inline (Verify_Pointer);
-	begin
-		if not Is_Normal_Pointer(Source) or else
-		   Source.Kind /= Moved_Object then
-			return Source;
-		else
-			return Get_New_Location(Source);
-		end if;
-	end Verify_Pointer;
 	-----------------------------------------------------------------------------
 
 	procedure Push_Top (Interp: in out Interpreter_Record;
 	                    Source: access Object_Pointer) is
 		Top: Top_Record renames Interp.Top;
 	begin
---declare
---	W: Object_WOrd;
---	for W'address use Source'address;
---begin
---Ada.Text_IO.Put_Line ("Push_Top -  " & Object_WOrd'Image(W));
---end;
 		if Top.Last >= Top.Data'Last then
 			-- Something is wrong. Too many temporary object pointers
 			raise Internal_Error; -- TODO: change the exception to something else.
@@ -916,7 +908,6 @@ end if;
 	                    Count:  in     Object_Size) is
 		Top: Top_Record renames Interp.Top;
 	begin
---Ada.Text_IO.Put_Line ("Pop_Top");
 		if Top.Last < Count then
 			-- Something is wrong. Too few temporary object pointers
 			raise Internal_Error; -- TODO: change the exception to something else.
@@ -944,8 +935,8 @@ end if;
 		Push_Top (Interp.all, Aliased_Cdr'Unchecked_Access);
 
 		Cons := Allocate_Pointer_Object (Interp, Cons_Object_Size, Nil_Pointer);
-		Cons.Pointer_Slot(Cons_Car_Index) := Aliased_Car; -- TODO: is this really a good idea? resise this...
-		Cons.Pointer_Slot(Cons_Cdr_Index) := Aliased_Cdr; --       If so, use Verify_pointer after Allocate_XXX
+		Cons.Pointer_Slot(Cons_Car_Index) := Aliased_Car;
+		Cons.Pointer_Slot(Cons_Cdr_Index) := Aliased_Cdr;
 		Cons.Tag := Cons_Object;
 
 		Pop_Tops (Interp.all, 2);
@@ -989,7 +980,6 @@ end if;
 		Source.Pointer_Slot(Cons_Cdr_Index) := Value;
 	end Set_Cdr;
 
-
 	function Reverse_Cons (Source:   in Object_Pointer; 
 	                       Last_Cdr: in Object_Pointer := Nil_Pointer) return Object_Pointer is
 		pragma Assert (Is_Cons(Source));
@@ -1000,20 +990,15 @@ end if;
 		Next: Object_Pointer;
 		Prev: Object_Pointer;
 	begin
-		--Prev := Nil_Pointer;
 		Prev := Last_Cdr;
 		Ptr := Source;
 		loop
 			Next := Get_Cdr(Ptr);
 			Set_Cdr (Ptr, Prev);
 			Prev := Ptr;
-			if Is_Cons(Next) then
-				Ptr := Next;
-			else
-				exit;
-			end if;
+			exit when not Is_Cons(Next);
+			Ptr := Next;
 		end loop;
-
 		return Ptr;
 	end Reverse_Cons;
 	-----------------------------------------------------------------------------
@@ -1052,29 +1037,26 @@ Ada.Text_IO.Put_Line ("Make_String...");
 				Car: Object_Pointer renames Ptr.Pointer_Slot(Cons_Car_Index);
 				Cdr: Object_Pointer renames Ptr.Pointer_Slot(Cons_Cdr_Index);
 			begin
---Text_IO.Put_Line (Car.Kind'Img & Car.Tag'Img & Object_Word'Image(Pointer_To_Word(Car)));
 				pragma Assert (Car.Tag = Symbol_Object);
 
-	 			--if Match_Character_Object(Car, Source) then
 				if Car.Character_Slot = Source then
+					-- the character string contents are the same.
 					return Car;
---Print_Object_Pointer ("Make_Symbol Result (Existing) - " & Source, Car);
 				end if;
 
 				Ptr := Cdr;	
 			end;
 		end loop;
 
---Text_IO.Put_Line ("Creating a symbol .. " & Source);
 		-- Create a symbol object
-		Ptr := Allocate_Character_Object (Interp, Source);
+		Ptr := Allocate_Character_Object(Interp, Source);
 		Ptr.Tag := Symbol_Object;
 
-		-- Make it safe from GC
+		-- Make Ptr safe from GC
 		Push_Top (Interp.all, Ptr'Unchecked_Access);
 
 		-- Link the symbol to the symbol table. 
-		Interp.Symbol_Table := Make_Cons (Interp.Self, Ptr, Interp.Symbol_Table);
+		Interp.Symbol_Table := Make_Cons(Interp.Self, Ptr, Interp.Symbol_Table);
 
 		Pop_Tops (Interp.all, 1);
 
@@ -1351,6 +1333,7 @@ Ada.Text_IO.Put_Line ("Make_String...");
 	                              Value:  in     Object_Pointer) is
 		pragma Inline (Chain_Frame_Result);
 		pragma Assert (Is_Frame(Frame));
+		V: Object_Pointer;
 	begin
 		-- Add a new cons cell to the front
 
@@ -1359,8 +1342,13 @@ Ada.Text_IO.Put_Line ("Make_String...");
 		--	Make_Cons(Interp.Self, Value, Frame.Pointer_Slot(Frame_Result_Index));
 		--Pop_Tops (Interp, 1);
 
-		Interp.Stack.Pointer_Slot(Frame_Result_Index) :=  
-			Make_Cons(Interp.Self, Value, Interp.Stack.Pointer_Slot(Frame_Result_Index));
+		-- This seems to cause a problem if Interp.Stack changes in Make_Cons().
+		--Interp.Stack.Pointer_Slot(Frame_Result_Index) :=  
+		--	Make_Cons(Interp.Self, Value, Interp.Stack.Pointer_Slot(Frame_Result_Index));
+
+		-- So, let's separate the evaluation and the assignment.
+		V := Make_Cons(Interp.Self, Value, Interp.Stack.Pointer_Slot(Frame_Result_Index));
+		Interp.Stack.Pointer_Slot(Frame_Result_Index) := V;
 	end Chain_Frame_Result;
 
 	procedure Clear_Frame_Result (Frame: in Object_Pointer) is
@@ -1829,7 +1817,7 @@ Ada.Text_IO.Put_Line ("Make_String...");
 					end if;
 
 					Cdr := Get_Cdr(Cons);
-					if Is_Cons (Cdr) then
+					if Is_Cons(Cdr) then
 						Ada.Text_IO.Put (" ");
 						Cons := Cdr;
 						exit when Cons = Nil_Pointer;
@@ -1858,8 +1846,6 @@ Ada.Text_IO.Put_Line ("Make_String...");
 if DEBUG_GC then
 ADA.TEXT_IO.PUT_LINE ("XXXXXXXXXXXXXXXXXXXXXXXXX NO PROINTING XXXXXXXXXXXXXXXXXXXXXXXxxx");
 return;
-else
-ADA.TEXT_IO.PUT_LINE ("XXXXXXXXXXXXXXXXXXXXXXXXX TTTTTTTTTTTTTTTTTTTT XXXXXXXXXXXXXXXXXXXXXXXxxx");
 end if;
 		-- TODO: Let Make_Frame use a dedicated stack space that's apart from the heap.
 		--       This way, the stack frame doesn't have to be managed by GC.
@@ -1941,25 +1927,9 @@ end if;
 	procedure Push_Frame (Interp:  in out Interpreter_Record;
 	                      Opcode:  in     Opcode_Type; 
 	                      Operand: in     Object_Pointer) is
-		--pragma Inline (Push_Frame);
+		pragma Inline (Push_Frame);
 	begin
-if IS_NORMAL_POINTER(Interp.Stack) then
-declare
-	X: Heap_Number := Get_Heap_Number(Interp.Self, Interp.Stack);
-begin
-	Ada.Text_IO.Put_Line ("$$$$ [PUSH FRAME BEFORE] Stack in HEAP: " & Heap_Number'Image(X));
-	Print_Object_Pointer ("$$$$ -> Stack ", Interp.Stack);
-end;
-else
-	Ada.Text_IO.Put_Line ("$$$$ [PUSH FRAME BEFORE] Stack NULL");
-end if;
-		Interp.Stack := Make_Frame (Interp.Self, Interp.Stack, Opcode_To_Pointer(Opcode), Operand, Interp.Environment);
-declare
-	X: Heap_Number := Get_Heap_Number(Interp.Self, Interp.Stack);
-begin
-	Ada.Text_IO.Put_Line ("$$$$ [PUSH FRAME AFTER] Stack in HEAP: " & Heap_Number'Image(X));
-	Print_Object_Pointer ("$$$$ -> Stack ", Interp.Stack);
-end;
+		Interp.Stack := Make_Frame(Interp.Self, Interp.Stack, Opcode_To_Pointer(Opcode), Operand, Interp.Environment);
 	end Push_Frame;
 
 	--procedure Pop_Frame (Interp.Stack: out Object_Pointer;
@@ -1974,16 +1944,11 @@ end;
 	--end Pop_Frame;
 
 	procedure Pop_Frame (Interp: in out Interpreter_Record) is
-		--pragma Inline (Pop_Frame);
+		pragma Inline (Pop_Frame);
 	begin
 		pragma Assert (Interp.Stack /= Nil_Pointer);
 		Interp.Environment := Interp.Stack.Pointer_Slot(Frame_Environment_Index); -- restore environment
 		Interp.Stack := Interp.Stack.Pointer_Slot(Frame_Stack_Index); -- pop 
-declare
-	X: Heap_Number := Get_Heap_Number(Interp.Self, Interp.Stack);
-begin
-	Ada.Text_IO.Put_Line ("$$$$ [POP FRAME] Stack in HEAP: " & Heap_Number'Image(X));
-end;
 	end Pop_Frame;
 
 	procedure Execute (Interp: in out Interpreter_Record) is separate;
@@ -2026,14 +1991,13 @@ Print_Object_Pointer ("STACK IN EVALUTE => ", Interp.Stack);
 	begin
 		pragma Assert (Interp.Base_Input.Stream /= null);
 
-DEBUG_GC := Standard.True;
+--DEBUG_GC := Standard.True;
 		Clear_Tops (Interp);
 		Result := Nil_Pointer;
 
 		loop
 			pragma Assert (Interp.Stack = Nil_Pointer);
 			Interp.Stack := Nil_Pointer;
-Print_Object_Pointer ("STACK IN Run_Loop => ", Interp.Stack);
 
 			Push_Frame (Interp, Opcode_Exit, Nil_Pointer);
 			--Push_Frame (Interp, Opcode_Print_Result, Nil_Pointer);
