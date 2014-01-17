@@ -1,11 +1,10 @@
-with H2.Scheme;
-with H2.Utf8;
+with H2.Wide;
 with Ada.Wide_Text_IO;
 
 package Stream is
 
-	package S is new H2.Scheme (Standard.Wide_Character);
-	package Utf8 is new H2.Utf8 (Standard.Character, Standard.Wide_Character);
+	package S renames H2.Wide.Scheme;
+	package Utf8 renames H2.Wide.Utf8;
 
 	------------------------------------------------------------
 	--type Object_Character_Array_Pointer is access all S.Object_Character_Array;

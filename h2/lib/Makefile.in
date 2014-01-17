@@ -22,3 +22,61 @@ clean:
 	
 
 distclean: clean
+
+
+ADAFLAGS := -gnatA -fPIC -gnata -gnato -gnatN -gnatwl -lgnat95 -gnatW8 -g
+BINDFLAGS := -x -shared
+
+
+SRCS := h2.ads h2-ascii.ads h2-pool.adb h2-scheme.adb h2-utf8.adb h2-wide.ads
+ALIS := $(patsubst %.ads,%.ali,$(patsubst %.adb,%.ali,$(SRCS)))
+OBJS := $(ALIS:.ali=.o)
+
+BINDALI := b~h2.adb
+
+libh2: $(ALIS) $(BINDALI)
+	gnatbind ${BINDFLAGS} -o b~h2.adb -n -Lh2 $(ALIS)
+	gcc -c -x ada ${ADAFLAGS} b~h2.adb
+	gcc -shared -o libh2.so $(OBJS) b~h2.o -L. -lgnat
+	
+#	gcc -c -x ada ${ADAFLAGS} ../../lib/h2.ads
+#	gcc -c -x ada ${ADAFLAGS} ../../lib/h2-ascii.ads
+#	gcc -c -x ada ${ADAFLAGS} ../../lib/h2-pool.adb
+#	gcc -c -x ada ${ADAFLAGS} ../../lib/h2-scheme.adb
+#	gcc -c -x ada ${ADAFLAGS} ../../lib/h2-utf8.adb
+#	gcc -c -x ada ${ADAFLAGS} ../../lib/h2-wide.ads
+#	gnatbind ${BINDFLAGS} -o b~h2.adb -n -Lh2  h2.ali h2-ascii.ali h2-pool.ali h2-scheme.ali h2-utf8.ali h2-wide.ali
+#	#gnatbind ${BINDFLAGS} -C -o b~h2.c -n -Lh2  h2.ali  h2-scheme.ali h2-pool.ali  #for a show
+#	gcc -c -x ada ${ADAFLAGS} b~h2.adb
+#	gcc -shared -o libh2.so h2.o h2-ascii.o h2-pool.o h2-scheme.o h2-utf8.o h2-wide.o b~h2.o -L. -lgnat
+#	#gnatlink -v -v -olibh2.so h2
+
+
+#h2cmd:
+#	gcc -c -x ada ${ADAFLAGS} -I../../lib ../../cmd/storage.adb
+#	gcc -c -x ada ${ADAFLAGS} -I../../lib ../../cmd/stream.adb
+#	gcc -c -x ada ${ADAFLAGS} -I../../lib ../../cmd/scheme.adb
+#	gnatbind ${BINDFLAGS} -o b~scheme.adb scheme.ali storage.ali #-I- -I. -O
+#	gcc -c -x ada ${ADAFLAGS} b~scheme.adb
+#	gcc -oh2scm b~scheme.o storage.o stream.o scheme.o -L. -lh2 -Wl,-rpath=. #-lgnat-4.1
+#	#gnatlink -v -v -o h2scm scheme
+#	#/usr/bin/gnatbind -x -shared -o b__scheme.adb ./scheme.ali ./storage.ali -I- -I. -I../lib/objdir -O
+#	#gcc -c -x ada -gnatA -gnata -gnato -gnatN -gnatwl -c -gnatA -gnatWb -gnatiw -gnatws b__scheme.adb -o b__scheme.o
+#	#gcc -oh2scm scheme.o b__scheme.o storage.o -shared-libgcc -L../lib -lh2 -Wl,-rpath=../lib -L -lgna
+
+
+#.SUFFIXES: .ads .adb .ali 
+#.ads.ali:
+#	gcc -c -x ada ${ADAFLAGS} @abs_srcdir@/$<
+#
+#.adb.ali:
+#	gcc -c -x ada ${ADAFLAGS} @abs_srcdir@/$<
+
+$(BINDALI): 
+
+%.ali: @abs_srcdir@/%.adb
+	gcc -c -x ada ${ADAFLAGS} $<
+
+%.ali: @abs_srcdir@/%.ads
+	gcc -c -x ada ${ADAFLAGS} $<
+

@@ -17,14 +17,16 @@ project Lib is
 		"h2-scheme-execute.adb",
 		"h2-scheme-token.adb",
 		"h2-utf8.adb",
-		"h2-utf8.ads"
+		"h2-utf8.ads",
+		"h2-wide.ads"
 	);
 	for Library_Interface use (
 		"h2",
 		"h2.ascii",
 		"h2.pool",
 		"h2.scheme",
-		"h2.utf8"
+		"h2.utf8",
+		"h2.wide"
 	);
 
 	package Compiler is
