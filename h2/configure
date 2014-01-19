@@ -2519,7 +2519,7 @@ else
 
 fi
 
-ac_config_files="$ac_config_files Makefile lib/Makefile lib/lib.gpr lib/libh2.gpr cmd/Makefile cmd/scheme.gpr"
+ac_config_files="$ac_config_files Makefile lib/Makefile lib/GNUmakefile lib/lib.gpr lib/libh2.gpr cmd/Makefile cmd/scheme.gpr"
 
 cat >confcache <<\_ACEOF
 # This file is a shell script that caches the results of configure
@@ -3240,6 +3240,7 @@ do
   case $ac_config_target in
     "Makefile") CONFIG_FILES="$CONFIG_FILES Makefile" ;;
     "lib/Makefile") CONFIG_FILES="$CONFIG_FILES lib/Makefile" ;;
+    "lib/GNUmakefile") CONFIG_FILES="$CONFIG_FILES lib/GNUmakefile" ;;
     "lib/lib.gpr") CONFIG_FILES="$CONFIG_FILES lib/lib.gpr" ;;
     "lib/libh2.gpr") CONFIG_FILES="$CONFIG_FILES lib/libh2.gpr" ;;
     "cmd/Makefile") CONFIG_FILES="$CONFIG_FILES cmd/Makefile" ;;

@@ -16,6 +16,7 @@ fi
 AC_CONFIG_FILES([
 	Makefile
 	lib/Makefile
+	lib/GNUmakefile
 	lib/lib.gpr
 	lib/libh2.gpr
 	cmd/Makefile

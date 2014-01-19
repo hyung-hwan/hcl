@@ -40,14 +40,16 @@ package body H2.Scheme is
 	Label_Quote:    constant Object_Character_Array := (Ch.LC_Q, Ch.LC_U, Ch.LC_O, Ch.LC_T, Ch.LC_E); -- "quote"
 	Label_Set:      constant Object_Character_Array := (Ch.LC_S, Ch.LC_E, Ch.LC_T, Ch.Exclamation); -- "set!"
 
-	Label_Car:      constant Object_Character_Array := (Ch.LC_C, Ch.LC_A, Ch.LC_R); -- "car"
-	Label_Cdr:      constant Object_Character_Array := (Ch.LC_C, Ch.LC_D, Ch.LC_R); -- "cdr"
-	Label_Setcar:   constant Object_Character_Array := (Ch.LC_S, Ch.LC_E, Ch.LC_T, Ch.LC_C, Ch.LC_A, Ch.LC_R); -- "setcar"
-	Label_Setcdr:   constant Object_Character_Array := (Ch.LC_S, Ch.LC_E, Ch.LC_T, Ch.LC_C, Ch.LC_D, Ch.LC_R); -- "setcar"
-	Label_Plus:     constant Object_Character_Array := (1 => Ch.Plus_Sign); -- "+"
-	Label_Minus:    constant Object_Character_Array := (1 => Ch.Minus_Sign); -- "-"
-	Label_Multiply: constant Object_Character_Array := (1 => Ch.Asterisk); -- "*"
-	Label_Divide:   constant Object_Character_Array := (1 => Ch.Slash); -- "/"
+	Label_Car:       constant Object_Character_Array := (Ch.LC_C, Ch.LC_A, Ch.LC_R); -- "car"
+	Label_Cdr:       constant Object_Character_Array := (Ch.LC_C, Ch.LC_D, Ch.LC_R); -- "cdr"
+	Label_Cons:      constant Object_Character_Array := (Ch.LC_C, Ch.LC_O, Ch.LC_N, Ch.LC_S); -- "cons"
+	Label_Quotient:  constant Object_Character_Array := (Ch.LC_Q, Ch.LC_U, Ch.LC_O, Ch.LC_T, Ch.LC_I, Ch.LC_E, Ch.LC_N, Ch.LC_T); -- "quotient"
+	Label_Remainder: constant Object_Character_Array := (Ch.LC_R, Ch.LC_E, Ch.LC_M, Ch.LC_A, Ch.LC_I, Ch.LC_N, Ch.LC_D, Ch.LC_E, Ch.LC_R); -- "remainder"
+	Label_Setcar:    constant Object_Character_Array := (Ch.LC_S, Ch.LC_E, Ch.LC_T, Ch.Minus_Sign, Ch.LC_C, Ch.LC_A, Ch.LC_R, Ch.Exclamation); -- "set-car!"
+	Label_Setcdr:    constant Object_Character_Array := (Ch.LC_S, Ch.LC_E, Ch.LC_T, Ch.Minus_Sign, Ch.LC_C, Ch.LC_D, Ch.LC_R, Ch.Exclamation); -- "set-cdr!"
+	Label_Plus:      constant Object_Character_Array := (1 => Ch.Plus_Sign); -- "+"
+	Label_Minus:     constant Object_Character_Array := (1 => Ch.Minus_Sign); -- "-"
+	Label_Multiply:  constant Object_Character_Array := (1 => Ch.Asterisk); -- "*"
 
 	-----------------------------------------------------------------------------
 	-- EXCEPTIONS
@@ -1582,14 +1584,16 @@ Ada.Text_IO.Put_Line ("Make_String...");
 		procedure Make_Procedure_Objects is
 			Dummy: Object_Pointer;
 		begin
-			Dummy := Make_Procedure (Interp.Self, Car_Procedure,      Label_Car); -- "car"
-			Dummy := Make_Procedure (Interp.Self, Cdr_Procedure,      Label_Cdr); -- "cdr"
-			Dummy := Make_Procedure (Interp.Self, Setcar_Procedure,   Label_Setcar); -- "setcar"
-			Dummy := Make_Procedure (Interp.Self, Setcdr_Procedure,   Label_Setcdr); -- "setcdr"
-			Dummy := Make_Procedure (Interp.Self, Add_Procedure,      Label_Plus); -- "+"
-			Dummy := Make_Procedure (Interp.Self, Subtract_Procedure, Label_Minus); -- "-"
-			Dummy := Make_Procedure (Interp.Self, Multiply_Procedure, Label_Multiply); -- "*"
-			Dummy := Make_Procedure (Interp.Self, Divide_Procedure,   Label_Divide); -- "/"
+			Dummy := Make_Procedure (Interp.Self, Add_Procedure,       Label_Plus); -- "+"
+			Dummy := Make_Procedure (Interp.Self, Car_Procedure,       Label_Car); -- "car"
+			Dummy := Make_Procedure (Interp.Self, Cdr_Procedure,       Label_Cdr); -- "cdr"
+			Dummy := Make_Procedure (Interp.Self, Cons_Procedure,      Label_Cons); -- "cons"
+			Dummy := Make_Procedure (Interp.Self, Multiply_Procedure,  Label_Multiply); -- "*"
+			Dummy := Make_Procedure (Interp.Self, Quotient_Procedure,  Label_Quotient); -- "quotient"
+			Dummy := Make_Procedure (Interp.Self, Remainder_Procedure, Label_Remainder); -- "remainder"
+			Dummy := Make_Procedure (Interp.Self, Setcar_Procedure,    Label_Setcar); -- "set-car!"
+			Dummy := Make_Procedure (Interp.Self, Setcdr_Procedure,    Label_Setcdr); -- "set-cdr!"
+			Dummy := Make_Procedure (Interp.Self, Subtract_Procedure,  Label_Minus); -- "-"
 		end Make_Procedure_Objects;
 	begin
 		declare

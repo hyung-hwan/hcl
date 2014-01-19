@@ -1,6 +1,4 @@
-all: @abs_builddir@/@ADA_OBJDIR@
-	#gnatmake -x -aP@abs_builddir@ -Plib
-	gprbuild @abs_builddir@/lib.gpr
+all: libh2
 
 install: install-exec install-data
 
@@ -20,7 +18,6 @@ clean:
 	rm -f @abs_builddir@/*.a
 	rm -f @abs_builddir@/*.cgpr
 	
-
 distclean: clean
 
 
@@ -38,7 +35,7 @@ BINDALI := b~h2.adb
 libh2: $(ALIS) $(BINDALI)
 	gnatbind ${BINDFLAGS} -o b~h2.adb $(ALIS)
 	$(ADAC) ${ADAFLAGS} -c b~h2.adb
-	$(LD) -shared -o libh2.so $(OBJS) b~h2.o -L. -lgnat
+	$(ADAC) -shared -o libh2.so $(OBJS) b~h2.o -L. -lgnat
 	
 #	gcc -c -x ada ${ADAFLAGS} ../../lib/h2.ads
 #	gcc -c -x ada ${ADAFLAGS} ../../lib/h2-ascii.ads
