@@ -51,6 +51,9 @@ package body H2.Scheme is
 	Label_Minus:     constant Object_Character_Array := (1 => Ch.Minus_Sign); -- "-"
 	Label_Multiply:  constant Object_Character_Array := (1 => Ch.Asterisk); -- "*"
 
+
+	Label_Newline:  constant Object_Character_Array := (Ch.LC_N, Ch.LC_E, Ch.LC_W, Ch.LC_L, Ch.LC_I, Ch.LC_N, Ch.LC_E); -- "newline"
+	Label_Space:    constant Object_Character_Array := (Ch.LC_S, Ch.LC_P, Ch.LC_A, Ch.LC_C, Ch.LC_E); -- "space"
 	-----------------------------------------------------------------------------
 	-- EXCEPTIONS
 	-----------------------------------------------------------------------------
@@ -76,18 +79,18 @@ package body H2.Scheme is
 	subtype Moved_Object_Record is Object_Record (Moved_Object, 0);
 
 	subtype Opcode_Type is Object_Integer range 0 .. 11;
-	Opcode_Exit:               constant Opcode_Type := Opcode_Type'(0);
-	Opcode_Evaluate_Result:    constant Opcode_Type := Opcode_Type'(1);
-	Opcode_Evaluate_Object:    constant Opcode_Type := Opcode_Type'(2);
-	Opcode_Evaluate_Group:     constant Opcode_Type := Opcode_Type'(3); -- (begin ...) and closure apply
-	Opcode_Evaluate_Procedure: constant Opcode_Type := Opcode_Type'(4);
-	Opcode_Apply:              constant Opcode_Type := Opcode_Type'(5);
-	Opcode_Read_Object:        constant Opcode_Type := Opcode_Type'(6);
-	Opcode_Read_List:          constant Opcode_Type := Opcode_Type'(7);
-	Opcode_Read_List_Cdr:      constant Opcode_Type := Opcode_Type'(8);
-	Opcode_Read_List_End:      constant Opcode_Type := Opcode_Type'(9);
-	Opcode_Close_List:         constant Opcode_Type := Opcode_Type'(10);
-	Opcode_Close_Quote:        constant Opcode_Type := Opcode_Type'(11);
+	Opcode_Exit:                 constant Opcode_Type := Opcode_Type'(0);
+	Opcode_Evaluate_Result:      constant Opcode_Type := Opcode_Type'(1);
+	Opcode_Evaluate_Object:      constant Opcode_Type := Opcode_Type'(2);
+	Opcode_Evaluate_Group:       constant Opcode_Type := Opcode_Type'(3); -- (begin ...) and closure apply
+	Opcode_Finish_Define_Symbol: constant Opcode_Type := Opcode_Type'(4); 
+	Opcode_Apply:                constant Opcode_Type := Opcode_Type'(5);
+	Opcode_Read_Object:          constant Opcode_Type := Opcode_Type'(6);
+	Opcode_Read_List:            constant Opcode_Type := Opcode_Type'(7);
+	Opcode_Read_List_Cdr:        constant Opcode_Type := Opcode_Type'(8);
+	Opcode_Read_List_End:        constant Opcode_Type := Opcode_Type'(9);
+	Opcode_Close_List:           constant Opcode_Type := Opcode_Type'(10);
+	Opcode_Close_Quote:          constant Opcode_Type := Opcode_Type'(11);
 
 	-----------------------------------------------------------------------------
 	-- COMMON OBJECTS

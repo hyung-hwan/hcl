@@ -451,6 +451,9 @@ private
 	                    Right_Parenthesis_Token,
 	                    Period_Token,
 	                    Single_Quote_Token,
+	                    True_Token,
+	                    False_Token,
+	                    Character_Token,
 	                    String_Token,
 	                    Integer_Token
 	);

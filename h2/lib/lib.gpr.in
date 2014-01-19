@@ -16,6 +16,7 @@ project Lib is
 		"h2-scheme.ads",
 		"h2-scheme-execute.adb",
 		"h2-scheme-execute-apply.adb",
+		"h2-scheme-execute-evaluate.adb",
 		"h2-scheme-token.adb",
 		"h2-utf8.adb",
 		"h2-utf8.ads",

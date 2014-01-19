@@ -16,7 +16,7 @@ procedure Apply is
 		A: Object_Pointer;
 	begin
 		if Ptr = Nil_Pointer or else Get_Cdr(Ptr) /= Nil_Pointer then
-Ada.Text_IO.Put ("WRONG NUMBER OF ARGUMETNS FOR CAR"); 
+Ada.Text_IO.Put_Line ("WRONG NUMBER OF ARGUMETNS FOR CAR"); 
 			raise Syntax_Error;
 		end if;
 
@@ -31,7 +31,7 @@ Ada.Text_IO.Put ("WRONG NUMBER OF ARGUMETNS FOR CAR");
 		A: Object_Pointer;
 	begin
 		if Ptr = Nil_Pointer or else Get_Cdr(Ptr) /= Nil_Pointer then
-Ada.Text_IO.Put ("WRONG NUMBER OF ARGUMETNS FOR CDR"); 
+Ada.Text_IO.Put_Line ("WRONG NUMBER OF ARGUMETNS FOR CDR"); 
 			raise Syntax_Error;
 		end if;
 
@@ -47,7 +47,7 @@ Ada.Text_IO.Put ("WRONG NUMBER OF ARGUMETNS FOR CDR");
 		B: Object_Pointer;
 	begin
 		if Ptr = Nil_Pointer or else Get_Cdr(Ptr) = Nil_Pointer or else Get_Cdr(Get_Cdr(Ptr)) /= Nil_Pointer  then
-Ada.Text_IO.Put ("WRONG NUMBER OF ARGUMETNS FOR CONS"); 
+Ada.Text_IO.Put_Line ("WRONG NUMBER OF ARGUMETNS FOR CONS"); 
 			raise Syntax_Error;
 		end if;
 
@@ -65,7 +65,7 @@ Ada.Text_IO.Put ("WRONG NUMBER OF ARGUMETNS FOR CONS");
 		B: Object_Pointer;
 	begin
 		if Ptr = Nil_Pointer or else Get_Cdr(Ptr) = Nil_Pointer or else Get_Cdr(Get_Cdr(Ptr)) /= Nil_Pointer  then
-Ada.Text_IO.Put ("WRONG NUMBER OF ARGUMETNS FOR SET-CAR!"); 
+Ada.Text_IO.Put_Line ("WRONG NUMBER OF ARGUMETNS FOR SET-CAR!"); 
 			raise Syntax_Error;
 		end if;
 
@@ -83,7 +83,7 @@ Ada.Text_IO.Put ("WRONG NUMBER OF ARGUMETNS FOR SET-CAR!");
 		B: Object_Pointer;
 	begin
 		if Ptr = Nil_Pointer or else Get_Cdr(Ptr) = Nil_Pointer or else Get_Cdr(Get_Cdr(Ptr)) /= Nil_Pointer  then
-Ada.Text_IO.Put ("WRONG NUMBER OF ARGUMETNS FOR SET-CDR!"); 
+Ada.Text_IO.Put_Line ("WRONG NUMBER OF ARGUMETNS FOR SET-CDR!"); 
 			raise Syntax_Error;
 		end if;
 
@@ -259,6 +259,7 @@ begin
 	Operand := Get_Frame_Operand(Interp.Stack);
 	pragma Assert (Is_Cons(Operand));
 
+ada.text_io.put ("OPERAND TO  APPLY => ");
 Print (Interp, Operand);
 	Func := Get_Car(Operand);
 	if not Is_Normal_Pointer(Func) then
