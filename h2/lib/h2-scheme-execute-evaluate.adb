@@ -47,6 +47,57 @@ procedure Evaluate is
 
 	end Evaluate_Define_Syntax;
 
+	procedure Evaluate_If_Syntax is
+		pragma Inline (Evaluate_If_Syntax);
+	begin
+		-- (if <test> <consequent>)
+		-- (if <test> <consequent> <alternate>)
+		--   (if (> 3 2) 'yes)
+		--   (if (> 3 2) 'yes 'no)
+		--   (if (> 3 2) (- 3 2) (+ 3 2))      
+		Operand := Cdr;  -- Skip "if"
+		if Not Is_Cons(Operand) then
+			-- e.g) (if)
+			--      (if . 10)
+			Ada.Text_IO.Put_LINE ("NO CONDITIONAL FOR IF");
+			raise Syntax_Error;
+		end if;
+
+		Car := Get_Car(Operand); -- <test>
+
+		Operand := Get_Cdr(Operand); -- cons cell containg <consequent>
+		if not Is_Cons(Operand) then
+			Ada.Text_IO.Put_Line ("NO ACTION FOR IF");
+			raise Syntax_Error;
+		end if;
+
+		Cdr := Get_Cdr(Operand); -- cons cell containing <alternate>
+		if Cdr = Nil_Pointer then
+			-- no <alternate>. it's ok
+Ada.Text_IO.Put_Line ("NO ALTERNATE");
+			null;
+		elsif not Is_Cons(Cdr) then
+			-- no <alternate> but reduncant cdr.	
+			-- (if (> 3 2) 3 . 99)
+			Ada.Text_IO.Put_Line ("FUCKING CDR FOR IF");
+			raise Syntax_Error;
+			
+		elsif Get_Cdr(Cdr) /= Nil_Pointer then
+			-- (if (> 3 2) 3 2 . 99) 
+			-- (if (> 3 2) 3 2 99) 
+			Ada.Text_IO.Put_Line ("TOO MANY ARGUMENTS FOR IF");
+			raise Syntax_Error;
+		end if;
+
+		-- Switch the current frame to execute action after <test> evaluation.
+		Set_Frame_Opcode (Interp.Stack, Opcode_Finish_If);
+		Set_Frame_Operand (Interp.Stack, Operand); 
+
+		-- Arrange to evalaute the conditional
+		Push_Frame (Interp, Opcode_Evaluate_Object, Car); 
+
+	end Evaluate_If_Syntax;
+
 	procedure Evaluate_Lambda_Syntax is
 		pragma Inline (Evaluate_Lambda_Syntax);
 	begin
@@ -142,7 +193,6 @@ begin
 							--      (begin . 10)
 							Ada.Text_IO.Put_LINE ("FUCKNING CDR FOR BEGIN");
 							raise Syntax_Error;
-							--Pop_Frame (Interp);  -- Done
 
 						else
 							Set_Frame_Opcode (Interp.Stack, Opcode_Evaluate_Group);
@@ -160,6 +210,9 @@ begin
 
 					when Define_Syntax =>
 						Evaluate_Define_Syntax;
+
+					when If_Syntax =>
+						Evaluate_If_Syntax;
 
 					when Lambda_Syntax =>
 						Evaluate_Lambda_Syntax;

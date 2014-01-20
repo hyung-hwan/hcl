@@ -59,7 +59,7 @@ Nine
 Colon
 Semicolon
 Less_Than_Sign
-Equals_Sign
+Equal_Sign
 Greater_Than_Sign
 Question
 Commercial_At

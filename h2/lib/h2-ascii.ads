@@ -67,7 +67,7 @@ package H2.Ascii is
 		Colon               : constant := 58; -- :
 		Semicolon           : constant := 59; -- ;
 		Less_Than_Sign      : constant := 60; -- <
-		Equals_Sign         : constant := 61; -- =
+		Equal_Sign          : constant := 61; -- =
 		Greater_Than_Sign   : constant := 62; -- >
 		Question            : constant := 63; -- ?
 		Commercial_At       : constant := 64; -- @
@@ -197,7 +197,7 @@ package H2.Ascii is
 	Colon               : constant Character_Type := Character_Type'Val(Pos.Colon);
 	Semicolon           : constant Character_Type := Character_Type'Val(Pos.Semicolon);
 	Less_Than_Sign      : constant Character_Type := Character_Type'Val(Pos.Less_Than_Sign);
-	Equals_Sign         : constant Character_Type := Character_Type'Val(Pos.Equals_Sign);
+	Equal_Sign          : constant Character_Type := Character_Type'Val(Pos.Equal_Sign);
 	Greater_Than_Sign   : constant Character_Type := Character_Type'Val(Pos.Greater_Than_Sign);
 	Question            : constant Character_Type := Character_Type'Val(Pos.Question);
 	Commercial_At       : constant Character_Type := Character_Type'Val(Pos.Commercial_At);

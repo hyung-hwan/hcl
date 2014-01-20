@@ -54,6 +54,8 @@ package body H2.Scheme is
 
 	Label_Newline:  constant Object_Character_Array := (Ch.LC_N, Ch.LC_E, Ch.LC_W, Ch.LC_L, Ch.LC_I, Ch.LC_N, Ch.LC_E); -- "newline"
 	Label_Space:    constant Object_Character_Array := (Ch.LC_S, Ch.LC_P, Ch.LC_A, Ch.LC_C, Ch.LC_E); -- "space"
+
+	Label_Arrow:    constant Object_Character_Array := (Ch.Equal_Sign, Ch.Greater_Than_Sign); -- "=>"
 	-----------------------------------------------------------------------------
 	-- EXCEPTIONS
 	-----------------------------------------------------------------------------
@@ -78,19 +80,20 @@ package body H2.Scheme is
 
 	subtype Moved_Object_Record is Object_Record (Moved_Object, 0);
 
-	subtype Opcode_Type is Object_Integer range 0 .. 11;
+	subtype Opcode_Type is Object_Integer range 0 .. 12;
 	Opcode_Exit:                 constant Opcode_Type := Opcode_Type'(0);
 	Opcode_Evaluate_Result:      constant Opcode_Type := Opcode_Type'(1);
 	Opcode_Evaluate_Object:      constant Opcode_Type := Opcode_Type'(2);
 	Opcode_Evaluate_Group:       constant Opcode_Type := Opcode_Type'(3); -- (begin ...) and closure apply
 	Opcode_Finish_Define_Symbol: constant Opcode_Type := Opcode_Type'(4); 
-	Opcode_Apply:                constant Opcode_Type := Opcode_Type'(5);
-	Opcode_Read_Object:          constant Opcode_Type := Opcode_Type'(6);
-	Opcode_Read_List:            constant Opcode_Type := Opcode_Type'(7);
-	Opcode_Read_List_Cdr:        constant Opcode_Type := Opcode_Type'(8);
-	Opcode_Read_List_End:        constant Opcode_Type := Opcode_Type'(9);
-	Opcode_Close_List:           constant Opcode_Type := Opcode_Type'(10);
-	Opcode_Close_Quote:          constant Opcode_Type := Opcode_Type'(11);
+	Opcode_Finish_If:            constant Opcode_Type := Opcode_Type'(5); 
+	Opcode_Apply:                constant Opcode_Type := Opcode_Type'(6);
+	Opcode_Read_Object:          constant Opcode_Type := Opcode_Type'(7);
+	Opcode_Read_List:            constant Opcode_Type := Opcode_Type'(8);
+	Opcode_Read_List_Cdr:        constant Opcode_Type := Opcode_Type'(9);
+	Opcode_Read_List_End:        constant Opcode_Type := Opcode_Type'(10);
+	Opcode_Close_List:           constant Opcode_Type := Opcode_Type'(11);
+	Opcode_Close_Quote:          constant Opcode_Type := Opcode_Type'(12);
 
 	-----------------------------------------------------------------------------
 	-- COMMON OBJECTS
@@ -734,6 +737,8 @@ ada.text_io.put_line ("HEAP SOURCE IS NIL");
 --Print_Object_Pointer (">>> [GC MOVING SYMBOL TABLE]", Interp.Symbol_Table);
 		-- Migrate the symbol table itself
 		Interp.Symbol_Table := Move_One_Object(Interp.Symbol_Table);
+		Interp.Symbol.Arrow := Move_One_Object(Interp.Symbol.Arrow);
+		Interp.Symbol.Quote := Move_One_Object(Interp.Symbol.Quote);
 
 		-- Update temporary object pointers that were pointing to the symbol table
 		if Original_Symbol_Table /= null then
@@ -1580,7 +1585,7 @@ Ada.Text_IO.Put_Line ("Make_String...");
 			Dummy := Make_Syntax (Interp.Self, Letast_Syntax, Label_Letast); -- "let*"
 			Dummy := Make_Syntax (Interp.Self, Letrec_Syntax, Label_Letrec); -- "letrc"
 			Dummy := Make_Syntax (Interp.Self, Or_Syntax,     Label_Or); -- "or"
-			Dummy := Make_Syntax (Interp.Self, Quote_Syntax,  Label_Quote); -- "quote"
+			Interp.Symbol.Quote := Make_Syntax (Interp.Self, Quote_Syntax,  Label_Quote); -- "quote"
 			Dummy := Make_Syntax (Interp.Self, Set_Syntax,    Label_Set); -- "set!"
 		end Make_Syntax_Objects;
 
@@ -1598,6 +1603,11 @@ Ada.Text_IO.Put_Line ("Make_String...");
 			Dummy := Make_Procedure (Interp.Self, Setcdr_Procedure,    Label_Setcdr); -- "set-cdr!"
 			Dummy := Make_Procedure (Interp.Self, Subtract_Procedure,  Label_Minus); -- "-"
 		end Make_Procedure_Objects;
+
+		procedure Make_Common_Symbol_Objects is
+		begin
+			Interp.Symbol.Arrow := Make_Symbol (Interp.Self, Label_Arrow);	
+		end Make_Common_Symbol_Objects;
 	begin
 		declare
 			Aliased_Interp: aliased Interpreter_Record;
@@ -1636,6 +1646,7 @@ Ada.Text_IO.Put_Line ("Make_String...");
 		Interp.Environment := Interp.Root_Environment;
 		Make_Syntax_Objects;
 		Make_Procedure_Objects;
+		Make_Common_Symbol_Objects;
 
 	exception
 		when others =>

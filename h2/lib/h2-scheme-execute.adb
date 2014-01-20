@@ -45,7 +45,7 @@ procedure Execute (Interp: in out Interpreter_Record) is
 					if Cdr /= Nil_Pointer then
 						-- The last CDR is not Nil.
 						Ada.Text_IO.Put_Line ("$$$$..................FUCKING CDR. FOR GROUP....................$$$$");
-						-- raise Syntax_Error;
+						raise Syntax_Error;
 					end if;
 
 					-- Change the operand to a mark object so that the call to this 
@@ -86,8 +86,8 @@ Ada.Text_IO.PUt_Line ("FINISH DEFINE SYMBOL");
 		Push_Top (Interp, X'Unchecked_Access);
 		Push_Top (Interp, Y'Unchecked_Access);
 
-		X := Get_Frame_Operand(Interp.Stack);
-		Y := Get_Car(Get_Frame_Result(Interp.Stack)); 
+		X := Get_Frame_Operand(Interp.Stack); -- symbol
+		Y := Get_Car(Get_Frame_Result(Interp.Stack));  -- value
 		pragma Assert (Is_Symbol(X));
 		pragma Assert (Get_Cdr(Get_Frame_Result(Interp.Stack)) = Nil_Pointer);
 
@@ -98,6 +98,41 @@ Ada.Text_IO.PUt_Line ("FINISH DEFINE SYMBOL");
 
 		Pop_Tops (Interp, 2);
 	end Finish_Define_Symbol;
+
+	procedure Finish_If is
+		pragma Inline (Finish_If);
+		X: aliased Object_Pointer;
+		Y: aliased Object_Pointer;
+		Z: aliased Object_Pointer;
+	begin
+Ada.Text_IO.PUt_Line ("FINISH IF");
+
+		Push_Top (Interp, X'Unchecked_Access);
+		Push_Top (Interp, Y'Unchecked_Access);
+
+		X := Get_Frame_Operand(Interp.Stack); -- cons cell containing <consequent>
+		Y := Get_Car(Get_Frame_Result(Interp.Stack)); -- result of conditional
+		pragma Assert (Is_Cons(X)); 
+		pragma Assert (Get_Cdr(Get_Frame_Result(Interp.Stack)) = Nil_Pointer);
+
+		Pop_Frame (Interp);
+		if Y = False_Pointer then
+			-- <test> evaluated to #f.
+			X := Get_Cdr(X); -- cons cell containing <alternate>
+			if Is_Cons(X) then
+				-- evaluate <alternate>
+				Push_Frame (Interp, Opcode_Evaluate_Object, Get_Car(X));
+			else
+				-- return nil if no <alternate> is specified
+				Chain_Frame_Result (Interp, Interp.Stack, Nil_Pointer);
+			end if;
+		else
+			-- all values except #f are true values. evaluate <consequent>
+			Push_Frame (Interp, Opcode_Evaluate_Object, Get_Car(X));
+		end if;
+
+		Pop_Tops (Interp, 2);
+	end Finish_If;
 
 	procedure Evaluate is separate;
 	procedure Apply is separate;
@@ -449,6 +484,12 @@ Ada.Text_IO.Put_Line ("ERROR: PREMATURE LIST END");
 				V := Make_Symbol(Interp.Self, Interp.Token.Value.Ptr.all(1..Interp.Token.Value.Last));
 				Chain_Frame_Result (Interp, Interp.Stack, V);
 
+			when True_Token =>
+				Chain_Frame_Result (Interp, Interp.Stack, True_Pointer);
+
+			when False_Token =>
+				Chain_Frame_Result (Interp, Interp.Stack, False_Pointer);
+
 			when others =>
 				-- TODO: set various error info
 				raise Syntax_Error;
@@ -507,6 +548,14 @@ Ada.Text_IO.Put_Line ("ERROR: CDR QUOT LIST END");
 				Set_Frame_Opcode (Interp.Stack, Opcode_Read_List_End);
 				Chain_Frame_Result (Interp, Interp.Stack, V);
 
+			when True_Token =>
+				Set_Frame_Opcode (Interp.Stack, Opcode_Read_List_End);
+				Chain_Frame_Result (Interp, Interp.Stack, True_Pointer);
+
+			when False_Token =>
+				Set_Frame_Opcode (Interp.Stack, Opcode_Read_List_End);
+				Chain_Frame_Result (Interp, Interp.Stack, False_Pointer);
+
 			when others =>
 				-- TODO: set various error info
 				raise Syntax_Error;
@@ -558,8 +607,7 @@ Ada.Text_IO.Put_Line ("ERROR: CDR QUOT LIST END");
 	begin
 		--Push_Top (Interp, V'Unchecked_Access);
 
--- TODO: use Interp.Quote_Syntax instead of Make_Symbol("quote")
-		Chain_Frame_Result (Interp, Interp.Stack, Make_Symbol(Interp.Self, Label_Quote));
+		Chain_Frame_Result (Interp, Interp.Stack, Interp.Symbol.Quote);
 		V := Get_Frame_Result(Interp.Stack);
 		Pop_Frame (Interp); -- Done with the current frame
 		Chain_Frame_Result (Interp, Interp.Stack, V);
@@ -609,6 +657,15 @@ Ada.Text_IO.Put_Line ("INFO: NO MORE TOKEN ");
 				V := Make_Symbol (Interp.Self, Interp.Token.Value.Ptr.all(1..Interp.Token.Value.Last));
 				Pop_Frame (Interp); -- Done with the current frame
 				Chain_Frame_Result (Interp, Interp.Stack, V);
+
+			when True_Token =>	
+				Pop_Frame (Interp); -- Done with the current frame
+				Chain_Frame_Result (Interp, Interp.Stack, True_Pointer);
+
+			when False_Token =>	
+				Pop_Frame (Interp); -- Done with the current frame
+				Chain_Frame_Result (Interp, Interp.Stack, False_Pointer);
+
 
 			when others =>
 				-- TODO: set various error info
@@ -701,6 +758,9 @@ begin
 
 			when Opcode_Finish_Define_Symbol =>
 				Finish_Define_Symbol;
+
+			when Opcode_Finish_If =>
+				Finish_If;
 				
 			when Opcode_Apply =>
 				Apply;

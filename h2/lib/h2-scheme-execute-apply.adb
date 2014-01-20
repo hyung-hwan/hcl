@@ -131,6 +131,7 @@ Ada.Text_IO.Put ("NOT INTEGER FOR ADD"); Print (Interp, Car);
 			end if;
 			Num := Pointer_To_Integer(Car);
 
+			Ptr := Get_Cdr(Ptr);
 			while Ptr /= Nil_Pointer loop
 				-- TODO: check if car is an integer or bignum or something else.
 				--       if something else, error

@@ -471,6 +471,11 @@ private
 		Data: Top_Array(1 .. 100) := (others => null);
 	end record;
 
+	type Common_Symbol_Record is record
+		Quote: Object_Pointer := Nil_Pointer;
+		Arrow: Object_Pointer := Nil_Pointer;
+	end record;
+
 	--type Interpreter_Record is tagged limited record
 	type Interpreter_Record is limited record
 		Self: Interpreter_Pointer := Interpreter_Record'Unchecked_Access; -- Current instance's pointer
@@ -488,6 +493,7 @@ private
 		Stack: aliased Object_Pointer := Nil_Pointer;
 		Mark: Object_Pointer := Nil_Pointer;
 
+		Symbol: Common_Symbol_Record;
 		Top: Top_Record; -- temporary object pointers
 
 		Base_Input: aliased IO_Record;
