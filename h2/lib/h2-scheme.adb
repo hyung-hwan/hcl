@@ -80,20 +80,21 @@ package body H2.Scheme is
 
 	subtype Moved_Object_Record is Object_Record (Moved_Object, 0);
 
-	subtype Opcode_Type is Object_Integer range 0 .. 12;
+	subtype Opcode_Type is Object_Integer range 0 .. 13;
 	Opcode_Exit:                 constant Opcode_Type := Opcode_Type'(0);
 	Opcode_Evaluate_Result:      constant Opcode_Type := Opcode_Type'(1);
 	Opcode_Evaluate_Object:      constant Opcode_Type := Opcode_Type'(2);
 	Opcode_Evaluate_Group:       constant Opcode_Type := Opcode_Type'(3); -- (begin ...) and closure apply
 	Opcode_Finish_Define_Symbol: constant Opcode_Type := Opcode_Type'(4); 
 	Opcode_Finish_If:            constant Opcode_Type := Opcode_Type'(5); 
-	Opcode_Apply:                constant Opcode_Type := Opcode_Type'(6);
-	Opcode_Read_Object:          constant Opcode_Type := Opcode_Type'(7);
-	Opcode_Read_List:            constant Opcode_Type := Opcode_Type'(8);
-	Opcode_Read_List_Cdr:        constant Opcode_Type := Opcode_Type'(9);
-	Opcode_Read_List_End:        constant Opcode_Type := Opcode_Type'(10);
-	Opcode_Close_List:           constant Opcode_Type := Opcode_Type'(11);
-	Opcode_Close_Quote:          constant Opcode_Type := Opcode_Type'(12);
+	Opcode_Finish_Set:           constant Opcode_Type := Opcode_Type'(6); 
+	Opcode_Apply:                constant Opcode_Type := Opcode_Type'(7);
+	Opcode_Read_Object:          constant Opcode_Type := Opcode_Type'(8);
+	Opcode_Read_List:            constant Opcode_Type := Opcode_Type'(9);
+	Opcode_Read_List_Cdr:        constant Opcode_Type := Opcode_Type'(10);
+	Opcode_Read_List_End:        constant Opcode_Type := Opcode_Type'(11);
+	Opcode_Close_List:           constant Opcode_Type := Opcode_Type'(12);
+	Opcode_Close_Quote:          constant Opcode_Type := Opcode_Type'(13);
 
 	-----------------------------------------------------------------------------
 	-- COMMON OBJECTS
@@ -990,6 +991,17 @@ end if;
 		Source.Pointer_Slot(Cons_Cdr_Index) := Value;
 	end Set_Cdr;
 
+	function Get_Last_Cdr (Source: in Object_Pointer) return Object_Pointer is
+		pragma Assert (Is_Cons(Source));
+		Ptr: Object_Pointer := Source;
+	begin
+		loop
+			Ptr := Get_Cdr(Ptr);
+			exit when not Is_Cons(Ptr);
+		end loop;
+		return Ptr;
+	end Get_Last_Cdr;
+
 	function Reverse_Cons (Source:   in Object_Pointer; 
 	                       Last_Cdr: in Object_Pointer := Nil_Pointer) return Object_Pointer is
 		pragma Assert (Is_Cons(Source));
@@ -1151,7 +1163,24 @@ Ada.Text_IO.Put_Line ("Make_String...");
 		return null; -- not found. note that it's not Nil_Pointer.
 	end Find_In_Environment_List;
 
-	procedure Set_Environment (Interp: in out Interpreter_Record;
+	function Set_Environment (Interp: access Interpreter_Record;
+	                          Key:    in     Object_Pointer;
+	                          Value:  in     Object_Pointer) return Object_Pointer is
+		Arr: Object_Pointer;
+	begin
+		pragma Assert (Is_Symbol(Key));
+
+		Arr := Find_In_Environment_List(Interp, Get_Car(Interp.Environment), Key);
+		if Arr = null then
+			return null;	
+		else
+			-- overwrite an existing pair
+			Arr.Pointer_Slot(2) := Value;
+			return Value;
+		end if;
+	end Set_Environment;
+
+	procedure Put_Environment (Interp: in out Interpreter_Record;
 	                           Key:    in     Object_Pointer;
 	                           Value:  in     Object_Pointer) is
 		Arr: Object_Pointer;
@@ -1182,8 +1211,7 @@ Ada.Text_IO.Put_Line ("Make_String...");
 			-- overwrite an existing pair
 			Arr.Pointer_Slot(2) := Value;
 		end if;
-
-	end Set_Environment;
+	end Put_Environment;
 
 	function Get_Environment (Interp: access Interpreter_Record;
 	                          Key:    in     Object_Pointer) return Object_Pointer is
@@ -1261,7 +1289,7 @@ Ada.Text_IO.Put_Line ("Make_String...");
 		-- Link it to the top environement
 		pragma Assert (Interp.Environment = Interp.Root_Environment); 
 		pragma Assert (Get_Environment (Interp.Self, Symbol) = null);
-		Set_Environment (Interp.all, Symbol, Proc);
+		Put_Environment (Interp.all, Symbol, Proc);
 
 		Pop_Tops (Interp.all, 2);
 		return Proc;

@@ -208,36 +208,34 @@ Ada.Text_IO.Put ("NOT INTEGER FOR MULTIPLY"); Print (Interp, Car);
 		Fbody := Get_Closure_Code(Func);
 		pragma Assert (Is_Cons(Fbody)); -- the reader must ensure this.
 
-		Param := Get_Car(Fbody); -- Parameter list
-		--Arg := Get_Car(Args); -- Actual argument list
+		Param := Get_Car(Fbody); -- Formal argument list
 		Arg := Args; -- Actual argument list
 
-		Fbody := Get_Cdr (Fbody); -- Real function body
+		Fbody := Get_Cdr(Fbody); -- Real function body
 		pragma Assert (Is_Cons(Fbody)); -- the reader must ensure this as wel..
 
 		while Is_Cons(Param) loop
-
 			if not Is_Cons(Arg) then
 				Ada.Text_IO.Put_Line (">>>> Too few arguments <<<<");	
 				raise Evaluation_Error;
 			end if;
 
 			-- Insert the key/value pair into the environment
-			Set_Environment (Interp, Get_Car(Param), Get_Car(Arg));
+			Put_Environment (Interp, Get_Car(Param), Get_Car(Arg));
 
 			Param := Get_Cdr(Param);
 			Arg := Get_Cdr(Arg);
 		end loop;
 
 		-- Perform cosmetic checks for the parameter list
-		if Param /= Nil_Pointer then
-			Ada.Text_IO.Put_Line (">>> GARBAGE IN PARAMETER LIST <<<");
-			raise Syntax_Error;
-		end if;
+		--if Param /= Nil_Pointer then -- this check handled in reading (lambda ...)
+		--	Ada.Text_IO.Put_Line (">>> GARBAGE IN PARAMETER LIST <<<");
+		--	raise Syntax_Error;
+		--end if;
 
 		-- Perform cosmetic checks for the argument list
 		if Is_Cons(Arg) then
-			Ada.Text_IO.Put_Line (">>>> Two many arguments <<<<");	
+			Ada.Text_IO.Put_Line (">>>> TOO MANY ARGUMETNS FOR CLOSURE  <<<<");	
 			raise Evaluation_Error;
 		elsif Arg /= Nil_Pointer then	
 			Ada.Text_IO.Put_Line (">>> GARBAGE IN ARGUMENT LIST <<<");

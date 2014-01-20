@@ -17,6 +17,7 @@ procedure Evaluate is
 		if not Is_Cons(Operand) or else not Is_Cons(Get_Cdr(Operand)) then
 			-- e.g) (define)
 			--      (define . 10)
+			--      (define x . 10)
 			Ada.Text_IO.Put_LINE ("TOO FEW ARGUMENTS FOR DEFINE");
 			raise Syntax_Error;
 		end if;
@@ -52,9 +53,9 @@ procedure Evaluate is
 	begin
 		-- (if <test> <consequent>)
 		-- (if <test> <consequent> <alternate>)
-		--   (if (> 3 2) 'yes)
-		--   (if (> 3 2) 'yes 'no)
-		--   (if (> 3 2) (- 3 2) (+ 3 2))      
+		-- e.g) (if (> 3 2) 'yes)
+		--      (if (> 3 2) 'yes 'no)
+		--      (if (> 3 2) (- 3 2) (+ 3 2))      
 		Operand := Cdr;  -- Skip "if"
 		if Not Is_Cons(Operand) then
 			-- e.g) (if)
@@ -101,8 +102,9 @@ Ada.Text_IO.Put_Line ("NO ALTERNATE");
 	procedure Evaluate_Lambda_Syntax is
 		pragma Inline (Evaluate_Lambda_Syntax);
 	begin
-		-- (lambda (x y) (+ x y));
-		Operand := Cdr; -- Skip "lambda"
+		-- (lambda <formals> <body>)
+		--   (lambda (x y) (+ x y));
+		Operand := Cdr; -- Skip "lambda". cons cell pointing to <formals>
 		if not Is_Cons(Operand) then
 			-- e.g) (lambda)
 			--      (lambda . 10)
@@ -110,14 +112,28 @@ Ada.Text_IO.Put_Line ("NO ALTERNATE");
 			raise Syntax_Error;
 		end if;
 
-		if not Is_Cons(Get_Car(Operand)) then
-			Ada.Text_IO.Put_Line ("INVALID PARRAMETER LIST");
+		Car := Get_Car(Operand);  -- <formals>
+		if not Is_Cons(Car) then
+			Ada.Text_IO.Put_Line ("INVALID FORMALS FOR LAMBDA");
 			raise Syntax_Error;
 		end if;
 
---Print (Interp, Get_Cdr(Operand));
-		if not Is_Cons(Get_Cdr(Operand)) then
+		Cdr := Get_Last_Cdr(Car);
+		if Cdr /= Nil_Pointer then
+			-- (lambda (x y . z) ...)
+			Ada.Text_IO.Put_Line ("FUCKING CDR IN FORMALS FOR LAMBDA");
+			raise Syntax_Error;
+		end if;
+	
+		Cdr := Get_Cdr(Operand); -- cons cell containing <body>
+		if not Is_Cons(Cdr) then
 			Ada.Text_IO.Put_Line ("NO BODY");
+			raise Syntax_Error;
+		end if;
+
+		if Get_Last_Cdr(Cdr) /= Nil_Pointer then
+			-- (lambda (x y) (+ x y) . 99)
+			Ada.Text_IO.Put_Line ("FUCKING CDR IN BODY FOR LAMBDA");
 			raise Syntax_Error;
 		end if;
 
@@ -146,6 +162,43 @@ Ada.Text_IO.Put_Line ("NO ALTERNATE");
 		Pop_Frame (Interp);	 -- Done
 		Chain_Frame_Result (Interp, Interp.Stack, Get_Car(Operand));
 	end Evaluate_Quote_Syntax;
+
+	procedure Evaluate_Set_Syntax is
+		pragma Inline (Evaluate_Set_Syntax);
+	begin
+		-- (set! <variable> <expression>)
+		-- e.g) (set! x 10) 
+
+		Operand := Cdr; -- Skip "set!"
+
+		if not Is_Cons(Operand) or else not Is_Cons(Get_Cdr(Operand)) then
+			-- e.g) (set!)
+			--      (set . 10)
+			--      (set x . 10)
+			Ada.Text_IO.Put_LINE ("TOO FEW ARGUMENTS FOR SET");
+			raise Syntax_Error;
+		end if;
+
+		Car := Get_Car(Operand); -- <variable>
+		Cdr := Get_Cdr(Operand); -- cons cell to <expression>
+		if Is_Symbol(Car) then
+			if Get_Cdr(Cdr) /= Nil_Pointer then
+				Ada.Text_IO.Put_LINE ("TOO MANY ARGUMENTS FOR set!");
+				raise Syntax_Error;
+			end if;
+			Cdr := Get_Car(Cdr); -- <expression>
+
+			-- Arrange to finish setting a variable after <expression> evaluation.
+			Set_Frame_Opcode (Interp.Stack, Opcode_Finish_Set);
+			Set_Frame_Operand (Interp.Stack, Car); 
+
+			-- Arrange to evalaute the value part
+			Push_Frame (Interp, Opcode_Evaluate_Object, Cdr); 
+		else
+			Ada.Text_IO.Put_LINE ("INVALID SYMBOL AFTER SET!");
+			raise Syntax_Error;	
+		end if;
+	end Evaluate_Set_Syntax;
 
 begin
 	Push_Top (Interp, Operand'Unchecked_Access);
@@ -220,6 +273,9 @@ begin
 					when Quote_Syntax =>
 						Evaluate_Quote_Syntax;
 
+					when Set_Syntax => -- set!
+						Evaluate_Set_Syntax;
+
 					when others =>
 						Ada.Text_IO.Put_Line ("Unknown syntax");	
 						--Set_Frame_Opcode (Interp.Stack, Opcode_Evaluate_Syntax);  -- Switch to syntax evaluation
@@ -242,6 +298,12 @@ begin
 							Cdr := Get_Cdr(Operand);
 						else
 							-- last cons 
+							if Cdr /= Nil_Pointer then
+								-- The last CDR is not Nil.
+								Ada.Text_IO.Put_Line ("WARNING: $$$$$$$$$$$$$$$$$$$$$..FUCKING CDR.....................OPTIMIZATIN $$$$");
+								raise Syntax_Error;
+							end if;
+
 							Operand := Reverse_Cons(Get_Frame_Result(Interp.Stack));
 							Clear_Frame_Result (Interp.Stack);
 							Set_Frame_Opcode (Interp.Stack, Opcode_Apply); 

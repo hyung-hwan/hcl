@@ -91,7 +91,7 @@ Ada.Text_IO.PUt_Line ("FINISH DEFINE SYMBOL");
 		pragma Assert (Is_Symbol(X));
 		pragma Assert (Get_Cdr(Get_Frame_Result(Interp.Stack)) = Nil_Pointer);
 
-		Set_Environment (Interp, X, Y);
+		Put_Environment (Interp, X, Y);
 
 		Pop_Frame (Interp);     -- Done
 		Chain_Frame_Result (Interp, Interp.Stack, Y);
@@ -133,6 +133,32 @@ Ada.Text_IO.PUt_Line ("FINISH IF");
 
 		Pop_Tops (Interp, 2);
 	end Finish_If;
+
+	procedure Finish_Set is
+		pragma Inline (Finish_Set);
+		X: aliased Object_Pointer;
+		Y: aliased Object_Pointer;
+	begin
+Ada.Text_IO.PUt_Line ("FINISH Set");
+		Push_Top (Interp, X'Unchecked_Access);
+		Push_Top (Interp, Y'Unchecked_Access);
+
+		X := Get_Frame_Operand(Interp.Stack); -- symbol
+		Y := Get_Car(Get_Frame_Result(Interp.Stack));  -- value
+		pragma Assert (Is_Symbol(X));
+		pragma Assert (Get_Cdr(Get_Frame_Result(Interp.Stack)) = Nil_Pointer);
+
+		if Set_Environment(Interp.Self, X, Y) = null then
+			Ada.Text_IO.PUt_LINE ("ERROR: UNBOUND SYMBOL");
+			raise Evaluation_Error;
+		end if;
+
+		Pop_Frame (Interp);     -- Done
+		Chain_Frame_Result (Interp, Interp.Stack, Y);
+
+		Pop_Tops (Interp, 2);
+	end Finish_Set;
+
 
 	procedure Evaluate is separate;
 	procedure Apply is separate;
@@ -761,6 +787,9 @@ begin
 
 			when Opcode_Finish_If =>
 				Finish_If;
+
+			when Opcode_Finish_Set =>
+				Finish_Set;
 				
 			when Opcode_Apply =>
 				Apply;
