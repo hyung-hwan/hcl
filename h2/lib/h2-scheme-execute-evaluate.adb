@@ -119,18 +119,34 @@ Ada.Text_IO.Put_Line ("NO ALTERNATE");
 			-- (lambda x ...)
 			null;	
 		elsif Is_Cons(Car) then 
-			Cdr := Car;
-			loop
-				Cdr := Get_Cdr(Cdr);
-				exit when not Is_Cons(Cdr);
+			declare
+				Formals: Object_Pointer := Car;
+				V: Object_Pointer;
+			begin
+				Cdr := Formals;
+				loop
+					Car := Get_Car(Cdr); -- <formal argument>
+					if not Is_Symbol(Car) then
+						Ada.Text_IO.Put_Line ("WRONG FORMAL FOR LAMBDA");
+						raise Syntax_Error;
+					end if;
 
-				Car := Get_Car(Cdr);	
-				if not Is_Symbol(Car) then
-					Ada.Text_IO.Put_Line ("WRONG FORMALS FOR LAMBDA");
-					raise Syntax_Error;
-				end if;
--- TODO: Check duplicate symbol names???
-			end loop;
+					V := Formals;
+					loop
+						exit when V = Cdr;
+
+						if Get_Car(V) = Car then
+							Ada.Text_IO.Put_Line ("DUPLICATE FORMAL FOR LAMBDA");
+							raise Syntax_Error;
+						end if;
+
+						V := Get_Cdr(V);
+					end loop;
+
+					Cdr := Get_Cdr(Cdr);
+					exit when not Is_Cons(Cdr);
+				end loop;
+			end;
 
 			if Cdr /= Nil_Pointer and then not Is_Symbol(Cdr) then
 				Ada.Text_IO.Put_Line ("FUCKING CDR IN FORMALS FOR LAMBDA");

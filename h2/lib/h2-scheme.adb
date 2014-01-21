@@ -1668,19 +1668,12 @@ Ada.Text_IO.Put_Line ("Make_String...");
 
 -- TODO: disallow garbage collecion during initialization.
 		Initialize_Heap (Initial_Heap_Size);
-ada.text_io.put_line ("kkkkkkkkkkkkkk");
 		Interp.Mark := Make_Mark(Interp.Self, 0); -- to indicate the end of cons evaluation
-ada.text_io.put_line ("xxxxxxxxxxxxxx");
 		Interp.Root_Environment := Make_Environment(Interp.Self, Nil_Pointer);
-ada.text_io.put_line ("zzzzzzzzzzzzzzzzzz");
 		Interp.Environment := Interp.Root_Environment;
 		Make_Syntax_Objects;
-print (interp, interp.mark);
-ada.text_io.put_line ("zzzzzzzzzzzzzzzzzz 00");
 		Make_Procedure_Objects;
-ada.text_io.put_line ("zzzzzzzzzzzzzzzzzz 00--00");
 		Make_Common_Symbol_Objects;
-ada.text_io.put_line ("zzzzzzzzzzzzzzzzzz 11");
 
 	exception
 		when others =>

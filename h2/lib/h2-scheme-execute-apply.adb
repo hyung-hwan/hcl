@@ -15,12 +15,16 @@ procedure Apply is
 		Ptr: Object_Pointer := Args;
 		A: Object_Pointer;
 	begin
-		if Ptr = Nil_Pointer or else Get_Cdr(Ptr) /= Nil_Pointer then
+		if not Is_Cons(Ptr) or else Get_Cdr(Ptr) /= Nil_Pointer then
 Ada.Text_IO.Put_Line ("WRONG NUMBER OF ARGUMETNS FOR CAR"); 
 			raise Syntax_Error;
 		end if;
 
 		A := Get_Car(Ptr); -- the first argument
+		if not Is_Cons(A) then
+Ada.Text_IO.Put_Line ("EXPECTED CONS-CELL FOR CAR"); 
+			raise Evaluation_Error;
+		end if;
 
 		Pop_Frame (Interp); -- Done with the current frame
 		Chain_Frame_Result (Interp, Interp.Stack, Get_Car(A));
@@ -30,12 +34,16 @@ Ada.Text_IO.Put_Line ("WRONG NUMBER OF ARGUMETNS FOR CAR");
 		Ptr: Object_Pointer := Args;
 		A: Object_Pointer;
 	begin
-		if Ptr = Nil_Pointer or else Get_Cdr(Ptr) /= Nil_Pointer then
+		if not Is_Cons(Ptr) or else Get_Cdr(Ptr) /= Nil_Pointer then
 Ada.Text_IO.Put_Line ("WRONG NUMBER OF ARGUMETNS FOR CDR"); 
 			raise Syntax_Error;
 		end if;
 
 		A := Get_Car(Ptr); -- the first argument
+		if not Is_Cons(A) then
+Ada.Text_IO.Put_Line ("EXPECTED CONS-CELL FOR CDR"); 
+			raise Evaluation_Error;
+		end if;
 
 		Pop_Frame (Interp); -- Done with the current frame
 		Chain_Frame_Result (Interp, Interp.Stack, Get_Cdr(A));
@@ -46,7 +54,7 @@ Ada.Text_IO.Put_Line ("WRONG NUMBER OF ARGUMETNS FOR CDR");
 		A: Object_Pointer;
 		B: Object_Pointer;
 	begin
-		if Ptr = Nil_Pointer or else Get_Cdr(Ptr) = Nil_Pointer or else Get_Cdr(Get_Cdr(Ptr)) /= Nil_Pointer  then
+		if not Is_Cons(Ptr) or else not Is_Cons(Get_Cdr(Ptr)) or else Get_Cdr(Get_Cdr(Ptr)) /= Nil_Pointer  then
 Ada.Text_IO.Put_Line ("WRONG NUMBER OF ARGUMETNS FOR CONS"); 
 			raise Syntax_Error;
 		end if;
@@ -64,12 +72,16 @@ Ada.Text_IO.Put_Line ("WRONG NUMBER OF ARGUMETNS FOR CONS");
 		A: Object_Pointer;
 		B: Object_Pointer;
 	begin
-		if Ptr = Nil_Pointer or else Get_Cdr(Ptr) = Nil_Pointer or else Get_Cdr(Get_Cdr(Ptr)) /= Nil_Pointer  then
+		if not Is_Cons(Ptr) or else not Is_Cons(Get_Cdr(Ptr)) or else Get_Cdr(Get_Cdr(Ptr)) /= Nil_Pointer  then
 Ada.Text_IO.Put_Line ("WRONG NUMBER OF ARGUMETNS FOR SET-CAR!"); 
 			raise Syntax_Error;
 		end if;
 
 		A := Get_Car(Ptr); -- the first argument
+		if not Is_Cons(A) then
+Ada.Text_IO.Put_Line ("EXPECTED CONS-CELL FOR Setcar"); 
+			raise Evaluation_Error;
+		end if;
 		B := Get_Car(Get_Cdr(Ptr)); -- the second argument
 		Set_Car (A, B); -- change car
 
@@ -82,12 +94,16 @@ Ada.Text_IO.Put_Line ("WRONG NUMBER OF ARGUMETNS FOR SET-CAR!");
 		A: Object_Pointer;
 		B: Object_Pointer;
 	begin
-		if Ptr = Nil_Pointer or else Get_Cdr(Ptr) = Nil_Pointer or else Get_Cdr(Get_Cdr(Ptr)) /= Nil_Pointer  then
+		if not Is_Cons(Ptr) or else not Is_Cons(Get_Cdr(Ptr)) or else Get_Cdr(Get_Cdr(Ptr)) /= Nil_Pointer  then
 Ada.Text_IO.Put_Line ("WRONG NUMBER OF ARGUMETNS FOR SET-CDR!"); 
 			raise Syntax_Error;
 		end if;
 
 		A := Get_Car(Ptr); -- the first argument
+		if not Is_Cons(A) then
+Ada.Text_IO.Put_Line ("EXPECTED CONS-CELL FOR Setcdr"); 
+			raise Evaluation_Error;
+		end if;
 		B := Get_Car(Get_Cdr(Ptr)); -- the second argument
 		Set_Cdr (A, B); -- change cdr
 
@@ -103,7 +119,7 @@ Ada.Text_IO.Put_Line ("WRONG NUMBER OF ARGUMETNS FOR SET-CDR!");
 		Num: Object_Integer := 0; -- TODO: support BIGNUM
 		Car: Object_Pointer;
 	begin
-		while Ptr /= Nil_Pointer loop
+		while Is_Cons(Ptr) loop
 			-- TODO: check if car is an integer or bignum or something else.
 			--       if something else, error
 			Car := Get_Car(Ptr);
@@ -124,7 +140,7 @@ Ada.Text_IO.Put ("NOT INTEGER FOR ADD"); Print (Interp, Car);
 		Num: Object_Integer := 0; -- TODO: support BIGNUM
 		Car: Object_Pointer;
 	begin
-		if Ptr /= Nil_Pointer then
+		if Is_Cons(Ptr) then
 			Car := Get_Car(Ptr);
 			if not Is_Integer(Car) then
 				raise Evaluation_Error;
@@ -132,7 +148,7 @@ Ada.Text_IO.Put ("NOT INTEGER FOR ADD"); Print (Interp, Car);
 			Num := Pointer_To_Integer(Car);
 
 			Ptr := Get_Cdr(Ptr);
-			while Ptr /= Nil_Pointer loop
+			while Is_Cons(Ptr) loop
 				-- TODO: check if car is an integer or bignum or something else.
 				--       if something else, error
 				Car := Get_Car(Ptr);
@@ -153,7 +169,7 @@ Ada.Text_IO.Put ("NOT INTEGER FOR ADD"); Print (Interp, Car);
 		Num: Object_Integer := 1; -- TODO: support BIGNUM
 		Car: Object_Pointer;
 	begin
-		while Ptr /= Nil_Pointer loop
+		while Is_Cons(Ptr) loop
 			-- TODO: check if car is an integer or bignum or something else.
 			--       if something else, error
 			Car := Get_Car(Ptr);
@@ -174,7 +190,7 @@ Ada.Text_IO.Put ("NOT INTEGER FOR MULTIPLY"); Print (Interp, Car);
 		Num: Object_Integer := 1; -- TODO: support BIGNUM
 		Car: Object_Pointer;
 	begin
-		while Ptr /= Nil_Pointer loop
+		while Is_Cons(Ptr) loop
 			-- TODO: check if car is an integer or bignum or something else.
 			--       if something else, error
 			Car := Get_Car(Ptr);
@@ -192,12 +208,12 @@ Ada.Text_IO.Put ("NOT INTEGER FOR MULTIPLY"); Print (Interp, Car);
 
 	procedure Apply_Closure is
 		Fbody: aliased Object_Pointer;
-		Param: aliased Object_Pointer;
-		Arg: aliased Object_Pointer;
+		Formal: aliased Object_Pointer;
+		Actual: aliased Object_Pointer;
 	begin
 		Push_Top (Interp, Fbody'Unchecked_Access);
-		Push_Top (Interp, Param'Unchecked_Access);
-		Push_Top (Interp, Arg'Unchecked_Access);
+		Push_Top (Interp, Formal'Unchecked_Access);
+		Push_Top (Interp, Actual'Unchecked_Access);
 
 		-- For a closure created of "(lambda (x y) (+ x y) (* x y))"
 		-- Get_Closure_Code(Func) returns "((x y) (+ x y) (* x y))"
@@ -206,47 +222,47 @@ Ada.Text_IO.Put ("NOT INTEGER FOR MULTIPLY"); Print (Interp, Car);
 		Interp.Environment := Make_Environment (Interp.Self, Get_Closure_Environment(Func));
 
 		Fbody := Get_Closure_Code(Func);
-		pragma Assert (Is_Cons(Fbody)); -- the reader must ensure this.
+		pragma Assert (Is_Cons(Fbody)); -- the lambda evaluator must ensure this.
 
-		Param := Get_Car(Fbody); -- Formal argument list
-		Arg := Args; -- Actual argument list
+		Formal := Get_Car(Fbody); -- Formal argument list
+		Actual := Args; -- Actual argument list
 
 		Fbody := Get_Cdr(Fbody); -- Real function body
 		pragma Assert (Is_Cons(Fbody)); -- the lambda evaluator must ensure this.
 
-		if Is_Symbol(Param) then
+		if Is_Symbol(Formal) then
 			-- Closure made of a lambda expression with a single formal argument
 			-- e.g) (lambda x (car x))
 			-- Apply the whole actual argument list to the closure.
-Print (Interp, Arg);
-			Put_Environment (Interp, Param, Arg);
+			Put_Environment (Interp, Formal, Actual);
 		else
-			while Is_Cons(Param) loop
-				if not Is_Cons(Arg) then
-					Ada.Text_IO.Put_Line (">>>> Too few arguments <<<<");	
+			while Is_Cons(Formal) loop
+				if not Is_Cons(Actual) then
+					Ada.Text_IO.Put_Line (">>>> Too few arguments for CLOSURE <<<<");	
 					raise Evaluation_Error;
 				end if;
 
 				-- Insert the key/value pair into the environment
-				Put_Environment (Interp, Get_Car(Param), Get_Car(Arg));
+				Put_Environment (Interp, Get_Car(Formal), Get_Car(Actual));
 
-				Param := Get_Cdr(Param);
-				Arg := Get_Cdr(Arg);
+				Formal := Get_Cdr(Formal);
+				Actual := Get_Cdr(Actual);
 			end loop;
 
 			-- Perform cosmetic checks for the parameter list
-			if Param /= Nil_Pointer then 
-				Ada.Text_IO.Put_Line (">>> GARBAGE IN PARAMETER LIST <<<");
-				raise Syntax_Error;
-			end if;
+			if Is_Symbol(Formal) then
+				-- The last formal argument to the closure is in a CDR.
+				-- Assign the remaining actual arguments to the last formal argument
+				-- e.g) ((lambda (x y . z) z) 1 2 3 4 5)
+				Put_Environment (Interp, Formal, Actual);
+			else
+				-- The lambda evaluator must ensure all formal arguments are symbols.
+				pragma Assert (Formal = Nil_Pointer); 
 
-			-- Perform cosmetic checks for the argument list
-			if Is_Cons(Arg) then
-				Ada.Text_IO.Put_Line (">>>> TOO MANY ARGUMETNS FOR CLOSURE  <<<<");	
-				raise Evaluation_Error;
-			elsif Arg /= Nil_Pointer then	
-				Ada.Text_IO.Put_Line (">>> GARBAGE IN ARGUMENT LIST <<<");
-				raise Syntax_Error;
+				if Actual /= Nil_Pointer then	
+					Ada.Text_IO.Put_Line (">>>> TOO MANY ARGUMETNS FOR CLOSURE  <<<<");	
+					raise Evaluation_Error;
+				end if;
 			end if;
 		end if;
 			
