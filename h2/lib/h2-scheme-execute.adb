@@ -135,6 +135,13 @@ procedure Execute (Interp: in out Interpreter_Record) is
 		Pop_Tops (Interp, 2);
 	end Finish_If;
 
+	procedure Finish_Let is
+		pragma Inline (Finish_Let);
+	begin
+ada.text_io.put_line ("Finish_Let");
+		null;
+	end Finish_Let;
+
 	procedure Finish_Set is
 		pragma Inline (Finish_Set);
 		X: aliased Object_Pointer;
@@ -288,6 +295,8 @@ procedure Execute (Interp: in out Interpreter_Record) is
 				-- #t
 				-- #f
 				-- #\C -- character
+				-- #\xHHHH -- unicode
+				-- #\xHHHHHHHH -- unicode
 				-- #( ) -- vector
 				-- #[ ] -- list
 				-- #{ } -- hash table
@@ -322,6 +331,7 @@ procedure Execute (Interp: in out Interpreter_Record) is
 
 						if Interp.Token.Value.Last > 1 then
 							-- TODO: case insensitive match. binary search for more diverse words
+							-- TODO: #\xHHHH....
 							if Interp.Token.Value.Ptr.all(1..Interp.Token.Value.Last) = Label_Newline then
 								Token.Set (Interp, Character_Token, Ch.LF);  -- reset the token to LF
 							elsif Interp.Token.Value.Ptr.all(1..Interp.Token.Value.Last) = Label_Space then
@@ -787,6 +797,9 @@ begin
 
 			when Opcode_Finish_If =>
 				Finish_If;
+
+			when Opcode_Finish_Let =>
+				Finish_Let;
 
 			when Opcode_Finish_Set =>
 				Finish_Set;

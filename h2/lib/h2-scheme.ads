@@ -165,19 +165,21 @@ package H2.Scheme is
 	Syntax_Object: constant Object_Flags := Object_Flags'(2#0001#); 
 
 	type Syntax_Code is mod 2 ** 4;
-	And_Syntax:    constant Syntax_Code := Syntax_Code'(0);
-	Begin_Syntax:  constant Syntax_Code := Syntax_Code'(1);
-	Case_Syntax:   constant Syntax_Code := Syntax_Code'(2);
-	Cond_Syntax:   constant Syntax_Code := Syntax_Code'(3);
-	Define_Syntax: constant Syntax_Code := Syntax_Code'(4);
-	If_Syntax:     constant Syntax_Code := Syntax_Code'(5);
-	Lambda_Syntax: constant Syntax_Code := Syntax_Code'(6);
-	Let_Syntax:    constant Syntax_Code := Syntax_Code'(7);
-	Letast_Syntax: constant Syntax_Code := Syntax_Code'(8);
-	Letrec_Syntax: constant Syntax_Code := Syntax_Code'(9);
-	Or_Syntax:     constant Syntax_Code := Syntax_Code'(10);
-	Quote_Syntax:  constant Syntax_Code := Syntax_Code'(11);
-	Set_Syntax:    constant Syntax_Code := Syntax_Code'(12);
+	And_Syntax:        constant Syntax_Code := Syntax_Code'(0);
+	Begin_Syntax:      constant Syntax_Code := Syntax_Code'(1);
+	Case_Syntax:       constant Syntax_Code := Syntax_Code'(2);
+	Cond_Syntax:       constant Syntax_Code := Syntax_Code'(3);
+	Define_Syntax:     constant Syntax_Code := Syntax_Code'(4);
+	Do_Syntax:         constant Syntax_Code := Syntax_Code'(5);
+	If_Syntax:         constant Syntax_Code := Syntax_Code'(6);
+	Lambda_Syntax:     constant Syntax_Code := Syntax_Code'(7);
+	Let_Syntax:        constant Syntax_Code := Syntax_Code'(8);
+	Letast_Syntax:     constant Syntax_Code := Syntax_Code'(9);
+	Letrec_Syntax:     constant Syntax_Code := Syntax_Code'(10);
+	Or_Syntax:         constant Syntax_Code := Syntax_Code'(11);
+	Quasiquote_Syntax: constant Syntax_Code := Syntax_Code'(12);
+	Quote_Syntax:      constant Syntax_Code := Syntax_Code'(13);
+	Set_Syntax:        constant Syntax_Code := Syntax_Code'(14);
 
 	subtype Procedure_Code is Object_Integer;
 	Add_Procedure:       constant Procedure_Code := Procedure_Code'(0);
@@ -473,8 +475,9 @@ private
 	end record;
 
 	type Common_Symbol_Record is record
-		Quote: Object_Pointer := Nil_Pointer;
-		Arrow: Object_Pointer := Nil_Pointer;
+		Arrow:      Object_Pointer := Nil_Pointer;
+		Quasiquote: Object_Pointer := Nil_Pointer;
+		Quote:      Object_Pointer := Nil_Pointer;
 	end record;
 
 	--type Interpreter_Record is tagged limited record

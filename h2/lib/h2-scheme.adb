@@ -26,19 +26,22 @@ package body H2.Scheme is
 	-- Why doesn't ada include a formal type support for different character
 	-- and string types? This limitation is caused because the generic 
 	-- type I chosed to use to represent a character type is a discrete type.
-	Label_And:      constant Object_Character_Array := (Ch.LC_A, Ch.LC_N, Ch.LC_D); -- "and"
-	Label_Begin:    constant Object_Character_Array := (Ch.LC_B, Ch.LC_E, Ch.LC_G, Ch.LC_I, Ch.LC_N); -- "begin"
-	Label_Case:     constant Object_Character_Array := (Ch.LC_C, Ch.LC_A, Ch.LC_S, Ch.LC_E); -- "case"
-	Label_Cond:     constant Object_Character_Array := (Ch.LC_C, Ch.LC_O, Ch.LC_N, Ch.LC_D); -- "cond"
-	Label_Define:   constant Object_Character_Array := (Ch.LC_D, Ch.LC_E, Ch.LC_F, Ch.LC_I, Ch.LC_N, Ch.LC_E); -- "define"
-	Label_If:       constant Object_Character_Array := (Ch.LC_I, Ch.LC_F); -- "if"
-	Label_Lambda:   constant Object_Character_Array := (Ch.LC_L, Ch.LC_A, Ch.LC_M, Ch.LC_B, Ch.LC_D, Ch.LC_A); -- "lambda"
-	Label_Let:      constant Object_Character_Array := (Ch.LC_L, Ch.LC_E, Ch.LC_T); -- "let"
-	Label_Letast:   constant Object_Character_Array := (Ch.LC_L, Ch.LC_E, Ch.LC_T, Ch.Asterisk); -- "let*"
-	Label_Letrec:   constant Object_Character_Array := (Ch.LC_L, Ch.LC_E, Ch.LC_T, Ch.LC_R, Ch.LC_E, Ch.LC_C); -- "letrec"
-	Label_Or:       constant Object_Character_Array := (Ch.LC_O, Ch.LC_R); -- "or"
-	Label_Quote:    constant Object_Character_Array := (Ch.LC_Q, Ch.LC_U, Ch.LC_O, Ch.LC_T, Ch.LC_E); -- "quote"
-	Label_Set:      constant Object_Character_Array := (Ch.LC_S, Ch.LC_E, Ch.LC_T, Ch.Exclamation); -- "set!"
+	Label_And:        constant Object_Character_Array := (Ch.LC_A, Ch.LC_N, Ch.LC_D); -- "and"
+	Label_Begin:      constant Object_Character_Array := (Ch.LC_B, Ch.LC_E, Ch.LC_G, Ch.LC_I, Ch.LC_N); -- "begin"
+	Label_Case:       constant Object_Character_Array := (Ch.LC_C, Ch.LC_A, Ch.LC_S, Ch.LC_E); -- "case"
+	Label_Cond:       constant Object_Character_Array := (Ch.LC_C, Ch.LC_O, Ch.LC_N, Ch.LC_D); -- "cond"
+	Label_Define:     constant Object_Character_Array := (Ch.LC_D, Ch.LC_E, Ch.LC_F, Ch.LC_I, Ch.LC_N, Ch.LC_E); -- "define"
+	Label_Do:         constant Object_Character_Array := (Ch.LC_D, Ch.LC_O); -- "do"
+	Label_If:         constant Object_Character_Array := (Ch.LC_I, Ch.LC_F); -- "if"
+	Label_Lambda:     constant Object_Character_Array := (Ch.LC_L, Ch.LC_A, Ch.LC_M, Ch.LC_B, Ch.LC_D, Ch.LC_A); -- "lambda"
+	Label_Let:        constant Object_Character_Array := (Ch.LC_L, Ch.LC_E, Ch.LC_T); -- "let"
+	Label_Letast:     constant Object_Character_Array := (Ch.LC_L, Ch.LC_E, Ch.LC_T, Ch.Asterisk); -- "let*"
+	Label_Letrec:     constant Object_Character_Array := (Ch.LC_L, Ch.LC_E, Ch.LC_T, Ch.LC_R, Ch.LC_E, Ch.LC_C); -- "letrec"
+	Label_Or:         constant Object_Character_Array := (Ch.LC_O, Ch.LC_R); -- "or"
+	Label_Quasiquote: constant Object_Character_Array := (Ch.LC_Q, Ch.LC_U, Ch.LC_A, Ch.LC_S, Ch.LC_I, 
+	                                                      Ch.LC_Q, Ch.LC_U, Ch.LC_O, Ch.LC_T, Ch.LC_E); -- "quasiquote"
+	Label_Quote:      constant Object_Character_Array := (Ch.LC_Q, Ch.LC_U, Ch.LC_O, Ch.LC_T, Ch.LC_E); -- "quote"
+	Label_Set:        constant Object_Character_Array := (Ch.LC_S, Ch.LC_E, Ch.LC_T, Ch.Exclamation); -- "set!"
 
 	Label_Car:       constant Object_Character_Array := (Ch.LC_C, Ch.LC_A, Ch.LC_R); -- "car"
 	Label_Cdr:       constant Object_Character_Array := (Ch.LC_C, Ch.LC_D, Ch.LC_R); -- "cdr"
@@ -80,21 +83,22 @@ package body H2.Scheme is
 
 	subtype Moved_Object_Record is Object_Record (Moved_Object, 0);
 
-	subtype Opcode_Type is Object_Integer range 0 .. 13;
+	subtype Opcode_Type is Object_Integer range 0 .. 14;
 	Opcode_Exit:                 constant Opcode_Type := Opcode_Type'(0);
 	Opcode_Evaluate_Result:      constant Opcode_Type := Opcode_Type'(1);
 	Opcode_Evaluate_Object:      constant Opcode_Type := Opcode_Type'(2);
 	Opcode_Evaluate_Group:       constant Opcode_Type := Opcode_Type'(3); -- (begin ...) and closure apply
 	Opcode_Finish_Define_Symbol: constant Opcode_Type := Opcode_Type'(4); 
 	Opcode_Finish_If:            constant Opcode_Type := Opcode_Type'(5); 
-	Opcode_Finish_Set:           constant Opcode_Type := Opcode_Type'(6); 
-	Opcode_Apply:                constant Opcode_Type := Opcode_Type'(7);
-	Opcode_Read_Object:          constant Opcode_Type := Opcode_Type'(8);
-	Opcode_Read_List:            constant Opcode_Type := Opcode_Type'(9);
-	Opcode_Read_List_Cdr:        constant Opcode_Type := Opcode_Type'(10);
-	Opcode_Read_List_End:        constant Opcode_Type := Opcode_Type'(11);
-	Opcode_Close_List:           constant Opcode_Type := Opcode_Type'(12);
-	Opcode_Close_Quote:          constant Opcode_Type := Opcode_Type'(13);
+	Opcode_Finish_Let:           constant Opcode_Type := Opcode_Type'(6); 
+	Opcode_Finish_Set:           constant Opcode_Type := Opcode_Type'(7); 
+	Opcode_Apply:                constant Opcode_Type := Opcode_Type'(8);
+	Opcode_Read_Object:          constant Opcode_Type := Opcode_Type'(9);
+	Opcode_Read_List:            constant Opcode_Type := Opcode_Type'(10);
+	Opcode_Read_List_Cdr:        constant Opcode_Type := Opcode_Type'(11);
+	Opcode_Read_List_End:        constant Opcode_Type := Opcode_Type'(12);
+	Opcode_Close_List:           constant Opcode_Type := Opcode_Type'(13);
+	Opcode_Close_Quote:          constant Opcode_Type := Opcode_Type'(14);
 
 	-----------------------------------------------------------------------------
 	-- COMMON OBJECTS
@@ -739,6 +743,7 @@ ada.text_io.put_line ("HEAP SOURCE IS NIL");
 		-- Migrate the symbol table itself
 		Interp.Symbol_Table := Move_One_Object(Interp.Symbol_Table);
 		Interp.Symbol.Arrow := Move_One_Object(Interp.Symbol.Arrow);
+		Interp.Symbol.Quasiquote := Move_One_Object(Interp.Symbol.Quasiquote);
 		Interp.Symbol.Quote := Move_One_Object(Interp.Symbol.Quote);
 
 		-- Update temporary object pointers that were pointing to the symbol table
@@ -1235,7 +1240,7 @@ Ada.Text_IO.Put_Line ("Make_String...");
 		pragma Inline (Push_Environment);
 		pragma Assert (Is_Cons(Interp.Environment));
 	begin
-		Interp.Environment := Make_Environment (Interp.Self, Interp.Environment);
+		Interp.Environment := Make_Environment(Interp.Self, Interp.Environment);
 	end Push_Environment;
 
 	procedure Pop_Environment (Interp: in out Interpreter_Record) is
@@ -1606,6 +1611,7 @@ Ada.Text_IO.Put_Line ("Make_String...");
 			Dummy := Make_Syntax (Interp.Self, Case_Syntax,   Label_Case); -- "case"
 			Dummy := Make_Syntax (Interp.Self, Cond_Syntax,   Label_Cond); -- "cond"
 			Dummy := Make_Syntax (Interp.Self, Define_Syntax, Label_Define); -- "define"
+			Dummy := Make_Syntax (Interp.Self, Do_Syntax,     Label_Do); -- "do"
 			Dummy := Make_Syntax (Interp.Self, If_Syntax,     Label_If); -- "if"
 			Dummy := Make_Syntax (Interp.Self, Lambda_Syntax, Label_Lambda); -- "lamba"
 			Dummy := Make_Syntax (Interp.Self, Let_Syntax,    Label_Let); -- "let"
@@ -1613,6 +1619,7 @@ Ada.Text_IO.Put_Line ("Make_String...");
 			Dummy := Make_Syntax (Interp.Self, Letrec_Syntax, Label_Letrec); -- "letrc"
 			Dummy := Make_Syntax (Interp.Self, Or_Syntax,     Label_Or); -- "or"
 			Interp.Symbol.Quote := Make_Syntax (Interp.Self, Quote_Syntax,  Label_Quote); -- "quote"
+			Interp.Symbol.Quasiquote := Make_Syntax (Interp.Self, Quasiquote_Syntax,  Label_Quasiquote); -- "quasiquote"
 			Dummy := Make_Syntax (Interp.Self, Set_Syntax,    Label_Set); -- "set!"
 		end Make_Syntax_Objects;
 
