@@ -103,7 +103,9 @@ Ada.Text_IO.Put_Line ("NO ALTERNATE");
 		pragma Inline (Evaluate_Lambda_Syntax);
 	begin
 		-- (lambda <formals> <body>)
-		--   (lambda (x y) (+ x y));
+		-- e.g)  (lambda (x y) (+ x y))
+		-- e.g)  (lambda (x y . z) z)
+		-- e.g)  (lambda x (car x))
 		Operand := Cdr; -- Skip "lambda". cons cell pointing to <formals>
 		if not Is_Cons(Operand) then
 			-- e.g) (lambda)
@@ -113,18 +115,32 @@ Ada.Text_IO.Put_Line ("NO ALTERNATE");
 		end if;
 
 		Car := Get_Car(Operand);  -- <formals>
-		if not Is_Cons(Car) then
+		if Is_Symbol(Car) then
+			-- (lambda x ...)
+			null;	
+		elsif Is_Cons(Car) then 
+			Cdr := Car;
+			loop
+				Cdr := Get_Cdr(Cdr);
+				exit when not Is_Cons(Cdr);
+
+				Car := Get_Car(Cdr);	
+				if not Is_Symbol(Car) then
+					Ada.Text_IO.Put_Line ("WRONG FORMALS FOR LAMBDA");
+					raise Syntax_Error;
+				end if;
+-- TODO: Check duplicate symbol names???
+			end loop;
+
+			if Cdr /= Nil_Pointer and then not Is_Symbol(Cdr) then
+				Ada.Text_IO.Put_Line ("FUCKING CDR IN FORMALS FOR LAMBDA");
+				raise Syntax_Error;
+			end if;
+		else 
 			Ada.Text_IO.Put_Line ("INVALID FORMALS FOR LAMBDA");
 			raise Syntax_Error;
 		end if;
 
-		Cdr := Get_Last_Cdr(Car);
-		if Cdr /= Nil_Pointer then
-			-- (lambda (x y . z) ...)
-			Ada.Text_IO.Put_Line ("FUCKING CDR IN FORMALS FOR LAMBDA");
-			raise Syntax_Error;
-		end if;
-	
 		Cdr := Get_Cdr(Operand); -- cons cell containing <body>
 		if not Is_Cons(Cdr) then
 			Ada.Text_IO.Put_Line ("NO BODY");
@@ -140,7 +156,7 @@ Ada.Text_IO.Put_Line ("NO ALTERNATE");
 		declare
 			Closure: Object_Pointer;
 		begin
-			Closure := Make_Closure (Interp.Self, Operand, Interp.Environment);
+			Closure := Make_Closure(Interp.Self, Operand, Interp.Environment);
 			Pop_Frame (Interp);  -- Done
 			Chain_Frame_Result (Interp, Interp.Stack, Closure);
 		end;

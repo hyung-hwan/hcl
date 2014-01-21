@@ -212,34 +212,42 @@ Ada.Text_IO.Put ("NOT INTEGER FOR MULTIPLY"); Print (Interp, Car);
 		Arg := Args; -- Actual argument list
 
 		Fbody := Get_Cdr(Fbody); -- Real function body
-		pragma Assert (Is_Cons(Fbody)); -- the reader must ensure this as wel..
+		pragma Assert (Is_Cons(Fbody)); -- the lambda evaluator must ensure this.
 
-		while Is_Cons(Param) loop
-			if not Is_Cons(Arg) then
-				Ada.Text_IO.Put_Line (">>>> Too few arguments <<<<");	
-				raise Evaluation_Error;
+		if Is_Symbol(Param) then
+			-- Closure made of a lambda expression with a single formal argument
+			-- e.g) (lambda x (car x))
+			-- Apply the whole actual argument list to the closure.
+Print (Interp, Arg);
+			Put_Environment (Interp, Param, Arg);
+		else
+			while Is_Cons(Param) loop
+				if not Is_Cons(Arg) then
+					Ada.Text_IO.Put_Line (">>>> Too few arguments <<<<");	
+					raise Evaluation_Error;
+				end if;
+
+				-- Insert the key/value pair into the environment
+				Put_Environment (Interp, Get_Car(Param), Get_Car(Arg));
+
+				Param := Get_Cdr(Param);
+				Arg := Get_Cdr(Arg);
+			end loop;
+
+			-- Perform cosmetic checks for the parameter list
+			if Param /= Nil_Pointer then 
+				Ada.Text_IO.Put_Line (">>> GARBAGE IN PARAMETER LIST <<<");
+				raise Syntax_Error;
 			end if;
 
-			-- Insert the key/value pair into the environment
-			Put_Environment (Interp, Get_Car(Param), Get_Car(Arg));
-
-			Param := Get_Cdr(Param);
-			Arg := Get_Cdr(Arg);
-		end loop;
-
-		-- Perform cosmetic checks for the parameter list
-		--if Param /= Nil_Pointer then -- this check handled in reading (lambda ...)
-		--	Ada.Text_IO.Put_Line (">>> GARBAGE IN PARAMETER LIST <<<");
-		--	raise Syntax_Error;
-		--end if;
-
-		-- Perform cosmetic checks for the argument list
-		if Is_Cons(Arg) then
-			Ada.Text_IO.Put_Line (">>>> TOO MANY ARGUMETNS FOR CLOSURE  <<<<");	
-			raise Evaluation_Error;
-		elsif Arg /= Nil_Pointer then	
-			Ada.Text_IO.Put_Line (">>> GARBAGE IN ARGUMENT LIST <<<");
-			raise Syntax_Error;
+			-- Perform cosmetic checks for the argument list
+			if Is_Cons(Arg) then
+				Ada.Text_IO.Put_Line (">>>> TOO MANY ARGUMETNS FOR CLOSURE  <<<<");	
+				raise Evaluation_Error;
+			elsif Arg /= Nil_Pointer then	
+				Ada.Text_IO.Put_Line (">>> GARBAGE IN ARGUMENT LIST <<<");
+				raise Syntax_Error;
+			end if;
 		end if;
 			
 -- TODO: is it correct to keep the environement in the frame?

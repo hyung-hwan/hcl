@@ -367,28 +367,29 @@ package H2.Scheme is
 
 	-- The nil/true/false object are represented by special pointer values.
 	-- The special values are defined under the assumption that actual objects
-	-- are never allocated on one of these addresses. Addresses of 0, 4, 8 are
-	-- very low, making the assumption pretty safe.
-	Nil_Word: constant Object_Word := 2#0000#; -- 0
+	-- are never allocated on one of these addresses. Addresses of 4, 8, 12 are
+	-- very low, making the assumption pretty safe. I don't use 0 for Nil_Word
+	-- as it may conflict with ada's null.
+	Nil_Word: constant Object_Word := 2#0100#; -- 4
 	--Nil_Pointer: constant Object_Pointer;
 	--for Nil_Pointer'Address use Nil_Word'Address;
 	--pragma Import (Ada, Nil_Pointer);
 
-	True_Word: constant Object_Word := 2#0100#; -- 4
+	True_Word: constant Object_Word := 2#1000#; -- 8
 	--True_Pointer: constant Object_Pointer;
 	--for True_Pointer'Address use True_Word'Address;
 	--pragma Import (Ada, True_Pointer);
 
-	False_Word: constant Object_Word := 2#1000#; -- 8
+	False_Word: constant Object_Word := 2#1100#; -- 12 
 	--False_Pointer: constant Object_Pointer;
 	--for False_Pointer'Address use False_Word'Address;
 	--pragma Import (Ada, False_Pointer);
 
 	function Object_Word_To_Pointer is new Ada.Unchecked_Conversion (Object_Word, Object_Pointer);
 	function Object_Pointer_To_Word is new Ada.Unchecked_Conversion (Object_Pointer, Object_Word);
-	Nil_Pointer: constant Object_Pointer := Object_Word_To_Pointer (Nil_Word);
-	True_Pointer: constant Object_Pointer := Object_Word_To_Pointer (True_Word);
-	False_Pointer: constant Object_Pointer := Object_Word_To_Pointer (False_Word);
+	Nil_Pointer: constant Object_Pointer := Object_Word_To_Pointer(Nil_Word);
+	True_Pointer: constant Object_Pointer := Object_Word_To_Pointer(True_Word);
+	False_Pointer: constant Object_Pointer := Object_Word_To_Pointer(False_Word);
 
 	-- -----------------------------------------------------------------------------
 

@@ -31,7 +31,7 @@ package body Token is
 				Pool.Deallocate (Tmp);
 			end;
 
-			Buffer := ( Ptr => null, Len => 0, Last => 0);
+			Buffer := (Ptr => null, Len => 0, Last => 0);
 		end if;
 	end Purge_Buffer;
 

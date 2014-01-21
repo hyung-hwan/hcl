@@ -61,7 +61,7 @@ procedure Execute (Interp: in out Interpreter_Record) is
 				Push_Frame (Interp, Opcode_Evaluate_Object, Car);
 
 			when Mark_Object =>
-				Operand := Get_Frame_Result (Interp.Stack);
+				Operand := Get_Frame_Result(Interp.Stack);
 				Pop_Frame (Interp); -- Done
 
 				-- There must be only 1 return value chained in the Group frame.
@@ -82,14 +82,15 @@ procedure Execute (Interp: in out Interpreter_Record) is
 		X: aliased Object_Pointer;
 		Y: aliased Object_Pointer;
 	begin
-Ada.Text_IO.PUt_Line ("FINISH DEFINE SYMBOL");
 		Push_Top (Interp, X'Unchecked_Access);
 		Push_Top (Interp, Y'Unchecked_Access);
 
 		X := Get_Frame_Operand(Interp.Stack); -- symbol
-		Y := Get_Car(Get_Frame_Result(Interp.Stack));  -- value
 		pragma Assert (Is_Symbol(X));
-		pragma Assert (Get_Cdr(Get_Frame_Result(Interp.Stack)) = Nil_Pointer);
+
+		Y := Get_Frame_Result(Interp.Stack);  -- value list
+		pragma Assert (Get_Cdr(Y) = Nil_Pointer); -- ensure only 1 return value 
+		Y := Get_Car(Y); -- the first value 
 
 		Put_Environment (Interp, X, Y);
 
@@ -105,15 +106,15 @@ Ada.Text_IO.PUt_Line ("FINISH DEFINE SYMBOL");
 		Y: aliased Object_Pointer;
 		Z: aliased Object_Pointer;
 	begin
-Ada.Text_IO.PUt_Line ("FINISH IF");
-
 		Push_Top (Interp, X'Unchecked_Access);
 		Push_Top (Interp, Y'Unchecked_Access);
 
 		X := Get_Frame_Operand(Interp.Stack); -- cons cell containing <consequent>
-		Y := Get_Car(Get_Frame_Result(Interp.Stack)); -- result of conditional
 		pragma Assert (Is_Cons(X)); 
-		pragma Assert (Get_Cdr(Get_Frame_Result(Interp.Stack)) = Nil_Pointer);
+
+		Y := Get_Frame_Result(Interp.Stack);  -- result list of <test>
+		pragma Assert (Get_Cdr(Y) = Nil_Pointer); -- ensure only 1 return value 
+		Y := Get_Car(Y); -- the first value 
 
 		Pop_Frame (Interp);
 		if Y = False_Pointer then
@@ -139,7 +140,6 @@ Ada.Text_IO.PUt_Line ("FINISH IF");
 		X: aliased Object_Pointer;
 		Y: aliased Object_Pointer;
 	begin
-Ada.Text_IO.PUt_Line ("FINISH Set");
 		Push_Top (Interp, X'Unchecked_Access);
 		Push_Top (Interp, Y'Unchecked_Access);
 
@@ -158,7 +158,6 @@ Ada.Text_IO.PUt_Line ("FINISH Set");
 
 		Pop_Tops (Interp, 2);
 	end Finish_Set;
-
 
 	procedure Evaluate is separate;
 	procedure Apply is separate;
@@ -607,6 +606,7 @@ Ada.Text_IO.Put_Line ("ERROR: CDR QUOT LIST END");
 				Pop_Frame (Interp); 
 				Chain_Frame_Result (Interp, Interp.Stack, V);
 			when others =>
+Ada.Text_IO.Put_Line ("Right parenthesis expected");
 				raise Syntax_Error;
 		end case;
 

@@ -1159,26 +1159,8 @@ Ada.Text_IO.Put_Line ("Make_String...");
 
 			Arr := Arr.Pointer_Slot(3);
 		end loop;	
-
-		return null; -- not found. note that it's not Nil_Pointer.
+		return null; -- not found. 
 	end Find_In_Environment_List;
-
-	function Set_Environment (Interp: access Interpreter_Record;
-	                          Key:    in     Object_Pointer;
-	                          Value:  in     Object_Pointer) return Object_Pointer is
-		Arr: Object_Pointer;
-	begin
-		pragma Assert (Is_Symbol(Key));
-
-		Arr := Find_In_Environment_List(Interp, Get_Car(Interp.Environment), Key);
-		if Arr = null then
-			return null;	
-		else
-			-- overwrite an existing pair
-			Arr.Pointer_Slot(2) := Value;
-			return Value;
-		end if;
-	end Set_Environment;
 
 	procedure Put_Environment (Interp: in out Interpreter_Record;
 	                           Key:    in     Object_Pointer;
@@ -1213,6 +1195,23 @@ Ada.Text_IO.Put_Line ("Make_String...");
 		end if;
 	end Put_Environment;
 
+	function Set_Environment (Interp: access Interpreter_Record;
+	                          Key:    in     Object_Pointer;
+	                          Value:  in     Object_Pointer) return Object_Pointer is
+		Arr: Object_Pointer;
+	begin
+		pragma Assert (Is_Symbol(Key));
+
+		Arr := Find_In_Environment_List(Interp, Get_Car(Interp.Environment), Key);
+		if Arr = null then
+			return null;
+		else
+			-- overwrite an existing pair
+			Arr.Pointer_Slot(2) := Value;
+			return Value;
+		end if;
+	end Set_Environment;
+
 	function Get_Environment (Interp: access Interpreter_Record;
 	                          Key:    in     Object_Pointer) return Object_Pointer is
 		Envir: Object_Pointer;
@@ -1222,7 +1221,7 @@ Ada.Text_IO.Put_Line ("Make_String...");
 		while Envir /= Nil_Pointer loop
 			pragma Assert (Is_Cons(Envir));
 			Arr := Find_In_Environment_List(Interp, Get_Car(Envir), Key);
-			if Arr /= Nil_Pointer then
+			if Arr /= null then
 				return Arr.Pointer_Slot(2);
 			end if;
 
@@ -1254,7 +1253,7 @@ Ada.Text_IO.Put_Line ("Make_String...");
 	                      Name:   in     Object_Character_Array) return Object_Pointer is
 		Result: Object_Pointer;
 	begin
-		Result := Make_Symbol (Interp, Name);
+		Result := Make_Symbol(Interp, Name);
 		Result.Flags := Result.Flags or Syntax_Object;
 		Result.Scode := Opcode;
 --Ada.Text_IO.Put ("Creating Syntax Symbol ");
@@ -1279,16 +1278,16 @@ Ada.Text_IO.Put_Line ("Make_String...");
 		Push_Top (Interp.all, Proc'Unchecked_Access);
 
 		-- Make a symbol for the procedure
-		Symbol := Make_Symbol (Interp, Name);
+		Symbol := Make_Symbol(Interp, Name);
 
 		-- Make the actual procedure object
-		Proc := Allocate_Pointer_Object (Interp, Procedure_Object_Size, Nil_Pointer);
+		Proc := Allocate_Pointer_Object(Interp, Procedure_Object_Size, Nil_Pointer);
 		Proc.Tag := Procedure_Object;
 		Proc.Pointer_Slot(Procedure_Opcode_Index) := Integer_To_Pointer(Opcode);
 
 		-- Link it to the top environement
 		pragma Assert (Interp.Environment = Interp.Root_Environment); 
-		pragma Assert (Get_Environment (Interp.Self, Symbol) = null);
+		pragma Assert (Get_Environment(Interp.Self, Symbol) = null);
 		Put_Environment (Interp.all, Symbol, Proc);
 
 		Pop_Tops (Interp.all, 2);
@@ -1669,12 +1668,19 @@ Ada.Text_IO.Put_Line ("Make_String...");
 
 -- TODO: disallow garbage collecion during initialization.
 		Initialize_Heap (Initial_Heap_Size);
-		Interp.Mark := Make_Mark(Interp.Self, 0); -- to indicate the end of cons evluation
+ada.text_io.put_line ("kkkkkkkkkkkkkk");
+		Interp.Mark := Make_Mark(Interp.Self, 0); -- to indicate the end of cons evaluation
+ada.text_io.put_line ("xxxxxxxxxxxxxx");
 		Interp.Root_Environment := Make_Environment(Interp.Self, Nil_Pointer);
+ada.text_io.put_line ("zzzzzzzzzzzzzzzzzz");
 		Interp.Environment := Interp.Root_Environment;
 		Make_Syntax_Objects;
+print (interp, interp.mark);
+ada.text_io.put_line ("zzzzzzzzzzzzzzzzzz 00");
 		Make_Procedure_Objects;
+ada.text_io.put_line ("zzzzzzzzzzzzzzzzzz 00--00");
 		Make_Common_Symbol_Objects;
+ada.text_io.put_line ("zzzzzzzzzzzzzzzzzz 11");
 
 	exception
 		when others =>
@@ -1801,6 +1807,8 @@ Ada.Text_IO.Put_Line ("Make_String...");
 						when Others =>
 							if Atom.Kind = Character_Object then
 								Output_Character_Array (Atom.Character_Slot);
+							elsif Atom.Tag = Mark_Object then
+								Ada.Text_IO.Put ("#INTERNAL MARK#");
 							else
 								Ada.Text_IO.Put ("#NOIMPL#");
 							end if;
@@ -2007,7 +2015,6 @@ end if;
 		
 		pragma Assert (Interp.Stack = Nil_Pointer);
 		Interp.Stack := Nil_Pointer;
-Print_Object_Pointer ("STACK IN EVALUTE => ", Interp.Stack);
 
 		-- Push a pseudo-frame to terminate the evaluation loop
 		Push_Frame (Interp, Opcode_Exit, Nil_Pointer);
