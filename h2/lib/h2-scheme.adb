@@ -1164,16 +1164,72 @@ Ada.Text_IO.Put_Line ("Make_String...");
 		return null; -- not found. 
 	end Find_In_Environment_List;
 
+	function Get_Environment (Interp: access Interpreter_Record;
+	                          Key:    in     Object_Pointer) return Object_Pointer is
+		Envir: Object_Pointer;
+		Arr: Object_Pointer;
+	begin
+		pragma Assert (Is_Symbol(Key));
+
+		Envir := Interp.Environment;	
+		while Envir /= Nil_Pointer loop
+			pragma Assert (Is_Cons(Envir));
+
+			Arr := Find_In_Environment_List(Interp, Get_Car(Envir), Key);
+			if Arr /= null then
+				return Arr.Pointer_Slot(2);
+			end if;
+
+			-- Move on to the parent environment
+			Envir := Get_Cdr(Envir);
+		end loop;
+		return null; -- not found
+	end Get_Environment;
+
+	function Set_Environment (Interp: access Interpreter_Record;
+	                          Key:    in     Object_Pointer;
+	                          Value:  in     Object_Pointer) return Object_Pointer is
+		Envir: Object_Pointer;
+		Arr: Object_Pointer;
+	begin
+		-- Search the whole environment chain unlike Put_Environment().
+		-- It is mainly for set!.
+		pragma Assert (Is_Symbol(Key));
+
+		Envir := Interp.Environment;	
+		while Envir /= Nil_Pointer loop
+			pragma Assert (Is_Cons(Envir));
+
+			Arr := Find_In_Environment_List(Interp, Get_Car(Envir), Key);
+			if Arr /= null then
+				-- Overwrite an existing pair
+				Arr.Pointer_Slot(2) := Value;
+				return Value;
+			end if;
+
+			-- Move on to the parent environment
+			Envir := Get_Cdr(Envir);
+		end loop;
+		return null; -- not found. not set
+	end Set_Environment;
+
 	procedure Put_Environment (Interp: in out Interpreter_Record;
 	                           Key:    in     Object_Pointer;
 	                           Value:  in     Object_Pointer) is
 		Arr: Object_Pointer;
 	begin
+		-- Search the current environment only. It doesn't search the 
+		-- environment. If no key is found, add a new pair
+		-- This is mainly for define.
 		pragma Assert (Is_Symbol(Key));
 
 		Arr := Find_In_Environment_List(Interp.Self, Get_Car(Interp.Environment), Key);
-		if Arr = null then
-			-- Add a new key/value pair
+		if Arr /= null then
+			-- Found. Update the existing one
+			Arr.Pointer_Slot(2) := Value;
+		else
+			-- Add a new key/value pair in the current environment
+			-- if no existing pair has been found.
 			declare 
 				Aliased_Key: aliased Object_Pointer := Key;
 				Aliased_Value: aliased Object_Pointer := Value;
@@ -1191,47 +1247,8 @@ Ada.Text_IO.Put_Line ("Make_String...");
 	
 				Pop_Tops (Interp, 2);
 			end;
-		else
-			-- overwrite an existing pair
-			Arr.Pointer_Slot(2) := Value;
 		end if;
 	end Put_Environment;
-
-	function Set_Environment (Interp: access Interpreter_Record;
-	                          Key:    in     Object_Pointer;
-	                          Value:  in     Object_Pointer) return Object_Pointer is
-		Arr: Object_Pointer;
-	begin
-		pragma Assert (Is_Symbol(Key));
-
-		Arr := Find_In_Environment_List(Interp, Get_Car(Interp.Environment), Key);
-		if Arr = null then
-			return null;
-		else
-			-- overwrite an existing pair
-			Arr.Pointer_Slot(2) := Value;
-			return Value;
-		end if;
-	end Set_Environment;
-
-	function Get_Environment (Interp: access Interpreter_Record;
-	                          Key:    in     Object_Pointer) return Object_Pointer is
-		Envir: Object_Pointer;
-		Arr: Object_Pointer;
-	begin
-		Envir := Interp.Environment;	
-		while Envir /= Nil_Pointer loop
-			pragma Assert (Is_Cons(Envir));
-			Arr := Find_In_Environment_List(Interp, Get_Car(Envir), Key);
-			if Arr /= null then
-				return Arr.Pointer_Slot(2);
-			end if;
-
-			-- Move on to the parent environment
-			Envir := Get_Cdr(Envir);
-		end loop;
-		return null; -- not found
-	end Get_Environment;
 
 	procedure Push_Environment (Interp: in out Interpreter_Record) is
 		pragma Inline (Push_Environment);
