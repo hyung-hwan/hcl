@@ -10,6 +10,8 @@ procedure Evaluate is
 	procedure Evaluate_Define_Syntax is
 		pragma Inline (Evaluate_Define_Syntax);
 	begin
+-- TODO: limit the context where define can be used.
+
 		-- (define x 10) 
 		-- (define (add x y) (+ x y)) -> (define add (lambda (x y) (+ x y)))
 		Operand := Cdr; -- Skip "define"
@@ -114,10 +116,10 @@ Ada.Text_IO.Put_Line ("NO ALTERNATE");
 		end if;
 
 		Car := Get_Car(Operand);  -- <formals>
-		if Is_Symbol(Car) then
-			-- (lambda x ...)
-			-- nothing to do.
-			null;	
+		if Car = Nil_Pointer or else Is_Symbol(Car) then
+			-- (lambda () ...) or (lambda x ...)
+			-- nothing to do	
+			null;
 		elsif Is_Cons(Car) then 
 			declare
 				Formals: Object_Pointer := Car;

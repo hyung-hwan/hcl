@@ -182,16 +182,21 @@ package H2.Scheme is
 	Set_Syntax:        constant Syntax_Code := Syntax_Code'(14);
 
 	subtype Procedure_Code is Object_Integer;
-	Add_Procedure:       constant Procedure_Code := Procedure_Code'(0);
-	Car_Procedure:       constant Procedure_Code := Procedure_Code'(1);
-	Cdr_Procedure:       constant Procedure_Code := Procedure_Code'(2);
-	Cons_Procedure:      constant Procedure_Code := Procedure_Code'(3);
-	Multiply_Procedure:  constant Procedure_Code := Procedure_Code'(4);
-	Quotient_Procedure:  constant Procedure_Code := Procedure_Code'(5);
-	Remainder_Procedure: constant Procedure_Code := Procedure_Code'(6);
-	Setcar_Procedure:    constant Procedure_Code := Procedure_Code'(7);
-	Setcdr_Procedure:    constant Procedure_Code := Procedure_Code'(8);
-	Subtract_Procedure:  constant Procedure_Code := Procedure_Code'(9);
+	Add_Procedure:          constant Procedure_Code := Procedure_Code'(0);
+	Car_Procedure:          constant Procedure_Code := Procedure_Code'(1);
+	Cdr_Procedure:          constant Procedure_Code := Procedure_Code'(2);
+	Cons_Procedure:         constant Procedure_Code := Procedure_Code'(3);
+	EQ_Procedure:           constant Procedure_Code := Procedure_Code'(4);
+	GT_Procedure:           constant Procedure_Code := Procedure_Code'(5);
+	LT_Procedure:           constant Procedure_Code := Procedure_Code'(6);
+	GE_Procedure:           constant Procedure_Code := Procedure_Code'(7);
+	LE_Procedure:           constant Procedure_Code := Procedure_Code'(8);
+	Multiply_Procedure:     constant Procedure_Code := Procedure_Code'(9);
+	Quotient_Procedure:     constant Procedure_Code := Procedure_Code'(10);
+	Remainder_Procedure:    constant Procedure_Code := Procedure_Code'(11);
+	Setcar_Procedure:       constant Procedure_Code := Procedure_Code'(12);
+	Setcdr_Procedure:       constant Procedure_Code := Procedure_Code'(13);
+	Subtract_Procedure:     constant Procedure_Code := Procedure_Code'(14);
 
 	type Object_Tag is (
 		Unknown_Object, 

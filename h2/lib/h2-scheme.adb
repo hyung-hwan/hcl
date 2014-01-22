@@ -46,13 +46,18 @@ package body H2.Scheme is
 	Label_Car:       constant Object_Character_Array := (Ch.LC_C, Ch.LC_A, Ch.LC_R); -- "car"
 	Label_Cdr:       constant Object_Character_Array := (Ch.LC_C, Ch.LC_D, Ch.LC_R); -- "cdr"
 	Label_Cons:      constant Object_Character_Array := (Ch.LC_C, Ch.LC_O, Ch.LC_N, Ch.LC_S); -- "cons"
+	Label_EQ:        constant Object_Character_Array := (1 => Ch.Equal_Sign); -- "="
+	Label_GE:        constant Object_Character_Array := (Ch.Greater_Than_Sign, Ch.Equal_Sign); -- ">="
+	Label_GT:        constant Object_Character_Array := (1 => Ch.Greater_Than_Sign); -- ">"
+	Label_LE:        constant Object_Character_Array := (Ch.Less_Than_Sign, Ch.Equal_Sign); -- "<="
+	Label_LT:        constant Object_Character_Array := (1 => Ch.Less_Than_Sign); -- "<"
+	Label_Minus:     constant Object_Character_Array := (1 => Ch.Minus_Sign); -- "-"
+	Label_Multiply:  constant Object_Character_Array := (1 => Ch.Asterisk); -- "*"
+	Label_Plus:      constant Object_Character_Array := (1 => Ch.Plus_Sign); -- "+"
 	Label_Quotient:  constant Object_Character_Array := (Ch.LC_Q, Ch.LC_U, Ch.LC_O, Ch.LC_T, Ch.LC_I, Ch.LC_E, Ch.LC_N, Ch.LC_T); -- "quotient"
 	Label_Remainder: constant Object_Character_Array := (Ch.LC_R, Ch.LC_E, Ch.LC_M, Ch.LC_A, Ch.LC_I, Ch.LC_N, Ch.LC_D, Ch.LC_E, Ch.LC_R); -- "remainder"
 	Label_Setcar:    constant Object_Character_Array := (Ch.LC_S, Ch.LC_E, Ch.LC_T, Ch.Minus_Sign, Ch.LC_C, Ch.LC_A, Ch.LC_R, Ch.Exclamation); -- "set-car!"
 	Label_Setcdr:    constant Object_Character_Array := (Ch.LC_S, Ch.LC_E, Ch.LC_T, Ch.Minus_Sign, Ch.LC_C, Ch.LC_D, Ch.LC_R, Ch.Exclamation); -- "set-cdr!"
-	Label_Plus:      constant Object_Character_Array := (1 => Ch.Plus_Sign); -- "+"
-	Label_Minus:     constant Object_Character_Array := (1 => Ch.Minus_Sign); -- "-"
-	Label_Multiply:  constant Object_Character_Array := (1 => Ch.Asterisk); -- "*"
 
 
 	Label_Newline:  constant Object_Character_Array := (Ch.LC_N, Ch.LC_E, Ch.LC_W, Ch.LC_L, Ch.LC_I, Ch.LC_N, Ch.LC_E); -- "newline"
@@ -548,25 +553,17 @@ ada.text_io.put_line ("HEAP SOURCE IS NIL");
 		Original_Symbol_Table: Object_Pointer;
 
 		--function To_Object_Pointer is new Ada.Unchecked_Conversion (Heap_Element_Pointer, Object_Pointer);
-
 		function Move_One_Object (Source: in Object_Pointer) return Object_Pointer is
 		begin
 			pragma Assert (Is_Normal_Pointer(Source));
 
-			--if Is_Special_Pointer(Source)  then
---Print_Object_Pointer ("Moving special ...", Source);
-			--	return Source;
-			--end if;
-
 			if Source.Kind = Moved_Object then
---Print_Object_Pointer ("Moving NOT ...", Source);
 				-- the object has moved to the new heap.
 				-- the size field has been updated to the new object
 				-- in the 'else' block below. i can simply return it
 				-- without further migration.
 				return Get_New_Location (Source);
 			else
---Print_Object_Pointer ("Moving REALLY ...", Source);
 				declare
 					Bytes: Heap_Size;
 
@@ -608,8 +605,6 @@ ada.text_io.put_line ("HEAP SOURCE IS NIL");
 					-- if the object is marked with FLAG_MOVED;
 					Set_New_Location (Source, Ptr);
 
---Ada.Text_IO.Put_Line (Object_Word'Image(Pointer_To_Word(Source)) & Object_Word'Image(Pointer_To_Word(New_Object)));
---Ada.Text_IO.Put_Line ("  Flags....after " & Object_Kind'Image(Source.Kind) & " New Size " & Object_Size'Image(Source.Size) & " New Loc: " & Object_Word'Image(Pointer_To_Word(Source.New_Pointer)));
 					-- Return the new object
 					return New_Object;
 				end;
@@ -728,6 +723,11 @@ ada.text_io.put_line ("HEAP SOURCE IS NIL");
 			end if;
 		end loop;
 
+		-- Migrate some known symbols
+		Interp.Symbol.Arrow := Move_One_Object(Interp.Symbol.Arrow);
+		Interp.Symbol.Quasiquote := Move_One_Object(Interp.Symbol.Quasiquote);
+		Interp.Symbol.Quote := Move_One_Object(Interp.Symbol.Quote);
+
 --Ada.Text_IO.Put_Line (">>> [GC SCANNING NEW HEAP]");
 		-- Scan the heap
 		Last_Pos := Scan_New_Heap(Interp.Heap(New_Heap).Space'First);
@@ -742,9 +742,6 @@ ada.text_io.put_line ("HEAP SOURCE IS NIL");
 --Print_Object_Pointer (">>> [GC MOVING SYMBOL TABLE]", Interp.Symbol_Table);
 		-- Migrate the symbol table itself
 		Interp.Symbol_Table := Move_One_Object(Interp.Symbol_Table);
-		Interp.Symbol.Arrow := Move_One_Object(Interp.Symbol.Arrow);
-		Interp.Symbol.Quasiquote := Move_One_Object(Interp.Symbol.Quasiquote);
-		Interp.Symbol.Quote := Move_One_Object(Interp.Symbol.Quote);
 
 		-- Update temporary object pointers that were pointing to the symbol table
 		if Original_Symbol_Table /= null then
@@ -1626,16 +1623,21 @@ Ada.Text_IO.Put_Line ("Make_String...");
 		procedure Make_Procedure_Objects is
 			Dummy: Object_Pointer;
 		begin
-			Dummy := Make_Procedure (Interp.Self, Add_Procedure,       Label_Plus); -- "+"
-			Dummy := Make_Procedure (Interp.Self, Car_Procedure,       Label_Car); -- "car"
-			Dummy := Make_Procedure (Interp.Self, Cdr_Procedure,       Label_Cdr); -- "cdr"
-			Dummy := Make_Procedure (Interp.Self, Cons_Procedure,      Label_Cons); -- "cons"
-			Dummy := Make_Procedure (Interp.Self, Multiply_Procedure,  Label_Multiply); -- "*"
-			Dummy := Make_Procedure (Interp.Self, Quotient_Procedure,  Label_Quotient); -- "quotient"
-			Dummy := Make_Procedure (Interp.Self, Remainder_Procedure, Label_Remainder); -- "remainder"
-			Dummy := Make_Procedure (Interp.Self, Setcar_Procedure,    Label_Setcar); -- "set-car!"
-			Dummy := Make_Procedure (Interp.Self, Setcdr_Procedure,    Label_Setcdr); -- "set-cdr!"
-			Dummy := Make_Procedure (Interp.Self, Subtract_Procedure,  Label_Minus); -- "-"
+			Dummy := Make_Procedure (Interp.Self, Add_Procedure,          Label_Plus); -- "+"
+			Dummy := Make_Procedure (Interp.Self, Car_Procedure,          Label_Car); -- "car"
+			Dummy := Make_Procedure (Interp.Self, Cdr_Procedure,          Label_Cdr); -- "cdr"
+			Dummy := Make_Procedure (Interp.Self, Cons_Procedure,         Label_Cons); -- "cons"
+			Dummy := Make_Procedure (Interp.Self, EQ_Procedure,           Label_EQ); -- "="
+			Dummy := Make_Procedure (Interp.Self, GE_Procedure,           Label_GE); -- ">="
+			Dummy := Make_Procedure (Interp.Self, GT_Procedure,           Label_GT); -- ">"
+			Dummy := Make_Procedure (Interp.Self, LE_Procedure,           Label_LE); -- "<="
+			Dummy := Make_Procedure (Interp.Self, LT_Procedure,           Label_LT); -- "<"
+			Dummy := Make_Procedure (Interp.Self, Multiply_Procedure,     Label_Multiply); -- "*"
+			Dummy := Make_Procedure (Interp.Self, Quotient_Procedure,     Label_Quotient); -- "quotient"
+			Dummy := Make_Procedure (Interp.Self, Remainder_Procedure,    Label_Remainder); -- "remainder"
+			Dummy := Make_Procedure (Interp.Self, Setcar_Procedure,       Label_Setcar); -- "set-car!"
+			Dummy := Make_Procedure (Interp.Self, Setcdr_Procedure,       Label_Setcdr); -- "set-cdr!"
+			Dummy := Make_Procedure (Interp.Self, Subtract_Procedure,     Label_Minus); -- "-"
 		end Make_Procedure_Objects;
 
 		procedure Make_Common_Symbol_Objects is

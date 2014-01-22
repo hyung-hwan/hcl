@@ -206,6 +206,90 @@ Ada.Text_IO.Put ("NOT INTEGER FOR MULTIPLY"); Print (Interp, Car);
 		Chain_Frame_Result (Interp, Interp.Stack, Integer_To_Pointer(Num));
 	end Apply_Quotient_Procedure;
 
+	generic 
+		with function Validate (X: in Object_Pointer; Y: in Object_Pointer) return Standard.Boolean;
+		with function Compare (X: in Object_Pointer; Y: in Object_Pointer) return Standard.Boolean;
+	procedure Apply_Compare_Procedure;
+
+	procedure Apply_Compare_Procedure is
+		-- TODO: support other values
+		Ptr: Object_Pointer := Args;
+		X: Object_Pointer;
+		Y: Object_Pointer;
+		Bool: Object_Pointer := True_Pointer;
+	begin
+		if Is_Cons(Ptr) and then Is_Cons(Get_Cdr(Ptr)) then
+			-- at least 2 actual arguments
+			X := Get_Car(Ptr);
+			
+			Ptr := Get_Cdr(Ptr);
+			while Is_Cons(Ptr) loop
+				Y := Get_Car(Ptr);
+
+				if not Validate(X, Y) then
+					ADA.TEXT_IO.PUT_LINE ("NON INTEGER FOR COMPARISION");
+					raise Evaluation_Error;
+				end if;
+
+				if not Compare(X, Y) then
+					Bool := False_Pointer;
+					exit;
+				end if;
+
+				X := Y;
+				Ptr := Get_Cdr(Ptr);
+			end loop;
+
+			Pop_Frame (Interp); --  Done with the current frame
+			Chain_Frame_Result (Interp, Interp.Stack, Bool);
+		else
+Ada.Text_IO.Put_line ("TOO FEW ARGUMETNS FOR COMPARISON");
+			raise Syntax_Error;
+		end if;
+	end Apply_Compare_Procedure;
+
+	function Validate_Numeric (X: in Object_Pointer; Y: in Object_Pointer) return Standard.Boolean is
+		-- TODO: support BIGNUM, OTHER DATA TYPES
+	begin
+		return Is_Integer(X) and then Is_Integer(Y);
+	end Validate_Numeric;
+
+	function Equal_To (X: in Object_Pointer; Y: in Object_Pointer) return Standard.Boolean is
+		-- TODO: support BIGNUM, OTHER DATA TYPES
+	begin
+		return Pointer_To_Integer(X) = Pointer_To_Integer(Y);
+	end Equal_To;
+
+	function Greater_Than (X: in Object_Pointer; Y: in Object_Pointer) return Standard.Boolean is
+		-- TODO: support BIGNUM, OTHER DATA TYPES
+	begin
+		return Pointer_To_Integer(X) > Pointer_To_Integer(Y);
+	end Greater_Than;
+
+	function Less_Than (X: in Object_Pointer; Y: in Object_Pointer) return Standard.Boolean is
+		-- TODO: support BIGNUM, OTHER DATA TYPES
+	begin
+		return Pointer_To_Integer(X) < Pointer_To_Integer(Y);
+	end Less_Than;
+
+	function Greater_Or_Equal (X: in Object_Pointer; Y: in Object_Pointer) return Standard.Boolean is
+		-- TODO: support BIGNUM, OTHER DATA TYPES
+	begin
+		return Pointer_To_Integer(X) >= Pointer_To_Integer(Y);
+	end Greater_Or_Equal;
+
+	function Less_Or_Equal (X: in Object_Pointer; Y: in Object_Pointer) return Standard.Boolean is
+		-- TODO: support BIGNUM, OTHER DATA TYPES
+	begin
+		return Pointer_To_Integer(X) <= Pointer_To_Integer(Y);
+	end Less_Or_Equal;
+
+	procedure Apply_EQ_Procedure is new Apply_Compare_Procedure (Validate_Numeric, Equal_To);
+	procedure Apply_GT_Procedure is new Apply_Compare_Procedure (Validate_Numeric, Greater_Than);
+	procedure Apply_LT_Procedure is new Apply_Compare_Procedure (Validate_Numeric, Less_Than);
+	procedure Apply_GE_Procedure is new Apply_Compare_Procedure (Validate_Numeric, Greater_Or_Equal);
+	procedure Apply_LE_Procedure is new Apply_Compare_Procedure (Validate_Numeric, Less_Or_Equal);
+
 	procedure Apply_Closure is
 		Fbody: aliased Object_Pointer;
 		Formal: aliased Object_Pointer;
@@ -219,7 +303,7 @@ Ada.Text_IO.Put ("NOT INTEGER FOR MULTIPLY"); Print (Interp, Car);
 		-- Get_Closure_Code(Func) returns "((x y) (+ x y) (* x y))"
 
 		-- Push a new environmen for the closure
-		Interp.Environment := Make_Environment (Interp.Self, Get_Closure_Environment(Func));
+		Interp.Environment := Make_Environment(Interp.Self, Get_Closure_Environment(Func));
 
 		Fbody := Get_Closure_Code(Func);
 		pragma Assert (Is_Cons(Fbody)); -- the lambda evaluator must ensure this.
@@ -307,7 +391,6 @@ Print (Interp, Operand);
 				when Setcdr_Procedure =>
 					Apply_Setcdr_Procedure;
 
-
 				when Add_Procedure =>
 					Apply_Add_Procedure;
 				when Subtract_Procedure =>
@@ -319,6 +402,16 @@ Print (Interp, Operand);
 				--when Remainder_Procedure =>
 				--	Apply_Remainder_Procedure;
 
+				when EQ_Procedure =>
+					Apply_EQ_Procedure;
+				when GT_Procedure =>
+					Apply_GT_Procedure;
+				when LT_Procedure =>
+					Apply_LT_Procedure;
+				when GE_Procedure =>
+					Apply_GE_Procedure;
+				when LE_Procedure =>
+					Apply_LE_Procedure;
 				when others =>
 					raise Internal_Error;
 			end case;	
