@@ -88,22 +88,24 @@ package body H2.Scheme is
 
 	subtype Moved_Object_Record is Object_Record (Moved_Object, 0);
 
-	subtype Opcode_Type is Object_Integer range 0 .. 14;
+	subtype Opcode_Type is Object_Integer range 0 .. 16;
 	Opcode_Exit:                 constant Opcode_Type := Opcode_Type'(0);
 	Opcode_Evaluate_Result:      constant Opcode_Type := Opcode_Type'(1);
 	Opcode_Evaluate_Object:      constant Opcode_Type := Opcode_Type'(2);
 	Opcode_Evaluate_Group:       constant Opcode_Type := Opcode_Type'(3); -- (begin ...) and closure apply
-	Opcode_Finish_Define_Symbol: constant Opcode_Type := Opcode_Type'(4); 
-	Opcode_Finish_If:            constant Opcode_Type := Opcode_Type'(5); 
-	Opcode_Finish_Let:           constant Opcode_Type := Opcode_Type'(6); 
-	Opcode_Finish_Set:           constant Opcode_Type := Opcode_Type'(7); 
-	Opcode_Apply:                constant Opcode_Type := Opcode_Type'(8);
-	Opcode_Read_Object:          constant Opcode_Type := Opcode_Type'(9);
-	Opcode_Read_List:            constant Opcode_Type := Opcode_Type'(10);
-	Opcode_Read_List_Cdr:        constant Opcode_Type := Opcode_Type'(11);
-	Opcode_Read_List_End:        constant Opcode_Type := Opcode_Type'(12);
-	Opcode_Close_List:           constant Opcode_Type := Opcode_Type'(13);
-	Opcode_Close_Quote:          constant Opcode_Type := Opcode_Type'(14);
+	Opcode_Finish_And_Syntax:    constant Opcode_Type := Opcode_Type'(4); 
+	Opcode_Finish_Define_Symbol: constant Opcode_Type := Opcode_Type'(5); 
+	Opcode_Finish_If_Syntax:     constant Opcode_Type := Opcode_Type'(6); 
+	Opcode_Finish_Let_Syntax:    constant Opcode_Type := Opcode_Type'(7); 
+	Opcode_Finish_Or_Syntax:     constant Opcode_Type := Opcode_Type'(8); 
+	Opcode_Finish_Set_Syntax:    constant Opcode_Type := Opcode_Type'(9); 
+	Opcode_Apply:                constant Opcode_Type := Opcode_Type'(10);
+	Opcode_Read_Object:          constant Opcode_Type := Opcode_Type'(11);
+	Opcode_Read_List:            constant Opcode_Type := Opcode_Type'(12);
+	Opcode_Read_List_Cdr:        constant Opcode_Type := Opcode_Type'(13);
+	Opcode_Read_List_End:        constant Opcode_Type := Opcode_Type'(14);
+	Opcode_Close_List:           constant Opcode_Type := Opcode_Type'(15);
+	Opcode_Close_Quote:          constant Opcode_Type := Opcode_Type'(16);
 
 	-----------------------------------------------------------------------------
 	-- COMMON OBJECTS
@@ -1222,6 +1224,7 @@ Ada.Text_IO.Put_Line ("Make_String...");
 		-- environment. If no key is found, add a new pair
 		-- This is mainly for define.
 		pragma Assert (Is_Symbol(Key));
+		pragma Assert (Is_Cons(Interp.Environment));
 
 		Arr := Find_In_Environment_List(Interp.Self, Get_Car(Interp.Environment), Key);
 		if Arr /= null then

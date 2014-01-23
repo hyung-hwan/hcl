@@ -77,6 +77,42 @@ procedure Execute (Interp: in out Interpreter_Record) is
 		Pop_Tops (Interp, 3);
 	end Evaluate_Group;
 
+	-- ----------------------------------------------------------------
+	generic
+		V: Object_Pointer;
+	procedure Evaluate_Up_To;
+
+	procedure Evaluate_Up_To  is
+		X: aliased Object_Pointer;
+		Y: aliased Object_Pointer;
+	begin	
+		X := Get_Frame_Operand(Interp.Stack);
+		Y := Get_Frame_Result(Interp.Stack);
+
+		-- Evaluate_And_Syntax/Evaluate-Or_Syntax has arranged to 
+		-- evaluate <test1>. Y must not be Nil_Pointer even at the 
+		-- first time this procedure is called, 
+		pragma Assert (Is_Cons(Y));
+		pragma Assert (Get_Cdr(Y) = Nil_Pointer); -- ensure 1 resul
+		Y := Get_Car(Y); -- actual result 
+
+		if Y /= V and then Is_Cons(X) then
+			-- The result is not what I look for.
+			-- Yet there are still more tests to evaluate.
+			Set_Frame_Operand (Interp.Stack, Get_Cdr(X));
+			Clear_Frame_Result (Interp.Stack);
+			Push_Frame (Interp, Opcode_Evaluate_Object, Get_Car(X));
+		else
+			-- Return the result of the last expression evaluated.
+			Pop_Frame (Interp);
+			Chain_Frame_Result (Interp, Interp.Stack, Y);
+		end if;
+	end Evaluate_Up_To;
+
+	procedure Finish_And_Syntax is new Evaluate_Up_To(False_Pointer);
+	procedure Finish_Or_Syntax is new Evaluate_Up_To(True_Pointer);
+	-- ----------------------------------------------------------------
+
 	procedure Finish_Define_Symbol is
 		pragma Inline (Finish_Define_Symbol);
 		X: aliased Object_Pointer;
@@ -100,8 +136,8 @@ procedure Execute (Interp: in out Interpreter_Record) is
 		Pop_Tops (Interp, 2);
 	end Finish_Define_Symbol;
 
-	procedure Finish_If is
-		pragma Inline (Finish_If);
+	procedure Finish_If_Syntax is
+		pragma Inline (Finish_If_Syntax);
 		X: aliased Object_Pointer;
 		Y: aliased Object_Pointer;
 		Z: aliased Object_Pointer;
@@ -133,17 +169,17 @@ procedure Execute (Interp: in out Interpreter_Record) is
 		end if;
 
 		Pop_Tops (Interp, 2);
-	end Finish_If;
+	end Finish_If_Syntax;
 
-	procedure Finish_Let is
-		pragma Inline (Finish_Let);
+	procedure Finish_Let_Syntax is
+		pragma Inline (Finish_Let_Syntax);
 	begin
-ada.text_io.put_line ("Finish_Let");
+ada.text_io.put_line ("Finish_Let_Syntax");
 		null;
-	end Finish_Let;
+	end Finish_Let_Syntax;
 
-	procedure Finish_Set is
-		pragma Inline (Finish_Set);
+	procedure Finish_Set_Syntax is
+		pragma Inline (Finish_Set_Syntax);
 		X: aliased Object_Pointer;
 		Y: aliased Object_Pointer;
 	begin
@@ -164,7 +200,7 @@ ada.text_io.put_line ("Finish_Let");
 		Chain_Frame_Result (Interp, Interp.Stack, Y);
 
 		Pop_Tops (Interp, 2);
-	end Finish_Set;
+	end Finish_Set_Syntax;
 
 	procedure Evaluate is separate;
 	procedure Apply is separate;
@@ -795,18 +831,30 @@ begin
 			when Opcode_Finish_Define_Symbol =>
 				Finish_Define_Symbol;
 
-			when Opcode_Finish_If =>
-				Finish_If;
+			-- Conditionals
+			when Opcode_Finish_If_Syntax =>
+				Finish_If_Syntax;
+			--when Opcode_Finish_Cond_Syntax => -- Derived, Essential
+			--when Opcode_Finish_Case_Syntax => -- Derived
+			when Opcode_Finish_And_Syntax => -- Derived
+				Finish_And_Syntax;
+			when Opcode_Finish_Or_Syntax => -- Derived
+				Finish_Or_Syntax;
 
-			when Opcode_Finish_Let =>
-				Finish_Let;
+			-- Assignments
+			when Opcode_Finish_Set_Syntax =>
+				Finish_Set_Syntax;
 
-			when Opcode_Finish_Set =>
-				Finish_Set;
-				
+			-- Bindings
+			when Opcode_Finish_Let_Syntax =>
+				Finish_Let_Syntax;
+			--when Opcode_Finish_Letast_Syntax =>
+			--when Opcode_Finish_Letrec_Syntax =>
+
 			when Opcode_Apply =>
 				Apply;
 
+			-- Reading
 			when Opcode_Read_Object =>
 				Read_Object;
 

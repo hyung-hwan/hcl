@@ -7,6 +7,43 @@ procedure Evaluate is
 	Car: aliased Object_Pointer;
 	Cdr: aliased Object_Pointer;
 
+	generic
+		V: Object_Pointer;
+		Opcode: Opcode_Type;
+	procedure Generic_And_Or_Syntax;
+
+	procedure Generic_And_Or_Syntax is
+	begin
+		-- (and <test1> <test2> ...)
+		--   (and (= 2 2) (> 2 1))                  ==>  #t
+		--   (and (= 2 2) (< 2 1))                  ==>  #f
+		--   (and (= 2 2) (< 2 1) (= 3 3))                  ==>  #f
+		--   (and 1 2 'c '(f g))                    ==>  (f g)
+		--   (and)                                  ==>  #t
+
+		Operand := Cdr;  -- Skip "And"
+		if Operand = Nil_Pointer then
+			-- (and)
+			Pop_Frame (Interp); 
+			Chain_Frame_Result (Interp, Interp.Stack, V);
+		elsif not Is_Cons(Operand) or else Get_Last_Cdr(Operand) /= Nil_Pointer then
+			-- (and . 10)
+			-- (and 1 2 . 10)
+			Ada.Text_IO.Put_LINE ("FUCKING cDR FOR DEFINE");
+			raise Syntax_Error;	
+		else
+			Set_Frame_Opcode (Interp.Stack, Opcode);
+               Set_Frame_Operand (Interp.Stack, Get_Cdr(Operand)); -- <test2> onwards
+               Clear_Frame_Result (Interp.Stack);
+
+			-- arrange to evaluate <test1>
+               Push_Frame (Interp, Opcode_Evaluate_Object, Get_Car(Operand)); 
+		end if;
+	end Generic_And_Or_Syntax;
+
+	procedure Evaluate_And_Syntax is new Generic_And_Or_Syntax(True_Pointer, Opcode_Finish_And_Syntax);
+	procedure Evaluate_Or_Syntax is new Generic_And_Or_Syntax(False_Pointer, Opcode_Finish_Or_Syntax);
+
 	procedure Evaluate_Define_Syntax is
 		pragma Inline (Evaluate_Define_Syntax);
 	begin
@@ -92,7 +129,7 @@ Ada.Text_IO.Put_Line ("NO ALTERNATE");
 		end if;
 
 		-- Switch the current frame to execute action after <test> evaluation.
-		Set_Frame_Opcode (Interp.Stack, Opcode_Finish_If);
+		Set_Frame_Opcode (Interp.Stack, Opcode_Finish_If_Syntax);
 		Set_Frame_Operand (Interp.Stack, Operand); 
 
 		-- Arrange to evalaute the conditional
@@ -206,7 +243,7 @@ Ada.Text_IO.Put_Line ("NO ALTERNATE");
 			raise Syntax_Error;
 		end if;
 
-		Set_Frame_Opcode (Interp.Stack, Opcode_Finish_Let);
+		Set_Frame_Opcode (Interp.Stack, Opcode_Finish_Let_Syntax);
 		Set_Frame_Operand (Interp.Stack, Operand); 
 
 		declare
@@ -303,7 +340,7 @@ Ada.Text_IO.Put_Line ("NO ALTERNATE");
 			Cdr := Get_Car(Cdr); -- <expression>
 
 			-- Arrange to finish setting a variable after <expression> evaluation.
-			Set_Frame_Opcode (Interp.Stack, Opcode_Finish_Set);
+			Set_Frame_Opcode (Interp.Stack, Opcode_Finish_Set_Syntax);
 			Set_Frame_Operand (Interp.Stack, Car); 
 
 			-- Arrange to evalaute the value part
@@ -351,6 +388,9 @@ begin
 				-- apply for special syntax objects.
 
 				case Car.Scode is
+					when And_Syntax =>
+						Evaluate_And_Syntax;
+						
 					when Begin_Syntax =>
 
 						Operand := Cdr; -- Skip "begin"
@@ -386,6 +426,9 @@ begin
 
 					when Let_Syntax =>
 						Evaluate_Let_Syntax;
+
+					when Or_Syntax =>
+						Evaluate_Or_Syntax;
 
 					when Quote_Syntax =>
 						Evaluate_Quote_Syntax;
