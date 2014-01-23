@@ -302,7 +302,7 @@ Ada.Text_IO.Put_line ("TOO FEW ARGUMETNS FOR COMPARISON");
 		-- For a closure created of "(lambda (x y) (+ x y) (* x y))"
 		-- Get_Closure_Code(Func) returns "((x y) (+ x y) (* x y))"
 
-		-- Push a new environmen for the closure
+		-- Push a new environment for the closure
 		Interp.Environment := Make_Environment(Interp.Self, Get_Closure_Environment(Func));
 
 		Fbody := Get_Closure_Code(Func);

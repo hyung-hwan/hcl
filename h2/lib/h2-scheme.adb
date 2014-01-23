@@ -88,7 +88,7 @@ package body H2.Scheme is
 
 	subtype Moved_Object_Record is Object_Record (Moved_Object, 0);
 
-	subtype Opcode_Type is Object_Integer range 0 .. 16;
+	subtype Opcode_Type is Object_Integer range 0 .. 18;
 	Opcode_Exit:                 constant Opcode_Type := Opcode_Type'(0);
 	Opcode_Evaluate_Result:      constant Opcode_Type := Opcode_Type'(1);
 	Opcode_Evaluate_Object:      constant Opcode_Type := Opcode_Type'(2);
@@ -96,16 +96,20 @@ package body H2.Scheme is
 	Opcode_Finish_And_Syntax:    constant Opcode_Type := Opcode_Type'(4); 
 	Opcode_Finish_Define_Symbol: constant Opcode_Type := Opcode_Type'(5); 
 	Opcode_Finish_If_Syntax:     constant Opcode_Type := Opcode_Type'(6); 
-	Opcode_Finish_Let_Syntax:    constant Opcode_Type := Opcode_Type'(7); 
-	Opcode_Finish_Or_Syntax:     constant Opcode_Type := Opcode_Type'(8); 
-	Opcode_Finish_Set_Syntax:    constant Opcode_Type := Opcode_Type'(9); 
-	Opcode_Apply:                constant Opcode_Type := Opcode_Type'(10);
-	Opcode_Read_Object:          constant Opcode_Type := Opcode_Type'(11);
-	Opcode_Read_List:            constant Opcode_Type := Opcode_Type'(12);
-	Opcode_Read_List_Cdr:        constant Opcode_Type := Opcode_Type'(13);
-	Opcode_Read_List_End:        constant Opcode_Type := Opcode_Type'(14);
-	Opcode_Close_List:           constant Opcode_Type := Opcode_Type'(15);
-	Opcode_Close_Quote:          constant Opcode_Type := Opcode_Type'(16);
+	Opcode_Finish_Or_Syntax:     constant Opcode_Type := Opcode_Type'(7); 
+	Opcode_Finish_Set_Syntax:    constant Opcode_Type := Opcode_Type'(8); 
+
+	Opcode_Let_Binding:          constant Opcode_Type := Opcode_Type'(9);
+	Opcode_Let_Evaluation:       constant Opcode_Type := Opcode_Type'(10);
+	Opcode_Let_Finish:           constant Opcode_Type := Opcode_Type'(11);
+
+	Opcode_Apply:                constant Opcode_Type := Opcode_Type'(12);
+	Opcode_Read_Object:          constant Opcode_Type := Opcode_Type'(13);
+	Opcode_Read_List:            constant Opcode_Type := Opcode_Type'(14);
+	Opcode_Read_List_Cdr:        constant Opcode_Type := Opcode_Type'(15);
+	Opcode_Read_List_End:        constant Opcode_Type := Opcode_Type'(16);
+	Opcode_Close_List:           constant Opcode_Type := Opcode_Type'(17);
+	Opcode_Close_Quote:          constant Opcode_Type := Opcode_Type'(18);
 
 	-----------------------------------------------------------------------------
 	-- COMMON OBJECTS
@@ -1253,21 +1257,20 @@ Ada.Text_IO.Put_Line ("Make_String...");
 		end if;
 	end Put_Environment;
 
-	procedure Push_Environment (Interp: in out Interpreter_Record) is
-		pragma Inline (Push_Environment);
-		pragma Assert (Is_Cons(Interp.Environment));
-	begin
-		Interp.Environment := Make_Environment(Interp.Self, Interp.Environment);
-	end Push_Environment;
+	--procedure Push_Environment (Interp: in out Interpreter_Record) is
+	--	pragma Inline (Push_Environment);
+	--	pragma Assert (Is_Cons(Interp.Environment));
+	--begin
+	--	Interp.Environment := Make_Environment(Interp.Self, Interp.Environment);
+	--end Push_Environment;
 
-	procedure Pop_Environment (Interp: in out Interpreter_Record) is
-		pragma Inline (Pop_Environment);
-		pragma Assert (Is_Cons(Interp.Environment));
-	begin
-		Interp.Environment := Get_Cdr(Interp.Environment);
-	end Pop_Environment;
+	--procedure Pop_Environment (Interp: in out Interpreter_Record) is
+	--	pragma Inline (Pop_Environment);
+	--	pragma Assert (Is_Cons(Interp.Environment));
+	--begin
+	--	Interp.Environment := Get_Cdr(Interp.Environment);
+	--end Pop_Environment;
 	                     
-		
 	-----------------------------------------------------------------------------
 
 	function Make_Syntax (Interp: access Interpreter_Record;
@@ -1379,13 +1382,19 @@ Ada.Text_IO.Put_Line ("Make_String...");
 		return Frame.Pointer_Slot(Frame_Result_Index);
 	end Get_Frame_Result;
 
-	--procedure Set_Frame_Result (Frame: in out Object_Pointer;
-	--                            Value: in     Object_Pointer) is
-	--	pragma Inline (Set_Frame_Result);
-	--	pragma Assert (Is_Frame(Frame));
-	--begin
-	--	Frame.Pointer_Slot(Frame_Result_Index) := Value;
-	--end Set_Frame_Result;
+	procedure Set_Frame_Result (Frame: in out Object_Pointer;
+	                            Value: in     Object_Pointer) is
+		pragma Inline (Set_Frame_Result);
+		pragma Assert (Is_Frame(Frame));
+
+		-- This procedure is not to set a single result,
+		-- but to set the result chain. so it can be useful
+		-- if you want to migrate a result chain from one frame
+		-- to another. It's what this assertion is for.
+		pragma Assert (Is_Cons(Value));
+	begin
+		Frame.Pointer_Slot(Frame_Result_Index) := Value;
+	end Set_Frame_Result;
 
 	procedure Chain_Frame_Result (Interp: in out Interpreter_Record;
 	                              Frame:  in     Object_Pointer; -- TODO: remove this parameter
@@ -1421,6 +1430,14 @@ Ada.Text_IO.Put_Line ("Make_String...");
 	begin
 		return Frame.Pointer_Slot(Frame_Environment_Index);
 	end Get_Frame_Environment;
+
+	procedure Set_Frame_Environment (Frame: in Object_Pointer;
+	                                 Value: in Object_Pointer) is
+		pragma Inline (Set_Frame_Environment);
+		pragma Assert (Is_Frame(Frame));
+	begin
+		Frame.Pointer_Slot(Frame_Environment_Index) := Value;
+	end Set_Frame_Environment;
 
 	function Get_Frame_Opcode (Frame: in Object_Pointer) return Opcode_Type is
 		pragma Inline (Get_Frame_Opcode);

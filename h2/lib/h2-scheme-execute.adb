@@ -83,8 +83,8 @@ procedure Execute (Interp: in out Interpreter_Record) is
 	procedure Evaluate_Up_To;
 
 	procedure Evaluate_Up_To  is
-		X: aliased Object_Pointer;
-		Y: aliased Object_Pointer;
+		X: Object_Pointer;
+		Y: Object_Pointer;
 	begin	
 		X := Get_Frame_Operand(Interp.Stack);
 		Y := Get_Frame_Result(Interp.Stack);
@@ -171,12 +171,74 @@ procedure Execute (Interp: in out Interpreter_Record) is
 		Pop_Tops (Interp, 2);
 	end Finish_If_Syntax;
 
-	procedure Finish_Let_Syntax is
-		pragma Inline (Finish_Let_Syntax);
+	-- --------------------------------------------------------------------
+
+	procedure Do_Let_Evaluation is
+		pragma Inline (Do_Let_Evaluation);
+		X: Object_Pointer;
+		Y: Object_Pointer;
+	begin	
+		X := Get_Frame_Operand(Interp.Stack); -- <bindings> and onward
+
+		if Is_Cons(X) then
+			Set_Frame_Operand (Interp.Stack, Get_Cdr(X));
+			-- Say, <bindings> is ((x 2) (y 2)).
+			-- for the first call, Get_Car(X) is (x 2).
+			-- To get x, Get_Car(Get_Car(X))
+			-- To get 2, Get_Car(Get_Cdr(Get_Car(X)))
+			Push_Frame (Interp, Opcode_Evaluate_Object, Get_Car(Get_Cdr(Get_Car(X))));
+		else
+			-- Pass the result to the Perform_Let_Binding frame.
+			Y := Get_Frame_Result(Interp.Stack);
+			Pop_Frame (Interp);
+			Set_Frame_Result (Interp.Stack, Y);
+		end if;
+	end Do_Let_Evaluation;
+
+	procedure Do_Let_Binding is
+		pragma Inline (Do_Let_Binding);
+		X: aliased Object_Pointer;
+		Y: aliased Object_Pointer;
 	begin
-ada.text_io.put_line ("Finish_Let_Syntax");
-		null;
-	end Finish_Let_Syntax;
+		Push_Top (Interp, X'Unchecked_Access);
+		Push_Top (Interp, Y'Unchecked_Access);
+
+		X := Get_Frame_Operand(Interp.Stack); -- <bindings> and onward
+		Y := Get_Frame_Result(Interp.Stack);
+
+		pragma Assert (Interp.Environment = Get_Frame_Environment(Interp.Stack));
+
+		-- Push a new environment
+		Interp.Environment := Make_Environment(Interp.Self, Interp.Environment);
+
+		-- Change the frame's environment so that Pop_Frame() doesn't 
+		-- restore the environment to the old one. The new environment
+		-- has been just pushed above after binding evaluation.
+		Set_Frame_Environment (Interp.Stack, Interp.Environment); 
+
+		while Is_Cons(X) loop
+			pragma Assert (Is_Cons(Y));
+			Put_Environment (Interp, Get_Car(Get_Car(X)), Get_Car(Y));
+
+			X := Get_Cdr(X);
+			Y := Get_Cdr(Y);
+		end loop;
+
+		Pop_Frame (Interp); -- done. 
+
+		Pop_Tops (Interp, 2);
+	end Do_Let_Binding;
+
+	procedure Do_Let_Finish is
+		pragma Inline (Do_Let_Finish);
+	begin
+		pragma Assert (Get_Frame_Result(Interp.Stack) = Nil_Pointer);
+		-- Evaluate_Let_Syntax has places <body> in the operand of this frame.
+		-- <body> can be evaluated as if it's in 'begin'.
+		Set_Frame_Opcode (Interp.Stack, Opcode_Evaluate_Group);
+	end Do_Let_Finish;
+
+	-- --------------------------------------------------------------------
 
 	procedure Finish_Set_Syntax is
 		pragma Inline (Finish_Set_Syntax);
@@ -828,33 +890,37 @@ begin
 			when Opcode_Evaluate_Group =>
 				Evaluate_Group;
 
+			when Opcode_Finish_And_Syntax => 
+				Finish_And_Syntax; -- Conditional
+
+			--when Opcode_Finish_Case_Syntax => 
+			--when Opcode_Finish_Cond_Syntax => 
+
 			when Opcode_Finish_Define_Symbol =>
 				Finish_Define_Symbol;
 
-			-- Conditionals
 			when Opcode_Finish_If_Syntax =>
-				Finish_If_Syntax;
-			--when Opcode_Finish_Cond_Syntax => -- Derived, Essential
-			--when Opcode_Finish_Case_Syntax => -- Derived
-			when Opcode_Finish_And_Syntax => -- Derived
-				Finish_And_Syntax;
-			when Opcode_Finish_Or_Syntax => -- Derived
-				Finish_Or_Syntax;
+				Finish_If_Syntax; -- Conditional
 
-			-- Assignments
-			when Opcode_Finish_Set_Syntax =>
-				Finish_Set_Syntax;
+			when Opcode_Let_Binding =>
+				Do_Let_Binding; 
+			when Opcode_Let_Evaluation =>
+				Do_Let_Evaluation;
+			when Opcode_Let_Finish =>
+				Do_Let_Finish; 
 
-			-- Bindings
-			when Opcode_Finish_Let_Syntax =>
-				Finish_Let_Syntax;
 			--when Opcode_Finish_Letast_Syntax =>
 			--when Opcode_Finish_Letrec_Syntax =>
+
+			when Opcode_Finish_Or_Syntax => 
+				Finish_Or_Syntax; -- Conditional
+
+			when Opcode_Finish_Set_Syntax =>
+				Finish_Set_Syntax; -- Assignment
 
 			when Opcode_Apply =>
 				Apply;
 
-			-- Reading
 			when Opcode_Read_Object =>
 				Read_Object;
 

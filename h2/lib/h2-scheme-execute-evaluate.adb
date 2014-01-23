@@ -170,6 +170,8 @@ Ada.Text_IO.Put_Line ("NO ALTERNATE");
 						raise Syntax_Error;
 					end if;
 
+					-- Check for a duplication formal argument
+-- TODO: make duplication check optional or change the implementation more efficient so that this check is not repeated 
 					V := Formals;
 					loop
 						exit when V = Cdr;
@@ -182,6 +184,7 @@ Ada.Text_IO.Put_Line ("NO ALTERNATE");
 						V := Get_Cdr(V);
 					end loop;
 
+					-- Move on to the next formal argument
 					Cdr := Get_Cdr(Cdr);
 					exit when not Is_Cons(Cdr);
 				end loop;
@@ -219,6 +222,9 @@ Ada.Text_IO.Put_Line ("NO ALTERNATE");
 
 	procedure Evaluate_Let_Syntax is
 		pragma Inline (Evaluate_Let_Syntax);
+
+		Bindings: Object_Pointer;
+		LetBody: Object_Pointer;
 	begin
 		-- let <bindings> <body>
 		Operand := Cdr; -- Skip "let".
@@ -229,73 +235,85 @@ Ada.Text_IO.Put_Line ("NO ALTERNATE");
 			raise Syntax_Error;
 		end if;
 
-		Car := Get_Car(Operand);  -- <bindings>
-		if not Is_Cons(Car) then
+		Bindings := Get_Car(Operand);  -- <bindings>
+		if not Is_Cons(Bindings) then
 			Ada.Text_IO.Put_Line ("INVALID BINDINGS FOR LET");
 			raise Syntax_Error;
 		end if;
 
-		Cdr := Get_Cdr(Operand); -- cons cell to <body>
-		if not Is_Cons(Cdr) then
+		Letbody := Get_Cdr(Operand); -- Cons cell to <body>
+		if not Is_Cons(Letbody) then
 			-- (let ((x 2)) )
 			-- (let ((x 2)) . 99)
 			Ada.Text_IO.Put_Line ("INVALID BODY FOR LET");
 			raise Syntax_Error;
 		end if;
 
-		Set_Frame_Opcode (Interp.Stack, Opcode_Finish_Let_Syntax);
-		Set_Frame_Operand (Interp.Stack, Operand); 
+		Cdr := Bindings;
+		loop
+			Car := Get_Car(Cdr); -- <binding>
+			if not Is_Cons(Car) or else not Is_Cons(Get_Cdr(Car)) or else Get_Cdr(Get_Cdr(Car)) /= Nil_Pointer then
+				-- no binding name or no binding value or garbage after that
+				Ada.Text_IO.Put_Line ("WRONG BINDING FOR LET");
+				raise Syntax_Error;
+			end if;
 
-		declare
-			Bindings: aliased Object_Pointer := Car;
-			Binding_Name: Object_Pointer;
-			Binding_Value: Object_Pointer;
-			V: Object_Pointer;
-		begin
-			Push_Top (Interp, Bindings'Unchecked_Access);
+			if not Is_Symbol(Get_Car(Car)) then
+				Ada.Text_IO.Put_Line ("WRONG BINDING NAME FOR LET");
+				raise Syntax_Error;
+			end if;
 
-			Cdr := Bindings;
-			loop
-				Car := Get_Car(Cdr); -- <binding>
-				if not Is_Cons(Car) or else not Is_Cons(Get_Cdr(Car)) or else Get_Cdr(Get_Cdr(Car)) /= Nil_Pointer then
-					Ada.Text_IO.Put_Line ("WRONG BINDING FOR LET");
-					raise Syntax_Error;
-				end if;
+			-- Check for a duplicate binding name
+-- TODO: make duplication check optional or change the implementation more efficient so that this check is not repeated 
+			declare
+				V: Object_Pointer;
+			begin
+				V := Bindings;
+				loop
+					exit when V = Cdr;
 
-				Binding_Name := Get_Car(Car);
-				if not Is_Symbol(Binding_Name) then
-					Ada.Text_IO.Put_Line ("WRONG BINDING NAME FOR LET");
-					raise Syntax_Error;
-				end if;
+					if Get_Car(Get_Car(V)) = Get_Car(Car) then
+						Ada.Text_IO.Put_Line ("DUPLICATE BINDING FOR LET");
+						raise Syntax_Error;
+					end if;
 
-				Binding_Value := Get_Car(Get_Cdr(Car));
-				Push_Frame (Interp, Opcode_Evaluate_Object, Binding_Value);
--- TODO: check duplicate
-				--V := Formals;
-				--loop
-				--	exit when V = Cdr;
+					V := Get_Cdr(V);
+				end loop;
+			end;
 
-				--	if Get_Car(V) = Car then
-				--		Ada.Text_IO.Put_Line ("DUPLICATE BINDING FOR LET");
-				--		raise Syntax_Error;
-				--	end if;
---
---					V := Get_Cdr(V);
---				end loop;
+				-- Move on to the next binding
+			Cdr := Get_Cdr(Cdr);
+			exit when not Is_Cons(Cdr);
+		end loop;
 
-				Cdr := Get_Cdr(Cdr);
-				exit when not Is_Cons(Cdr);
-			end loop;
+		if Cdr /= Nil_Pointer then
+			-- The last cdr is not nil.
+			Ada.Text_IO.Put_Line ("FUCKING CDR FOR LET BINDING");
+			raise Syntax_Error;
+		end if;
 
-			Pop_Tops (Interp, 1);
-		end;
+		-- To avoid problems of temporary object pointer problems.
+		Car := Bindings;
+		Cdr := LetBody;
 
---		if Cdr /= Nil_Pointer and then not Is_Symbol(Cdr) then
---			Ada.Text_IO.Put_Line ("FUCKING CDR IN FORMALS FOR LAMBDA");
---			raise Syntax_Error;
---		end if;
+		Set_Frame_Opcode (Interp.Stack, Opcode_Let_Finish);
+		Set_Frame_Operand (Interp.Stack, Cdr); 
 
+		Push_Frame (Interp, Opcode_Let_Binding, Car);
+		Push_Frame (Interp, Opcode_Let_Evaluation, Car);
 	end Evaluate_Let_Syntax;
+
+	procedure Evaluate_Letast_Syntax is
+		pragma Inline (Evaluate_Letast_Syntax);
+	begin
+
+		--Set_Frame_Opcode (Interp.Stack, Opcode_Let_Finish);
+		--Set_Frame_Operand (Interp.Stack, Cdr); 
+
+		--Push_Frame (Interp, Opcode_Let_Binding, Car);
+		--Push_Frame (Interp, Opcode_Let_Evaluation, Car);
+		null;
+	end Evaluate_Letast_Syntax;
 
 	procedure Evaluate_Quote_Syntax is
 		pragma Inline (Evaluate_Quote_Syntax);
@@ -426,6 +444,9 @@ begin
 
 					when Let_Syntax =>
 						Evaluate_Let_Syntax;
+
+					when Letast_Syntax =>
+						Evaluate_Letast_Syntax;
 
 					when Or_Syntax =>
 						Evaluate_Or_Syntax;
