@@ -152,20 +152,29 @@ procedure Execute (Interp: in out Interpreter_Record) is
 		pragma Assert (Get_Cdr(Y) = Nil_Pointer); -- ensure only 1 return value 
 		Y := Get_Car(Y); -- the first value 
 
-		Pop_Frame (Interp);
+		pragma Assert (Interp.Environment = Get_Frame_Environment(Interp.Stack));
+
 		if Y = False_Pointer then
 			-- <test> evaluated to #f.
 			X := Get_Cdr(X); -- cons cell containing <alternate>
 			if Is_Cons(X) then
-				-- evaluate <alternate>
-				Push_Frame (Interp, Opcode_Evaluate_Object, Get_Car(X));
+				-- Switch the current current to evaluate <alternate>
+				-- Keep the environment untouched.
+				Set_Frame_Opcode (Interp.Stack, Opcode_Evaluate_Object);
+				Set_Frame_Operand (Interp.Stack, Get_Car(X));
+				Clear_Frame_Result (Interp.Stack);
 			else
-				-- return nil if no <alternate> is specified
+				Pop_Frame (Interp);
+				-- Return nil if no <alternate> is specified
 				Chain_Frame_Result (Interp, Interp.Stack, Nil_Pointer);
 			end if;
 		else
-			-- all values except #f are true values. evaluate <consequent>
-			Push_Frame (Interp, Opcode_Evaluate_Object, Get_Car(X));
+			-- All values except #f are true values. evaluate <consequent>
+			-- Switch the current current to evaluate <consequent>
+			-- Keep the environment untouched.
+			Set_Frame_Opcode (Interp.Stack, Opcode_Evaluate_Object);
+			Set_Frame_Operand (Interp.Stack, Get_Car(X));
+			Clear_Frame_Result (Interp.Stack);
 		end if;
 
 		Pop_Tops (Interp, 2);
@@ -204,7 +213,7 @@ procedure Execute (Interp: in out Interpreter_Record) is
 		Push_Top (Interp, Y'Unchecked_Access);
 
 		X := Get_Frame_Operand(Interp.Stack); -- <bindings> and onward
-		Y := Get_Frame_Result(Interp.Stack);
+		Y := Reverse_Cons(Get_Frame_Result(Interp.Stack));
 
 		pragma Assert (Interp.Environment = Get_Frame_Environment(Interp.Stack));
 
