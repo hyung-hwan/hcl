@@ -712,7 +712,7 @@ ada.text_io.put_line ("HEAP SOURCE IS NIL");
 		end if;
 
 		Interp.Root_Environment := Move_One_Object(Interp.Root_Environment);
-		Interp.Environment := Move_One_Object(Interp.Environment);
+		Interp.Root_Frame := Move_One_Object(Interp.Root_Frame);
 		Interp.Mark := Move_One_Object(Interp.Mark);
 
 		-- Migrate temporary object pointers
@@ -1113,229 +1113,6 @@ Ada.Text_IO.Put_Line ("Make_String...");
 
 	-----------------------------------------------------------------------------
 
-	--
-	-- Environment is a cons cell whose slots represents:
-	--   Car: Point to the first key/value pair.
-	--   Cdr: Point to Parent environment
-	-- 
-	-- A key/value pair is held in an array object consisting of 3 slots.
-	--   #1: Key
-	--   #2: Value
-	--   #3: Link to the next key/value array.
-	--
-	-- Interp.Environment     Interp.Root_Environment
-     --   |                      |
-	--   |                      V
-	--   |     +----+----+    +----+----+
-	--   +---> | |  |   ----> | |  | Nil|
-	--         +-|--+-----    +-|--+-----
-	--           |              |
-	--           |              +--> another list
-	--           V
-	--         +----+----+----+   +----+----+----+   +----+----+----+   +----+----+----+
-	--   list: | |  | |  |  ----> | |  | |  | -----> | |  | |  | -----> | |  | |  | Nil|
-	--         +-|--+-|-------+   +-|--+-|-------+   +-|--+-|-------+   +-|--+-|-------+
-	--           |    |             |    |             |    |             |    |
-	--           V    V             V    V             V    V             V    V
-	--          Key  Value          Key  Value        Key  Value         Key  Value
-	--
-	-- Upon initialization, Interp.Environment is equal to Interp.Root_Environment.
-	-- CDR(Interp.Root_Environment) is Nil_Pointer.
-	--
-	-- TODO: Change environment implementation to a hash table or something similar
-
-	function Make_Environment (Interp: access Interpreter_Record;
-	                           Parent: in     Object_Pointer) return Object_Pointer is
-		pragma Inline (Make_Environment);
-	begin
-		return Make_Cons(Interp, Nil_Pointer, Parent);
-	end Make_Environment;
-
-	function Find_In_Environment_List (Interp: access Interpreter_Record;
-	                                   List:   in     Object_Pointer;
-	                                   Key:    in     Object_Pointer) return Object_Pointer is
-		Arr: Object_Pointer;
-	begin
-		Arr := List;
-		while Arr /= Nil_Pointer loop
-			pragma Assert (Is_Array(Arr));
-			pragma Assert (Arr.Size = 3);
-			
-			if Arr.Pointer_Slot(1) = Key then
-				return Arr;
-			end if;
-
-			Arr := Arr.Pointer_Slot(3);
-		end loop;	
-		return null; -- not found. 
-	end Find_In_Environment_List;
-
-	function Get_Environment (Interp: access Interpreter_Record;
-	                          Key:    in     Object_Pointer) return Object_Pointer is
-		Envir: Object_Pointer;
-		Arr: Object_Pointer;
-	begin
-		pragma Assert (Is_Symbol(Key));
-
-		Envir := Interp.Environment;	
-		while Envir /= Nil_Pointer loop
-			pragma Assert (Is_Cons(Envir));
-
-			Arr := Find_In_Environment_List(Interp, Get_Car(Envir), Key);
-			if Arr /= null then
-				return Arr.Pointer_Slot(2);
-			end if;
-
-			-- Move on to the parent environment
-			Envir := Get_Cdr(Envir);
-		end loop;
-		return null; -- not found
-	end Get_Environment;
-
-	function Set_Environment (Interp: access Interpreter_Record;
-	                          Key:    in     Object_Pointer;
-	                          Value:  in     Object_Pointer) return Object_Pointer is
-		Envir: Object_Pointer;
-		Arr: Object_Pointer;
-	begin
-		-- Search the whole environment chain unlike Put_Environment().
-		-- It is mainly for set!.
-		pragma Assert (Is_Symbol(Key));
-
-		Envir := Interp.Environment;	
-		while Envir /= Nil_Pointer loop
-			pragma Assert (Is_Cons(Envir));
-
-			Arr := Find_In_Environment_List(Interp, Get_Car(Envir), Key);
-			if Arr /= null then
-				-- Overwrite an existing pair
-				Arr.Pointer_Slot(2) := Value;
-				return Value;
-			end if;
-
-			-- Move on to the parent environment
-			Envir := Get_Cdr(Envir);
-		end loop;
-		return null; -- not found. not set
-	end Set_Environment;
-
-	procedure Put_Environment (Interp: in out Interpreter_Record;
-	                           Key:    in     Object_Pointer;
-	                           Value:  in     Object_Pointer) is
-		Arr: Object_Pointer;
-	begin
-		-- Search the current environment only. It doesn't search the 
-		-- environment. If no key is found, add a new pair
-		-- This is mainly for define.
-		pragma Assert (Is_Symbol(Key));
-		pragma Assert (Is_Cons(Interp.Environment));
-
-		Arr := Find_In_Environment_List(Interp.Self, Get_Car(Interp.Environment), Key);
-		if Arr /= null then
-			-- Found. Update the existing one
-			Arr.Pointer_Slot(2) := Value;
-		else
-			-- Add a new key/value pair in the current environment
-			-- if no existing pair has been found.
-			declare 
-				Aliased_Key: aliased Object_Pointer := Key;
-				Aliased_Value: aliased Object_Pointer := Value;
-			begin
-				Push_Top (Interp, Aliased_Key'Unchecked_Access);
-				Push_Top (Interp, Aliased_Value'Unchecked_Access);
-
-				Arr := Make_Array(Interp.Self, 3);
-				Arr.Pointer_Slot(1) := Aliased_Key;
-				Arr.Pointer_Slot(2) := Aliased_Value;
-
-				-- Chain the pair to the head of the list
-				Arr.Pointer_Slot(3) := Get_Car(Interp.Environment);	
-				Set_Car (Interp.Environment, Arr);
-	
-				Pop_Tops (Interp, 2);
-			end;
-		end if;
-	end Put_Environment;
-
-	--procedure Push_Environment (Interp: in out Interpreter_Record) is
-	--	pragma Inline (Push_Environment);
-	--	pragma Assert (Is_Cons(Interp.Environment));
-	--begin
-	--	Interp.Environment := Make_Environment(Interp.Self, Interp.Environment);
-	--end Push_Environment;
-
-	--procedure Pop_Environment (Interp: in out Interpreter_Record) is
-	--	pragma Inline (Pop_Environment);
-	--	pragma Assert (Is_Cons(Interp.Environment));
-	--begin
-	--	Interp.Environment := Get_Cdr(Interp.Environment);
-	--end Pop_Environment;
-	                     
-	-----------------------------------------------------------------------------
-
-	function Make_Syntax (Interp: access Interpreter_Record;
-	                      Opcode: in     Syntax_Code;
-	                      Name:   in     Object_Character_Array) return Object_Pointer is
-		Result: Object_Pointer;
-	begin
-		Result := Make_Symbol(Interp, Name);
-		Result.Flags := Result.Flags or Syntax_Object;
-		Result.Scode := Opcode;
---Ada.Text_IO.Put ("Creating Syntax Symbol ");
---Put_String (To_Thin_Object_String_Pointer (Result));
-		return Result;
-	end Make_Syntax;
-
-	function Is_Syntax (Source: in Object_Pointer) return Standard.Boolean is
-		pragma Inline (Is_Syntax);
-	begin
-		return Is_Symbol(Source) and then (Source.Flags and Syntax_Object) /= 0;
-	end Is_Syntax;
-
-	function Make_Procedure (Interp: access Interpreter_Record;
-	                         Opcode: in     Procedure_Code;
-	                         Name:   in     Object_Character_Array) return Object_Pointer is
-		-- this procedure is for internal use only
-		Symbol: aliased Object_Pointer;
-		Proc:   aliased Object_Pointer;
-	begin
-		Push_Top (Interp.all, Symbol'Unchecked_Access);
-		Push_Top (Interp.all, Proc'Unchecked_Access);
-
-		-- Make a symbol for the procedure
-		Symbol := Make_Symbol(Interp, Name);
-
-		-- Make the actual procedure object
-		Proc := Allocate_Pointer_Object(Interp, Procedure_Object_Size, Nil_Pointer);
-		Proc.Tag := Procedure_Object;
-		Proc.Pointer_Slot(Procedure_Opcode_Index) := Integer_To_Pointer(Opcode);
-
-		-- Link it to the top environement
-		pragma Assert (Interp.Environment = Interp.Root_Environment); 
-		pragma Assert (Get_Environment(Interp.Self, Symbol) = null);
-		Put_Environment (Interp.all, Symbol, Proc);
-
-		Pop_Tops (Interp.all, 2);
-		return Proc;
-	end Make_Procedure;
-
-	function Is_Procedure (Source: in Object_Pointer) return Standard.Boolean is
-		pragma Inline (Is_Procedure);
-	begin
-		return Is_Normal_Pointer(Source) and then 
-		       Source.Tag = Procedure_Object;
-	end Is_Procedure;
-
-	function Get_Procedure_Opcode (Proc: in Object_Pointer) return Procedure_Code is
-		pragma Inline (Get_Procedure_Opcode);
-		pragma Assert (Is_Procedure(Proc));
-		pragma Assert (Proc.Size = Procedure_Object_Size);
-	begin
-		return Pointer_To_Integer(Proc.Pointer_Slot(Procedure_Opcode_Index));
-	end Get_Procedure_Opcode;
-	
-	-----------------------------------------------------------------------------
-
 	function Make_Frame (Interp:  access Interpreter_Record;
 	                     Stack:   in     Object_Pointer; -- current stack pointer
 	                     Opcode:  in     Object_Pointer;
@@ -1469,6 +1246,221 @@ Ada.Text_IO.Put_Line ("Make_String...");
 		Frame.Pointer_Slot(Frame_Operand_Index) := Value;
 	end Set_Frame_Operand;
 
+
+	-----------------------------------------------------------------------------
+
+	--
+	-- Environment is a cons cell whose slots represents:
+	--   Car: Point to the first key/value pair.
+	--   Cdr: Point to Parent environment
+	-- 
+	-- A key/value pair is held in an array object consisting of 3 slots.
+	--   #1: Key
+	--   #2: Value
+	--   #3: Link to the next key/value array.
+	--
+	-- Frame.Environment     Interp.Root_Environment
+     --   |                      |
+	--   |                      V
+	--   |     +----+----+    +----+----+
+	--   +---> | |  |   ----> | |  | Nil|
+	--         +-|--+-----    +-|--+-----
+	--           |              |
+	--           |              +--> another list
+	--           V
+	--         +----+----+----+   +----+----+----+   +----+----+----+   +----+----+----+
+	--   list: | |  | |  |  ----> | |  | |  | -----> | |  | |  | -----> | |  | |  | Nil|
+	--         +-|--+-|-------+   +-|--+-|-------+   +-|--+-|-------+   +-|--+-|-------+
+	--           |    |             |    |             |    |             |    |
+	--           V    V             V    V             V    V             V    V
+	--          Key  Value          Key  Value        Key  Value         Key  Value
+	--
+	-- Upon initialization, Root_Frame.Environment is equal to Interp.Root_Environment.
+	-- CDR(Interp.Root_Environment) is Nil_Pointer.
+	--
+	-- TODO: Change environment implementation to a hash table or something similar
+
+	function Make_Environment (Interp: access Interpreter_Record;
+	                           Parent: in     Object_Pointer) return Object_Pointer is
+		pragma Inline (Make_Environment);
+	begin
+		return Make_Cons(Interp, Nil_Pointer, Parent);
+	end Make_Environment;
+
+	function Find_In_Environment_List (Interp: access Interpreter_Record;
+	                                   List:   in     Object_Pointer;
+	                                   Key:    in     Object_Pointer) return Object_Pointer is
+		Arr: Object_Pointer;
+	begin
+		Arr := List;
+		while Arr /= Nil_Pointer loop
+			pragma Assert (Is_Array(Arr));
+			pragma Assert (Arr.Size = 3);
+			
+			if Arr.Pointer_Slot(1) = Key then
+				return Arr;
+			end if;
+
+			Arr := Arr.Pointer_Slot(3);
+		end loop;	
+		return null; -- not found. 
+	end Find_In_Environment_List;
+
+	function Get_Environment (Interp: access Interpreter_Record;
+	                          Key:    in     Object_Pointer) return Object_Pointer is
+		Envir: Object_Pointer;
+		Arr: Object_Pointer;
+	begin
+		pragma Assert (Is_Symbol(Key));
+
+		Envir := Get_Frame_Environment(Interp.Stack);
+
+		while Envir /= Nil_Pointer loop
+			pragma Assert (Is_Cons(Envir));
+
+			Arr := Find_In_Environment_List(Interp, Get_Car(Envir), Key);
+			if Arr /= null then
+				return Arr.Pointer_Slot(2);
+			end if;
+
+			-- Move on to the parent environment
+			Envir := Get_Cdr(Envir);
+		end loop;
+		return null; -- not found
+	end Get_Environment;
+
+	function Set_Environment (Interp: access Interpreter_Record;
+	                          Key:    in     Object_Pointer;
+	                          Value:  in     Object_Pointer) return Object_Pointer is
+		Envir: Object_Pointer;
+		Arr: Object_Pointer;
+	begin
+		-- Search the whole environment chain unlike Put_Environment().
+		-- It is mainly for set!.
+		pragma Assert (Is_Symbol(Key));
+
+		Envir := Get_Frame_Environment(Interp.Stack);
+		while Envir /= Nil_Pointer loop
+			pragma Assert (Is_Cons(Envir));
+
+			Arr := Find_In_Environment_List(Interp, Get_Car(Envir), Key);
+			if Arr /= null then
+				-- Overwrite an existing pair
+				Arr.Pointer_Slot(2) := Value;
+				return Value;
+			end if;
+
+			-- Move on to the parent environment
+			Envir := Get_Cdr(Envir);
+		end loop;
+		return null; -- not found. not set
+	end Set_Environment;
+
+	procedure Put_Environment (Interp: in out Interpreter_Record;
+	                           Key:    in     Object_Pointer;
+	                           Value:  in     Object_Pointer) is
+		Arr: Object_Pointer;
+		Envir: aliased Object_Pointer;
+	begin
+		Envir := Get_Frame_Environment(Interp.Stack);
+
+		-- Search the current environment only. It doesn't search the 
+		-- environment. If no key is found, add a new pair
+		-- This is mainly for define.
+		pragma Assert (Is_Symbol(Key));
+		pragma Assert (Is_Cons(Envir));
+
+		Arr := Find_In_Environment_List(Interp.Self, Get_Car(Envir), Key);
+		if Arr /= null then
+			-- Found. Update the existing one
+			Arr.Pointer_Slot(2) := Value;
+		else
+			-- Add a new key/value pair in the current environment
+			-- if no existing pair has been found.
+			declare 
+				Aliased_Key: aliased Object_Pointer := Key;
+				Aliased_Value: aliased Object_Pointer := Value;
+			begin
+				Push_Top (Interp, Envir'Unchecked_Access);
+				Push_Top (Interp, Aliased_Key'Unchecked_Access);
+				Push_Top (Interp, Aliased_Value'Unchecked_Access);
+
+				Arr := Make_Array(Interp.Self, 3);
+				Arr.Pointer_Slot(1) := Aliased_Key;
+				Arr.Pointer_Slot(2) := Aliased_Value;
+
+				-- Chain the pair to the head of the list
+				Arr.Pointer_Slot(3) := Get_Car(Envir);	
+				Set_Car (Envir, Arr);
+	
+				Pop_Tops (Interp, 3);
+			end;
+		end if;
+	end Put_Environment;
+
+	-----------------------------------------------------------------------------
+
+	function Make_Syntax (Interp: access Interpreter_Record;
+	                      Opcode: in     Syntax_Code;
+	                      Name:   in     Object_Character_Array) return Object_Pointer is
+		Result: Object_Pointer;
+	begin
+		Result := Make_Symbol(Interp, Name);
+		Result.Flags := Result.Flags or Syntax_Object;
+		Result.Scode := Opcode;
+--Ada.Text_IO.Put ("Creating Syntax Symbol ");
+--Put_String (To_Thin_Object_String_Pointer (Result));
+		return Result;
+	end Make_Syntax;
+
+	function Is_Syntax (Source: in Object_Pointer) return Standard.Boolean is
+		pragma Inline (Is_Syntax);
+	begin
+		return Is_Symbol(Source) and then (Source.Flags and Syntax_Object) /= 0;
+	end Is_Syntax;
+
+	function Make_Procedure (Interp: access Interpreter_Record;
+	                         Opcode: in     Procedure_Code;
+	                         Name:   in     Object_Character_Array) return Object_Pointer is
+		-- this procedure is for internal use only
+		Symbol: aliased Object_Pointer;
+		Proc:   aliased Object_Pointer;
+	begin
+		Push_Top (Interp.all, Symbol'Unchecked_Access);
+		Push_Top (Interp.all, Proc'Unchecked_Access);
+
+		-- Make a symbol for the procedure
+		Symbol := Make_Symbol(Interp, Name);
+
+		-- Make the actual procedure object
+		Proc := Allocate_Pointer_Object(Interp, Procedure_Object_Size, Nil_Pointer);
+		Proc.Tag := Procedure_Object;
+		Proc.Pointer_Slot(Procedure_Opcode_Index) := Integer_To_Pointer(Opcode);
+
+		-- Link it to the top environement
+		pragma Assert (Get_Frame_Environment(Interp.Stack) = Interp.Root_Environment); 
+		pragma Assert (Get_Environment(Interp.Self, Symbol) = null);
+		Put_Environment (Interp.all, Symbol, Proc);
+
+		Pop_Tops (Interp.all, 2);
+		return Proc;
+	end Make_Procedure;
+
+	function Is_Procedure (Source: in Object_Pointer) return Standard.Boolean is
+		pragma Inline (Is_Procedure);
+	begin
+		return Is_Normal_Pointer(Source) and then 
+		       Source.Tag = Procedure_Object;
+	end Is_Procedure;
+
+	function Get_Procedure_Opcode (Proc: in Object_Pointer) return Procedure_Code is
+		pragma Inline (Get_Procedure_Opcode);
+		pragma Assert (Is_Procedure(Proc));
+		pragma Assert (Proc.Size = Procedure_Object_Size);
+	begin
+		return Pointer_To_Integer(Proc.Pointer_Slot(Procedure_Opcode_Index));
+	end Get_Procedure_Opcode;
+	
 	-----------------------------------------------------------------------------
 
 	function Make_Mark (Interp:  access Interpreter_Record;
@@ -1715,8 +1707,11 @@ Ada.Text_IO.Put_Line ("Make_String...");
 -- TODO: disallow garbage collecion during initialization.
 		Initialize_Heap (Initial_Heap_Size);
 		Interp.Mark := Make_Mark(Interp.Self, 0); -- to indicate the end of cons evaluation
+
 		Interp.Root_Environment := Make_Environment(Interp.Self, Nil_Pointer);
-		Interp.Environment := Interp.Root_Environment;
+		Interp.Root_Frame := Make_Frame(Interp.Self, Nil_Pointer, Integer_To_Pointer(Opcode_Exit), Nil_Pointer, Interp.Root_Environment);
+		Interp.Stack := Interp.Root_Frame;
+
 		Make_Syntax_Objects;
 		Make_Procedure_Objects;
 		Make_Common_Symbol_Objects;
@@ -2022,7 +2017,8 @@ end if;
 	                      Operand: in     Object_Pointer) is
 		pragma Inline (Push_Frame);
 	begin
-		Interp.Stack := Make_Frame(Interp.Self, Interp.Stack, Opcode_To_Pointer(Opcode), Operand, Interp.Environment);
+		--Interp.Stack := Make_Frame(Interp.Self, Interp.Stack, Opcode_To_Pointer(Opcode), Operand, Interp.Environment);
+		Interp.Stack := Make_Frame(Interp.Self, Interp.Stack, Opcode_To_Pointer(Opcode), Operand, Get_Frame_Environment(Interp.Stack));
 	end Push_Frame;
 
 	--procedure Pop_Frame (Interp.Stack: out Object_Pointer;
@@ -2040,7 +2036,6 @@ end if;
 		pragma Inline (Pop_Frame);
 	begin
 		pragma Assert (Interp.Stack /= Nil_Pointer);
-		Interp.Environment := Interp.Stack.Pointer_Slot(Frame_Environment_Index); -- restore environment
 		Interp.Stack := Interp.Stack.Pointer_Slot(Frame_Stack_Index); -- pop 
 	end Pop_Frame;
 
@@ -2051,12 +2046,12 @@ end if;
 	                    Source: in     Object_Pointer;
 	                    Result: out    Object_Pointer) is
 	begin
-		
-		pragma Assert (Interp.Stack = Nil_Pointer);
-		Interp.Stack := Nil_Pointer;
-
 		-- Push a pseudo-frame to terminate the evaluation loop
-		Push_Frame (Interp, Opcode_Exit, Nil_Pointer);
+		--pragma Assert (Interp.Stack = Nil_Pointer);
+		--Interp.Stack := Nil_Pointer;
+		--Push_Frame (Interp, Opcode_Exit, Nil_Pointer);
+		pragma Assert (Interp.Stack = Interp.Root_Frame);
+		pragma Assert (Get_Frame_Result(Interp.Stack) = Nil_Pointer);
 
 		-- Push the actual frame for evaluation
 		Push_Frame (Interp, Opcode_Evaluate_Object, Source);
@@ -2071,10 +2066,12 @@ end if;
 		pragma Assert (Get_Cdr(Result) = Nil_Pointer);
 		-- Get the only value chained 
 		Result := Get_Car(Result);
-		Pop_Frame (Interp);
 
-		pragma Assert (Interp.Stack = Nil_Pointer);
+		--Pop_Frame (Interp);
+		--pragma Assert (Interp.Stack = Nil_Pointer);
 
+		pragma Assert (Interp.Stack = Interp.Root_Frame);
+		Clear_Frame_Result (Interp.Stack);
 	end Evaluate;
 
 	procedure Run_Loop (Interp: in out Interpreter_Record;
@@ -2088,10 +2085,13 @@ end if;
 		Result := Nil_Pointer;
 
 		loop
-			pragma Assert (Interp.Stack = Nil_Pointer);
-			Interp.Stack := Nil_Pointer;
+			--pragma Assert (Interp.Stack = Nil_Pointer);
+			--Interp.Stack := Nil_Pointer;
+			--Push_Frame (Interp, Opcode_Exit, Nil_Pointer);
+			pragma Assert (Interp.Stack = Interp.Root_Frame);
+			pragma Assert (Get_Frame_Result(Interp.Stack) = Nil_Pointer);
 
-			Push_Frame (Interp, Opcode_Exit, Nil_Pointer);
+
 			--Push_Frame (Interp, Opcode_Print_Result, Nil_Pointer);
 			Push_Frame (Interp, Opcode_Evaluate_Result, Nil_Pointer);
 			Push_Frame (Interp, Opcode_Read_Object, Nil_Pointer);
@@ -2104,11 +2104,13 @@ end if;
 			Result := Get_Frame_Result (Interp.Stack); 
 			pragma Assert (Get_Cdr(Result) = Nil_Pointer);
 			Result := Get_Car(Result);
-			Pop_Frame (Interp);
 
+			--Pop_Frame (Interp);
 Ada.Text_IO.Put ("RESULT>>>>>");
 Print (Interp, Result);
-			pragma Assert (Interp.Stack = Nil_Pointer);
+			--pragma Assert (Interp.Stack = Nil_Pointer);
+			pragma Assert (Interp.Stack = Interp.Root_Frame);
+			Clear_Frame_Result (Interp.Stack);
 Ada.Text_IO.Put_Line (">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> LOOP ITERATION XXXXXX CHECKPOINT"); 
 		end loop;
 

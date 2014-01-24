@@ -294,16 +294,19 @@ Ada.Text_IO.Put_line ("TOO FEW ARGUMETNS FOR COMPARISON");
 		Fbody: aliased Object_Pointer;
 		Formal: aliased Object_Pointer;
 		Actual: aliased Object_Pointer;
+		Envir: aliased Object_Pointer;
 	begin
 		Push_Top (Interp, Fbody'Unchecked_Access);
 		Push_Top (Interp, Formal'Unchecked_Access);
 		Push_Top (Interp, Actual'Unchecked_Access);
+		Push_Top (Interp, Envir'Unchecked_Access);
 
 		-- For a closure created of "(lambda (x y) (+ x y) (* x y))"
 		-- Get_Closure_Code(Func) returns "((x y) (+ x y) (* x y))"
 
-		-- Push a new environment for the closure
-		Interp.Environment := Make_Environment(Interp.Self, Get_Closure_Environment(Func));
+		-- Create a new environment for the closure
+		--Interp.Environment := Make_Environment(Interp.Self, Get_Closure_Environment(Func));
+		Envir := Make_Environment(Interp.Self, Get_Closure_Environment(Func));
 
 		Fbody := Get_Closure_Code(Func);
 		pragma Assert (Is_Cons(Fbody)); -- the lambda evaluator must ensure this.
@@ -355,7 +358,11 @@ Ada.Text_IO.Put_line ("TOO FEW ARGUMETNS FOR COMPARISON");
 		Set_Frame_Operand (Interp.Stack, Fbody);
 		Clear_Frame_Result (Interp.Stack);
 
-		Pop_Tops (Interp, 3);
+		-- Update the environment of the frame so as to perform
+		-- body evaluation in the new environment.
+		Set_Frame_Environment (Interp.Stack, Envir);
+
+		Pop_Tops (Interp, 4);
 	end Apply_Closure;
 
 begin

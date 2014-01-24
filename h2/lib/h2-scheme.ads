@@ -498,7 +498,7 @@ private
 
 		Symbol_Table: Object_Pointer := Nil_Pointer;
 		Root_Environment: Object_Pointer := Nil_Pointer;
-		Environment: Object_Pointer := Nil_Pointer;
+		Root_Frame: Object_Pointer := Nil_Pointer;
 		Stack: aliased Object_Pointer := Nil_Pointer;
 		Mark: Object_Pointer := Nil_Pointer;
 

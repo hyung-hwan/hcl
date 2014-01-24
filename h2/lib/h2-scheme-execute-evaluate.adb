@@ -214,7 +214,8 @@ Ada.Text_IO.Put_Line ("NO ALTERNATE");
 		declare
 			Closure: Object_Pointer;
 		begin
-			Closure := Make_Closure(Interp.Self, Operand, Interp.Environment);
+			--Closure := Make_Closure(Interp.Self, Operand, Interp.Environment);
+			Closure := Make_Closure(Interp.Self, Operand, Get_Frame_Environment(Interp.Stack));
 			Pop_Frame (Interp);  -- Done
 			Chain_Frame_Result (Interp, Interp.Stack, Closure);
 		end;
@@ -301,20 +302,23 @@ Ada.Text_IO.Put_Line ("NO ALTERNATE");
 
 	procedure Evaluate_Let_Syntax is
 		pragma Inline (Evaluate_Let_Syntax);
+		Envir: Object_Pointer;
 	begin
 		Check_Let_Syntax;
 		-- Car: <bindings>, Cdr: <body>
+
 		Set_Frame_Opcode (Interp.Stack, Opcode_Let_Finish);
 		Set_Frame_Operand (Interp.Stack, Cdr); 
 
-		Interp.Environment := Make_Environment(Interp.Self, Interp.Environment);
-		Set_Frame_Environment (Interp.Stack, Interp.Environment); 
+		-- Push a new environment to the current frame.
+		Envir := Make_Environment(Interp.Self, Get_Frame_Environment(Interp.Stack));
+		Set_Frame_Environment (Interp.Stack, Envir);
 
 		-- Some let samples:
 		-- #1.
-		--    (define x 99)
-		--    (let () (define x 100)) ; no actual bindings
-		--    x ; this must be 99
+		--    (define x 99) ; define x in the root environment
+		--    (let () (define x 100)) ; x is defined in the new environment.
+		--    x ; this must be 99.
 		--
 		-- #2.
 		--    ...
@@ -328,19 +332,17 @@ Ada.Text_IO.Put_Line ("NO ALTERNATE");
 
 	procedure Evaluate_Letast_Syntax is
 		pragma Inline (Evaluate_Letast_Syntax);
+		Envir: Object_Pointer;
 	begin
 		Check_Let_Syntax;
 		-- Car: <bindings>, Cdr: <body>
 
-		-- Letast_Binding must see this new environment 
-		-- and must make the binding in this environment.
-		Interp.Environment := Make_Environment(Interp.Self, Interp.Environment);
-
-		-- Body evaluation can be done the same way as normal let.
 		Set_Frame_Opcode (Interp.Stack, Opcode_Let_Finish);
 		Set_Frame_Operand (Interp.Stack, Cdr); 
-		-- but in the environment pushed above.
-		Set_Frame_Environment (Interp.Stack, Interp.Environment); 
+
+		-- Push a new environment to the current frame.
+		Envir := Make_Environment(Interp.Self, Get_Frame_Environment(Interp.Stack));
+		Set_Frame_Environment (Interp.Stack, Envir);
 
 		if Car /= Nil_Pointer then
 			-- <bindings> is not empty

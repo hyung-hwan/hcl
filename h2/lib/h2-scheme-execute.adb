@@ -152,8 +152,6 @@ procedure Execute (Interp: in out Interpreter_Record) is
 		pragma Assert (Get_Cdr(Y) = Nil_Pointer); -- ensure only 1 return value 
 		Y := Get_Car(Y); -- the first value 
 
-		pragma Assert (Interp.Environment = Get_Frame_Environment(Interp.Stack));
-
 		if Y = False_Pointer then
 			-- <test> evaluated to #f.
 			X := Get_Cdr(X); -- cons cell containing <alternate>
