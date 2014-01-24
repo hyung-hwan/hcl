@@ -220,8 +220,8 @@ Ada.Text_IO.Put_Line ("NO ALTERNATE");
 		end;
 	end Evaluate_Lambda_Syntax;
 
-	procedure Evaluate_Let_Syntax is
-		pragma Inline (Evaluate_Let_Syntax);
+	procedure Check_Let_Syntax is
+		pragma Inline (Check_Let_Syntax);
 
 		Bindings: Object_Pointer;
 		LetBody: Object_Pointer;
@@ -236,7 +236,7 @@ Ada.Text_IO.Put_Line ("NO ALTERNATE");
 		end if;
 
 		Bindings := Get_Car(Operand);  -- <bindings>
-		if not Is_Cons(Bindings) then
+		if Bindings /= Nil_Pointer and then not Is_Cons(Bindings) then
 			Ada.Text_IO.Put_Line ("INVALID BINDINGS FOR LET");
 			raise Syntax_Error;
 		end if;
@@ -249,70 +249,103 @@ Ada.Text_IO.Put_Line ("NO ALTERNATE");
 			raise Syntax_Error;
 		end if;
 
-		Cdr := Bindings;
-		loop
-			Car := Get_Car(Cdr); -- <binding>
-			if not Is_Cons(Car) or else not Is_Cons(Get_Cdr(Car)) or else Get_Cdr(Get_Cdr(Car)) /= Nil_Pointer then
-				-- no binding name or no binding value or garbage after that
-				Ada.Text_IO.Put_Line ("WRONG BINDING FOR LET");
-				raise Syntax_Error;
-			end if;
-
-			if not Is_Symbol(Get_Car(Car)) then
-				Ada.Text_IO.Put_Line ("WRONG BINDING NAME FOR LET");
-				raise Syntax_Error;
-			end if;
-
-			-- Check for a duplicate binding name
+		if Is_Cons(Bindings) then
+			Cdr := Bindings;
+			loop
+				Car := Get_Car(Cdr); -- <binding>
+				if not Is_Cons(Car) or else not Is_Cons(Get_Cdr(Car)) or else Get_Cdr(Get_Cdr(Car)) /= Nil_Pointer then
+					-- no binding name or no binding value or garbage after that
+					Ada.Text_IO.Put_Line ("WRONG BINDING FOR LET");
+					raise Syntax_Error;
+				end if;
+	
+				if not Is_Symbol(Get_Car(Car)) then
+					Ada.Text_IO.Put_Line ("WRONG BINDING NAME FOR LET");
+					raise Syntax_Error;
+				end if;
+	
+				-- Check for a duplicate binding name
 -- TODO: make duplication check optional or change the implementation more efficient so that this check is not repeated 
-			declare
-				V: Object_Pointer;
-			begin
-				V := Bindings;
-				loop
-					exit when V = Cdr;
-
-					if Get_Car(Get_Car(V)) = Get_Car(Car) then
-						Ada.Text_IO.Put_Line ("DUPLICATE BINDING FOR LET");
-						raise Syntax_Error;
-					end if;
-
-					V := Get_Cdr(V);
-				end loop;
-			end;
-
+				declare
+					V: Object_Pointer;
+				begin
+					V := Bindings;
+					loop
+						exit when V = Cdr;
+	
+						if Get_Car(Get_Car(V)) = Get_Car(Car) then
+							Ada.Text_IO.Put_Line ("DUPLICATE BINDING FOR LET");
+							raise Syntax_Error;
+						end if;
+	
+						V := Get_Cdr(V);
+					end loop;
+				end;
+	
 				-- Move on to the next binding
-			Cdr := Get_Cdr(Cdr);
-			exit when not Is_Cons(Cdr);
-		end loop;
-
-		if Cdr /= Nil_Pointer then
-			-- The last cdr is not nil.
-			Ada.Text_IO.Put_Line ("FUCKING CDR FOR LET BINDING");
-			raise Syntax_Error;
-		end if;
+				Cdr := Get_Cdr(Cdr);
+				exit when not Is_Cons(Cdr);
+			end loop;
+	
+			if Cdr /= Nil_Pointer then
+				-- The last cdr is not nil.
+				Ada.Text_IO.Put_Line ("FUCKING CDR FOR LET BINDING");
+				raise Syntax_Error;
+			end if;
+		end  if;
 
 		-- To avoid problems of temporary object pointer problems.
 		Car := Bindings;
 		Cdr := LetBody;
+	end Check_Let_Syntax;
 
+	procedure Evaluate_Let_Syntax is
+		pragma Inline (Evaluate_Let_Syntax);
+	begin
+		Check_Let_Syntax;
+		-- Car: <bindings>, Cdr: <body>
 		Set_Frame_Opcode (Interp.Stack, Opcode_Let_Finish);
 		Set_Frame_Operand (Interp.Stack, Cdr); 
 
-		Push_Frame (Interp, Opcode_Let_Binding, Car);
-		Push_Frame (Interp, Opcode_Let_Evaluation, Car);
+		Interp.Environment := Make_Environment(Interp.Self, Interp.Environment);
+		Set_Frame_Environment (Interp.Stack, Interp.Environment); 
+
+		-- Some let samples:
+		-- #1.
+		--    (define x 99)
+		--    (let () (define x 100)) ; no actual bindings
+		--    x ; this must be 99
+		--
+		-- #2.
+		--    ...
+
+		if Car /= Nil_Pointer then
+			-- <bindings> is not empty
+			Push_Frame (Interp, Opcode_Let_Binding, Car);
+			Push_Frame (Interp, Opcode_Let_Evaluation, Car);
+		end if;
 	end Evaluate_Let_Syntax;
 
 	procedure Evaluate_Letast_Syntax is
 		pragma Inline (Evaluate_Letast_Syntax);
 	begin
+		Check_Let_Syntax;
+		-- Car: <bindings>, Cdr: <body>
 
-		--Set_Frame_Opcode (Interp.Stack, Opcode_Let_Finish);
-		--Set_Frame_Operand (Interp.Stack, Cdr); 
+		-- Letast_Binding must see this new environment 
+		-- and must make the binding in this environment.
+		Interp.Environment := Make_Environment(Interp.Self, Interp.Environment);
 
-		--Push_Frame (Interp, Opcode_Let_Binding, Car);
-		--Push_Frame (Interp, Opcode_Let_Evaluation, Car);
-		null;
+		-- Body evaluation can be done the same way as normal let.
+		Set_Frame_Opcode (Interp.Stack, Opcode_Let_Finish);
+		Set_Frame_Operand (Interp.Stack, Cdr); 
+		-- but in the environment pushed above.
+		Set_Frame_Environment (Interp.Stack, Interp.Environment); 
+
+		if Car /= Nil_Pointer then
+			-- <bindings> is not empty
+			Push_Frame (Interp, Opcode_Letast_Binding, Car);
+		end if;
 	end Evaluate_Letast_Syntax;
 
 	procedure Evaluate_Quote_Syntax is

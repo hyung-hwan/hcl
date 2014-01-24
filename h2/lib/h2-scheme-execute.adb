@@ -212,18 +212,10 @@ procedure Execute (Interp: in out Interpreter_Record) is
 		Push_Top (Interp, X'Unchecked_Access);
 		Push_Top (Interp, Y'Unchecked_Access);
 
+		-- Evaluation of <bindings> is completed.
+		-- Update the environments.
 		X := Get_Frame_Operand(Interp.Stack); -- <bindings> and onward
 		Y := Reverse_Cons(Get_Frame_Result(Interp.Stack));
-
-		pragma Assert (Interp.Environment = Get_Frame_Environment(Interp.Stack));
-
-		-- Push a new environment
-		Interp.Environment := Make_Environment(Interp.Self, Interp.Environment);
-
-		-- Change the frame's environment so that Pop_Frame() doesn't 
-		-- restore the environment to the old one. The new environment
-		-- has been just pushed above after binding evaluation.
-		Set_Frame_Environment (Interp.Stack, Interp.Environment); 
 
 		while Is_Cons(X) loop
 			pragma Assert (Is_Cons(Y));
@@ -234,9 +226,43 @@ procedure Execute (Interp: in out Interpreter_Record) is
 		end loop;
 
 		Pop_Frame (Interp); -- done. 
-
 		Pop_Tops (Interp, 2);
 	end Do_Let_Binding;
+
+	procedure Do_Letast_Binding is
+		pragma Inline (Do_Letast_Binding);
+		X: aliased Object_Pointer;
+		Y: aliased Object_Pointer;
+	begin
+		Push_Top (Interp, X'Unchecked_Access);
+		Push_Top (Interp, Y'Unchecked_Access);
+
+		X := Get_Frame_Operand(Interp.Stack); -- <bindings> and onward
+		Y := Get_Frame_Result(Interp.Stack);
+
+		if Y = Nil_Pointer then
+			-- First call
+			pragma Assert (Is_Cons(X)); -- Don't provoke this procedure if <bindings> is empty.
+			Push_Frame (Interp, Opcode_Evaluate_Object, Get_Car(Get_Cdr(Get_Car(X))));
+		else
+			-- Subsequence calls
+			-- Update the environment while evaluating <bindings>
+			Put_Environment (Interp, Get_Car(Get_Car(X)), Get_Car(Y));
+			X := Get_Cdr(X); -- next binding
+			if Is_Cons(X) then
+				-- More bingings to evaluate
+				Set_Frame_Operand (Interp.Stack, X);
+				Clear_Frame_Result (Interp.Stack);
+
+				Push_Frame (Interp, Opcode_Evaluate_Object, Get_Car(Get_Cdr(Get_Car(X))));
+			else
+				-- No more bingings left
+				Pop_Frame (Interp); -- Done
+			end if;
+		end if;
+
+		Pop_Tops (Interp, 2);
+	end Do_Letast_Binding;
 
 	procedure Do_Let_Finish is
 		pragma Inline (Do_Let_Finish);
@@ -913,13 +939,12 @@ begin
 
 			when Opcode_Let_Binding =>
 				Do_Let_Binding; 
+			when Opcode_Letast_Binding =>
+				Do_Letast_Binding; 
 			when Opcode_Let_Evaluation =>
 				Do_Let_Evaluation;
 			when Opcode_Let_Finish =>
 				Do_Let_Finish; 
-
-			--when Opcode_Finish_Letast_Syntax =>
-			--when Opcode_Finish_Letrec_Syntax =>
 
 			when Opcode_Finish_Or_Syntax => 
 				Finish_Or_Syntax; -- Conditional

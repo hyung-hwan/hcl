@@ -79,8 +79,7 @@ package body H2.Scheme is
 	-- INTERNALLY-USED TYPES
 	-----------------------------------------------------------------------------
 	type Heap_Element_Pointer is access all Heap_Element;
-	for Heap_Element_Pointer'Size use Object_Pointer_Bits; -- ensure that it can be overlayed by an ObjectPointer
-
+	for Heap_Element_Pointer'Size use Object_Pointer_Bits; -- ensure that it can be overlaid by an ObjectPointer
 
 	type Thin_Heap_Element_Array is array (1 .. Heap_Size'Last) of Heap_Element;
 	type Thin_Heap_Element_Array_Pointer is access all Thin_Heap_Element_Array;
@@ -88,7 +87,7 @@ package body H2.Scheme is
 
 	subtype Moved_Object_Record is Object_Record (Moved_Object, 0);
 
-	subtype Opcode_Type is Object_Integer range 0 .. 18;
+	subtype Opcode_Type is Object_Integer range 0 .. 19;
 	Opcode_Exit:                 constant Opcode_Type := Opcode_Type'(0);
 	Opcode_Evaluate_Result:      constant Opcode_Type := Opcode_Type'(1);
 	Opcode_Evaluate_Object:      constant Opcode_Type := Opcode_Type'(2);
@@ -100,16 +99,17 @@ package body H2.Scheme is
 	Opcode_Finish_Set_Syntax:    constant Opcode_Type := Opcode_Type'(8); 
 
 	Opcode_Let_Binding:          constant Opcode_Type := Opcode_Type'(9);
-	Opcode_Let_Evaluation:       constant Opcode_Type := Opcode_Type'(10);
-	Opcode_Let_Finish:           constant Opcode_Type := Opcode_Type'(11);
+	Opcode_Letast_Binding:       constant Opcode_Type := Opcode_Type'(10);
+	Opcode_Let_Evaluation:       constant Opcode_Type := Opcode_Type'(11);
+	Opcode_Let_Finish:           constant Opcode_Type := Opcode_Type'(12);
 
-	Opcode_Apply:                constant Opcode_Type := Opcode_Type'(12);
-	Opcode_Read_Object:          constant Opcode_Type := Opcode_Type'(13);
-	Opcode_Read_List:            constant Opcode_Type := Opcode_Type'(14);
-	Opcode_Read_List_Cdr:        constant Opcode_Type := Opcode_Type'(15);
-	Opcode_Read_List_End:        constant Opcode_Type := Opcode_Type'(16);
-	Opcode_Close_List:           constant Opcode_Type := Opcode_Type'(17);
-	Opcode_Close_Quote:          constant Opcode_Type := Opcode_Type'(18);
+	Opcode_Apply:                constant Opcode_Type := Opcode_Type'(13);
+	Opcode_Read_Object:          constant Opcode_Type := Opcode_Type'(14);
+	Opcode_Read_List:            constant Opcode_Type := Opcode_Type'(15);
+	Opcode_Read_List_Cdr:        constant Opcode_Type := Opcode_Type'(16);
+	Opcode_Read_List_End:        constant Opcode_Type := Opcode_Type'(17);
+	Opcode_Close_List:           constant Opcode_Type := Opcode_Type'(18);
+	Opcode_Close_Quote:          constant Opcode_Type := Opcode_Type'(19);
 
 	-----------------------------------------------------------------------------
 	-- COMMON OBJECTS
@@ -1650,7 +1650,7 @@ Ada.Text_IO.Put_Line ("Make_String...");
 			Dummy := Make_Syntax (Interp.Self, Lambda_Syntax, Label_Lambda); -- "lamba"
 			Dummy := Make_Syntax (Interp.Self, Let_Syntax,    Label_Let); -- "let"
 			Dummy := Make_Syntax (Interp.Self, Letast_Syntax, Label_Letast); -- "let*"
-			Dummy := Make_Syntax (Interp.Self, Letrec_Syntax, Label_Letrec); -- "letrc"
+			Dummy := Make_Syntax (Interp.Self, Letrec_Syntax, Label_Letrec); -- "letrec"
 			Dummy := Make_Syntax (Interp.Self, Or_Syntax,     Label_Or); -- "or"
 			Interp.Symbol.Quote := Make_Syntax (Interp.Self, Quote_Syntax,  Label_Quote); -- "quote"
 			Interp.Symbol.Quasiquote := Make_Syntax (Interp.Self, Quasiquote_Syntax,  Label_Quasiquote); -- "quasiquote"
