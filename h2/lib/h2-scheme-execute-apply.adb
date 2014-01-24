@@ -305,8 +305,10 @@ Ada.Text_IO.Put_line ("TOO FEW ARGUMETNS FOR COMPARISON");
 		-- Get_Closure_Code(Func) returns "((x y) (+ x y) (* x y))"
 
 		-- Create a new environment for the closure
-		--Interp.Environment := Make_Environment(Interp.Self, Get_Closure_Environment(Func));
 		Envir := Make_Environment(Interp.Self, Get_Closure_Environment(Func));
+		-- Update the environment of the frame to the one created above
+		-- so as to put the arguments into the new environment.
+		Set_Frame_Environment (Interp.Stack, Envir);
 
 		Fbody := Get_Closure_Code(Func);
 		pragma Assert (Is_Cons(Fbody)); -- the lambda evaluator must ensure this.
@@ -325,7 +327,7 @@ Ada.Text_IO.Put_line ("TOO FEW ARGUMETNS FOR COMPARISON");
 		else
 			while Is_Cons(Formal) loop
 				if not Is_Cons(Actual) then
-					Ada.Text_IO.Put_Line (">>>> Too few arguments for CLOSURE <<<<");	
+					Ada.Text_IO.Put_Line (">>>> TOO FEW ARGUMENTS FOR CLOSURE <<<<");	
 					raise Evaluation_Error;
 				end if;
 
@@ -353,14 +355,9 @@ Ada.Text_IO.Put_line ("TOO FEW ARGUMETNS FOR COMPARISON");
 			end if;
 		end if;
 			
--- TODO: is it correct to keep the environement in the frame?
 		Set_Frame_Opcode (Interp.Stack, Opcode_Evaluate_Group);
 		Set_Frame_Operand (Interp.Stack, Fbody);
 		Clear_Frame_Result (Interp.Stack);
-
-		-- Update the environment of the frame so as to perform
-		-- body evaluation in the new environment.
-		Set_Frame_Environment (Interp.Stack, Envir);
 
 		Pop_Tops (Interp, 4);
 	end Apply_Closure;

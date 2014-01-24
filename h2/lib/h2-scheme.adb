@@ -2000,78 +2000,53 @@ end if;
 		Ada.Text_IO.New_Line;
 	end Print;
 
-	function Pointer_To_Opcode (Pointer: in Object_Pointer) return Opcode_Type is
-		pragma Inline (Pointer_To_Opcode);
-	begin	
-		return Pointer_To_Integer(Pointer);
-	end Pointer_To_Opcode;
-
-	function Opcode_To_Pointer (Opcode: in Opcode_Type) return Object_Pointer is
-		pragma Inline (Opcode_To_Pointer);
-	begin	
-		return Integer_To_Pointer(Opcode);
-	end Opcode_To_Pointer;
+	function Pointer_To_Opcode (Pointer: in Object_Pointer) return Opcode_Type renames Pointer_To_Integer;
+	function Opcode_To_Pointer (Opcode: in Opcode_Type) return Object_Pointer renames Integer_To_Pointer;
 
 	procedure Push_Frame (Interp:  in out Interpreter_Record;
 	                      Opcode:  in     Opcode_Type; 
 	                      Operand: in     Object_Pointer) is
 		pragma Inline (Push_Frame);
 	begin
-		--Interp.Stack := Make_Frame(Interp.Self, Interp.Stack, Opcode_To_Pointer(Opcode), Operand, Interp.Environment);
 		Interp.Stack := Make_Frame(Interp.Self, Interp.Stack, Opcode_To_Pointer(Opcode), Operand, Get_Frame_Environment(Interp.Stack));
 	end Push_Frame;
-
-	--procedure Pop_Frame (Interp.Stack: out Object_Pointer;
-	--                     Opcode:  out Opcode_Type;
-	--                     Operand: out Object_Pointer) is
-	--	pragma Inline (Pop_Frame);
-	--begin
-	--	pragma Assert (Interp.Stack /= Nil_Pointer);
-	--	Opcode := Pointer_To_Opcode(Interp.Stack.Pointer_Slot(Frame_Opcode_Index));
-	--	Operand := Interp.Stack.Pointer_Slot(Frame_Operand_Index);
-	--	Interp.Stack := Interp.Stack.Pointer_Slot(Frame_Stack_Index); -- pop 
-	--end Pop_Frame;
 
 	procedure Pop_Frame (Interp: in out Interpreter_Record) is
 		pragma Inline (Pop_Frame);
 	begin
+		pragma Assert (Interp.Stack /= Interp.Root_Frame);
 		pragma Assert (Interp.Stack /= Nil_Pointer);
 		Interp.Stack := Interp.Stack.Pointer_Slot(Frame_Stack_Index); -- pop 
 	end Pop_Frame;
 
 	procedure Execute (Interp: in out Interpreter_Record) is separate;
 
-
 	procedure Evaluate (Interp: in out Interpreter_Record;
 	                    Source: in     Object_Pointer;
 	                    Result: out    Object_Pointer) is
 	begin
-		-- Push a pseudo-frame to terminate the evaluation loop
-		--pragma Assert (Interp.Stack = Nil_Pointer);
-		--Interp.Stack := Nil_Pointer;
-		--Push_Frame (Interp, Opcode_Exit, Nil_Pointer);
-		pragma Assert (Interp.Stack = Interp.Root_Frame);
-		pragma Assert (Get_Frame_Result(Interp.Stack) = Nil_Pointer);
+		Result := Nil_Pointer;
 
-		-- Push the actual frame for evaluation
+		-- Perform some clean ups in case the procedure is called
+		-- again after an exception is raised
+		Clear_Tops (Interp);
+		Interp.Stack := Interp.Root_Frame;
+		Clear_Frame_Result (Interp.Stack);
+
+		-- Push an actual frame for evaluation
 		Push_Frame (Interp, Opcode_Evaluate_Object, Source);
 
 		Execute (Interp);
 
+		pragma Assert (Interp.Stack = Interp.Root_Frame);
 		pragma Assert (Get_Frame_Opcode(Interp.Stack) = Opcode_Exit);
 
-		Result := Get_Frame_Result (Interp.Stack);
+		Result := Get_Frame_Result(Interp.Stack);
 		-- There must be only 1 value chained to the top-level frame
 		-- once evaluation is over.
 		pragma Assert (Get_Cdr(Result) = Nil_Pointer);
-		-- Get the only value chained 
-		Result := Get_Car(Result);
-
-		--Pop_Frame (Interp);
-		--pragma Assert (Interp.Stack = Nil_Pointer);
-
-		pragma Assert (Interp.Stack = Interp.Root_Frame);
-		Clear_Frame_Result (Interp.Stack);
+		Result := Get_Car(Result); -- Get the only value chained 
+		Clear_Frame_Result (Interp.Stack); 
 	end Evaluate;
 
 	procedure Run_Loop (Interp: in out Interpreter_Record;
@@ -2081,36 +2056,35 @@ end if;
 		pragma Assert (Interp.Base_Input.Stream /= null);
 
 --DEBUG_GC := Standard.True;
-		Clear_Tops (Interp);
+
 		Result := Nil_Pointer;
 
+		-- Perform some clean ups in case the procedure is called
+		-- again after an exception is raised
+		Clear_Tops (Interp);
+		Interp.Stack := Interp.Root_Frame;
+		Clear_Frame_Result (Interp.Stack);
+
 		loop
-			--pragma Assert (Interp.Stack = Nil_Pointer);
-			--Interp.Stack := Nil_Pointer;
-			--Push_Frame (Interp, Opcode_Exit, Nil_Pointer);
 			pragma Assert (Interp.Stack = Interp.Root_Frame);
 			pragma Assert (Get_Frame_Result(Interp.Stack) = Nil_Pointer);
-
 
 			--Push_Frame (Interp, Opcode_Print_Result, Nil_Pointer);
 			Push_Frame (Interp, Opcode_Evaluate_Result, Nil_Pointer);
 			Push_Frame (Interp, Opcode_Read_Object, Nil_Pointer);
-
 			Execute (Interp);
 
+			pragma Assert (Interp.Stack = Interp.Root_Frame);
 			pragma Assert (Get_Frame_Opcode(Interp.Stack) = Opcode_Exit);
 
 			-- TODO: this result must be kept at some where that GC dowsn't sweep.
-			Result := Get_Frame_Result (Interp.Stack); 
+			Result := Get_Frame_Result(Interp.Stack); 
 			pragma Assert (Get_Cdr(Result) = Nil_Pointer);
 			Result := Get_Car(Result);
+			Clear_Frame_Result (Interp.Stack);
 
-			--Pop_Frame (Interp);
 Ada.Text_IO.Put ("RESULT>>>>>");
 Print (Interp, Result);
-			--pragma Assert (Interp.Stack = Nil_Pointer);
-			pragma Assert (Interp.Stack = Interp.Root_Frame);
-			Clear_Frame_Result (Interp.Stack);
 Ada.Text_IO.Put_Line (">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> LOOP ITERATION XXXXXX CHECKPOINT"); 
 		end loop;
 

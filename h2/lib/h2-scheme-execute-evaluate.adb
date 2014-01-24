@@ -214,7 +214,6 @@ Ada.Text_IO.Put_Line ("NO ALTERNATE");
 		declare
 			Closure: Object_Pointer;
 		begin
-			--Closure := Make_Closure(Interp.Self, Operand, Interp.Environment);
 			Closure := Make_Closure(Interp.Self, Operand, Get_Frame_Environment(Interp.Stack));
 			Pop_Frame (Interp);  -- Done
 			Chain_Frame_Result (Interp, Interp.Stack, Closure);
@@ -350,6 +349,27 @@ Ada.Text_IO.Put_Line ("NO ALTERNATE");
 		end if;
 	end Evaluate_Letast_Syntax;
 
+	procedure Evaluate_Letrec_Syntax is
+		pragma Inline (Evaluate_Letrec_Syntax);
+		Envir: Object_Pointer;
+	begin
+		Check_Let_Syntax;
+		-- Car: <bindings>, Cdr: <body>
+
+ada.text_io.put_line ("XXXXX <<< LETREC IMPLEMENTATION NEEDED >>XXXXXXXXXXXXXXXXXXXXXXXXXXX");
+		--Set_Frame_Opcode (Interp.Stack, Opcode_Let_Finish);
+		--Set_Frame_Operand (Interp.Stack, Cdr); 
+
+		-- Push a new environment to the current frame.
+		--Envir := Make_Environment(Interp.Self, Get_Frame_Environment(Interp.Stack));
+		--Set_Frame_Environment (Interp.Stack, Envir);
+
+		--if Car /= Nil_Pointer then
+			-- <bindings> is not empty
+		--	Push_Frame (Interp, Opcode_Letrec_Binding, Car);
+		--end if;
+	end Evaluate_Letrec_Syntax;
+
 	procedure Evaluate_Quote_Syntax is
 		pragma Inline (Evaluate_Quote_Syntax);
 	begin
@@ -482,6 +502,9 @@ begin
 
 					when Letast_Syntax =>
 						Evaluate_Letast_Syntax;
+
+					when Letrec_Syntax =>
+						Evaluate_Letrec_Syntax;
 
 					when Or_Syntax =>
 						Evaluate_Or_Syntax;
