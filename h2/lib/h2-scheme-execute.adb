@@ -224,6 +224,8 @@ procedure Execute (Interp: in out Interpreter_Record) is
 		end loop;
 
 		Pop_Frame (Interp); -- done. 
+		pragma Assert (Get_Frame_Opcode(Interp.Stack) = Opcode_Let_Finish);
+
 		Pop_Tops (Interp, 2);
 	end Do_Let_Binding;
 
@@ -231,9 +233,11 @@ procedure Execute (Interp: in out Interpreter_Record) is
 		pragma Inline (Do_Letast_Binding);
 		X: aliased Object_Pointer;
 		Y: aliased Object_Pointer;
+		Envir: aliased Object_Pointer;
 	begin
 		Push_Top (Interp, X'Unchecked_Access);
 		Push_Top (Interp, Y'Unchecked_Access);
+		Push_Top (Interp, Envir'Unchecked_Access);
 
 		X := Get_Frame_Operand(Interp.Stack); -- <bindings> and onward
 		Y := Get_Frame_Result(Interp.Stack);
@@ -241,25 +245,36 @@ procedure Execute (Interp: in out Interpreter_Record) is
 		if Y = Nil_Pointer then
 			-- First call
 			pragma Assert (Is_Cons(X)); -- Don't provoke this procedure if <bindings> is empty.
+			Envir := Get_Frame_Environment(Get_Frame_Parent(Interp.Stack));	
 			Push_Frame (Interp, Opcode_Evaluate_Object, Get_Car(Get_Cdr(Get_Car(X))));
 		else
-			-- Subsequence calls
-			-- Update the environment while evaluating <bindings>
+			-- Subsequence calls. Update the environment while evaluating <bindings>
+
+			-- Push a new environment for each binding.
+			Envir := Make_Environment(Interp.Self, Get_Frame_Environment(Interp.Stack));
+			Set_Frame_Environment (Interp.Stack, Envir);
 			Put_Environment (Interp, Get_Car(Get_Car(X)), Get_Car(Y));
+
 			X := Get_Cdr(X); -- next binding
 			if Is_Cons(X) then
 				-- More bingings to evaluate
 				Set_Frame_Operand (Interp.Stack, X);
 				Clear_Frame_Result (Interp.Stack);
 
+				-- the next evaluation must be done in the environment where the 
+				-- current binding has been made.
 				Push_Frame (Interp, Opcode_Evaluate_Object, Get_Car(Get_Cdr(Get_Car(X))));
 			else
 				-- No more bingings left
 				Pop_Frame (Interp); -- Done
+
+				-- Update the environment of the Let_Finish frame.
+				pragma Assert (Get_Frame_Opcode(Interp.Stack) = Opcode_Let_Finish);
+				Set_Frame_Environment (Interp.Stack, Envir);
 			end if;
 		end if;
 
-		Pop_Tops (Interp, 2);
+		Pop_Tops (Interp, 3);
 	end Do_Letast_Binding;
 
 	procedure Do_Let_Finish is

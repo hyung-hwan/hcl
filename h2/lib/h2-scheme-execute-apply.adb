@@ -2,7 +2,7 @@
 separate (H2.Scheme.Execute)
 
 procedure Apply is
-	pragma Inline (Apply);
+	--pragma Inline (Apply);
 
 	Operand: aliased Object_Pointer;
 	Func: aliased Object_Pointer;

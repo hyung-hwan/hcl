@@ -119,7 +119,7 @@ package body H2.Scheme is
 	Cons_Cdr_Index: constant Pointer_Object_Size := 2;
 
 	Frame_Object_Size: constant Pointer_Object_Size := 5;
-	Frame_Stack_Index: constant Pointer_Object_Size := 1;
+	Frame_Parent_Index: constant Pointer_Object_Size := 1;
 	Frame_Opcode_Index: constant Pointer_Object_Size := 2;
 	Frame_Operand_Index: constant Pointer_Object_Size := 3;
 	Frame_Environment_Index: constant Pointer_Object_Size := 4;
@@ -1135,7 +1135,7 @@ Ada.Text_IO.Put_Line ("Make_String...");
 --       Since it's used for stack, it can be made special.
 		Frame := Allocate_Pointer_Object (Interp, Frame_Object_Size, Nil_Pointer);
 		Frame.Tag := Frame_Object;
-		Frame.Pointer_Slot(Frame_Stack_Index) := Aliased_Stack;
+		Frame.Pointer_Slot(Frame_Parent_Index) := Aliased_Stack;
 		Frame.Pointer_Slot(Frame_Opcode_Index) := Aliased_Opcode;
 		Frame.Pointer_Slot(Frame_Operand_Index) := Aliased_Operand;
 		Frame.Pointer_Slot(Frame_Environment_Index) := Aliased_Envir;
@@ -1246,6 +1246,13 @@ Ada.Text_IO.Put_Line ("Make_String...");
 		Frame.Pointer_Slot(Frame_Operand_Index) := Value;
 	end Set_Frame_Operand;
 
+
+	function Get_Frame_Parent (Frame: in Object_Pointer) return Object_Pointer is
+		pragma Inline (Get_Frame_Parent);
+		pragma Assert (Is_Frame(Frame));
+	begin
+		return Frame.Pointer_Slot(Frame_Parent_Index);
+	end Get_Frame_Parent;
 
 	-----------------------------------------------------------------------------
 
@@ -1962,7 +1969,7 @@ end if;
 					else
 						Opcode := Pointer_To_Integer(Stack.Pointer_Slot(Frame_Opcode_Index));
 						Operand := Stack.Pointer_Slot(Frame_Operand_Index);
-						Stack := Stack.Pointer_Slot(Frame_Stack_Index); -- pop
+						Stack := Stack.Pointer_Slot(Frame_Parent_Index); -- pop
 					end if;
 				end if;
 
@@ -1987,7 +1994,7 @@ end if;
 					else
 						Opcode := Pointer_To_Integer(Stack.Pointer_Slot(Frame_Opcode_Index));
 						Operand := Stack.Pointer_Slot(Frame_Operand_Index);
-						Stack := Stack.Pointer_Slot(Frame_Stack_Index); -- pop 
+						Stack := Stack.Pointer_Slot(Frame_Parent_Index); -- pop 
 					end if;
 				end if;
 
@@ -2008,15 +2015,25 @@ end if;
 	                      Operand: in     Object_Pointer) is
 		pragma Inline (Push_Frame);
 	begin
-		Interp.Stack := Make_Frame(Interp.Self, Interp.Stack, Opcode_To_Pointer(Opcode), Operand, Get_Frame_Environment(Interp.Stack));
+		Interp.Stack := Make_Frame(Interp.Self, Interp.Stack, Opcode_To_Pointer(Opcode),
+		                           Operand, Get_Frame_Environment(Interp.Stack));
 	end Push_Frame;
+
+	procedure Push_Frame_With_Environment (Interp:  in out Interpreter_Record;
+	                                       Opcode:  in     Opcode_Type; 
+	                                       Operand: in     Object_Pointer;
+	                                       Envir:   in     Object_Pointer) is
+		pragma Inline (Push_Frame_With_Environment);
+	begin
+		Interp.Stack := Make_Frame(Interp.Self, Interp.Stack, Opcode_To_Pointer(Opcode), Operand, Envir);
+	end Push_Frame_With_Environment;
 
 	procedure Pop_Frame (Interp: in out Interpreter_Record) is
 		pragma Inline (Pop_Frame);
 	begin
 		pragma Assert (Interp.Stack /= Interp.Root_Frame);
 		pragma Assert (Interp.Stack /= Nil_Pointer);
-		Interp.Stack := Interp.Stack.Pointer_Slot(Frame_Stack_Index); -- pop 
+		Interp.Stack := Interp.Stack.Pointer_Slot(Frame_Parent_Index); -- pop 
 	end Pop_Frame;
 
 	procedure Execute (Interp: in out Interpreter_Record) is separate;

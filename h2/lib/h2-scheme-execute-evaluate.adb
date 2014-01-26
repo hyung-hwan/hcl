@@ -1,7 +1,7 @@
 separate (H2.Scheme.Execute)
 
 procedure Evaluate is
-	pragma Inline (Evaluate);
+	--pragma Inline (Evaluate);
 
 	Operand: aliased Object_Pointer;
 	Car: aliased Object_Pointer;
@@ -301,7 +301,7 @@ Ada.Text_IO.Put_Line ("NO ALTERNATE");
 
 	procedure Evaluate_Let_Syntax is
 		pragma Inline (Evaluate_Let_Syntax);
-		Envir: Object_Pointer;
+		Envir: aliased Object_Pointer;
 	begin
 		Check_Let_Syntax;
 		-- Car: <bindings>, Cdr: <body>
@@ -309,7 +309,10 @@ Ada.Text_IO.Put_Line ("NO ALTERNATE");
 		Set_Frame_Opcode (Interp.Stack, Opcode_Let_Finish);
 		Set_Frame_Operand (Interp.Stack, Cdr); 
 
-		-- Push a new environment to the current frame.
+		-- Push a new environment onto the current frame.
+		-- It's pushed even if <bindings> is empty because
+		-- the new environment is still needed in such a case
+		-- as shown in the first sample below.
 		Envir := Make_Environment(Interp.Self, Get_Frame_Environment(Interp.Stack));
 		Set_Frame_Environment (Interp.Stack, Envir);
 
@@ -320,12 +323,25 @@ Ada.Text_IO.Put_Line ("NO ALTERNATE");
 		--    x ; this must be 99.
 		--
 		-- #2.
-		--    ...
+		--   (define x 10) ; x-outer
+		--   (define y (let ((x (+ x 1))) x)) ; x-inner := x-outer + 1, y := x-inner
+		--   y ; 11 
+		--   x ; 10
+		--    
 
 		if Car /= Nil_Pointer then
 			-- <bindings> is not empty
+			Push_Top (Interp, Envir'Unchecked_Access);
+			Envir := Get_Frame_Environment(Get_Frame_Parent(Interp.Stack));
+
+			-- The actual binding after evaluation must be performed in the 
+			-- new environment.
 			Push_Frame (Interp, Opcode_Let_Binding, Car);
-			Push_Frame (Interp, Opcode_Let_Evaluation, Car);
+
+			-- But evaluation must be done in the current environment which is 
+			-- the environment before the environment update above.
+			Push_Frame_With_Environment (Interp, Opcode_Let_Evaluation, Car, Envir); 
+			Pop_Tops (Interp, 1);
 		end if;
 	end Evaluate_Let_Syntax;
 
@@ -339,13 +355,14 @@ Ada.Text_IO.Put_Line ("NO ALTERNATE");
 		Set_Frame_Opcode (Interp.Stack, Opcode_Let_Finish);
 		Set_Frame_Operand (Interp.Stack, Cdr); 
 
-		-- Push a new environment to the current frame.
-		Envir := Make_Environment(Interp.Self, Get_Frame_Environment(Interp.Stack));
-		Set_Frame_Environment (Interp.Stack, Envir);
-
 		if Car /= Nil_Pointer then
 			-- <bindings> is not empty
 			Push_Frame (Interp, Opcode_Letast_Binding, Car);
+		else
+			-- <bindings> is empty. push the new environment
+			-- for <body> evaluation.
+			Envir := Make_Environment(Interp.Self, Get_Frame_Environment(Interp.Stack));
+			Set_Frame_Environment (Interp.Stack, Envir);
 		end if;
 	end Evaluate_Letast_Syntax;
 
@@ -356,18 +373,20 @@ Ada.Text_IO.Put_Line ("NO ALTERNATE");
 		Check_Let_Syntax;
 		-- Car: <bindings>, Cdr: <body>
 
-ada.text_io.put_line ("XXXXX <<< LETREC IMPLEMENTATION NEEDED >>XXXXXXXXXXXXXXXXXXXXXXXXXXX");
-		--Set_Frame_Opcode (Interp.Stack, Opcode_Let_Finish);
-		--Set_Frame_Operand (Interp.Stack, Cdr); 
+		Set_Frame_Opcode (Interp.Stack, Opcode_Let_Finish);
+		Set_Frame_Operand (Interp.Stack, Cdr); 
 
-		-- Push a new environment to the current frame.
-		--Envir := Make_Environment(Interp.Self, Get_Frame_Environment(Interp.Stack));
-		--Set_Frame_Environment (Interp.Stack, Envir);
+		-- Push a new environment.
+		Envir := Make_Environment(Interp.Self, Get_Frame_Environment(Interp.Stack));
+		Set_Frame_Environment (Interp.Stack, Envir);
 
-		--if Car /= Nil_Pointer then
+		if Car /= Nil_Pointer then
 			-- <bindings> is not empty
-		--	Push_Frame (Interp, Opcode_Letrec_Binding, Car);
-		--end if;
+			-- Arrange to perform evaluataion and binding in the
+			-- new environment created.
+			Push_Frame (Interp, Opcode_Let_Binding, Car);
+			Push_Frame (Interp, Opcode_Let_Evaluation, Car); 
+		end if;
 	end Evaluate_Letrec_Syntax;
 
 	procedure Evaluate_Quote_Syntax is
