@@ -43,6 +43,12 @@ package body H2.Scheme is
 	Label_Quote:      constant Object_Character_Array := (Ch.LC_Q, Ch.LC_U, Ch.LC_O, Ch.LC_T, Ch.LC_E); -- "quote"
 	Label_Set:        constant Object_Character_Array := (Ch.LC_S, Ch.LC_E, Ch.LC_T, Ch.Exclamation); -- "set!"
 
+
+	Label_Callcc:    constant Object_Character_Array := (Ch.LC_C, Ch.LC_A, Ch.LC_L, Ch.LC_L, Ch.Minus_Sign,
+	                                                     Ch.LC_W, Ch.LC_I, Ch.LC_T, Ch.LC_H, Ch.Minus_Sign,
+	                                                     Ch.LC_C, Ch.LC_U, Ch.LC_R, Ch.LC_R, Ch.LC_E, Ch.LC_N, Ch.LC_T, Ch.Minus_Sign,
+	                                                     Ch.LC_C, Ch.LC_O, Ch.LC_N, Ch.LC_T, Ch.LC_I, Ch.LC_N, Ch.LC_U, Ch.LC_A, 
+	                                                     Ch.LC_T, Ch.LC_I, Ch.LC_O, Ch.LC_N);  -- "call-with-current-continuation"
 	Label_Car:       constant Object_Character_Array := (Ch.LC_C, Ch.LC_A, Ch.LC_R); -- "car"
 	Label_Cdr:       constant Object_Character_Array := (Ch.LC_C, Ch.LC_D, Ch.LC_R); -- "cdr"
 	Label_Cons:      constant Object_Character_Array := (Ch.LC_C, Ch.LC_O, Ch.LC_N, Ch.LC_S); -- "cons"
@@ -87,7 +93,7 @@ package body H2.Scheme is
 
 	subtype Moved_Object_Record is Object_Record (Moved_Object, 0);
 
-	subtype Opcode_Type is Object_Integer range 0 .. 19;
+	subtype Opcode_Type is Object_Integer range 0 .. 20;
 	Opcode_Exit:                 constant Opcode_Type := Opcode_Type'(0);
 	Opcode_Evaluate_Result:      constant Opcode_Type := Opcode_Type'(1);
 	Opcode_Evaluate_Object:      constant Opcode_Type := Opcode_Type'(2);
@@ -98,18 +104,20 @@ package body H2.Scheme is
 	Opcode_Finish_Or_Syntax:     constant Opcode_Type := Opcode_Type'(7); 
 	Opcode_Finish_Set_Syntax:    constant Opcode_Type := Opcode_Type'(8); 
 
-	Opcode_Let_Binding:          constant Opcode_Type := Opcode_Type'(9);
-	Opcode_Letast_Binding:       constant Opcode_Type := Opcode_Type'(10);
-	Opcode_Let_Evaluation:       constant Opcode_Type := Opcode_Type'(11);
-	Opcode_Let_Finish:           constant Opcode_Type := Opcode_Type'(12);
 
-	Opcode_Apply:                constant Opcode_Type := Opcode_Type'(13);
-	Opcode_Read_Object:          constant Opcode_Type := Opcode_Type'(14);
-	Opcode_Read_List:            constant Opcode_Type := Opcode_Type'(15);
-	Opcode_Read_List_Cdr:        constant Opcode_Type := Opcode_Type'(16);
-	Opcode_Read_List_End:        constant Opcode_Type := Opcode_Type'(17);
-	Opcode_Close_List:           constant Opcode_Type := Opcode_Type'(18);
-	Opcode_Close_Quote:          constant Opcode_Type := Opcode_Type'(19);
+	Opcode_Continuation_Finish:  constant Opcode_Type := Opcode_Type'(9);
+	Opcode_Let_Binding:          constant Opcode_Type := Opcode_Type'(10);
+	Opcode_Letast_Binding:       constant Opcode_Type := Opcode_Type'(11);
+	Opcode_Let_Evaluation:       constant Opcode_Type := Opcode_Type'(12);
+	Opcode_Let_Finish:           constant Opcode_Type := Opcode_Type'(13);
+
+	Opcode_Apply:                constant Opcode_Type := Opcode_Type'(14);
+	Opcode_Read_Object:          constant Opcode_Type := Opcode_Type'(15);
+	Opcode_Read_List:            constant Opcode_Type := Opcode_Type'(16);
+	Opcode_Read_List_Cdr:        constant Opcode_Type := Opcode_Type'(17);
+	Opcode_Read_List_End:        constant Opcode_Type := Opcode_Type'(18);
+	Opcode_Close_List:           constant Opcode_Type := Opcode_Type'(19);
+	Opcode_Close_Quote:          constant Opcode_Type := Opcode_Type'(20);
 
 	-----------------------------------------------------------------------------
 	-- COMMON OBJECTS
@@ -134,6 +142,9 @@ package body H2.Scheme is
 	Closure_Object_Size: constant Pointer_Object_Size := 2;
 	Closure_Code_Index: constant Pointer_Object_Size := 1;
 	Closure_Environment_Index: constant Pointer_Object_Size := 2;
+
+	Continuation_Object_Size: constant Pointer_Object_Size := 1;
+	Continuation_Frame_Index: constant Pointer_Object_Size := 1;
 
 	procedure Set_New_Location (Object: in Object_Pointer;
 	                            Ptr:    in Heap_Element_Pointer);
@@ -1524,6 +1535,34 @@ Ada.Text_IO.Put_Line ("Make_String...");
 	end Get_Closure_Environment;
 
 	-----------------------------------------------------------------------------
+	function Make_Continuation (Interp: access Interpreter_Record;
+	                            Frame:   in     Object_Pointer) return Object_Pointer is
+		Cont: Object_Pointer;
+		Aliased_Frame: aliased Object_Pointer := Frame;
+	begin
+		Push_Top (Interp.all, Aliased_Frame'Unchecked_Access);
+		Cont := Allocate_Pointer_Object (Interp, Closure_Object_Size, Nil_Pointer);
+		Cont.Tag := Continuation_Object;
+		Cont.Pointer_Slot(Continuation_Frame_Index) := Aliased_Frame;
+		Pop_Tops (Interp.all, 1);
+		return Cont;
+	end Make_Continuation;
+
+	function Is_Continuation (Source: in Object_Pointer) return Standard.Boolean is
+		pragma Inline (Is_Continuation);
+	begin
+		return Is_Normal_Pointer(Source) and then 
+		       Source.Tag = Continuation_Object;
+	end Is_Continuation;
+
+	function Get_Continuation_Frame (Cont: in Object_Pointer) return Object_Pointer is
+		pragma Inline (Get_Continuation_Frame);
+		pragma Assert (Is_Continuation(Cont));
+	begin
+		return Cont.Pointer_Slot(Continuation_Frame_Index);
+	end Get_Continuation_Frame;
+
+	-----------------------------------------------------------------------------
 	procedure Deinitialize_Heap (Interp: in out Interpreter_Record) is
 	begin
 		for I in Interp.Heap'Range loop
@@ -1660,6 +1699,7 @@ Ada.Text_IO.Put_Line ("Make_String...");
 			Dummy: Object_Pointer;
 		begin
 			Dummy := Make_Procedure (Interp.Self, Add_Procedure,          Label_Plus); -- "+"
+			Dummy := Make_Procedure (Interp.Self, Callcc_Procedure,       Label_Callcc); -- "call-with-current-continuation"
 			Dummy := Make_Procedure (Interp.Self, Car_Procedure,          Label_Car); -- "car"
 			Dummy := Make_Procedure (Interp.Self, Cdr_Procedure,          Label_Cdr); -- "cdr"
 			Dummy := Make_Procedure (Interp.Self, Cons_Procedure,         Label_Cons); -- "cons"
@@ -1898,7 +1938,7 @@ Ada.Text_IO.Put_Line ("Make_String...");
 			Cdr: Object_Pointer;
 
 		begin
-			if Is_Cons (Obj) then
+			if Is_Cons(Obj) then
 				Cons := Obj;
 				Ada.Text_IO.Put ("(");
 

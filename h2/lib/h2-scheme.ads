@@ -183,20 +183,21 @@ package H2.Scheme is
 
 	subtype Procedure_Code is Object_Integer;
 	Add_Procedure:          constant Procedure_Code := Procedure_Code'(0);
-	Car_Procedure:          constant Procedure_Code := Procedure_Code'(1);
-	Cdr_Procedure:          constant Procedure_Code := Procedure_Code'(2);
-	Cons_Procedure:         constant Procedure_Code := Procedure_Code'(3);
-	EQ_Procedure:           constant Procedure_Code := Procedure_Code'(4);
-	GT_Procedure:           constant Procedure_Code := Procedure_Code'(5);
-	LT_Procedure:           constant Procedure_Code := Procedure_Code'(6);
-	GE_Procedure:           constant Procedure_Code := Procedure_Code'(7);
-	LE_Procedure:           constant Procedure_Code := Procedure_Code'(8);
-	Multiply_Procedure:     constant Procedure_Code := Procedure_Code'(9);
-	Quotient_Procedure:     constant Procedure_Code := Procedure_Code'(10);
-	Remainder_Procedure:    constant Procedure_Code := Procedure_Code'(11);
-	Setcar_Procedure:       constant Procedure_Code := Procedure_Code'(12);
-	Setcdr_Procedure:       constant Procedure_Code := Procedure_Code'(13);
-	Subtract_Procedure:     constant Procedure_Code := Procedure_Code'(14);
+	Callcc_Procedure:       constant Procedure_Code := Procedure_Code'(1);
+	Car_Procedure:          constant Procedure_Code := Procedure_Code'(2);
+	Cdr_Procedure:          constant Procedure_Code := Procedure_Code'(3);
+	Cons_Procedure:         constant Procedure_Code := Procedure_Code'(4);
+	EQ_Procedure:           constant Procedure_Code := Procedure_Code'(5);
+	GT_Procedure:           constant Procedure_Code := Procedure_Code'(6);
+	LT_Procedure:           constant Procedure_Code := Procedure_Code'(7);
+	GE_Procedure:           constant Procedure_Code := Procedure_Code'(8);
+	LE_Procedure:           constant Procedure_Code := Procedure_Code'(9);
+	Multiply_Procedure:     constant Procedure_Code := Procedure_Code'(10);
+	Quotient_Procedure:     constant Procedure_Code := Procedure_Code'(11);
+	Remainder_Procedure:    constant Procedure_Code := Procedure_Code'(12);
+	Setcar_Procedure:       constant Procedure_Code := Procedure_Code'(13);
+	Setcdr_Procedure:       constant Procedure_Code := Procedure_Code'(14);
+	Subtract_Procedure:     constant Procedure_Code := Procedure_Code'(15);
 
 	type Object_Tag is (
 		Unknown_Object, 

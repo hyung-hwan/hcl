@@ -179,6 +179,22 @@ procedure Execute (Interp: in out Interpreter_Record) is
 	end Finish_If_Syntax;
 
 	-- --------------------------------------------------------------------
+	procedure Do_Continuation_Finish is
+		pragma Inline (Do_Continuation_Finish);
+          C: Object_Pointer;
+          R: Object_Pointer;
+	begin	
+		C := Get_Frame_Operand(Interp.Stack); 
+		pragma Assert (Is_Continuation(C));
+		R := Get_Frame_Result(Interp.Stack);
+
+		Interp.Stack := Get_Continuation_Frame(C);
+		Set_Frame_Result (Interp.Stack, R);
+ada.text_io.put_line ("resettting result");
+print (interp, get_Frame_result(interp.stack));
+	end Do_Continuation_Finish;
+
+	-- --------------------------------------------------------------------
 
 	procedure Do_Let_Evaluation is
 		pragma Inline (Do_Let_Evaluation);
@@ -949,6 +965,9 @@ begin
 
 			when Opcode_Finish_If_Syntax =>
 				Finish_If_Syntax; -- Conditional
+
+			when Opcode_Continuation_Finish =>
+				Do_Continuation_Finish;
 
 			when Opcode_Let_Binding =>
 				Do_Let_Binding; 

@@ -8,6 +8,7 @@ procedure Apply is
 	Func: aliased Object_Pointer;
 	Args: aliased Object_Pointer;
 
+
 	-- -------------------------------------------------------------
 	-- List manipulation procedures
 	-- -------------------------------------------------------------
@@ -290,6 +291,9 @@ Ada.Text_IO.Put_line ("TOO FEW ARGUMETNS FOR COMPARISON");
 	procedure Apply_GE_Procedure is new Apply_Compare_Procedure (Validate_Numeric, Greater_Or_Equal);
 	procedure Apply_LE_Procedure is new Apply_Compare_Procedure (Validate_Numeric, Less_Or_Equal);
 
+	-- -------------------------------------------------------------
+	-- Closure
+	-- -------------------------------------------------------------
 	procedure Apply_Closure is
 		Fbody: aliased Object_Pointer;
 		Formal: aliased Object_Pointer;
@@ -362,6 +366,49 @@ Ada.Text_IO.Put_line ("TOO FEW ARGUMETNS FOR COMPARISON");
 		Pop_Tops (Interp, 4);
 	end Apply_Closure;
 
+	-- -------------------------------------------------------------
+	-- Continuation
+	-- -------------------------------------------------------------
+
+	procedure Apply_Callcc_Procedure is
+		A: Object_Pointer;
+		C: Object_Pointer;
+		X: Object_Pointer;
+	begin
+		-- (define f (lambda (return) (return 2) 3))
+		-- (f (lambda (x) x)) ; 3
+		-- (call-with-current-continuation f) ; 2
+
+
+-- TODO: gc aware
+-- TODO: check others, extra arguments.. etc
+		A := Get_Car(Args);
+		if not Is_Closure(A) then
+			ada.text_io.put_line ("NON CLOSURE XXXXXXX");
+			raise Syntax_Error;
+		end if; 
+
+		C := Make_Continuation (Interp.Self, Get_Frame_Parent(Interp.Stack));
+		C := Make_Cons (Interp.Self, C, Nil_Pointer);
+		X := Make_Cons (Interp.Self, A, C);
+		Set_Frame_Opcode (Interp.Stack, Opcode_Apply);
+		Set_Frame_Operand (Interp.Stack, X);
+	end Apply_Callcc_Procedure;
+
+	procedure Apply_Continuation is
+		A: Object_Pointer;
+	begin
+-- TODO: gc aware
+-- more argument check.
+		A := Get_Car(Args);
+
+ada.text_io.put_line ("continuation.....");
+		Set_Frame_Opcode (Interp.Stack, Opcode_Continuation_Finish);
+		Set_Frame_Operand (Interp.Stack, Func);
+print (interp, a);
+		Push_Frame (Interp, Opcode_Evaluate_Object, A);
+	end Apply_Continuation;
+
 begin
 	Push_Top (Interp, Operand'Unchecked_Access);
 	Push_Top (Interp, Func'Unchecked_Access);
@@ -384,6 +431,8 @@ Print (Interp, Operand);
 		when Procedure_Object => 
 			case Get_Procedure_Opcode(Func) is
 
+				when Callcc_Procedure =>
+					Apply_Callcc_Procedure;
 				when Car_Procedure =>
 					Apply_Car_Procedure;
 				when Cdr_Procedure =>
@@ -424,7 +473,7 @@ Print (Interp, Operand);
 			Apply_Closure;
 
 		when Continuation_Object =>
-			null;
+			Apply_Continuation;
 
 		when others =>
 			Ada.Text_IO.Put_Line ("INVALID FUNCTION TYPE");

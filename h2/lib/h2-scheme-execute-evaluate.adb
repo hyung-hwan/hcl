@@ -328,6 +328,9 @@ Ada.Text_IO.Put_Line ("NO ALTERNATE");
 		--   y ; 11 
 		--   x ; 10
 		--    
+		-- #3.
+		--   (define x (let ((x x)) x))
+		--    
 
 		if Car /= Nil_Pointer then
 			-- <bindings> is not empty
