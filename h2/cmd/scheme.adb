@@ -41,6 +41,8 @@ begin
 	                   Stream.Deallocate_Stream'Access)
 	);
 
+S.Set_Option (SI, (S.Trait_Option, S.No_Optimization));
+
 	File_Stream.Name := File_Name'Unchecked_Access;
 	begin
 		S.Set_Input_Stream (SI, File_Stream); -- specify main input stream

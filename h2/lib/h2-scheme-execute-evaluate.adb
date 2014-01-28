@@ -25,7 +25,7 @@ procedure Evaluate is
 		if Operand = Nil_Pointer then
 			-- (and)
 			Pop_Frame (Interp); 
-			Chain_Frame_Result (Interp, Interp.Stack, V);
+			Put_Frame_Result (Interp, Interp.Stack, V);
 		elsif not Is_Cons(Operand) or else Get_Last_Cdr(Operand) /= Nil_Pointer then
 			-- (and . 10)
 			-- (and 1 2 . 10)
@@ -33,11 +33,11 @@ procedure Evaluate is
 			raise Syntax_Error;	
 		else
 			Set_Frame_Opcode (Interp.Stack, Opcode);
-               Set_Frame_Operand (Interp.Stack, Get_Cdr(Operand)); -- <test2> onwards
-               Clear_Frame_Result (Interp.Stack);
+			Set_Frame_Operand (Interp.Stack, Get_Cdr(Operand)); -- <test2> onwards
+			Clear_Frame_Result (Interp.Stack);
 
 			-- arrange to evaluate <test1>
-               Push_Frame (Interp, Opcode_Evaluate_Object, Get_Car(Operand)); 
+			Push_Frame (Interp, Opcode_Evaluate_Object, Get_Car(Operand)); 
 		end if;
 	end Generic_And_Or_Syntax;
 
@@ -77,6 +77,7 @@ procedure Evaluate is
 			-- Arrange to finish defining after value evaluation.
 			Set_Frame_Opcode (Interp.Stack, Opcode_Finish_Define_Symbol);
 			Set_Frame_Operand (Interp.Stack, Car); 
+			Clear_Frame_Result (Interp.Stack);
 
 			-- Arrange to evalaute the value part
 			Push_Frame (Interp, Opcode_Evaluate_Object, Cdr); 
@@ -131,6 +132,7 @@ Ada.Text_IO.Put_Line ("NO ALTERNATE");
 		-- Switch the current frame to execute action after <test> evaluation.
 		Set_Frame_Opcode (Interp.Stack, Opcode_Finish_If_Syntax);
 		Set_Frame_Operand (Interp.Stack, Operand); 
+		Clear_Frame_Result (Interp.Stack);
 
 		-- Arrange to evalaute the conditional
 		Push_Frame (Interp, Opcode_Evaluate_Object, Car); 
@@ -216,7 +218,7 @@ Ada.Text_IO.Put_Line ("NO ALTERNATE");
 		begin
 			Closure := Make_Closure(Interp.Self, Operand, Get_Frame_Environment(Interp.Stack));
 			Pop_Frame (Interp);  -- Done
-			Chain_Frame_Result (Interp, Interp.Stack, Closure);
+			Put_Frame_Result (Interp, Interp.Stack, Closure);
 		end;
 	end Evaluate_Lambda_Syntax;
 
@@ -242,9 +244,10 @@ Ada.Text_IO.Put_Line ("NO ALTERNATE");
 		end if;
 
 		Letbody := Get_Cdr(Operand); -- Cons cell to <body>
-		if not Is_Cons(Letbody) then
+		if not Is_Cons(Letbody) or else Get_Last_Cdr(Letbody) /= Nil_Pointer then
 			-- (let ((x 2)) )
 			-- (let ((x 2)) . 99)
+			-- (let ((x 2)) (+ x 2) . 99)
 			Ada.Text_IO.Put_Line ("INVALID BODY FOR LET");
 			raise Syntax_Error;
 		end if;
@@ -308,6 +311,7 @@ Ada.Text_IO.Put_Line ("NO ALTERNATE");
 
 		Set_Frame_Opcode (Interp.Stack, Opcode_Let_Finish);
 		Set_Frame_Operand (Interp.Stack, Cdr); 
+		Clear_Frame_Result (Interp.Stack);
 
 		-- Push a new environment onto the current frame.
 		-- It's pushed even if <bindings> is empty because
@@ -357,6 +361,7 @@ Ada.Text_IO.Put_Line ("NO ALTERNATE");
 
 		Set_Frame_Opcode (Interp.Stack, Opcode_Let_Finish);
 		Set_Frame_Operand (Interp.Stack, Cdr); 
+		Clear_Frame_Result (Interp.Stack);
 
 		if Car /= Nil_Pointer then
 			-- <bindings> is not empty
@@ -378,6 +383,7 @@ Ada.Text_IO.Put_Line ("NO ALTERNATE");
 
 		Set_Frame_Opcode (Interp.Stack, Opcode_Let_Finish);
 		Set_Frame_Operand (Interp.Stack, Cdr); 
+		Clear_Frame_Result (Interp.Stack);
 
 		-- Push a new environment.
 		Envir := Make_Environment(Interp.Self, Get_Frame_Environment(Interp.Stack));
@@ -406,7 +412,7 @@ Ada.Text_IO.Put_Line ("NO ALTERNATE");
 			raise Syntax_Error;
 		end if;
 		Pop_Frame (Interp);	 -- Done
-		Chain_Frame_Result (Interp, Interp.Stack, Get_Car(Operand));
+		Put_Frame_Result (Interp, Interp.Stack, Get_Car(Operand));
 	end Evaluate_Quote_Syntax;
 
 	procedure Evaluate_Set_Syntax is
@@ -421,7 +427,7 @@ Ada.Text_IO.Put_Line ("NO ALTERNATE");
 			-- e.g) (set!)
 			--      (set . 10)
 			--      (set x . 10)
-			Ada.Text_IO.Put_LINE ("TOO FEW ARGUMENTS FOR SET");
+			Ada.Text_IO.Put_LINE ("TOO FEW ARGUMENTS FOR SET!");
 			raise Syntax_Error;
 		end if;
 
@@ -429,14 +435,15 @@ Ada.Text_IO.Put_Line ("NO ALTERNATE");
 		Cdr := Get_Cdr(Operand); -- cons cell to <expression>
 		if Is_Symbol(Car) then
 			if Get_Cdr(Cdr) /= Nil_Pointer then
-				Ada.Text_IO.Put_LINE ("TOO MANY ARGUMENTS FOR set!");
+				Ada.Text_IO.Put_LINE ("TOO MANY ARGUMENTS FOR SET!");
 				raise Syntax_Error;
 			end if;
 			Cdr := Get_Car(Cdr); -- <expression>
 
 			-- Arrange to finish setting a variable after <expression> evaluation.
-			Set_Frame_Opcode (Interp.Stack, Opcode_Finish_Set_Syntax);
+			Set_Frame_Opcode (Interp.Stack, Opcode_Set_Finish);
 			Set_Frame_Operand (Interp.Stack, Car); 
+			Clear_Frame_Result (Interp.Stack);
 
 			-- Arrange to evalaute the value part
 			Push_Frame (Interp, Opcode_Evaluate_Object, Cdr); 
@@ -453,6 +460,18 @@ begin
 
 <<Start_Over>>
 	Operand := Get_Frame_Operand(Interp.Stack);
+
+declare
+f: object_word;
+for f'address use interp.stack'address;
+o: object_word;
+for o'address use operand'address;
+begin
+ada.text_io.put ("Frame" & object_word'image(f) & " EVALUATE OPERAND" & object_word'image(o) & " ");
+print (interp, operand);
+ada.text_io.put ("                      CURRENT RESULT ");
+print (interp, get_Frame_result(interp.stack));
+end;
 
 	if not Is_Normal_Pointer(Operand) then
 		-- integer, character, specal pointers
@@ -487,28 +506,32 @@ begin
 						Evaluate_And_Syntax;
 						
 					when Begin_Syntax =>
-
 						Operand := Cdr; -- Skip "begin"
 
-						if not Is_Cons(Operand) then
-							-- e.g) (begin)
-							--      (begin . 10)
-							Ada.Text_IO.Put_LINE ("FUCKNING CDR FOR BEGIN");
-							raise Syntax_Error;
-
+						if Operand = Nil_Pointer then
+							-- (begin)
+							Pop_Frame (Interp);	
+							-- Return nil to the upper frame for (begin).
+							Put_Frame_Result (Interp, Interp.Stack, Nil_Pointer);
 						else
-							Set_Frame_Opcode (Interp.Stack, Opcode_Evaluate_Group);
-							Set_Frame_Operand (Interp.Stack, Operand);
-
-							if (Interp.Trait.Trait_Bits and No_Optimization) = 0 then
-								-- I call Evaluate_Group for optimization here.
-								Evaluate_Group; -- for optimization only. not really needed.
-								-- I can jump to Start_Over because Evaluate_Group called 
-								-- above pushes an Opcode_Evaluate_Object frame.
-								pragma Assert (Get_Frame_Opcode(Interp.Stack) = Opcode_Evaluate_Object);
-								goto Start_Over; -- for optimization only. not really needed.
+							if Get_Last_Cdr(Operand) /= Nil_Pointer then
+								Ada.Text_IO.Put_LINE ("FUCKNING CDR FOR BEGIN");
+								raise Syntax_Error;
 							end if;
+
+							Set_Frame_Opcode (Interp.Stack, Opcode_Grouped_Call);
+							Set_Frame_Operand (Interp.Stack, Operand);
+							Clear_Frame_Result (Interp.Stack);
 						end if;
+
+						--if (Interp.Trait.Trait_Bits and No_Optimization) = 0 then
+						--	-- I call Evaluate_Group for optimization here.
+						--	Evaluate_Group; -- for optimization only. not really needed.
+						--	-- I can jump to Start_Over because Evaluate_Group called 
+						--	-- above pushes an Opcode_Evaluate_Object frame.
+						--	pragma Assert (Get_Frame_Opcode(Interp.Stack) = Opcode_Evaluate_Object);
+						--	goto Start_Over; -- for optimization only. not really needed.
+						--end if;
 
 					when Define_Syntax =>
 						Evaluate_Define_Syntax;
@@ -543,78 +566,25 @@ begin
 						raise Internal_Error;
 				end case;
 			else
-				if (Interp.Trait.Trait_Bits and No_Optimization) = 0 then
-					while not Is_Normal_Pointer(Car) loop
-						-- This while block is for optimization only. It's not really needed.
-						-- If I know that the next object to evaluate is a literal object,
-						-- I can simply reverse-chain it to the return field of the current 
-						-- frame without pushing another frame dedicated for it.
-
-						-- TODO: some normal pointers may point to a literal object. e.g.) bignum 
-						--       then it can goto <<Literal>>.
-						Chain_Frame_Result (Interp, Interp.Stack, Car);
-						if Is_Cons(Cdr) then
-							Operand := Cdr;
-							Car := Get_Car(Operand);
-							Cdr := Get_Cdr(Operand);
-						else
-							-- last cons 
-							if Cdr /= Nil_Pointer then
-								-- The last CDR is not Nil.
-								Ada.Text_IO.Put_Line ("WARNING: $$$$$$$$$$$$$$$$$$$$$..FUCKING CDR.....................OPTIMIZATIN $$$$");
-								raise Syntax_Error;
-							end if;
-
-							Operand := Reverse_Cons(Get_Frame_Result(Interp.Stack));
-							Clear_Frame_Result (Interp.Stack);
-							Set_Frame_Opcode (Interp.Stack, Opcode_Apply); 
-							Set_Frame_Operand (Interp.Stack, Operand);
-							goto Done;
-						end if;
-					end loop;
+				-- procedure call
+				-- (<operator> <operand1> ...)
+				if Get_Last_Cdr(Operand) /= Nil_Pointer then
+					Ada.Text_IO.Put_Line ("ERROR: FUCKING CDR FOR PROCEDURE CALL.$$$$");
+					raise Syntax_Error;
 				end if;
 
-				if Is_Cons(Cdr) then
-					-- Not the last cons cell yet
-					Set_Frame_Operand (Interp.Stack, Cdr); -- change the operand for the next call 
-				else
-					-- Reached the last cons cell
-					if Cdr /= Nil_Pointer then
-						-- The last CDR is not Nil.
-						Ada.Text_IO.Put_Line ("WARNING: $$$$$$$$$$$$$$$$$$$$$..FUCKING CDR.....................$$$$");
-						raise Syntax_Error;
-					end if;
+				-- Create a cons cell whose 'car' holds arguments and 
+				-- 'cdr' holds evaluation results before applying them.
+				Cdr := Make_Cons (Interp.Self, Cdr, Nil_Pointer);
 
-					-- Change the operand to a mark object so that the call to this 
-					-- procedure after the evaluation of the last car goes to the 
-					-- Mark_Object case.
-					Set_Frame_Operand (Interp.Stack, Interp.Mark); 
-				end if;
+				-- Set it as a frame operand
+				Set_Frame_Opcode (Interp.Stack, Opcode_Procedure_Call);
+				Set_Frame_Operand (Interp.Stack, Cdr);
+				Clear_Frame_Result (Interp.Stack);
 
-				-- Arrange to evaluate the car object
-				if (Interp.Trait.Trait_Bits and No_Optimization) = 0 then
-					Push_Frame (Interp, Opcode_Evaluate_Object, Car);
-					goto Start_Over; -- for optimization only. not really needed.
-				end if;
+				-- Arrange to evaluate <operator> first.
+				Push_Frame (Interp, Opcode_Evaluate_Object, Car);
 			end if;
-
-		when Mark_Object =>
-			-- TODO: you can use the mark context to differentiate context
-
-			-- Get the evaluation result stored in the current stack frame by
-			-- various sub-Opcode_Evaluate_Object frames. the return value 
-			-- chain must be reversed Chain_Frame_Result reverse-chains values.
-			Operand := Reverse_Cons(Get_Frame_Result(Interp.Stack));
-
-			-- Refresh the current stack frame to Opcode_Apply.
-			-- This should be faster than Popping the current frame and pushing
-			-- a new frame.
-			--   Envir := Get_Frame_Environment(Interp.Stack);
-			--   Pop_Frame (Interp); -- done
-			--   Push_Frame (Interp, Opcode_Apply, Operand, Envir); 
-			Clear_Frame_Result (Interp.Stack);
-			Set_Frame_Opcode (Interp.Stack, Opcode_Apply); 
-			Set_Frame_Operand (Interp.Stack, Operand);
 
 		when others =>
 			-- normal literal object
@@ -624,9 +594,14 @@ begin
 
 <<Literal>>
 	Pop_Frame (Interp); -- done
-Ada.Text_IO.Put ("Return => ");
+declare
+w: object_word;
+for w'address use operand'address;
+begin
+Ada.Text_IO.Put ("Return => (" & object_word'image(w) & ") =>" );
 Print (Interp, Operand);
-	Chain_Frame_Result (Interp, Interp.Stack, Operand);
+end;
+	Put_Frame_Result (Interp, Interp.Stack, Operand);
 	goto Done;
 
 <<Done>>

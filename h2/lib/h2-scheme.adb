@@ -93,31 +93,31 @@ package body H2.Scheme is
 
 	subtype Moved_Object_Record is Object_Record (Moved_Object, 0);
 
-	subtype Opcode_Type is Object_Integer range 0 .. 20;
+	subtype Opcode_Type is Object_Integer range 0 .. 21;
 	Opcode_Exit:                 constant Opcode_Type := Opcode_Type'(0);
 	Opcode_Evaluate_Result:      constant Opcode_Type := Opcode_Type'(1);
 	Opcode_Evaluate_Object:      constant Opcode_Type := Opcode_Type'(2);
-	Opcode_Evaluate_Group:       constant Opcode_Type := Opcode_Type'(3); -- (begin ...) and closure apply
-	Opcode_Finish_And_Syntax:    constant Opcode_Type := Opcode_Type'(4); 
-	Opcode_Finish_Define_Symbol: constant Opcode_Type := Opcode_Type'(5); 
-	Opcode_Finish_If_Syntax:     constant Opcode_Type := Opcode_Type'(6); 
-	Opcode_Finish_Or_Syntax:     constant Opcode_Type := Opcode_Type'(7); 
-	Opcode_Finish_Set_Syntax:    constant Opcode_Type := Opcode_Type'(8); 
+	Opcode_Finish_And_Syntax:    constant Opcode_Type := Opcode_Type'(3); 
+	Opcode_Finish_Define_Symbol: constant Opcode_Type := Opcode_Type'(4); 
+	Opcode_Finish_If_Syntax:     constant Opcode_Type := Opcode_Type'(5); 
+	Opcode_Finish_Or_Syntax:     constant Opcode_Type := Opcode_Type'(6); 
 
+	Opcode_Grouped_Call:         constant Opcode_Type := Opcode_Type'(7); -- (begin ...), closure apply, let body
+	Opcode_Grouped_Call_Finish:  constant Opcode_Type := Opcode_Type'(8);
+	Opcode_Let_Binding:          constant Opcode_Type := Opcode_Type'(9);
+	Opcode_Letast_Binding:       constant Opcode_Type := Opcode_Type'(10);
+	Opcode_Let_Evaluation:       constant Opcode_Type := Opcode_Type'(11);
+	Opcode_Let_Finish:           constant Opcode_Type := Opcode_Type'(12);
+	Opcode_Procedure_Call:       constant Opcode_Type := Opcode_Type'(13); 
+	Opcode_Set_Finish:           constant Opcode_Type := Opcode_Type'(14); 
 
-	Opcode_Continuation_Finish:  constant Opcode_Type := Opcode_Type'(9);
-	Opcode_Let_Binding:          constant Opcode_Type := Opcode_Type'(10);
-	Opcode_Letast_Binding:       constant Opcode_Type := Opcode_Type'(11);
-	Opcode_Let_Evaluation:       constant Opcode_Type := Opcode_Type'(12);
-	Opcode_Let_Finish:           constant Opcode_Type := Opcode_Type'(13);
-
-	Opcode_Apply:                constant Opcode_Type := Opcode_Type'(14);
-	Opcode_Read_Object:          constant Opcode_Type := Opcode_Type'(15);
-	Opcode_Read_List:            constant Opcode_Type := Opcode_Type'(16);
-	Opcode_Read_List_Cdr:        constant Opcode_Type := Opcode_Type'(17);
-	Opcode_Read_List_End:        constant Opcode_Type := Opcode_Type'(18);
-	Opcode_Close_List:           constant Opcode_Type := Opcode_Type'(19);
-	Opcode_Close_Quote:          constant Opcode_Type := Opcode_Type'(20);
+	Opcode_Apply:                constant Opcode_Type := Opcode_Type'(15);
+	Opcode_Read_Object:          constant Opcode_Type := Opcode_Type'(16);
+	Opcode_Read_List:            constant Opcode_Type := Opcode_Type'(17);
+	Opcode_Read_List_Cdr:        constant Opcode_Type := Opcode_Type'(18);
+	Opcode_Read_List_End:        constant Opcode_Type := Opcode_Type'(19);
+	Opcode_Close_List:           constant Opcode_Type := Opcode_Type'(20);
+	Opcode_Close_Quote:          constant Opcode_Type := Opcode_Type'(21);
 
 	-----------------------------------------------------------------------------
 	-- COMMON OBJECTS
@@ -143,8 +143,10 @@ package body H2.Scheme is
 	Closure_Code_Index: constant Pointer_Object_Size := 1;
 	Closure_Environment_Index: constant Pointer_Object_Size := 2;
 
-	Continuation_Object_Size: constant Pointer_Object_Size := 1;
+	Continuation_Object_Size: constant Pointer_Object_Size := 3;
 	Continuation_Frame_Index: constant Pointer_Object_Size := 1;
+	Continuation_Save_Index: constant Pointer_Object_Size := 2;
+	Continuation_Save2_Index: constant Pointer_Object_Size := 3;
 
 	procedure Set_New_Location (Object: in Object_Pointer;
 	                            Ptr:    in Heap_Element_Pointer);
@@ -1170,8 +1172,8 @@ Ada.Text_IO.Put_Line ("Make_String...");
 		return Frame.Pointer_Slot(Frame_Result_Index);
 	end Get_Frame_Result;
 
-	procedure Set_Frame_Result (Frame: in out Object_Pointer;
-	                            Value: in     Object_Pointer) is
+	procedure Set_Frame_Result (Frame: in Object_Pointer;
+	                            Value: in Object_Pointer) is
 		pragma Inline (Set_Frame_Result);
 		pragma Assert (Is_Frame(Frame));
 
@@ -1179,10 +1181,21 @@ Ada.Text_IO.Put_Line ("Make_String...");
 		-- but to set the result chain. so it can be useful
 		-- if you want to migrate a result chain from one frame
 		-- to another. It's what this assertion is for.
-		pragma Assert (Is_Cons(Value));
+		pragma Assert (Value = Nil_Pointer or else Is_Cons(Value));
 	begin
 		Frame.Pointer_Slot(Frame_Result_Index) := Value;
 	end Set_Frame_Result;
+
+	procedure Put_Frame_Result (Interp: in out Interpreter_Record;
+	                              Frame:  in     Object_Pointer; -- TODO: remove this parameter
+	                              Value:  in     Object_Pointer) is
+		pragma Inline (Put_Frame_Result);
+		pragma Assert (Is_Frame(Frame));
+		V: Object_Pointer;
+	begin
+		V := Make_Cons(Interp.Self, Value, Nil_Pointer);
+		Interp.Stack.Pointer_Slot(Frame_Result_Index) := V;
+	end Put_Frame_Result;
 
 	procedure Chain_Frame_Result (Interp: in out Interpreter_Record;
 	                              Frame:  in     Object_Pointer; -- TODO: remove this parameter
@@ -1206,6 +1219,7 @@ Ada.Text_IO.Put_Line ("Make_String...");
 		V := Make_Cons(Interp.Self, Value, Interp.Stack.Pointer_Slot(Frame_Result_Index));
 		Interp.Stack.Pointer_Slot(Frame_Result_Index) := V;
 	end Chain_Frame_Result;
+
 
 	procedure Clear_Frame_Result (Frame: in Object_Pointer) is
 	begin
@@ -1536,14 +1550,20 @@ Ada.Text_IO.Put_Line ("Make_String...");
 
 	-----------------------------------------------------------------------------
 	function Make_Continuation (Interp: access Interpreter_Record;
-	                            Frame:   in     Object_Pointer) return Object_Pointer is
+	                            Frame:  in     Object_Pointer;
+	                            Save:   in     Object_Pointer;
+	                            Save2:   in     Object_Pointer) return Object_Pointer is
 		Cont: Object_Pointer;
 		Aliased_Frame: aliased Object_Pointer := Frame;
+		Aliased_Save: aliased Object_Pointer := Save;
+		Aliased_Save2: aliased Object_Pointer := Save2;
 	begin
 		Push_Top (Interp.all, Aliased_Frame'Unchecked_Access);
-		Cont := Allocate_Pointer_Object (Interp, Closure_Object_Size, Nil_Pointer);
+		Cont := Allocate_Pointer_Object (Interp, Continuation_Object_Size, Nil_Pointer);
 		Cont.Tag := Continuation_Object;
 		Cont.Pointer_Slot(Continuation_Frame_Index) := Aliased_Frame;
+		Cont.Pointer_Slot(Continuation_Save_Index) := Aliased_Save;
+		Cont.Pointer_Slot(Continuation_Save2_Index) := Aliased_Save2;
 		Pop_Tops (Interp.all, 1);
 		return Cont;
 	end Make_Continuation;
@@ -1561,6 +1581,20 @@ Ada.Text_IO.Put_Line ("Make_String...");
 	begin
 		return Cont.Pointer_Slot(Continuation_Frame_Index);
 	end Get_Continuation_Frame;
+
+	function Get_Continuation_Save (Cont: in Object_Pointer) return Object_Pointer is
+		pragma Inline (Get_Continuation_Save);
+		pragma Assert (Is_Continuation(Cont));
+	begin
+		return Cont.Pointer_Slot(Continuation_Save_Index);
+	end Get_Continuation_Save;
+
+	function Get_Continuation_Save2 (Cont: in Object_Pointer) return Object_Pointer is
+		pragma Inline (Get_Continuation_Save2);
+		pragma Assert (Is_Continuation(Cont));
+	begin
+		return Cont.Pointer_Slot(Continuation_Save2_Index);
+	end Get_Continuation_Save2;
 
 	-----------------------------------------------------------------------------
 	procedure Deinitialize_Heap (Interp: in out Interpreter_Record) is
@@ -1877,7 +1911,12 @@ Ada.Text_IO.Put_Line ("Make_String...");
 							Ada.Text_IO.Put ("#Closure");
 	
 						when Continuation_Object =>
-							Ada.Text_IO.Put ("#Continuation");
+							declare
+								w: object_word;
+								for w'address use Atom'address;
+							begin
+								Ada.Text_IO.Put ("#Continuation[" & object_word'image(w) & "]");
+							end;
 	
 						when Procedure_Object =>
 							Ada.Text_IO.Put ("#Procedure");
@@ -1891,7 +1930,7 @@ Ada.Text_IO.Put_Line ("Make_String...");
 							elsif Atom.Tag = Mark_Object then
 								Ada.Text_IO.Put ("#INTERNAL MARK#");
 							else
-								Ada.Text_IO.Put ("#NOIMPL#");
+								Ada.Text_IO.Put ("#NOIMPL# => " & Object_Tag'Image(Atom.Tag));
 							end if;
 						end case;
 				end case;

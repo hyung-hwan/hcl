@@ -28,7 +28,7 @@ Ada.Text_IO.Put_Line ("EXPECTED CONS-CELL FOR CAR");
 		end if;
 
 		Pop_Frame (Interp); -- Done with the current frame
-		Chain_Frame_Result (Interp, Interp.Stack, Get_Car(A));
+		Put_Frame_Result (Interp, Interp.Stack, Get_Car(A));
 	end Apply_Car_Procedure;
 
 	procedure Apply_Cdr_Procedure is
@@ -47,7 +47,7 @@ Ada.Text_IO.Put_Line ("EXPECTED CONS-CELL FOR CDR");
 		end if;
 
 		Pop_Frame (Interp); -- Done with the current frame
-		Chain_Frame_Result (Interp, Interp.Stack, Get_Cdr(A));
+		Put_Frame_Result (Interp, Interp.Stack, Get_Cdr(A));
 	end Apply_Cdr_Procedure;
 
 	procedure Apply_Cons_Procedure is
@@ -65,7 +65,7 @@ Ada.Text_IO.Put_Line ("WRONG NUMBER OF ARGUMETNS FOR CONS");
 		Ptr := Make_Cons (Interp.Self, A, B); -- change car
 
 		Pop_Frame (Interp); -- Done with the current frame
-		Chain_Frame_Result (Interp, Interp.Stack, Ptr);
+		Put_Frame_Result (Interp, Interp.Stack, Ptr);
 	end Apply_Cons_Procedure;
 
 	procedure Apply_Setcar_Procedure is
@@ -87,7 +87,7 @@ Ada.Text_IO.Put_Line ("EXPECTED CONS-CELL FOR Setcar");
 		Set_Car (A, B); -- change car
 
 		Pop_Frame (Interp); -- Done with the current frame
-		Chain_Frame_Result (Interp, Interp.Stack, A);
+		Put_Frame_Result (Interp, Interp.Stack, A);
 	end Apply_Setcar_Procedure;
 
 	procedure Apply_Setcdr_Procedure is
@@ -109,7 +109,7 @@ Ada.Text_IO.Put_Line ("EXPECTED CONS-CELL FOR Setcdr");
 		Set_Cdr (A, B); -- change cdr
 
 		Pop_Frame (Interp); -- Done with the current frame
-		Chain_Frame_Result (Interp, Interp.Stack, A);
+		Put_Frame_Result (Interp, Interp.Stack, A);
 	end Apply_Setcdr_Procedure;
 
 	-- -------------------------------------------------------------
@@ -133,7 +133,7 @@ Ada.Text_IO.Put ("NOT INTEGER FOR ADD"); Print (Interp, Car);
 		end loop;
 
 		Pop_Frame (Interp); -- Done with the current frame
-		Chain_Frame_Result (Interp, Interp.Stack, Integer_To_Pointer(Num));
+		Put_Frame_Result (Interp, Interp.Stack, Integer_To_Pointer(Num));
 	end Apply_Add_Procedure;
 
 	procedure Apply_Subtract_Procedure is
@@ -162,7 +162,7 @@ Ada.Text_IO.Put ("NOT INTEGER FOR ADD"); Print (Interp, Car);
 		end if;
 
 		Pop_Frame (Interp); --  Done with the current frame
-		Chain_Frame_Result (Interp, Interp.Stack, Integer_To_Pointer(Num));
+		Put_Frame_Result (Interp, Interp.Stack, Integer_To_Pointer(Num));
 	end Apply_Subtract_Procedure;
 
 	procedure Apply_Multiply_Procedure is
@@ -183,7 +183,7 @@ Ada.Text_IO.Put ("NOT INTEGER FOR MULTIPLY"); Print (Interp, Car);
 		end loop;
 
 		Pop_Frame (Interp); -- Done with the current frame
-		Chain_Frame_Result (Interp, Interp.Stack, Integer_To_Pointer(Num));
+		Put_Frame_Result (Interp, Interp.Stack, Integer_To_Pointer(Num));
 	end Apply_Multiply_Procedure;
 
 	procedure Apply_Quotient_Procedure is
@@ -204,7 +204,7 @@ Ada.Text_IO.Put ("NOT INTEGER FOR MULTIPLY"); Print (Interp, Car);
 		end loop;
 
 		Pop_Frame (Interp); -- Done with the current frame
-		Chain_Frame_Result (Interp, Interp.Stack, Integer_To_Pointer(Num));
+		Put_Frame_Result (Interp, Interp.Stack, Integer_To_Pointer(Num));
 	end Apply_Quotient_Procedure;
 
 	generic 
@@ -242,7 +242,7 @@ Ada.Text_IO.Put ("NOT INTEGER FOR MULTIPLY"); Print (Interp, Car);
 			end loop;
 
 			Pop_Frame (Interp); --  Done with the current frame
-			Chain_Frame_Result (Interp, Interp.Stack, Bool);
+			Put_Frame_Result (Interp, Interp.Stack, Bool);
 		else
 Ada.Text_IO.Put_line ("TOO FEW ARGUMETNS FOR COMPARISON");
 			raise Syntax_Error;
@@ -359,7 +359,7 @@ Ada.Text_IO.Put_line ("TOO FEW ARGUMETNS FOR COMPARISON");
 			end if;
 		end if;
 			
-		Set_Frame_Opcode (Interp.Stack, Opcode_Evaluate_Group);
+		Set_Frame_Opcode (Interp.Stack, Opcode_Grouped_Call);
 		Set_Frame_Operand (Interp.Stack, Fbody);
 		Clear_Frame_Result (Interp.Stack);
 
@@ -370,43 +370,155 @@ Ada.Text_IO.Put_line ("TOO FEW ARGUMETNS FOR COMPARISON");
 	-- Continuation
 	-- -------------------------------------------------------------
 
-	procedure Apply_Callcc_Procedure is
-		A: Object_Pointer;
-		C: Object_Pointer;
-		X: Object_Pointer;
+	function Is_Callcc_Friendly (A: Object_Pointer) return Standard.Boolean is
+		pragma Inline (Is_Callcc_Friendly);
 	begin
-		-- (define f (lambda (return) (return 2) 3))
-		-- (f (lambda (x) x)) ; 3
-		-- (call-with-current-continuation f) ; 2
+		return Is_Closure(A) or else Is_Procedure(A) or else Is_Continuation(A);
+	end Is_Callcc_Friendly;
 
+	procedure Apply_Callcc_Procedure is
+		C: aliased Object_Pointer;
+	begin
+		-- (call-with-current-continuation proc) 
+		-- where proc is a procedure accepting one argument.
+		--
+		--   (define f (lambda (return) (return 2) 3))
+		--   (f (lambda (x) x)) ; 3
+		--   (call-with-current-continuation f) ; 2
+		--
+		--   (call-with-current-continuation (lambda (return) (return 2) 3))
+		--
+		--   (define c (call-with-current-continuation call-with-current-continuation))
+		--   c ; continuation
+		--   (c (+ 1 2 3)) ; 6 becomes the result of the frame that continuation remembers.
+		--                 ; subsequently, its parent frames are executed. 
+		--   c ; 6
 
--- TODO: gc aware
--- TODO: check others, extra arguments.. etc
-		A := Get_Car(Args);
-		if not Is_Closure(A) then
-			ada.text_io.put_line ("NON CLOSURE XXXXXXX");
+		if not Is_Cons(Args) or else Get_Cdr(Args) /= Nil_Pointer then
+			Ada.Text_IO.Put_Line ("WRONG NUMBER OF ARGUMETNS FOR CALL/CC"); 
+			raise Syntax_Error;
+		end if;
+
+		if not Is_Callcc_Friendly(Get_Car(Args)) then
+			ada.text_io.put_line ("NON CLOSURE/PROCEDURE/CONTINUATION FOR CALL/CC");
 			raise Syntax_Error;
 		end if; 
 
-		C := Make_Continuation (Interp.Self, Get_Frame_Parent(Interp.Stack));
+		Push_Top (Interp, C'Unchecked_Access);
+		C := Get_Frame_Parent(Interp.Stack);
+		if Get_Frame_Parent(C) = Nil_Pointer then
+			C := Make_Continuation (Interp.Self, C, Nil_Pointer, Nil_Pointer);
+		else
+
+declare
+w: object_word;
+for w'address use c'address;
+f: object_word;
+for f'address use interp.stack'address;
+
+r: object_pointer := get_frame_result(c);
+rw: object_word;
+for rw'address use r'address;
+begin
+ada.text_io.put ("Frame" & object_word'image(f) & " PUSH CONTINUATION CURRENT RESULT" & object_word'image(rw) & " ----> ");
+print (interp, r);
+end;
+
+			--C := Make_Continuation (Interp.Self, C, Get_Frame_Result(Get_Frame_Parent(C)), Get_Frame_Operand(Get_Frame_Parent(C)));
+			C := Make_Continuation (Interp.Self, C, Get_Frame_Result(Get_Frame_Parent(C)), Get_Frame_Result(C));
+		end if;
 		C := Make_Cons (Interp.Self, C, Nil_Pointer);
-		X := Make_Cons (Interp.Self, A, C);
+		C := Make_Cons (Interp.Self, Get_Car(Args), C);
+declare
+w: object_word;
+for w'address use c'address;
+f: object_word;
+for f'address use interp.stack'address;
+begin
+ada.text_io.put ("                      PUSH CONTINUATION");
+ada.text_io.put (object_word'image(w) & " ");
+print (interp, c);
+end;
+
 		Set_Frame_Opcode (Interp.Stack, Opcode_Apply);
-		Set_Frame_Operand (Interp.Stack, X);
+		Set_Frame_Operand (Interp.Stack, C);
+		Clear_Frame_Result (Interp.Stack);
+ada.text_io.put_line ("                      CLEARED RESULT BEFORE APPLYING");
+
+		Pop_Tops (Interp, 1);
 	end Apply_Callcc_Procedure;
 
 	procedure Apply_Continuation is
-		A: Object_Pointer;
+		R: Object_Pointer;
 	begin
--- TODO: gc aware
--- more argument check.
-		A := Get_Car(Args);
+declare
+w: object_word;
+for w'address use func'address;
+f: object_word;
+for f'address use interp.stack'address;
+begin
+ada.text_io.put ("Frame" & object_word'image(f) & " POPING APPLY CONTINUATION -----> ");
+ada.text_io.put (object_word'image(w) & " ");
+end;
+Print (Interp, Args);
+ada.text_io.put ("                      CURRENT FREME RESULT " );
+Print (Interp, get_Frame_result(interp.stack));
+		if not Is_Cons(Args) or else Get_Cdr(Args) /= Nil_Pointer then
+			Ada.Text_IO.Put_Line ("WRONG NUMBER OF ARGUMETNS FOR CONTINUATION"); 
+			raise Syntax_Error;
+		end if;
 
-ada.text_io.put_line ("continuation.....");
-		Set_Frame_Opcode (Interp.Stack, Opcode_Continuation_Finish);
-		Set_Frame_Operand (Interp.Stack, Func);
-print (interp, a);
-		Push_Frame (Interp, Opcode_Evaluate_Object, A);
+-- Get the result of the continuation frame
+--		R := Get_Frame_Result(Interp.Stack);
+
+          -- Restore the frame to the remembered one
+          Interp.Stack := Get_Continuation_Frame(Func);
+
+declare
+f: object_word;
+for f'address use interp.stack'address;
+begin
+ada.text_io.put_line ("                      SWITCHED STACK TO FREME " & object_word'image(f) );
+ada.text_io.put ("                      CURRENT RESULT " );
+print (interp, get_Frame_result(interp.stack));
+ada.text_io.put ("                      CURRENT OPERAND " );
+print (interp, get_Frame_operand(interp.stack));
+ada.text_io.put_line ("                      CURRENT OPCODE" & opcode_type'image(get_Frame_opcode(interp.stack)));
+end;
+
+
+declare
+k: object_pointer := get_continuation_save2(func);
+w: object_word;
+for w'address use k'address;
+begin
+ada.text_io.put ("                      RESTORE FREME RESULT TO " & object_word'image(w) & " --> ");
+print (interp, k);
+end;
+		--Set_Frame_Result (Interp.Stack, Get_Continuation_Save2(Func));
+
+ada.text_io.put ("                      CHAIN NEW RESULT, TAKING THE FIRST ONLY FROM ");
+print (interp, args);
+		Put_Frame_Result (Interp, Interp.Stack, Get_Car(Args)); 
+
+--		if R /= Nil_Pointer then
+--ada.text_io.put ("                      CARRY OVER RESULT ");
+--print (interp, get_car(r));
+--			Chain_Frame_Result (Interp, Interp.Stack, Get_Car(R));
+--		end if;
+
+--Set_Frame_Result (Interp.Stack, R);
+--Chain_Frame_Result (Interp, Interp.Stack, Get_Car(Args)); 
+
+
+ada.text_io.put ("                      FINAL RESULT ");
+print (interp, get_Frame_result(interp.stack));
+
+--		if Get_Frame_Parent(Interp.Stack) /= Nil_Pointer then
+--			Set_Frame_Result (Get_Frame_Parent(Interp.Stack), Get_Continuation_Save(Func));
+--			--Set_Frame_Operand (Get_Frame_Parent(Interp.Stack), Get_Continuation_Save2(Func));
+--		end if;
+
 	end Apply_Continuation;
 
 begin
@@ -417,8 +529,15 @@ begin
 	Operand := Get_Frame_Operand(Interp.Stack);
 	pragma Assert (Is_Cons(Operand));
 
-ada.text_io.put ("OPERAND TO  APPLY => ");
-Print (Interp, Operand);
+declare
+w: object_word;
+for w'address use interp.stack'address;
+begin
+ada.text_io.put ("Frame" & object_word'image(w) & " OPERAND TO APPLY => ");
+print (Interp, Operand);
+ada.text_io.put ("                      CURRENT RESULT => ");
+print (Interp, get_frame_result(interp.stack));
+end;
 	Func := Get_Car(Operand);
 	if not Is_Normal_Pointer(Func) then
 		Ada.Text_IO.Put_Line ("INVALID FUNCTION TYPE");

@@ -19,64 +19,6 @@ procedure Execute (Interp: in out Interpreter_Record) is
 		Set_Frame_Opcode (Interp.Stack, Opcode_Evaluate_Object);
 	end Evaluate_Result;
 
-	procedure Evaluate_Group is
-		pragma Inline (Evaluate_Group);
-
-		Operand: aliased Object_Pointer;
-		Car: aliased Object_Pointer;
-		Cdr: aliased Object_Pointer;
-	begin
-		Push_Top (Interp, Operand'Unchecked_Access);
-		Push_Top (Interp, Car'Unchecked_Access);
-		Push_Top (Interp, Cdr'Unchecked_Access);
-
-		Operand := Get_Frame_Operand(Interp.Stack);
-		pragma Assert (Is_Normal_Pointer(Operand));
-
-		case Operand.Tag is
-			when Cons_Object =>
-				Car := Get_Car(Operand);
-				Cdr := Get_Cdr(Operand);
-
-				if Is_Cons(Cdr) then
-					-- Let the current frame remember the next expression list
-					Set_Frame_Operand (Interp.Stack, Cdr);
-				else
-					if Cdr /= Nil_Pointer then
-						-- The last CDR is not Nil.
-						Ada.Text_IO.Put_Line ("$$$$..................FUCKING CDR. FOR GROUP....................$$$$");
-						raise Syntax_Error;
-					end if;
-
-					-- Change the operand to a mark object so that the call to this 
-					-- procedure after the evaluation of the last car goes to the 
-					-- Mark_Object case.
-					Set_Frame_Operand (Interp.Stack, Interp.Mark); 
-				end if;
-
-				-- Clear the return value from the previous expression.
-				Clear_Frame_Result (Interp.Stack);
-
-				-- Arrange to evaluate the current expression
-				Push_Frame (Interp, Opcode_Evaluate_Object, Car);
-
-			when Mark_Object =>
-				Operand := Get_Frame_Result(Interp.Stack);
-				Pop_Frame (Interp); -- Done
-
-				-- There must be only 1 return value chained in the Group frame.
-				pragma Assert (Get_Cdr(Operand) = Nil_Pointer);
-
-				-- Transfer the only return value to the upper chain
-				Chain_Frame_Result (Interp, Interp.Stack, Get_Car(Operand));
-
-			when others =>
-				raise Internal_Error;
-		end case;
-
-		Pop_Tops (Interp, 3);
-	end Evaluate_Group;
-
 	-- ----------------------------------------------------------------
 	generic
 		V: Object_Pointer;
@@ -89,7 +31,7 @@ procedure Execute (Interp: in out Interpreter_Record) is
 		X := Get_Frame_Operand(Interp.Stack);
 		Y := Get_Frame_Result(Interp.Stack);
 
-		-- Evaluate_And_Syntax/Evaluate-Or_Syntax has arranged to 
+		-- Evaluate_And_Syntax/Evaluate_Or_Syntax has arranged to 
 		-- evaluate <test1>. Y must not be Nil_Pointer even at the 
 		-- first time this procedure is called, 
 		pragma Assert (Is_Cons(Y));
@@ -105,7 +47,7 @@ procedure Execute (Interp: in out Interpreter_Record) is
 		else
 			-- Return the result of the last expression evaluated.
 			Pop_Frame (Interp);
-			Chain_Frame_Result (Interp, Interp.Stack, Y);
+			Put_Frame_Result (Interp, Interp.Stack, Y);
 		end if;
 	end Evaluate_Up_To;
 
@@ -131,7 +73,7 @@ procedure Execute (Interp: in out Interpreter_Record) is
 		Put_Environment (Interp, X, Y);
 
 		Pop_Frame (Interp);     -- Done
-		Chain_Frame_Result (Interp, Interp.Stack, Y);
+		Put_Frame_Result (Interp, Interp.Stack, Y);
 
 		Pop_Tops (Interp, 2);
 	end Finish_Define_Symbol;
@@ -164,7 +106,7 @@ procedure Execute (Interp: in out Interpreter_Record) is
 			else
 				Pop_Frame (Interp);
 				-- Return nil if no <alternate> is specified
-				Chain_Frame_Result (Interp, Interp.Stack, Nil_Pointer);
+				Put_Frame_Result (Interp, Interp.Stack, Nil_Pointer);
 			end if;
 		else
 			-- All values except #f are true values. evaluate <consequent>
@@ -178,23 +120,99 @@ procedure Execute (Interp: in out Interpreter_Record) is
 		Pop_Tops (Interp, 2);
 	end Finish_If_Syntax;
 
-	-- --------------------------------------------------------------------
-	procedure Do_Continuation_Finish is
-		pragma Inline (Do_Continuation_Finish);
-          C: Object_Pointer;
-          R: Object_Pointer;
-	begin	
-		C := Get_Frame_Operand(Interp.Stack); 
-		pragma Assert (Is_Continuation(C));
-		R := Get_Frame_Result(Interp.Stack);
+	-- ----------------------------------------------------------------
 
-		Interp.Stack := Get_Continuation_Frame(C);
-		Set_Frame_Result (Interp.Stack, R);
-ada.text_io.put_line ("resettting result");
-print (interp, get_Frame_result(interp.stack));
-	end Do_Continuation_Finish;
+	procedure Do_Procedure_Call is
+		pragma Inline (Do_Procedure_Call);
+		X: aliased Object_Pointer;
+		S: aliased Object_Pointer;
+		R: aliased Object_Pointer;
+	begin
+		Push_Top (Interp, X'Unchecked_Access);
+		Push_Top (Interp, S'Unchecked_Access);
+		Push_Top (Interp, R'Unchecked_Access);
 
-	-- --------------------------------------------------------------------
+		X := Get_Frame_Operand(Interp.Stack);
+		pragma Assert (Is_Cons(X));
+
+		-- When this procedure is called for the first time,
+		-- the first argument must be at the head of the list that 
+		-- 'S' points to. it's because <operator> evaluation frame 
+		-- is pushed by Evaluate().
+		S := Get_Car(X);  
+		R := Get_Cdr(X);
+		-- Threfore, the frame result is for <operator> for the first call.
+		R := Make_Cons(Interp.Self, Get_Car(Get_Frame_Result(Interp.Stack)), R); 
+
+		Clear_Frame_Result (Interp.Stack);
+		if not Is_Cons(S) then
+			-- no more argument to evaluate. 
+			-- apply the evaluated arguments to the evaluated operator.
+			Set_Frame_Opcode (Interp.Stack, Opcode_Apply); 
+			Set_Frame_Operand (Interp.Stack, Reverse_Cons(R));
+		else
+			Set_Cdr (X, R);
+			Set_Car (X, Get_Cdr(S)); 
+			Push_Frame (Interp, Opcode_Evaluate_Object, Get_Car(S));
+		end if;
+
+		Pop_Tops (Interp, 3);
+	end Do_Procedure_Call;
+
+	-- ----------------------------------------------------------------
+
+	procedure Do_Grouped_Call is
+		X: Object_Pointer;
+	begin
+		X := Get_Frame_Operand(Interp.Stack);
+
+		pragma Assert (Is_Cons(X)); -- The caller must ensure this.
+		--if Is_Cons(X) then
+			Set_Frame_Opcode (Interp.Stack, Opcode_Grouped_Call_Finish); 
+			Set_Frame_Operand (Interp.Stack, Get_Cdr(X));
+			Clear_Frame_Result (Interp.Stack);
+			Push_Frame (Interp, Opcode_Evaluate_Object, Get_Car(X));
+		--else
+		--	-- Nothing to evaluate.
+		--	Pop_Frame (Interp);
+		--	Put_Frame_Result (Interp, Interp.Stack, Nil_Pointer);
+		--end if;
+	end Do_Grouped_Call;
+
+	procedure Do_Grouped_Call_Finish is
+		X: Object_Pointer;
+		R: Object_Pointer;
+	begin
+		X := Get_Frame_Operand(Interp.Stack);
+
+		if Is_Cons(X) then
+			Set_Frame_Opcode (Interp.Stack, Opcode_Grouped_Call_Finish); 
+			Set_Frame_Operand (Interp.Stack, Get_Cdr(X));
+			Clear_Frame_Result (Interp.Stack);
+			Push_Frame (Interp, Opcode_Evaluate_Object, Get_Car(X));
+		else
+			-- Nothing more to evaluate.
+			R := Get_Frame_Result(Interp.Stack);
+
+declare
+w: object_word;
+for w'address use interp.stack'address;
+begin
+ada.text_io.put ("Frame " & object_word'image(w) &  " EVAL-GROUP RESULT ");
+print (Interp, R);
+end;
+
+-- There must be only 1 return value chained in the Group frame.
+pragma Assert (Get_Cdr(R) = Nil_Pointer);
+
+			Pop_Frame (Interp);
+
+			-- Return the last result to the upper frame
+			Put_Frame_Result (Interp, Interp.Stack, Get_Car(R));
+		end if;
+	end Do_Grouped_Call_Finish;
+
+	-- ----------------------------------------------------------------
 
 	procedure Do_Let_Evaluation is
 		pragma Inline (Do_Let_Evaluation);
@@ -217,6 +235,7 @@ print (interp, get_Frame_result(interp.stack));
 			Set_Frame_Result (Interp.Stack, Y);
 		end if;
 	end Do_Let_Evaluation;
+
 
 	procedure Do_Let_Binding is
 		pragma Inline (Do_Let_Binding);
@@ -299,13 +318,14 @@ print (interp, get_Frame_result(interp.stack));
 		pragma Assert (Get_Frame_Result(Interp.Stack) = Nil_Pointer);
 		-- Evaluate_Let_Syntax has places <body> in the operand of this frame.
 		-- <body> can be evaluated as if it's in 'begin'.
-		Set_Frame_Opcode (Interp.Stack, Opcode_Evaluate_Group);
+		--Set_Frame_Opcode (Interp.Stack, Opcode_Evaluate_Group);
+		Set_Frame_Opcode (Interp.Stack, Opcode_Grouped_Call);
 	end Do_Let_Finish;
 
 	-- --------------------------------------------------------------------
 
-	procedure Finish_Set_Syntax is
-		pragma Inline (Finish_Set_Syntax);
+	procedure Do_Set_Finish is
+		pragma Inline (Do_Set_Finish);
 		X: aliased Object_Pointer;
 		Y: aliased Object_Pointer;
 	begin
@@ -314,6 +334,8 @@ print (interp, get_Frame_result(interp.stack));
 
 		X := Get_Frame_Operand(Interp.Stack); -- symbol
 		Y := Get_Car(Get_Frame_Result(Interp.Stack));  -- value
+ada.text_io.put ("%%%%% FINISH SET SYNTAX => ");
+print (interp, Get_Frame_Result(Interp.Stack));
 		pragma Assert (Is_Symbol(X));
 		pragma Assert (Get_Cdr(Get_Frame_Result(Interp.Stack)) = Nil_Pointer);
 
@@ -323,10 +345,10 @@ print (interp, get_Frame_result(interp.stack));
 		end if;
 
 		Pop_Frame (Interp);     -- Done
-		Chain_Frame_Result (Interp, Interp.Stack, Y);
+		Put_Frame_Result (Interp, Interp.Stack, Y);
 
 		Pop_Tops (Interp, 2);
-	end Finish_Set_Syntax;
+	end Do_Set_Finish;
 
 	procedure Evaluate is separate;
 	procedure Apply is separate;
@@ -867,6 +889,7 @@ Ada.Text_IO.Put_Line ("INFO: NO MORE TOKEN ");
 
 			when others =>
 				-- TODO: set various error info
+Ada.Text_IO.Put_Line ("INFO: UNKNOWN TOKEN " & Token_Kind'Image(Interp.Token.Kind));
 				raise Syntax_Error;
 		end case;
 
@@ -951,9 +974,6 @@ begin
 			when Opcode_Evaluate_Object =>
 				Evaluate;
 
-			when Opcode_Evaluate_Group =>
-				Evaluate_Group;
-
 			when Opcode_Finish_And_Syntax => 
 				Finish_And_Syntax; -- Conditional
 
@@ -966,9 +986,10 @@ begin
 			when Opcode_Finish_If_Syntax =>
 				Finish_If_Syntax; -- Conditional
 
-			when Opcode_Continuation_Finish =>
-				Do_Continuation_Finish;
-
+			when Opcode_Grouped_Call =>
+				Do_Grouped_Call;
+			when Opcode_Grouped_Call_Finish =>
+				Do_Grouped_Call_Finish;
 			when Opcode_Let_Binding =>
 				Do_Let_Binding; 
 			when Opcode_Letast_Binding =>
@@ -978,11 +999,14 @@ begin
 			when Opcode_Let_Finish =>
 				Do_Let_Finish; 
 
+			when Opcode_Procedure_Call =>
+				Do_Procedure_Call;
+
+			when Opcode_Set_Finish =>
+				Do_Set_Finish; -- Assignment
+
 			when Opcode_Finish_Or_Syntax => 
 				Finish_Or_Syntax; -- Conditional
-
-			when Opcode_Finish_Set_Syntax =>
-				Finish_Set_Syntax; -- Assignment
 
 			when Opcode_Apply =>
 				Apply;
