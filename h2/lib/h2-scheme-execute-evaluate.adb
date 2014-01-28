@@ -341,13 +341,17 @@ Ada.Text_IO.Put_Line ("NO ALTERNATE");
 			Push_Top (Interp, Envir'Unchecked_Access);
 			Envir := Get_Frame_Environment(Get_Frame_Parent(Interp.Stack));
 
+			-- Create an array to hold the binding list and the evaluation result
+			Cdr := Make_Array (Interp.Self, 3);
+			Cdr.Pointer_Slot(1) := Car;
+
 			-- The actual binding after evaluation must be performed in the 
 			-- new environment.
-			Push_Frame (Interp, Opcode_Let_Binding, Car);
+			Push_Frame (Interp, Opcode_Let_Binding, Cdr);
 
 			-- But evaluation must be done in the current environment which is 
 			-- the environment before the environment update above.
-			Push_Frame_With_Environment (Interp, Opcode_Let_Evaluation, Car, Envir); 
+			Push_Frame_With_Environment (Interp, Opcode_Let_Evaluation, Cdr, Envir); 
 			Pop_Tops (Interp, 1);
 		end if;
 	end Evaluate_Let_Syntax;
@@ -393,8 +397,11 @@ Ada.Text_IO.Put_Line ("NO ALTERNATE");
 			-- <bindings> is not empty
 			-- Arrange to perform evaluataion and binding in the
 			-- new environment created.
-			Push_Frame (Interp, Opcode_Let_Binding, Car);
-			Push_Frame (Interp, Opcode_Let_Evaluation, Car); 
+			Cdr := Make_Array (Interp.Self, 3);
+			Cdr.Pointer_Slot(1) := Car;
+
+			Push_Frame (Interp, Opcode_Let_Binding, Cdr);
+			Push_Frame (Interp, Opcode_Let_Evaluation, Cdr); 
 		end if;
 	end Evaluate_Letrec_Syntax;
 

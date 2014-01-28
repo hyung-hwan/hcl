@@ -93,7 +93,7 @@ package body H2.Scheme is
 
 	subtype Moved_Object_Record is Object_Record (Moved_Object, 0);
 
-	subtype Opcode_Type is Object_Integer range 0 .. 21;
+	subtype Opcode_Type is Object_Integer range 0 .. 22;
 	Opcode_Exit:                 constant Opcode_Type := Opcode_Type'(0);
 	Opcode_Evaluate_Result:      constant Opcode_Type := Opcode_Type'(1);
 	Opcode_Evaluate_Object:      constant Opcode_Type := Opcode_Type'(2);
@@ -106,18 +106,19 @@ package body H2.Scheme is
 	Opcode_Grouped_Call_Finish:  constant Opcode_Type := Opcode_Type'(8);
 	Opcode_Let_Binding:          constant Opcode_Type := Opcode_Type'(9);
 	Opcode_Letast_Binding:       constant Opcode_Type := Opcode_Type'(10);
-	Opcode_Let_Evaluation:       constant Opcode_Type := Opcode_Type'(11);
-	Opcode_Let_Finish:           constant Opcode_Type := Opcode_Type'(12);
-	Opcode_Procedure_Call:       constant Opcode_Type := Opcode_Type'(13); 
-	Opcode_Set_Finish:           constant Opcode_Type := Opcode_Type'(14); 
+	Opcode_Letast_Binding_Finish:constant Opcode_Type := Opcode_Type'(11);
+	Opcode_Let_Evaluation:       constant Opcode_Type := Opcode_Type'(12);
+	Opcode_Let_Finish:           constant Opcode_Type := Opcode_Type'(13);
+	Opcode_Procedure_Call:       constant Opcode_Type := Opcode_Type'(14); 
+	Opcode_Set_Finish:           constant Opcode_Type := Opcode_Type'(15); 
 
-	Opcode_Apply:                constant Opcode_Type := Opcode_Type'(15);
-	Opcode_Read_Object:          constant Opcode_Type := Opcode_Type'(16);
-	Opcode_Read_List:            constant Opcode_Type := Opcode_Type'(17);
-	Opcode_Read_List_Cdr:        constant Opcode_Type := Opcode_Type'(18);
-	Opcode_Read_List_End:        constant Opcode_Type := Opcode_Type'(19);
-	Opcode_Close_List:           constant Opcode_Type := Opcode_Type'(20);
-	Opcode_Close_Quote:          constant Opcode_Type := Opcode_Type'(21);
+	Opcode_Apply:                constant Opcode_Type := Opcode_Type'(16);
+	Opcode_Read_Object:          constant Opcode_Type := Opcode_Type'(17);
+	Opcode_Read_List:            constant Opcode_Type := Opcode_Type'(18);
+	Opcode_Read_List_Cdr:        constant Opcode_Type := Opcode_Type'(19);
+	Opcode_Read_List_End:        constant Opcode_Type := Opcode_Type'(20);
+	Opcode_Close_List:           constant Opcode_Type := Opcode_Type'(21);
+	Opcode_Close_Quote:          constant Opcode_Type := Opcode_Type'(22);
 
 	-----------------------------------------------------------------------------
 	-- COMMON OBJECTS

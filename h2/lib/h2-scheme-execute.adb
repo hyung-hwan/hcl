@@ -145,15 +145,15 @@ procedure Execute (Interp: in out Interpreter_Record) is
 		R := Make_Cons(Interp.Self, Get_Car(Get_Frame_Result(Interp.Stack)), R); 
 
 		Clear_Frame_Result (Interp.Stack);
-		if not Is_Cons(S) then
+		if Is_Cons(S) then
+			Set_Cdr (X, R); -- chain the result
+			Set_Car (X, Get_Cdr(S)); -- remember the next <operator> to evaluate
+			Push_Frame (Interp, Opcode_Evaluate_Object, Get_Car(S));
+		else
 			-- no more argument to evaluate. 
 			-- apply the evaluated arguments to the evaluated operator.
 			Set_Frame_Opcode (Interp.Stack, Opcode_Apply); 
 			Set_Frame_Operand (Interp.Stack, Reverse_Cons(R));
-		else
-			Set_Cdr (X, R);
-			Set_Car (X, Get_Cdr(S)); 
-			Push_Frame (Interp, Opcode_Evaluate_Object, Get_Car(S));
 		end if;
 
 		Pop_Tops (Interp, 3);
@@ -216,56 +216,108 @@ pragma Assert (Get_Cdr(R) = Nil_Pointer);
 
 	procedure Do_Let_Evaluation is
 		pragma Inline (Do_Let_Evaluation);
-		X: Object_Pointer;
-		Y: Object_Pointer;
+		X: aliased Object_Pointer;
+		S: aliased Object_Pointer;
+		R: aliased Object_Pointer;
 	begin	
-		X := Get_Frame_Operand(Interp.Stack); -- <bindings> and onward
+		Push_Top (Interp, X'Unchecked_Access);
+		Push_Top (Interp, S'Unchecked_Access);
+		Push_Top (Interp, R'Unchecked_Access);
 
-		if Is_Cons(X) then
-			Set_Frame_Operand (Interp.Stack, Get_Cdr(X));
-			-- Say, <bindings> is ((x 2) (y 2)).
-			-- for the first call, Get_Car(X) is (x 2).
-			-- To get x, Get_Car(Get_Car(X))
-			-- To get 2, Get_Car(Get_Cdr(Get_Car(X)))
-			Push_Frame (Interp, Opcode_Evaluate_Object, Get_Car(Get_Cdr(Get_Car(X))));
+		X := Get_Frame_Operand(Interp.Stack); 
+		pragma Assert (Is_Array(X));
+
+		R := X.Pointer_Slot(3);
+		if R = Nil_Pointer then
+			-- First call;
+			X.Pointer_Slot(2) := X.Pointer_Slot(1);
 		else
-			-- Pass the result to the Perform_Let_Binding frame.
-			Y := Get_Frame_Result(Interp.Stack);
-			Pop_Frame (Interp);
-			Set_Frame_Result (Interp.Stack, Y);
+			-- Subsequent calls. Store the result in the room created 
+			-- in the previous call.
+			pragma Assert (Is_Cons(R));
+			Set_Car (R, Get_Car(Get_Frame_Result(Interp.Stack)));
 		end if;
-	end Do_Let_Evaluation;
+		S := X.Pointer_Slot(2);
 
+		if Is_Cons(S) then
+			-- Handle each binding.
+
+			-- Make an empty room to hold the result on the next call
+			R := Make_Cons (Interp.Self, Nil_Pointer, R);
+			X.Pointer_Slot(3) := R;
+
+			-- Remember the next <operator> to evaluate
+			X.Pointer_Slot(2) := Get_Cdr(S);
+
+			-- Say, <bindings> is ((x 2) (y 2)).
+			-- for the first call, Get_Car(S) is (x 2).
+			-- To get x, Get_Car(Get_Car(S))
+			-- To get 2, Get_Car(Get_Cdr(Get_Car(S)))
+			Push_Frame (Interp, Opcode_Evaluate_Object, Get_Car(Get_Cdr(Get_Car(S))));
+
+		else
+			-- No more binding to handle.
+			Pop_Frame (Interp);
+
+			-- The operands at the Let_Evaluation and the Let_Binding frame
+			-- must be the identical objects. this way, i don't need to carry
+			-- over the binding result to the Let_Binding frame.
+			pragma Assert (X = Get_Frame_Operand(Interp.Stack));
+			pragma Assert (Get_Frame_Opcode(Interp.Stack) = Opcode_Let_Binding);
+			--X := Get_Frame_Operand(Interp.Stack);
+			--pragma Assert (Is_Array(X));
+			--pragma Assert (X.Pointer_Slot(3) = Nil_Pointer);
+			--X.Pointer_Slot(3) := R;
+		end if;
+
+		Pop_Tops (Interp, 3);
+	end Do_Let_Evaluation;
 
 	procedure Do_Let_Binding is
 		pragma Inline (Do_Let_Binding);
 		X: aliased Object_Pointer;
-		Y: aliased Object_Pointer;
+		S: aliased Object_Pointer;
+		R: aliased Object_Pointer;
 	begin
 		Push_Top (Interp, X'Unchecked_Access);
-		Push_Top (Interp, Y'Unchecked_Access);
+		Push_Top (Interp, S'Unchecked_Access);
+		Push_Top (Interp, R'Unchecked_Access);
 
-		-- Evaluation of <bindings> is completed.
-		-- Update the environments.
 		X := Get_Frame_Operand(Interp.Stack); -- <bindings> and onward
-		Y := Reverse_Cons(Get_Frame_Result(Interp.Stack));
+		pragma Assert (Is_Array(X));
 
-		while Is_Cons(X) loop
-			pragma Assert (Is_Cons(Y));
-			Put_Environment (Interp, Get_Car(Get_Car(X)), Get_Car(Y));
+		S := X.Pointer_Slot(1);
+		R := X.Pointer_Slot(3);
+		R := Reverse_Cons(R);
 
-			X := Get_Cdr(X);
-			Y := Get_Cdr(Y);
+		while Is_Cons(S) loop
+			pragma Assert (Is_Cons(R));
+			Put_Environment (Interp, Get_Car(Get_Car(S)), Get_Car(R));
+			S := Get_Cdr(S);
+			R := Get_Cdr(R);
 		end loop;
 
 		Pop_Frame (Interp); -- done. 
 		pragma Assert (Get_Frame_Opcode(Interp.Stack) = Opcode_Let_Finish);
 
-		Pop_Tops (Interp, 2);
+		Pop_Tops (Interp, 3);
 	end Do_Let_Binding;
 
 	procedure Do_Letast_Binding is
 		pragma Inline (Do_Letast_Binding);
+		X: Object_Pointer;
+	begin
+		X := Get_Frame_Operand(Interp.Stack); -- <bindings> and onward
+
+		-- Don't call this procedure if <bindings> is empty. The caller must ensure this
+		pragma Assert (Is_Cons(X)); 
+
+		Set_Frame_Opcode (Interp.Stack, Opcode_Letast_Binding_Finish);
+		Push_Frame (Interp, Opcode_Evaluate_Object, Get_Car(Get_Cdr(Get_Car(X))));
+	end Do_Letast_Binding;
+
+	procedure Do_Letast_Binding_Finish is
+		pragma Inline (Do_Letast_Binding_Finish);
 		X: aliased Object_Pointer;
 		Y: aliased Object_Pointer;
 		Envir: aliased Object_Pointer;
@@ -277,40 +329,33 @@ pragma Assert (Get_Cdr(R) = Nil_Pointer);
 		X := Get_Frame_Operand(Interp.Stack); -- <bindings> and onward
 		Y := Get_Frame_Result(Interp.Stack);
 
-		if Y = Nil_Pointer then
-			-- First call
-			pragma Assert (Is_Cons(X)); -- Don't provoke this procedure if <bindings> is empty.
-			Envir := Get_Frame_Environment(Get_Frame_Parent(Interp.Stack));	
+		-- Update the environment while evaluating <bindings>
+
+		-- Push a new environment for each binding.
+		Envir := Make_Environment(Interp.Self, Get_Frame_Environment(Interp.Stack));
+		Set_Frame_Environment (Interp.Stack, Envir);
+		Put_Environment (Interp, Get_Car(Get_Car(X)), Get_Car(Y));
+
+		X := Get_Cdr(X); -- next binding
+		if Is_Cons(X) then
+			-- More bingings to evaluate
+			Set_Frame_Operand (Interp.Stack, X);
+			Clear_Frame_Result (Interp.Stack);
+
+			-- the next evaluation must be done in the environment where the 
+			-- current binding has been made.
 			Push_Frame (Interp, Opcode_Evaluate_Object, Get_Car(Get_Cdr(Get_Car(X))));
 		else
-			-- Subsequence calls. Update the environment while evaluating <bindings>
+			-- No more bingings left
+			Pop_Frame (Interp); -- Done
 
-			-- Push a new environment for each binding.
-			Envir := Make_Environment(Interp.Self, Get_Frame_Environment(Interp.Stack));
+			-- Update the environment of the Let_Finish frame.
+			pragma Assert (Get_Frame_Opcode(Interp.Stack) = Opcode_Let_Finish);
 			Set_Frame_Environment (Interp.Stack, Envir);
-			Put_Environment (Interp, Get_Car(Get_Car(X)), Get_Car(Y));
-
-			X := Get_Cdr(X); -- next binding
-			if Is_Cons(X) then
-				-- More bingings to evaluate
-				Set_Frame_Operand (Interp.Stack, X);
-				Clear_Frame_Result (Interp.Stack);
-
-				-- the next evaluation must be done in the environment where the 
-				-- current binding has been made.
-				Push_Frame (Interp, Opcode_Evaluate_Object, Get_Car(Get_Cdr(Get_Car(X))));
-			else
-				-- No more bingings left
-				Pop_Frame (Interp); -- Done
-
-				-- Update the environment of the Let_Finish frame.
-				pragma Assert (Get_Frame_Opcode(Interp.Stack) = Opcode_Let_Finish);
-				Set_Frame_Environment (Interp.Stack, Envir);
-			end if;
 		end if;
 
 		Pop_Tops (Interp, 3);
-	end Do_Letast_Binding;
+	end Do_Letast_Binding_Finish;
 
 	procedure Do_Let_Finish is
 		pragma Inline (Do_Let_Finish);
@@ -994,6 +1039,8 @@ begin
 				Do_Let_Binding; 
 			when Opcode_Letast_Binding =>
 				Do_Letast_Binding; 
+			when Opcode_Letast_Binding_Finish =>
+				Do_Letast_Binding_Finish; 
 			when Opcode_Let_Evaluation =>
 				Do_Let_Evaluation;
 			when Opcode_Let_Finish =>
