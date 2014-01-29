@@ -420,7 +420,8 @@ r: object_pointer := get_frame_result(c);
 rw: object_word;
 for rw'address use r'address;
 begin
-ada.text_io.put ("Frame" & object_word'image(f) & " PUSH CONTINUATION CURRENT RESULT" & object_word'image(rw) & " ----> ");
+ada.text_io.put_line ("Frame" & object_word'image(f) & " " & Opcode_Type'Image(Get_Frame_Opcode(Interp.Stack)));
+ada.text_io.put ("                      CURRENT RESULT ");
 print (interp, r);
 end;
 
@@ -435,7 +436,7 @@ for w'address use c'address;
 f: object_word;
 for f'address use interp.stack'address;
 begin
-ada.text_io.put ("                      PUSH CONTINUATION");
+ada.text_io.put ("                      PUSH CONTINUATION ");
 ada.text_io.put (object_word'image(w) & " ");
 print (interp, c);
 end;
@@ -457,7 +458,8 @@ for w'address use func'address;
 f: object_word;
 for f'address use interp.stack'address;
 begin
-ada.text_io.put ("Frame" & object_word'image(f) & " POPING APPLY CONTINUATION -----> ");
+ada.text_io.put_line ("Frame" & object_word'image(f) & " " & Opcode_Type'Image(Get_Frame_Opcode(Interp.Stack)));
+ada.text_io.put ("                      POPPING ...  APPLY CONTINUATION -->> ");
 ada.text_io.put (object_word'image(w) & " ");
 end;
 Print (Interp, Args);
@@ -483,7 +485,7 @@ ada.text_io.put ("                      CURRENT RESULT " );
 print (interp, get_Frame_result(interp.stack));
 ada.text_io.put ("                      CURRENT OPERAND " );
 print (interp, get_Frame_operand(interp.stack));
-ada.text_io.put_line ("                      CURRENT OPCODE" & opcode_type'image(get_Frame_opcode(interp.stack)));
+ada.text_io.put_line ("                      CURRENT OPCODE " & opcode_type'image(get_Frame_opcode(interp.stack)));
 end;
 
 
@@ -533,7 +535,8 @@ declare
 w: object_word;
 for w'address use interp.stack'address;
 begin
-ada.text_io.put ("Frame" & object_word'image(w) & " OPERAND TO APPLY => ");
+ada.text_io.put_line ("Frame" & object_word'image(w) & " " & Opcode_Type'Image(Get_Frame_Opcode(Interp.Stack)));
+ada.text_io.put ("                      OPERAND TO APPLY => ");
 print (Interp, Operand);
 ada.text_io.put ("                      CURRENT RESULT => ");
 print (Interp, get_frame_result(interp.stack));

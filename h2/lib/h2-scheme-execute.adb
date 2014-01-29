@@ -198,7 +198,8 @@ declare
 w: object_word;
 for w'address use interp.stack'address;
 begin
-ada.text_io.put ("Frame " & object_word'image(w) &  " EVAL-GROUP RESULT ");
+ada.text_io.put_line ("Frame" & object_word'image(w) & " " & Opcode_Type'Image(Get_Frame_Opcode(Interp.Stack)));
+ada.text_io.put ("                      EVAL-GROUP RESULT ");
 print (Interp, R);
 end;
 

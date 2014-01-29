@@ -93,32 +93,35 @@ package body H2.Scheme is
 
 	subtype Moved_Object_Record is Object_Record (Moved_Object, 0);
 
-	subtype Opcode_Type is Object_Integer range 0 .. 22;
-	Opcode_Exit:                 constant Opcode_Type := Opcode_Type'(0);
-	Opcode_Evaluate_Result:      constant Opcode_Type := Opcode_Type'(1);
-	Opcode_Evaluate_Object:      constant Opcode_Type := Opcode_Type'(2);
-	Opcode_Finish_And_Syntax:    constant Opcode_Type := Opcode_Type'(3); 
-	Opcode_Finish_Define_Symbol: constant Opcode_Type := Opcode_Type'(4); 
-	Opcode_Finish_If_Syntax:     constant Opcode_Type := Opcode_Type'(5); 
-	Opcode_Finish_Or_Syntax:     constant Opcode_Type := Opcode_Type'(6); 
+	type Opcode_Type is (
+		Opcode_Exit,
+		Opcode_Evaluate_Result,
+		Opcode_Evaluate_Object,
+		Opcode_Finish_And_Syntax,
+		Opcode_Finish_Define_Symbol,
+		Opcode_Finish_If_Syntax,
+		Opcode_Finish_Or_Syntax,
+	
+		Opcode_Grouped_Call,  -- (begin ...), closure apply, let body
+		Opcode_Grouped_Call_Finish,
+		Opcode_Let_Binding,
+		Opcode_Letast_Binding,
+		Opcode_Letast_Binding_Finish,
+		Opcode_Let_Evaluation,
+		Opcode_Let_Finish,
+		Opcode_Procedure_Call,
+		Opcode_Set_Finish,
+	
+		Opcode_Apply,
+		Opcode_Read_Object,
+		Opcode_Read_List,
+		Opcode_Read_List_Cdr,
+		Opcode_Read_List_End,
+		Opcode_Close_List,
+		Opcode_Close_Quote
+	);
+	for Opcode_Type'Size use Object_Integer'Size;
 
-	Opcode_Grouped_Call:         constant Opcode_Type := Opcode_Type'(7); -- (begin ...), closure apply, let body
-	Opcode_Grouped_Call_Finish:  constant Opcode_Type := Opcode_Type'(8);
-	Opcode_Let_Binding:          constant Opcode_Type := Opcode_Type'(9);
-	Opcode_Letast_Binding:       constant Opcode_Type := Opcode_Type'(10);
-	Opcode_Letast_Binding_Finish:constant Opcode_Type := Opcode_Type'(11);
-	Opcode_Let_Evaluation:       constant Opcode_Type := Opcode_Type'(12);
-	Opcode_Let_Finish:           constant Opcode_Type := Opcode_Type'(13);
-	Opcode_Procedure_Call:       constant Opcode_Type := Opcode_Type'(14); 
-	Opcode_Set_Finish:           constant Opcode_Type := Opcode_Type'(15); 
-
-	Opcode_Apply:                constant Opcode_Type := Opcode_Type'(16);
-	Opcode_Read_Object:          constant Opcode_Type := Opcode_Type'(17);
-	Opcode_Read_List:            constant Opcode_Type := Opcode_Type'(18);
-	Opcode_Read_List_Cdr:        constant Opcode_Type := Opcode_Type'(19);
-	Opcode_Read_List_End:        constant Opcode_Type := Opcode_Type'(20);
-	Opcode_Close_List:           constant Opcode_Type := Opcode_Type'(21);
-	Opcode_Close_Quote:          constant Opcode_Type := Opcode_Type'(22);
 
 	-----------------------------------------------------------------------------
 	-- COMMON OBJECTS
@@ -276,12 +279,12 @@ package body H2.Scheme is
 
 	function Pointer_To_Word is new Ada.Unchecked_Conversion (Object_Pointer, Object_Word);
 	--function Pointer_To_Word (Pointer: in Object_Pointer) return Object_Word is
+	--	pragma Inline (Pointer_To_Word);
 	--	Word: Object_Word;
 	--	for Word'Address use Pointer'Address;
 	--begin
 	--	return Word;
 	--end Pointer_To_Word;
-	pragma Inline (Pointer_To_Word);
 
 	function Pointer_To_Integer (Pointer: in Object_Pointer) return Object_Integer is
 		Word: Object_Word := Pointer_To_Word (Pointer);
@@ -395,6 +398,24 @@ package body H2.Scheme is
 
 		return Integer_To_Pointer(V);
 	end String_To_Integer_Pointer;
+
+	-----------------------------------------------------------------------------
+	-- MORE CONVERSIONS
+	-----------------------------------------------------------------------------
+	--function Pointer_To_Opcode (Pointer: in Object_Pointer) return Opcode_Type renames Pointer_To_Integer;
+	--function Opcode_To_Pointer (Opcode: in Opcode_Type) return Object_Pointer renames Integer_To_Pointer;
+		
+	function Pointer_To_Opcode (Pointer: in Object_Pointer) return Opcode_Type is
+		pragma Inline (Pointer_To_Opcode);
+	begin
+		return Opcode_Type'Val(Pointer_To_Integer(Pointer));
+	end Pointer_To_Opcode;
+
+	function Opcode_To_Pointer (Opcode: in Opcode_Type) return Object_Pointer is
+		pragma Inline (Opcode_To_Pointer);
+	begin
+		 return Integer_To_Pointer(Opcode_Type'Pos(Opcode));
+	end Opcode_To_Pointer;
 
 	-----------------------------------------------------------------------------
 	-- MEMORY MANAGEMENT
@@ -1246,15 +1267,15 @@ Ada.Text_IO.Put_Line ("Make_String...");
 		pragma Inline (Get_Frame_Opcode);
 		pragma Assert (Is_Frame(Frame));
 	begin
-		return Pointer_To_Integer(Frame.Pointer_Slot(Frame_Opcode_Index));
+		return Pointer_To_Opcode(Frame.Pointer_Slot(Frame_Opcode_Index));
 	end Get_Frame_Opcode;
 
 	procedure Set_Frame_Opcode (Frame:  in Object_Pointer; 
-	                            OpcodE: in Opcode_Type) is
+	                            Opcode: in Opcode_Type) is
 		pragma Inline (Set_Frame_Opcode);
 		pragma Assert (Is_Frame(Frame));
 	begin
-		Frame.Pointer_Slot(Frame_Opcode_Index) := Integer_To_Pointer(Opcode);
+		Frame.Pointer_Slot(Frame_Opcode_Index) := Opcode_To_Pointer(Opcode);
 	end Set_Frame_Opcode;
 
 	function Get_Frame_Operand (Frame: in Object_Pointer) return Object_Pointer is
@@ -1791,7 +1812,7 @@ Ada.Text_IO.Put_Line ("Make_String...");
 		Interp.Mark := Make_Mark(Interp.Self, 0); -- to indicate the end of cons evaluation
 
 		Interp.Root_Environment := Make_Environment(Interp.Self, Nil_Pointer);
-		Interp.Root_Frame := Make_Frame(Interp.Self, Nil_Pointer, Integer_To_Pointer(Opcode_Exit), Nil_Pointer, Interp.Root_Environment);
+		Interp.Root_Frame := Make_Frame(Interp.Self, Nil_Pointer, Opcode_To_Pointer(Opcode_Exit), Nil_Pointer, Interp.Root_Environment);
 		Interp.Stack := Interp.Root_Frame;
 
 		Make_Syntax_Objects;
@@ -2087,8 +2108,6 @@ end if;
 		Ada.Text_IO.New_Line;
 	end Print;
 
-	function Pointer_To_Opcode (Pointer: in Object_Pointer) return Opcode_Type renames Pointer_To_Integer;
-	function Opcode_To_Pointer (Opcode: in Opcode_Type) return Object_Pointer renames Integer_To_Pointer;
 
 	procedure Push_Frame (Interp:  in out Interpreter_Record;
 	                      Opcode:  in     Opcode_Type; 
