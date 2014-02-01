@@ -1036,6 +1036,7 @@ begin
 				Do_Grouped_Call;
 			when Opcode_Grouped_Call_Finish =>
 				Do_Grouped_Call_Finish;
+
 			when Opcode_Let_Binding =>
 				Do_Let_Binding; 
 			when Opcode_Letast_Binding =>

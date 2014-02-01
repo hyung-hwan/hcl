@@ -147,10 +147,8 @@ package body H2.Scheme is
 	Closure_Code_Index: constant Pointer_Object_Size := 1;
 	Closure_Environment_Index: constant Pointer_Object_Size := 2;
 
-	Continuation_Object_Size: constant Pointer_Object_Size := 3;
+	Continuation_Object_Size: constant Pointer_Object_Size := 1;
 	Continuation_Frame_Index: constant Pointer_Object_Size := 1;
-	Continuation_Save_Index: constant Pointer_Object_Size := 2;
-	Continuation_Save2_Index: constant Pointer_Object_Size := 3;
 
 	procedure Set_New_Location (Object: in Object_Pointer;
 	                            Ptr:    in Heap_Element_Pointer);
@@ -1572,20 +1570,14 @@ Ada.Text_IO.Put_Line ("Make_String...");
 
 	-----------------------------------------------------------------------------
 	function Make_Continuation (Interp: access Interpreter_Record;
-	                            Frame:  in     Object_Pointer;
-	                            Save:   in     Object_Pointer;
-	                            Save2:   in     Object_Pointer) return Object_Pointer is
+	                            Frame:  in     Object_Pointer) return Object_Pointer is
 		Cont: Object_Pointer;
 		Aliased_Frame: aliased Object_Pointer := Frame;
-		Aliased_Save: aliased Object_Pointer := Save;
-		Aliased_Save2: aliased Object_Pointer := Save2;
 	begin
 		Push_Top (Interp.all, Aliased_Frame'Unchecked_Access);
 		Cont := Allocate_Pointer_Object (Interp, Continuation_Object_Size, Nil_Pointer);
 		Cont.Tag := Continuation_Object;
 		Cont.Pointer_Slot(Continuation_Frame_Index) := Aliased_Frame;
-		Cont.Pointer_Slot(Continuation_Save_Index) := Aliased_Save;
-		Cont.Pointer_Slot(Continuation_Save2_Index) := Aliased_Save2;
 		Pop_Tops (Interp.all, 1);
 		return Cont;
 	end Make_Continuation;
@@ -1603,20 +1595,6 @@ Ada.Text_IO.Put_Line ("Make_String...");
 	begin
 		return Cont.Pointer_Slot(Continuation_Frame_Index);
 	end Get_Continuation_Frame;
-
-	function Get_Continuation_Save (Cont: in Object_Pointer) return Object_Pointer is
-		pragma Inline (Get_Continuation_Save);
-		pragma Assert (Is_Continuation(Cont));
-	begin
-		return Cont.Pointer_Slot(Continuation_Save_Index);
-	end Get_Continuation_Save;
-
-	function Get_Continuation_Save2 (Cont: in Object_Pointer) return Object_Pointer is
-		pragma Inline (Get_Continuation_Save2);
-		pragma Assert (Is_Continuation(Cont));
-	begin
-		return Cont.Pointer_Slot(Continuation_Save2_Index);
-	end Get_Continuation_Save2;
 
 	-----------------------------------------------------------------------------
 	procedure Deinitialize_Heap (Interp: in out Interpreter_Record) is

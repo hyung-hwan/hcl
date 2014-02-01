@@ -406,28 +406,22 @@ Ada.Text_IO.Put_line ("TOO FEW ARGUMETNS FOR COMPARISON");
 
 		Push_Top (Interp, C'Unchecked_Access);
 		C := Get_Frame_Parent(Interp.Stack);
-		if Get_Frame_Parent(C) = Nil_Pointer then
-			C := Make_Continuation (Interp.Self, C, Nil_Pointer, Nil_Pointer);
-		else
-
 declare
 w: object_word;
 for w'address use c'address;
+
 f: object_word;
 for f'address use interp.stack'address;
 
 r: object_pointer := get_frame_result(c);
-rw: object_word;
-for rw'address use r'address;
 begin
 ada.text_io.put_line ("Frame" & object_word'image(f) & " " & Opcode_Type'Image(Get_Frame_Opcode(Interp.Stack)));
 ada.text_io.put ("                      CURRENT RESULT ");
 print (interp, r);
+ada.text_io.put_line ("                      PARENT FRAME " & object_word'image(w));
 end;
 
-			--C := Make_Continuation (Interp.Self, C, Get_Frame_Result(Get_Frame_Parent(C)), Get_Frame_Operand(Get_Frame_Parent(C)));
-			C := Make_Continuation (Interp.Self, C, Get_Frame_Result(Get_Frame_Parent(C)), Get_Frame_Result(C));
-		end if;
+		C := Make_Continuation (Interp.Self, C);
 		C := Make_Cons (Interp.Self, C, Nil_Pointer);
 		C := Make_Cons (Interp.Self, Get_Car(Args), C);
 declare
@@ -444,6 +438,7 @@ end;
 		Set_Frame_Opcode (Interp.Stack, Opcode_Apply);
 		Set_Frame_Operand (Interp.Stack, C);
 		Clear_Frame_Result (Interp.Stack);
+
 ada.text_io.put_line ("                      CLEARED RESULT BEFORE APPLYING");
 
 		Pop_Tops (Interp, 1);
@@ -488,16 +483,6 @@ print (interp, get_Frame_operand(interp.stack));
 ada.text_io.put_line ("                      CURRENT OPCODE " & opcode_type'image(get_Frame_opcode(interp.stack)));
 end;
 
-
-declare
-k: object_pointer := get_continuation_save2(func);
-w: object_word;
-for w'address use k'address;
-begin
-ada.text_io.put ("                      RESTORE FREME RESULT TO " & object_word'image(w) & " --> ");
-print (interp, k);
-end;
-		--Set_Frame_Result (Interp.Stack, Get_Continuation_Save2(Func));
 
 ada.text_io.put ("                      CHAIN NEW RESULT, TAKING THE FIRST ONLY FROM ");
 print (interp, args);
