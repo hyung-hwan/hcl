@@ -171,6 +171,7 @@ procedure Execute (Interp: in out Interpreter_Record) is
 			Set_Frame_Opcode (Interp.Stack, Opcode_Grouped_Call_Finish); 
 			Set_Frame_Operand (Interp.Stack, Get_Cdr(X));
 			Clear_Frame_Result (Interp.Stack);
+
 			Push_Frame (Interp, Opcode_Evaluate_Object, Get_Car(X));
 		--else
 		--	-- Nothing to evaluate.
@@ -189,6 +190,7 @@ procedure Execute (Interp: in out Interpreter_Record) is
 			Set_Frame_Opcode (Interp.Stack, Opcode_Grouped_Call_Finish); 
 			Set_Frame_Operand (Interp.Stack, Get_Cdr(X));
 			Clear_Frame_Result (Interp.Stack);
+
 			Push_Frame (Interp, Opcode_Evaluate_Object, Get_Car(X));
 		else
 			-- Nothing more to evaluate.

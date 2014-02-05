@@ -137,9 +137,6 @@ package body H2.Scheme is
 	Frame_Environment_Index: constant Pointer_Object_Size := 4;
 	Frame_Result_Index: constant Pointer_Object_Size := 5;
 
-	Mark_Object_Size: constant Pointer_Object_Size := 1;
-	Mark_Context_Index: constant Pointer_Object_Size := 1;
-
 	Procedure_Object_Size: constant Pointer_Object_Size := 1;
 	Procedure_Opcode_Index: constant Pointer_Object_Size := 1;
 
@@ -738,7 +735,6 @@ ada.text_io.put_line ("HEAP SOURCE IS NIL");
 		New_Heap := Interp.Current_Heap + 1;
 
 		-- Migrate some root objects
---Print_Object_Pointer (">>> [GC] ROOT OBJECTS ...", Interp.Mark);
 --Print_Object_Pointer (">>> [GC] Stack BEFORE ...", Interp.Stack);
 		if Is_Normal_Pointer(Interp.Stack) then
 			Interp.Stack := Move_One_Object(Interp.Stack);
@@ -746,7 +742,6 @@ ada.text_io.put_line ("HEAP SOURCE IS NIL");
 
 		Interp.Root_Environment := Move_One_Object(Interp.Root_Environment);
 		Interp.Root_Frame := Move_One_Object(Interp.Root_Frame);
-		Interp.Mark := Move_One_Object(Interp.Mark);
 
 		-- Migrate temporary object pointers
 		for I in Interp.Top.Data'First .. Interp.Top.Last loop
@@ -1299,6 +1294,7 @@ Ada.Text_IO.Put_Line ("Make_String...");
 		return Frame.Pointer_Slot(Frame_Parent_Index);
 	end Get_Frame_Parent;
 
+
 	-----------------------------------------------------------------------------
 
 	--
@@ -1513,19 +1509,6 @@ Ada.Text_IO.Put_Line ("Make_String...");
 		return Pointer_To_Integer(Proc.Pointer_Slot(Procedure_Opcode_Index));
 	end Get_Procedure_Opcode;
 	
-	-----------------------------------------------------------------------------
-
-	function Make_Mark (Interp:  access Interpreter_Record;
-	                    Context: in     Object_Integer) return Object_Pointer is
-		Mark: Object_Pointer;
-	begin
-		-- TODO: allocate it in a static heap, not in a normal heap.
-		Mark := Allocate_Pointer_Object (Interp, Mark_Object_Size, Nil_Pointer);
-		Mark.Pointer_Slot(Mark_Context_Index) := Integer_To_Pointer(Context);
-		Mark.Tag := Mark_Object;
-		return Mark;
-	end Make_Mark;
-
 	-----------------------------------------------------------------------------
 
 	function Make_Closure (Interp: access Interpreter_Record;
@@ -1787,7 +1770,6 @@ Ada.Text_IO.Put_Line ("Make_String...");
 
 -- TODO: disallow garbage collecion during initialization.
 		Initialize_Heap (Initial_Heap_Size);
-		Interp.Mark := Make_Mark(Interp.Self, 0); -- to indicate the end of cons evaluation
 
 		Interp.Root_Environment := Make_Environment(Interp.Self, Nil_Pointer);
 		Interp.Root_Frame := Make_Frame(Interp.Self, Nil_Pointer, Opcode_To_Pointer(Opcode_Exit), Nil_Pointer, Interp.Root_Environment);
@@ -1927,8 +1909,6 @@ Ada.Text_IO.Put_Line ("Make_String...");
 						when Others =>
 							if Atom.Kind = Character_Object then
 								Output_Character_Array (Atom.Character_Slot);
-							elsif Atom.Tag = Mark_Object then
-								Ada.Text_IO.Put ("#INTERNAL MARK#");
 							else
 								Ada.Text_IO.Put ("#NOIMPL# => " & Object_Tag'Image(Atom.Tag));
 							end if;
@@ -2102,7 +2082,8 @@ end if;
 	                                       Envir:   in     Object_Pointer) is
 		pragma Inline (Push_Frame_With_Environment);
 	begin
-		Interp.Stack := Make_Frame(Interp.Self, Interp.Stack, Opcode_To_Pointer(Opcode), Operand, Envir);
+		Interp.Stack := Make_Frame(Interp.Self, Interp.Stack, Opcode_To_Pointer(Opcode),
+		                           Operand, Envir);
 	end Push_Frame_With_Environment;
 
 	procedure Pop_Frame (Interp: in out Interpreter_Record) is

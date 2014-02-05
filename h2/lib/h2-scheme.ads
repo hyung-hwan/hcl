@@ -210,8 +210,7 @@ package H2.Scheme is
 		Procedure_Object,
 		Closure_Object,
 		Continuation_Object,
-		Frame_Object,
-		Mark_Object
+		Frame_Object
 	);
 
 	type Object_Record(Kind: Object_Kind; Size: Object_Size) is record
@@ -500,8 +499,8 @@ private
 		Symbol_Table: Object_Pointer := Nil_Pointer;
 		Root_Environment: Object_Pointer := Nil_Pointer;
 		Root_Frame: Object_Pointer := Nil_Pointer;
-		Stack: aliased Object_Pointer := Nil_Pointer;
-		Mark: Object_Pointer := Nil_Pointer;
+		Stack: Object_Pointer := Nil_Pointer;
+		Active_Frame: Object_Pointer := NIl_Pointer;	
 
 		Symbol: Common_Symbol_Record;
 		Top: Top_Record; -- temporary object pointers
