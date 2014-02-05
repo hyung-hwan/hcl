@@ -448,12 +448,13 @@ Ada.Text_IO.Put_Line ("NO ALTERNATE");
 			Cdr := Get_Car(Cdr); -- <expression>
 
 			-- Arrange to finish setting a variable after <expression> evaluation.
-			Set_Frame_Opcode (Interp.Stack, Opcode_Set_Finish);
-			Set_Frame_Operand (Interp.Stack, Car); 
-			Clear_Frame_Result (Interp.Stack);
-
+			--Switch_Frame (Interp.Stack, Opcode_Set_Finish, Car);
 			-- Arrange to evalaute the value part
-			Push_Frame (Interp, Opcode_Evaluate_Object, Cdr); 
+			--Push_Frame (Interp, Opcode_Evaluate_Object, Cdr); 
+
+			-- These 2 lines derives the same result as the 2 lines commented out above.
+			Switch_Frame (Interp.Stack, Opcode_Evaluate_Object, Cdr);
+			Push_Subframe (Interp, Opcode_Set_Finish, Car); 
 		else
 			Ada.Text_IO.Put_LINE ("INVALID SYMBOL AFTER SET!");
 			raise Syntax_Error;	
@@ -526,9 +527,7 @@ end;
 								raise Syntax_Error;
 							end if;
 
-							Set_Frame_Opcode (Interp.Stack, Opcode_Grouped_Call);
-							Set_Frame_Operand (Interp.Stack, Operand);
-							Clear_Frame_Result (Interp.Stack);
+							Switch_Frame (Interp.Stack, Opcode_Grouped_Call, Operand);
 						end if;
 
 						--if (Interp.Trait.Trait_Bits and No_Optimization) = 0 then
@@ -580,17 +579,11 @@ end;
 					raise Syntax_Error;
 				end if;
 
-				-- Create a cons cell whose 'car' holds arguments and 
-				-- 'cdr' holds evaluation results before applying them.
-				Cdr := Make_Cons (Interp.Self, Cdr, Nil_Pointer);
+				-- Switch the current frame to evaluate <operator>
+				Switch_Frame (Interp.Stack, Opcode_Evaluate_Object, Car);
 
-				-- Set it as a frame operand
-				Set_Frame_Opcode (Interp.Stack, Opcode_Procedure_Call);
-				Set_Frame_Operand (Interp.Stack, Cdr);
-				Clear_Frame_Result (Interp.Stack);
-
-				-- Arrange to evaluate <operator> first.
-				Push_Frame (Interp, Opcode_Evaluate_Object, Car);
+				-- Push a new frame to evaluate arguments.
+				Push_Subframe (Interp, Opcode_Procedure_Call, Cdr);
 			end if;
 
 		when others =>

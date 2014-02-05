@@ -500,7 +500,6 @@ private
 		Root_Environment: Object_Pointer := Nil_Pointer;
 		Root_Frame: Object_Pointer := Nil_Pointer;
 		Stack: Object_Pointer := Nil_Pointer;
-		Active_Frame: Object_Pointer := NIl_Pointer;	
 
 		Symbol: Common_Symbol_Record;
 		Top: Top_Record; -- temporary object pointers
