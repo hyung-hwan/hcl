@@ -117,7 +117,8 @@ package body H2.Scheme is
 		Opcode_Read_List_Cdr,
 		Opcode_Read_List_End,
 		Opcode_Close_List,
-		Opcode_Close_Quote
+		Opcode_Close_Quote,
+		Opcode_Close_Quote_In_List
 	);
 	for Opcode_Type'Size use Object_Integer'Size;
 

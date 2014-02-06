@@ -669,7 +669,7 @@ Ada.Text_IO.Put_Line ("ERROR: PREMATURE LIST END");
 				end if;
 
 			when Single_Quote_Token =>
-				Push_Frame (Interp, Opcode_Close_Quote, Nil_Pointer);
+				Push_Frame (Interp, Opcode_Close_Quote_In_List, Nil_Pointer);
 				Push_Frame (Interp, Opcode_Read_Object, Nil_Pointer);
 
 			when Integer_Token =>
@@ -726,7 +726,7 @@ Ada.Text_IO.Put_Line ("ERROR: PREMATURE LIST END");
 			when Single_Quote_Token =>
 Ada.Text_IO.Put_Line ("ERROR: CDR QUOT LIST END");
 				Set_Frame_Opcode (Interp.Stack, Opcode_Read_List_End);
-				Push_Frame (Interp, Opcode_Close_Quote, Nil_Pointer);
+				Push_Frame (Interp, Opcode_Close_Quote_In_List, Nil_Pointer);
 				Push_Frame (Interp, Opcode_Read_Object, Nil_Pointer);
 
 			when Integer_Token =>
@@ -779,7 +779,7 @@ Ada.Text_IO.Put_Line ("ERROR: CDR QUOT LIST END");
 				-- The first item in the chain is actually Cdr of the last cell.
 				V := Reverse_Cons(Get_Cdr(V), Get_Car(V)); 
 				Pop_Frame (Interp); 
-				Set_Frame_Result (Interp.Stack, V);
+				Chain_Frame_Intermediate (Interp, Interp.Stack, V);
 			when others =>
 Ada.Text_IO.Put_Line ("Right parenthesis expected");
 				raise Syntax_Error;
@@ -796,6 +796,17 @@ Ada.Text_IO.Put_Line ("Right parenthesis expected");
 		Set_Frame_Result (Interp.Stack, Get_Car(V));
 	end Close_List;
 
+	procedure Close_Quote_In_List is
+		pragma Inline (Close_Quote_In_List);
+		V: Object_Pointer;
+	begin
+		V := Get_Frame_Result(Interp.Stack);
+		V := Make_Cons(Interp.Self, V, Nil_Pointer);
+		V := Make_Cons(Interp.Self, Interp.Symbol.Quote, V);
+		Pop_Frame (Interp); 
+		Chain_Frame_Intermediate (Interp, Interp.Stack, V);
+	end Close_Quote_In_List;
+
 	procedure Close_Quote is
 		pragma Inline (Close_Quote);
 		V: Object_Pointer;
@@ -803,7 +814,7 @@ Ada.Text_IO.Put_Line ("Right parenthesis expected");
 		V := Get_Frame_Result(Interp.Stack);
 		V := Make_Cons(Interp.Self, V, Nil_Pointer);
 		V := Make_Cons(Interp.Self, Interp.Symbol.Quote, V);
-		Pop_Frame (Interp); -- Done with the current frame
+		Pop_Frame (Interp);
 		Set_Frame_Result (Interp.Stack, V);
 	end Close_Quote;
 
@@ -998,6 +1009,9 @@ ada.text_io.put_line (Opcode_Type'Image(Get_Frame_Opcode(Interp.Stack)));
 
 			when Opcode_Close_Quote =>
 				Close_Quote;
+
+			when Opcode_Close_Quote_In_List =>
+				Close_Quote_In_List;
 
 		end case;
 	end loop;
