@@ -43,8 +43,7 @@ procedure Execute (Interp: in out Interpreter_Record) is
 			Push_Frame (Interp, Opcode_Evaluate_Object, Get_Car(X));
 		else
 			-- Return the result of the last expression evaluated.
-			Pop_Frame (Interp);
-			Put_Frame_Result (Interp, Interp.Stack, Y);
+			Return_Frame (Interp, Y);
 		end if;
 	end Evaluate_Up_To;
 
@@ -54,30 +53,27 @@ procedure Execute (Interp: in out Interpreter_Record) is
 
 	procedure Finish_Define_Symbol is
 		pragma Inline (Finish_Define_Symbol);
-		X: aliased Object_Pointer;
+		X: Object_Pointer;
 		Y: aliased Object_Pointer;
 	begin
-		Push_Top (Interp, X'Unchecked_Access);
-		Push_Top (Interp, Y'Unchecked_Access);
+		-- Keep Y managed as Y is referenced beyond the gc point. 
+		Push_Top (Interp, Y'Unchecked_Access); 
 
 		X := Get_Frame_Operand(Interp.Stack); -- symbol
 		pragma Assert (Is_Symbol(X));
 
 		Y := Get_Frame_Result(Interp.Stack);  -- value list
 
-		Put_Environment (Interp, X, Y);
+		Put_Environment (Interp, X, Y);  -- gc point
 
-		Pop_Frame (Interp);     -- Done
-		Put_Frame_Result (Interp, Interp.Stack, Y);
-
-		Pop_Tops (Interp, 2);
+		Return_Frame (Interp, Y); -- Y is referenced here.
+		Pop_Tops (Interp, 1); -- Unmanage Y
 	end Finish_Define_Symbol;
 
 	procedure Finish_If_Syntax is
 		pragma Inline (Finish_If_Syntax);
 		X: aliased Object_Pointer;
 		Y: aliased Object_Pointer;
-		Z: aliased Object_Pointer;
 	begin
 		Push_Top (Interp, X'Unchecked_Access);
 		Push_Top (Interp, Y'Unchecked_Access);
@@ -97,9 +93,8 @@ procedure Execute (Interp: in out Interpreter_Record) is
 				Set_Frame_Operand (Interp.Stack, Get_Car(X));
 				Clear_Frame_Result (Interp.Stack);
 			else
-				Pop_Frame (Interp);
 				-- Return nil if no <alternate> is specified
-				Put_Frame_Result (Interp, Interp.Stack, Nil_Pointer);
+				Return_Frame (Interp, Nil_Pointer);
 			end if;
 		else
 			-- All values except #f are true values. evaluate <consequent>
@@ -117,26 +112,65 @@ procedure Execute (Interp: in out Interpreter_Record) is
 
 	procedure Do_Procedure_Call is
 		pragma Inline (Do_Procedure_Call);
-		X: aliased Object_Pointer;
-		R: aliased Object_Pointer;
+		R: Object_Pointer;
+		X: Object_Pointer;
 	begin
-		Push_Top (Interp, X'Unchecked_Access);
-		Push_Top (Interp, R'Unchecked_Access);
-
-		X := Get_Frame_Operand(Interp.Stack);
+		-- Note: if you change the assignment order of R and X, 
+		--       Push_Top() and Pop_Tops() are needed.
+		--Push_Top (Interp, X'Unchecked_Access);
+		--Push_Top (Interp, R'Unchecked_Access);
 		R := Make_Cons(Interp.Self, Get_Frame_Result(Interp.Stack), Get_Frame_Intermediate(Interp.Stack));
+		X := Get_Frame_Operand(Interp.Stack);
 
 		if Is_Cons(X) then
-			Switch_Frame (Interp.Stack, Opcode_Evaluate_Object, Get_Car(X));
+			Switch_Frame (Interp.Stack, Opcode_Evaluate_Object, Get_Car(X), Nil_Pointer);
 			Push_Subframe_With_Intermediate (Interp, Opcode_Procedure_Call, Get_Cdr(X), R);
 		else
 			-- no more argument to evaluate. 
 			-- apply the evaluated arguments to the evaluated operator.
-			Switch_Frame (Interp.Stack, Opcode_Apply, Reverse_Cons(R));
+			R := Reverse_Cons(R);
+
+--ada.text_io.put_line ("xxxxxxxxxxxxxxxxxx");
+--print (interp, r);
+--print (interp, get_car(r));
+--print (interp, get_cdr(r));
+--ada.text_io.put_line ("xxxxxxxxxxxxxxxxxx");
+
+			-- This frame can be resumed. Switching the current frame to Opcode_Apply
+			-- affects continuation objects that point to the current frame. However,
+			-- keeping it unchanged causes this frame to repeat actions that has been 
+			-- taken previously when it's resumed. So i change the frame to something 
+			-- special designed for continuation only.
+			Switch_Frame (Interp.Stack, Opcode_Procedure_Call_Finish, Get_Car(R), Nil_Pointer);
+			Pop_Frame (Interp);
+
+			-- Replace the current frame popped by a new applying frame.
+			Push_Frame_With_Intermediate (Interp, Opcode_Apply, Get_Car(R), Get_Cdr(R));
 		end if;
 
-		Pop_Tops (Interp, 2);
+		--Pop_Tops (Interp, 2);
 	end Do_Procedure_Call;
+
+	procedure Do_Procedure_Call_Finish is
+		pragma Inline (Do_Procedure_Call_Finish);
+		R: Object_Pointer;
+		X: Object_Pointer;
+	begin
+		-- TODO: is this really correct? verify this.
+
+		-- Note: if you change the assignment order of R and X, 
+		--       Push_Top() and Pop_Tops() are needed.
+		--Push_Top (Interp, X'Unchecked_Access);
+		--Push_Top (Interp, R'Unchecked_Access);
+		R := Make_Cons(Interp.Self, Get_Frame_Result(Interp.Stack), Nil_Pointer);
+		X := Get_Frame_Operand(Interp.Stack);
+
+		pragma Assert (Is_Continuation(X)); -- this procedure can be called for continuation only.
+		Pop_Frame (Interp);
+		Push_Frame_With_Intermediate (Interp, Opcode_Apply, X, R);
+
+		--Pop_Tops (Interp, 2);
+	end Do_Procedure_Call_Finish;
 
 	-- ----------------------------------------------------------------
 
@@ -149,7 +183,7 @@ procedure Execute (Interp: in out Interpreter_Record) is
 		pragma Assert (Is_Cons(X)); -- The caller must ensure this.
 		-- Switch the current frame to evaluate the first 
 		-- expression in the group.
-		Switch_Frame (Interp.Stack, Opcode_Evaluate_Object, Get_Car(X));
+		Switch_Frame (Interp.Stack, Opcode_Evaluate_Object, Get_Car(X), Nil_Pointer);
 
 		X := Get_Cdr(X);
 		if Is_Cons(X) then
@@ -333,14 +367,15 @@ print (interp, Get_Frame_Result(Interp.Stack));
 			raise Evaluation_Error;
 		end if;
 
-		Pop_Frame (Interp);     -- Done
-		Put_Frame_Result (Interp, Interp.Stack, Y);
+		Return_Frame (Interp, Y);
 
 		Pop_Tops (Interp, 2);
 	end Do_Set_Finish;
 
 	procedure Evaluate is separate;
 	procedure Apply is separate;
+
+	-- --------------------------------------------------------------------
 
 	procedure Unfetch_Character is
 		pragma Inline (Unfetch_Character);
@@ -672,33 +707,15 @@ Ada.Text_IO.Put_Line ("ERROR: PREMATURE LIST END");
 				Push_Frame (Interp, Opcode_Close_Quote_In_List, Nil_Pointer);
 				Push_Frame (Interp, Opcode_Read_Object, Nil_Pointer);
 
-			when Integer_Token =>
-				-- TODO: bignum
-				V := String_To_Integer_Pointer(Interp.Token.Value.Ptr.all(1..Interp.Token.Value.Last));
-				Chain_Frame_Intermediate (Interp, Interp.Stack, V);
-
-			when Character_Token =>
-				pragma Assert (Interp.Token.Value.Last = 1);
-				V := Character_To_Pointer(Interp.Token.Value.Ptr.all(1));
-				Chain_Frame_Intermediate (Interp, Interp.Stack, V);
-
-			when String_Token =>
-				V := Make_String(Interp.Self, Interp.Token.Value.Ptr.all(1..Interp.Token.Value.Last));
-				Chain_Frame_Intermediate (Interp, Interp.Stack, V);
-
-			when Identifier_Token =>	
-				V := Make_Symbol(Interp.Self, Interp.Token.Value.Ptr.all(1..Interp.Token.Value.Last));
-				Chain_Frame_Intermediate (Interp, Interp.Stack, V);
-
-			when True_Token =>
-				Chain_Frame_Intermediate (Interp, Interp.Stack, True_Pointer);
-
-			when False_Token =>
-				Chain_Frame_Intermediate (Interp, Interp.Stack, False_Pointer);
-
 			when others =>
-				-- TODO: set various error info
-				raise Syntax_Error;
+				V := Token_To_Pointer (Interp.Self, Interp.Token);
+				if V = null then
+					-- TODO: set various error info
+					raise Syntax_Error;
+				else
+					Chain_Frame_Intermediate (Interp, Interp.Stack, V);
+				end if;
+
 		end case;
 
 	end Read_List;
@@ -729,39 +746,16 @@ Ada.Text_IO.Put_Line ("ERROR: CDR QUOT LIST END");
 				Push_Frame (Interp, Opcode_Close_Quote_In_List, Nil_Pointer);
 				Push_Frame (Interp, Opcode_Read_Object, Nil_Pointer);
 
-			when Integer_Token =>
-				-- TODO: bignum
-				V := String_To_Integer_Pointer(Interp.Token.Value.Ptr.all(1..Interp.Token.Value.Last));
-				Set_Frame_Opcode (Interp.Stack, Opcode_Read_List_End);
-				Chain_Frame_Intermediate (Interp, Interp.Stack, V);
-
-			when Character_Token =>
-				pragma Assert (Interp.Token.Value.Last = 1);
-				V := Character_To_Pointer(Interp.Token.Value.Ptr.all(1));
-				Set_Frame_Opcode (Interp.Stack, Opcode_Read_List_End);
-				Chain_Frame_Intermediate (Interp, Interp.Stack, V);
-		
-			when String_Token =>
-				V := Make_String (Interp.Self, Interp.Token.Value.Ptr.all(1..Interp.Token.Value.Last));
-				Set_Frame_Opcode (Interp.Stack, Opcode_Read_List_End);
-				Chain_Frame_Intermediate (Interp, Interp.Stack, V);
-
-			when Identifier_Token =>	
-				V := Make_Symbol (Interp.Self, Interp.Token.Value.Ptr.all(1..Interp.Token.Value.Last));
-				Set_Frame_Opcode (Interp.Stack, Opcode_Read_List_End);
-				Chain_Frame_Intermediate (Interp, Interp.Stack, V);
-
-			when True_Token =>
-				Set_Frame_Opcode (Interp.Stack, Opcode_Read_List_End);
-				Chain_Frame_Intermediate (Interp, Interp.Stack, True_Pointer);
-
-			when False_Token =>
-				Set_Frame_Opcode (Interp.Stack, Opcode_Read_List_End);
-				Chain_Frame_Intermediate (Interp, Interp.Stack, False_Pointer);
-
 			when others =>
-				-- TODO: set various error info
-				raise Syntax_Error;
+				V := Token_To_Pointer (Interp.Self, Interp.Token);
+				if V = null then
+					-- TODO: set various error info
+					raise Syntax_Error;
+				else
+					Chain_Frame_Intermediate (Interp, Interp.Stack, V);
+					Set_Frame_Opcode (Interp.Stack, Opcode_Read_List_End);
+				end if;
+	
 		end case;
 
 	end Read_List_Cdr;
@@ -775,7 +769,7 @@ Ada.Text_IO.Put_Line ("ERROR: CDR QUOT LIST END");
 		case Interp.Token.Kind is
 			when Right_Parenthesis_Token =>
 				V := Get_Frame_Intermediate(Interp.Stack);
-				pragma Assert (V /= Nil_Pointer);
+				pragma Assert (Is_Cons(V));
 				-- The first item in the chain is actually Cdr of the last cell.
 				V := Reverse_Cons(Get_Cdr(V), Get_Car(V)); 
 				Pop_Frame (Interp); 
@@ -792,8 +786,9 @@ Ada.Text_IO.Put_Line ("Right parenthesis expected");
 		V: Object_Pointer;
 	begin
 		V := Get_Frame_Intermediate(Interp.Stack);
-		Pop_Frame (Interp);
-		Set_Frame_Result (Interp.Stack, Get_Car(V));
+		pragma Assert (Is_Cons(V));
+		pragma Assert (Get_Cdr(V) = Nil_Pointer); -- only 1 item as it's used for the top-level list only
+		Return_Frame (Interp, Get_Car(V));
 	end Close_List;
 
 	procedure Close_Quote_In_List is
@@ -814,8 +809,7 @@ Ada.Text_IO.Put_Line ("Right parenthesis expected");
 		V := Get_Frame_Result(Interp.Stack);
 		V := Make_Cons(Interp.Self, V, Nil_Pointer);
 		V := Make_Cons(Interp.Self, Interp.Symbol.Quote, V);
-		Pop_Frame (Interp);
-		Set_Frame_Result (Interp.Stack, V);
+		Return_Frame (Interp, V);
 	end Close_Quote;
 
 	procedure Read_Object is
@@ -837,46 +831,24 @@ Ada.Text_IO.Put_Line ("INFO: NO MORE TOKEN ");
 				Set_Frame_Opcode (Interp.Stack, Opcode_Close_Quote);
 				Push_Frame (Interp, Opcode_Read_Object, Nil_Pointer);
 
-			when Integer_Token =>
-				-- TODO: bignum
-				V := String_To_Integer_Pointer(Interp.Token.Value.Ptr.all(1..Interp.Token.Value.Last));
-				Pop_Frame (Interp); -- Done with the current frame
-				Set_Frame_Result (Interp.Stack, V);
-
-			when Character_Token =>
-				pragma Assert (Interp.Token.Value.Last = 1);
-				V := Character_To_Pointer(Interp.Token.Value.Ptr.all(1));
-				Pop_Frame (Interp); -- Done with the current frame
-				Set_Frame_Result (Interp.Stack, V);
-
-			when String_Token =>
-				V := Make_String (Interp.Self, Interp.Token.Value.Ptr.all(1..Interp.Token.Value.Last));
-				Pop_Frame (Interp); -- Done with the current frame
-				Set_Frame_Result (Interp.Stack, V);
-
-			when Identifier_Token =>	
-				V := Make_Symbol (Interp.Self, Interp.Token.Value.Ptr.all(1..Interp.Token.Value.Last));
-				Pop_Frame (Interp); -- Done with the current frame
-				Set_Frame_Result (Interp.Stack, V);
-
-			when True_Token =>	
-				Pop_Frame (Interp); -- Done with the current frame
-				Set_Frame_Result (Interp.Stack, True_Pointer);
-
-			when False_Token =>	
-				Pop_Frame (Interp); -- Done with the current frame
-				Set_Frame_Result (Interp.Stack, False_Pointer);
-
 			when others =>
-				-- TODO: set various error info
+				V := Token_To_Pointer (Interp.Self, Interp.Token);
+				if V = null then
+					-- TODO: set various error info
 Ada.Text_IO.Put_Line ("INFO: UNKNOWN TOKEN " & Token_Kind'Image(Interp.Token.Kind));
-				raise Syntax_Error;
+					raise Syntax_Error;
+				else
+					Return_Frame (Interp, V);
+				end if;
 		end case;
 
 	end Read_Object;
 
+	-- --------------------------------------------------------------------
+
 begin
 	
+	-- TODO: This comment is out-dated. Update it with Intermediate.
 	-- Stack frames looks like this upon initialization
 	-- 
 	--               | Opcode                 | Operand    | Result
@@ -940,7 +912,7 @@ begin
 	pragma Assert (Interp.Stack /= Nil_Pointer);
 
 	-- The caller must ensure there are no temporary object pointers.
-	pragma Assert (Interp.Top.Last < Interp.Top.Data'First);
+	--pragma Assert (Interp.Top.Last < Interp.Top.Data'First);
 
 	loop
 ada.text_io.put_line (Opcode_Type'Image(Get_Frame_Opcode(Interp.Stack)));
@@ -982,6 +954,8 @@ ada.text_io.put_line (Opcode_Type'Image(Get_Frame_Opcode(Interp.Stack)));
 
 			when Opcode_Procedure_Call =>
 				Do_Procedure_Call;
+			when Opcode_Procedure_Call_Finish =>
+				Do_Procedure_Call_Finish;
 
 			when Opcode_Set_Finish =>
 				Do_Set_Finish; -- Assignment

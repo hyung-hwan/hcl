@@ -130,5 +130,4 @@ package body Token is
 		Append_Buffer (Interp, Interp.Token.Value, Tmp);
 	end Append_Character;
 
-
 end Token;

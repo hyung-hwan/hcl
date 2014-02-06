@@ -109,6 +109,7 @@ package body H2.Scheme is
 		Opcode_Let_Evaluation,
 		Opcode_Let_Finish,
 		Opcode_Procedure_Call,
+		Opcode_Procedure_Call_Finish,
 		Opcode_Set_Finish,
 	
 		Opcode_Apply,
@@ -412,6 +413,35 @@ package body H2.Scheme is
 	begin
 		 return Integer_To_Pointer(Opcode_Type'Pos(Opcode));
 	end Opcode_To_Pointer;
+
+	function Token_To_Pointer (Interp: access Interpreter_Record; 
+	                           Token:  in     Token_Record) return Object_Pointer is
+	begin
+		case Token.Kind is
+			when Integer_Token =>
+				-- TODO: bignum
+				return String_To_Integer_Pointer(Token.Value.Ptr.all(1..Token.Value.Last));
+
+			when Character_Token =>
+				pragma Assert (Token.Value.Last = 1);
+				return Character_To_Pointer(Token.Value.Ptr.all(1));
+		
+			when String_Token =>
+				return Make_String (Interp, Token.Value.Ptr.all(1..Token.Value.Last));
+
+			when Identifier_Token =>	
+				return Make_Symbol (Interp, Token.Value.Ptr.all(1..Token.Value.Last));
+
+			when True_Token =>
+				return True_Pointer;
+
+			when False_Token =>
+				return False_Pointer;
+
+			when others =>
+				return null;
+		end case;
+	end Token_To_Pointer;
 
 	-----------------------------------------------------------------------------
 	-- MEMORY MANAGEMENT
@@ -724,6 +754,7 @@ ada.text_io.put_line ("HEAP SOURCE IS NIL");
 
 	begin
 
+Ada.Text_IO.Put_LINE ("GC RUNNING");
 --declare
 --Avail: Heap_Size;
 --begin
@@ -1143,21 +1174,20 @@ Ada.Text_IO.Put_Line ("Make_String...");
 	-----------------------------------------------------------------------------
 
 	function Make_Frame (Interp:  access Interpreter_Record;
-	                     Stack:   in     Object_Pointer; -- current stack pointer
+	                     Parent:   in     Object_Pointer; -- current stack pointer
 	                     Opcode:  in     Object_Pointer;
 	                     Operand: in     Object_Pointer;
 	                     Envir:   in     Object_Pointer;
 	                     Interm:  in     Object_Pointer) return Object_Pointer is
 		Frame: Object_Pointer;
-		Aliased_Stack: aliased Object_Pointer := Stack;
+		Aliased_Parent: aliased Object_Pointer := Parent;
 		Aliased_Opcode: aliased Object_Pointer := Opcode;
 		Aliased_Operand: aliased Object_Pointer := Operand;
 		Aliased_Envir: aliased Object_Pointer := Envir;
 		Aliased_Interm: aliased Object_Pointer := Interm;
 
 	begin
-
-		Push_Top (Interp.all, Aliased_Stack'Unchecked_Access);
+		Push_Top (Interp.all, Aliased_Parent'Unchecked_Access);
 		Push_Top (Interp.all, Aliased_Opcode'Unchecked_Access);
 		Push_Top (Interp.all, Aliased_Operand'Unchecked_Access);
 		Push_Top (Interp.all, Aliased_Envir'Unchecked_Access);
@@ -1167,12 +1197,11 @@ Ada.Text_IO.Put_Line ("Make_String...");
 --       Since it's used for stack, it can be made special.
 		Frame := Allocate_Pointer_Object (Interp, Frame_Object_Size, Nil_Pointer);
 		Frame.Tag := Frame_Object;
-		Frame.Pointer_Slot(Frame_Parent_Index) := Aliased_Stack;
+		Frame.Pointer_Slot(Frame_Parent_Index) := Aliased_Parent;
 		Frame.Pointer_Slot(Frame_Opcode_Index) := Aliased_Opcode;
 		Frame.Pointer_Slot(Frame_Operand_Index) := Aliased_Operand;
 		Frame.Pointer_Slot(Frame_Environment_Index) := Aliased_Envir;
 		Frame.Pointer_Slot(Frame_Intermediate_Index) := Aliased_Interm;
---Print_Object_Pointer ("Make_Frame Result - ", Result);
 
 		Pop_Tops (Interp.all, 5);
 		return Frame;
@@ -1244,15 +1273,6 @@ Ada.Text_IO.Put_Line ("Make_String...");
 		Frame.Pointer_Slot(Frame_Result_Index) := Value;
 	end Set_Frame_Result;
 
-	procedure Put_Frame_Result (Interp: in out Interpreter_Record;
-	                              Frame:  in     Object_Pointer; -- TODO: remove this parameter
-	                              Value:  in     Object_Pointer) is
-		pragma Inline (Put_Frame_Result);
-		pragma Assert (Is_Frame(Frame));
-	begin
-		Interp.Stack.Pointer_Slot(Frame_Result_Index) := Value;
-	end Put_Frame_Result;
-
 	procedure Clear_Frame_Result (Frame: in Object_Pointer) is
 	begin
 		Frame.Pointer_Slot(Frame_Result_Index) := Nil_Pointer;
@@ -1310,14 +1330,23 @@ Ada.Text_IO.Put_Line ("Make_String...");
 		return Frame.Pointer_Slot(Frame_Parent_Index);
 	end Get_Frame_Parent;
 
+	procedure Set_Frame_Parent (Frame: in Object_Pointer;
+	                            Value: in Object_Pointer) is
+		pragma Inline (Set_Frame_Parent);
+		pragma Assert (Is_Frame(Frame));
+	begin
+		Frame.Pointer_Slot(Frame_Parent_Index) := Value;
+	end Set_Frame_Parent;
+
 	procedure Switch_Frame (Frame:   in Object_Pointer;
 	                        Opcode:  in Opcode_Type;
-	                        Operand: in Object_Pointer) is
+	                        Operand: in Object_Pointer;
+	                        Interm:  in Object_Pointer) is
 	begin
 		Set_Frame_Opcode (Frame, Opcode);	
 		Set_Frame_Operand (Frame, Operand);	
+		Set_Frame_Intermediate (Frame, Interm);
 		Set_Frame_Result (Frame, Nil_Pointer);
-		--Set_Frame_Intermediate (Frame, Nil_Pointer);
 	end Switch_Frame;
 
 	-----------------------------------------------------------------------------
@@ -2023,9 +2052,11 @@ Ada.Text_IO.Put_Line ("Make_String...");
 	begin
 
 if DEBUG_GC then
-ADA.TEXT_IO.PUT_LINE ("XXXXXXXXXXXXXXXXXXXXXXXXX NO PROINTING XXXXXXXXXXXXXXXXXXXXXXXxxx");
+Print_Object (Source); -- use a recursive version 
+Ada.Text_IO.New_Line;
 return;
 end if;
+
 		-- TODO: Let Make_Frame use a dedicated stack space that's apart from the heap.
 		--       This way, the stack frame doesn't have to be managed by GC.
 
@@ -2038,69 +2069,68 @@ end if;
 
 		loop
 			case Opcode is
-			when 1 =>
-				if Is_Cons(Operand) then
-					-- push cdr
-					Stack := Make_Frame (Interp.Self, Stack, Integer_To_Pointer(2), Get_Cdr(Operand), Nil_Pointer, Nil_Pointer); -- push cdr
-					Ada.Text_IO.Put ("(");
-					Operand := Get_Car(Operand);
-					Opcode := 1;
-				else
-					Print_Atom (Operand);
-					if Stack = Nil_Pointer then 
-						Opcode := 0; -- stack empty. arrange to exit
-						Operand := True_Pointer; -- return value
+				when 1 =>
+					if Is_Cons(Operand) then
+						-- push cdr
+						Stack := Make_Frame (Interp.Self, Stack, Integer_To_Pointer(2), Get_Cdr(Operand), Nil_Pointer, Nil_Pointer); -- push cdr
+						Ada.Text_IO.Put ("(");
+						Operand := Get_Car(Operand);
+						Opcode := 1;
 					else
-						Opcode := Pointer_To_Integer(Stack.Pointer_Slot(Frame_Opcode_Index));
-						Operand := Stack.Pointer_Slot(Frame_Operand_Index);
-						Stack := Stack.Pointer_Slot(Frame_Parent_Index); -- pop
-					end if;
-				end if;
-
-			when 2 =>
-
-				if Is_Cons(Operand) then
-					-- push cdr
-					Stack := Make_Frame (Interp.Self, Stack, Integer_To_Pointer(2), Get_Cdr(Operand), Nil_Pointer, Nil_Pointer); -- push
-					Ada.Text_IO.Put (" ");
-					Operand := Get_Car(Operand); -- car
-					Opcode := 1;
-				else
-					if Operand /= Nil_Pointer then
-						-- cdr of the last cons cell is not null.
-						Ada.Text_IO.Put (" . ");
 						Print_Atom (Operand);
+						if Stack = Nil_Pointer then 
+							Opcode := 0; -- stack empty. arrange to exit
+							Operand := True_Pointer; -- return value
+						else
+							Opcode := Pointer_To_Integer(Stack.Pointer_Slot(Frame_Opcode_Index));
+							Operand := Stack.Pointer_Slot(Frame_Operand_Index);
+							Stack := Stack.Pointer_Slot(Frame_Parent_Index); -- pop
+						end if;
 					end if;
-					Ada.Text_IO.Put (")");
-
-					if Stack = Nil_Pointer then
-						Opcode := 0; -- stack empty. arrange to exit
+	
+				when 2 =>
+	
+					if Is_Cons(Operand) then
+						-- push cdr
+						Stack := Make_Frame (Interp.Self, Stack, Integer_To_Pointer(2), Get_Cdr(Operand), Nil_Pointer, Nil_Pointer); -- push
+						Ada.Text_IO.Put (" ");
+						Operand := Get_Car(Operand); -- car
+						Opcode := 1;
 					else
-						Opcode := Pointer_To_Integer(Stack.Pointer_Slot(Frame_Opcode_Index));
-						Operand := Stack.Pointer_Slot(Frame_Operand_Index);
-						Stack := Stack.Pointer_Slot(Frame_Parent_Index); -- pop 
+						if Operand /= Nil_Pointer then
+							-- cdr of the last cons cell is not null.
+							Ada.Text_IO.Put (" . ");
+							Print_Atom (Operand);
+						end if;
+						Ada.Text_IO.Put (")");
+	
+						if Stack = Nil_Pointer then
+							Opcode := 0; -- stack empty. arrange to exit
+						else
+							Opcode := Pointer_To_Integer(Stack.Pointer_Slot(Frame_Opcode_Index));
+							Operand := Stack.Pointer_Slot(Frame_Operand_Index);
+							Stack := Stack.Pointer_Slot(Frame_Parent_Index); -- pop 
+						end if;
 					end if;
-				end if;
-
-			when others =>
-				exit;
+	
+				when others =>
+					exit;
 			end case;
 		end loop;
 
-		--Print_Object (Source);
 		Ada.Text_IO.New_Line;
 	end Print;
 
-	procedure Insert_Frame (Interp:  in out Interpreter_Record;
-	                        Parent:  in out Object_Pointer;
-	                        Opcode:  in     Opcode_Type; 
-	                        Operand: in     Object_Pointer;
-	                        Envir:   in     Object_Pointer;
-	                        Interm:  in     Object_Pointer) is
+	function Insert_Frame (Interp:  access Interpreter_Record;
+	                       Parent:  in     Object_Pointer;
+	                       Opcode:  in     Opcode_Type; 
+	                       Operand: in     Object_Pointer;
+	                       Envir:   in     Object_Pointer;
+	                       Interm:  in     Object_Pointer) return Object_Pointer is
 		pragma Inline (Insert_Frame);
 		pragma Assert (Parent = Nil_Pointer or else Is_Frame(Parent));
 	begin
-		Parent := Make_Frame(Interp.Self, Parent, Opcode_To_Pointer(Opcode), Operand, Envir, Interm);
+		return Make_Frame(Interp, Parent, Opcode_To_Pointer(Opcode), Operand, Envir, Interm);
 	end Insert_Frame;
 
 	procedure Push_Frame (Interp:  in out Interpreter_Record;
@@ -2108,9 +2138,7 @@ end if;
 	                      Operand: in     Object_Pointer) is
 		pragma Inline (Push_Frame);
 	begin
-		--Interp.Stack := Make_Frame(Interp.Self, Interp.Stack, Opcode_To_Pointer(Opcode),
-		--                           Operand, Get_Frame_Environment(Interp.Stack));
-		Insert_Frame (Interp, Interp.Stack, Opcode, Operand, Get_Frame_Environment(Interp.Stack), Nil_Pointer);
+		Interp.Stack :=Insert_Frame(Interp.Self, Interp.Stack, Opcode, Operand, Get_Frame_Environment(Interp.Stack), Nil_Pointer);
 	end Push_Frame;
 
 	procedure Push_Frame_With_Environment (Interp:  in out Interpreter_Record;
@@ -2119,10 +2147,18 @@ end if;
 	                                       Envir:   in     Object_Pointer) is
 		pragma Inline (Push_Frame_With_Environment);
 	begin
-		--Interp.Stack := Make_Frame(Interp.Self, Interp.Stack, Opcode_To_Pointer(Opcode),
-		--                           Operand, Envir);
-		Insert_Frame (Interp, Interp.Stack, Opcode, Operand, Envir, Nil_Pointer);
+		Interp.Stack := Insert_Frame(Interp.Self, Interp.Stack, Opcode, Operand, Envir, Nil_Pointer);
 	end Push_Frame_With_Environment;
+
+	procedure Push_Frame_With_Intermediate (Interp:  in out Interpreter_Record;
+	                                        Opcode:  in     Opcode_Type; 
+	                                        Operand: in     Object_Pointer;
+	                                        Interm:  in     Object_Pointer) is
+		pragma Inline (Push_Frame_With_Intermediate);
+	begin
+		-- Place a new frame below the existing top frame.
+		Interp.Stack := Insert_Frame (Interp.Self, Interp.Stack, Opcode, Operand, Get_Frame_Environment(Interp.Stack), Interm);
+	end Push_Frame_With_Intermediate;
 
 	procedure Push_Subframe (Interp:  in out Interpreter_Record;
 	                         Opcode:  in     Opcode_Type; 
@@ -2130,8 +2166,7 @@ end if;
 		pragma Inline (Push_Subframe);
 	begin
 		-- Place a new frame below the existing top frame.
-		Insert_Frame (Interp, Interp.Stack.Pointer_Slot(Frame_Parent_Index),
-		              Opcode, Operand, Get_Frame_Environment(Interp.Stack), Nil_Pointer);
+		Set_Frame_Parent (Interp.Stack, Insert_Frame(Interp.Self, Get_Frame_Parent(Interp.Stack), Opcode, Operand, Get_Frame_Environment(Interp.Stack), Nil_Pointer));
 	end Push_Subframe;
 
 	procedure Push_Subframe_With_Environment (Interp:  in out Interpreter_Record;
@@ -2141,8 +2176,7 @@ end if;
 		pragma Inline (Push_Subframe_With_Environment);
 	begin
 		-- Place a new frame below the existing top frame.
-		Insert_Frame (Interp, Interp.Stack.Pointer_Slot(Frame_Parent_Index),
-		              Opcode, Operand, Envir, Nil_Pointer);
+		Set_Frame_Parent (Interp.Stack, Insert_Frame(Interp.Self, Get_Frame_Parent(Interp.Stack), Opcode, Operand, Envir, Nil_Pointer));
 	end Push_Subframe_With_Environment;
 
 	procedure Push_Subframe_With_Intermediate (Interp:  in out Interpreter_Record;
@@ -2152,8 +2186,7 @@ end if;
 		pragma Inline (Push_Subframe_With_Intermediate);
 	begin
 		-- Place a new frame below the existing top frame.
-		Insert_Frame (Interp, Interp.Stack.Pointer_Slot(Frame_Parent_Index),
-		              Opcode, Operand, Get_Frame_Environment(Interp.Stack), Interm);
+		Set_Frame_Parent (Interp.Stack, Insert_Frame(Interp.Self, Get_Frame_Parent(Interp.Stack), Opcode, Operand, Get_Frame_Environment(Interp.Stack), Interm));
 	end Push_Subframe_With_Intermediate;
 
 	procedure Pop_Frame (Interp: in out Interpreter_Record) is
@@ -2163,6 +2196,16 @@ end if;
 		pragma Assert (Interp.Stack /= Nil_Pointer);
 		Interp.Stack := Interp.Stack.Pointer_Slot(Frame_Parent_Index); -- pop 
 	end Pop_Frame;
+
+	procedure Return_Frame (Interp: in out Interpreter_Record;
+	                        Value:  in     Object_Pointer) is
+		pragma Inline (Return_Frame);
+	begin
+		-- Remove the current frame and return a value 
+		-- to a new active(top) frame.
+		Pop_Frame (Interp);
+		Set_Frame_Result (Interp.Stack, Value);
+	end Return_Frame;
 
 	procedure Execute (Interp: in out Interpreter_Record) is separate;
 
@@ -2193,10 +2236,11 @@ end if;
 	procedure Run_Loop (Interp: in out Interpreter_Record;
 	                    Result: out    Object_Pointer) is
 		-- standard read-eval-print loop
+		Aliased_Result: aliased Object_Pointer;
 	begin
 		pragma Assert (Interp.Base_Input.Stream /= null);
 
---DEBUG_GC := Standard.True;
+DEBUG_GC := Standard.True;
 
 		Result := Nil_Pointer;
 
@@ -2206,6 +2250,7 @@ end if;
 		Interp.Stack := Interp.Root_Frame;
 		Clear_Frame_Result (Interp.Stack);
 
+		Push_Top (Interp, Aliased_Result'Unchecked_Access);
 		loop
 			pragma Assert (Interp.Stack = Interp.Root_Frame);
 			pragma Assert (Get_Frame_Result(Interp.Stack) = Nil_Pointer);
@@ -2218,19 +2263,27 @@ end if;
 			pragma Assert (Interp.Stack = Interp.Root_Frame);
 			pragma Assert (Get_Frame_Opcode(Interp.Stack) = Opcode_Exit);
 
-			-- TODO: this result must be kept at some where that GC dowsn't sweep.
-			Result := Get_Frame_Result(Interp.Stack); 
+			Aliased_Result := Get_Frame_Result(Interp.Stack); 
 			Clear_Frame_Result (Interp.Stack);
 
-Ada.Text_IO.Put ("RESULT>>>>>");
-Print (Interp, Result);
+Ada.Text_IO.Put ("RESULT: ");
+Print (Interp, Aliased_Result);
 Ada.Text_IO.Put_Line (">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> LOOP ITERATION XXXXXX CHECKPOINT"); 
 		end loop;
+
+		-- Jump into the exception handler not to repeat the same code here.
+		-- In fact, this part must not be reached since the loop above can't
+		-- be broken.
+		raise Stream_End_Error;
 
 	exception
 		when Stream_End_Error =>
 			-- this is not a real error. this indicates the end of input stream.
 			Ada.Text_IO.Put_LINE ("=== BYE ===");
+			Pop_Tops (Interp, 1);
+			if Aliased_Result /= null then
+				Result := Aliased_Result;
+			end if;
 
 		when X: others =>
 			Ada.TEXT_IO.PUT_LINE ("ERROR ERROR ERROR -> " & Ada.Exceptions.Exception_Name(X));

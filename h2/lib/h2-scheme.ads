@@ -431,6 +431,15 @@ package H2.Scheme is
 	procedure Run_Loop (Interp: in out Interpreter_Record;
 	                    Result: out    Object_Pointer);
 
+
+	procedure Collect_Garbage (Interp: in out Interpreter_Record);
+
+     function Make_String (Interp: access  Interpreter_Record;
+                           Source: in      Object_Character_Array) return Object_Pointer;
+
+     function Make_Symbol (Interp: access  Interpreter_Record;
+                           Source: in      Object_Character_Array) return Object_Pointer;
+
 	-- -----------------------------------------------------------------------------
 
 
@@ -534,6 +543,7 @@ private
 		procedure Append_Character (Interp: in out Interpreter_Record;
 		                            Value:  in     Object_Character);
 		pragma Inline (Append_Character);
+
 	end Token;
 
 

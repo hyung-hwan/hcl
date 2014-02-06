@@ -24,8 +24,7 @@ procedure Evaluate is
 		Operand := Cdr;  -- Skip "And"
 		if Operand = Nil_Pointer then
 			-- (and)
-			Pop_Frame (Interp); 
-			Put_Frame_Result (Interp, Interp.Stack, V);
+			Return_Frame (Interp, V);
 		elsif not Is_Cons(Operand) or else Get_Last_Cdr(Operand) /= Nil_Pointer then
 			-- (and . 10)
 			-- (and 1 2 . 10)
@@ -213,13 +212,8 @@ Ada.Text_IO.Put_Line ("NO ALTERNATE");
 			raise Syntax_Error;
 		end if;
 
-		declare
-			Closure: Object_Pointer;
-		begin
-			Closure := Make_Closure(Interp.Self, Operand, Get_Frame_Environment(Interp.Stack));
-			Pop_Frame (Interp);  -- Done
-			Put_Frame_Result (Interp, Interp.Stack, Closure);
-		end;
+		-- Create a closure object and return it the the upper frame.
+		Return_Frame (Interp, Make_Closure(Interp.Self, Operand, Get_Frame_Environment(Interp.Stack)));
 	end Evaluate_Lambda_Syntax;
 
 	procedure Check_Let_Syntax is
@@ -418,8 +412,7 @@ Ada.Text_IO.Put_Line ("NO ALTERNATE");
 			Ada.Text_IO.Put_LINE ("WRONG NUMBER OF ARGUMENTS FOR QUOTE");
 			raise Syntax_Error;
 		end if;
-		Pop_Frame (Interp);	 -- Done
-		Put_Frame_Result (Interp, Interp.Stack, Get_Car(Operand));
+		Return_Frame (Interp, Get_Car(Operand));
 	end Evaluate_Quote_Syntax;
 
 	procedure Evaluate_Set_Syntax is
@@ -448,12 +441,12 @@ Ada.Text_IO.Put_Line ("NO ALTERNATE");
 			Cdr := Get_Car(Cdr); -- <expression>
 
 			-- Arrange to finish setting a variable after <expression> evaluation.
-			--Switch_Frame (Interp.Stack, Opcode_Set_Finish, Car);
+			--Switch_Frame (Interp.Stack, Opcode_Set_Finish, Car, Nil_Pointer);
 			-- Arrange to evalaute the value part
 			--Push_Frame (Interp, Opcode_Evaluate_Object, Cdr); 
 
 			-- These 2 lines derives the same result as the 2 lines commented out above.
-			Switch_Frame (Interp.Stack, Opcode_Evaluate_Object, Cdr);
+			Switch_Frame (Interp.Stack, Opcode_Evaluate_Object, Cdr, Nil_Pointer);
 			Push_Subframe (Interp, Opcode_Set_Finish, Car); 
 		else
 			Ada.Text_IO.Put_LINE ("INVALID SYMBOL AFTER SET!");
@@ -518,16 +511,15 @@ end;
 
 						if Operand = Nil_Pointer then
 							-- (begin)
-							Pop_Frame (Interp);	
 							-- Return nil to the upper frame for (begin).
-							Put_Frame_Result (Interp, Interp.Stack, Nil_Pointer);
+							Return_Frame (Interp, Nil_Pointer);
 						else
 							if Get_Last_Cdr(Operand) /= Nil_Pointer then
 								Ada.Text_IO.Put_LINE ("FUCKNING CDR FOR BEGIN");
 								raise Syntax_Error;
 							end if;
 
-							Switch_Frame (Interp.Stack, Opcode_Grouped_Call, Operand);
+							Switch_Frame (Interp.Stack, Opcode_Grouped_Call, Operand, Nil_Pointer);
 						end if;
 
 						--if (Interp.Trait.Trait_Bits and No_Optimization) = 0 then
@@ -580,7 +572,7 @@ end;
 				end if;
 
 				-- Switch the current frame to evaluate <operator>
-				Switch_Frame (Interp.Stack, Opcode_Evaluate_Object, Car);
+				Switch_Frame (Interp.Stack, Opcode_Evaluate_Object, Car, Nil_Pointer);
 
 				-- Push a new frame to evaluate arguments.
 				Push_Subframe (Interp, Opcode_Procedure_Call, Cdr);
@@ -593,7 +585,6 @@ end;
 	goto Done;
 
 <<Literal>>
-	Pop_Frame (Interp); -- done
 declare
 w: object_word;
 for w'address use operand'address;
@@ -601,7 +592,7 @@ begin
 Ada.Text_IO.Put ("Return => (" & object_word'image(w) & ") =>" );
 Print (Interp, Operand);
 end;
-	Put_Frame_Result (Interp, Interp.Stack, Operand);
+	Return_Frame (Interp, Operand);
 	goto Done;
 
 <<Done>>
