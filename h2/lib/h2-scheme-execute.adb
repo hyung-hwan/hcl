@@ -911,11 +911,8 @@ begin
 	-- The caller must push some frames before calling this procedure
 	pragma Assert (Interp.Stack /= Nil_Pointer);
 
-	-- The caller must ensure there are no temporary object pointers.
-	--pragma Assert (Interp.Top.Last < Interp.Top.Data'First);
-
 	loop
-ada.text_io.put_line (Opcode_Type'Image(Get_Frame_Opcode(Interp.Stack)));
+--ada.text_io.put_line (Opcode_Type'Image(Get_Frame_Opcode(Interp.Stack)));
 		case Get_Frame_Opcode(Interp.Stack) is
 			when Opcode_Exit =>
 				exit;

@@ -754,7 +754,6 @@ ada.text_io.put_line ("HEAP SOURCE IS NIL");
 
 	begin
 
-Ada.Text_IO.Put_LINE ("GC RUNNING");
 --declare
 --Avail: Heap_Size;
 --begin

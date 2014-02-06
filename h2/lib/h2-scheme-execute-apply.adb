@@ -4,7 +4,6 @@ separate (H2.Scheme.Execute)
 procedure Apply is
 	--pragma Inline (Apply);
 
-	Operand: aliased Object_Pointer;
 	Func: aliased Object_Pointer;
 	Args: aliased Object_Pointer;
 
@@ -394,16 +393,7 @@ Ada.Text_IO.Put_line ("TOO FEW ARGUMETNS FOR COMPARISON");
 
 		Push_Top (Interp, C'Unchecked_Access); -- this is not needed. TOOD: remove this
 		C := Make_Continuation (Interp.Self, Get_Frame_Parent(Interp.Stack));
-declare
-p: object_Pointer := get_frame_parent(interp.stack);
-w: object_word;
-for w'address use p'address;
-begin
-ada.text_io.put_line ("making continuatination to " & object_word'image(w) & " opcode " & opcode_type'image(get_frame_opcode(p)));
-print (interp, get_Frame_operand(p));
-print (interp, get_Frame_intermediate(p));
-ada.text_io.put_line ("-----------------");
-end;
+
 		Set_Frame_Opcode (Interp.Stack, Opcode_Apply);
 		Set_Frame_Operand (Interp.Stack, Get_Car(Args)); -- (call/cc xxx), xxx becomes this.
 		Set_Frame_Intermediate (Interp.Stack, Nil_Pointer); -- pass the continuation object
@@ -415,19 +405,19 @@ end;
 
 	procedure Apply_Continuation is
 	begin
-declare
-w: object_word;
-for w'address use func'address;
-f: object_word;
-for f'address use interp.stack'address;
-begin
-ada.text_io.put_line ("Frame" & object_word'image(f) & " " & Opcode_Type'Image(Get_Frame_Opcode(Interp.Stack)));
-ada.text_io.put ("                      POPPING ...  APPLY CONTINUATION -->> ");
-ada.text_io.put (object_word'image(w) & " ");
-end;
-Print (Interp, Args);
-ada.text_io.put ("                      CURRENT FREME RESULT " );
-Print (Interp, get_Frame_result(interp.stack));
+--declare
+--w: object_word;
+--for w'address use func'address;
+--f: object_word;
+--for f'address use interp.stack'address;
+--begin
+--ada.text_io.put_line ("Frame" & object_word'image(f) & " " & Opcode_Type'Image(Get_Frame_Opcode(Interp.Stack)));
+--ada.text_io.put ("                      POPPING ...  APPLY CONTINUATION -->> ");
+--ada.text_io.put (object_word'image(w) & " ");
+--end;
+--Print (Interp, Args);
+--ada.text_io.put ("                      CURRENT FREME RESULT " );
+--Print (Interp, get_Frame_result(interp.stack));
 		if not Is_Cons(Args) or else Get_Cdr(Args) /= Nil_Pointer then
 			Ada.Text_IO.Put_Line ("WRONG NUMBER OF ARGUMETNS FOR CONTINUATION"); 
 			raise Syntax_Error;
@@ -436,54 +426,52 @@ Print (Interp, get_Frame_result(interp.stack));
           -- Restore the frame to the remembered one
 		Interp.Stack := Get_Continuation_Frame(Func);
 	
-declare
-f: object_word;
-for f'address use interp.stack'address;
-begin
-ada.text_io.put_line ("                      SWITCHED STACK TO FREME " & object_word'image(f) );
-ada.text_io.put ("                      CURRENT RESULT " );
-print (interp, get_Frame_result(interp.stack));
-ada.text_io.put ("                      CURRENT OPERAND " );
-print (interp, get_Frame_operand(interp.stack));
-ada.text_io.put ("                      CURRENT INTERMEDIATE " );
-print (interp, get_Frame_intermediate(interp.stack));
-ada.text_io.put_line ("                      CURRENT OPCODE " & opcode_type'image(get_Frame_opcode(interp.stack)));
-end;
+--declare
+--f: object_word;
+--for f'address use interp.stack'address;
+--begin
+--ada.text_io.put_line ("                      SWITCHED STACK TO FREME " & object_word'image(f) );
+--ada.text_io.put ("                      CURRENT RESULT " );
+--print (interp, get_Frame_result(interp.stack));
+--ada.text_io.put ("                      CURRENT OPERAND " );
+--print (interp, get_Frame_operand(interp.stack));
+--ada.text_io.put ("                      CURRENT INTERMEDIATE " );
+--print (interp, get_Frame_intermediate(interp.stack));
+--ada.text_io.put_line ("                      CURRENT OPCODE " & opcode_type'image(get_Frame_opcode(interp.stack)));
+--end;
 
 		Set_Frame_Result (Interp.Stack, Get_Car(Args)); 
 
-ada.text_io.put ("                      FINAL RESULT ");
-print (interp, get_Frame_result(interp.stack));
+--ada.text_io.put ("                      FINAL RESULT ");
+--print (interp, get_Frame_result(interp.stack));
 
 	end Apply_Continuation;
 
 begin
-	Push_Top (Interp, Operand'Unchecked_Access);
 	Push_Top (Interp, Func'Unchecked_Access);
 	Push_Top (Interp, Args'Unchecked_Access);
 
-	Operand := Get_Frame_Operand(Interp.Stack);
---	pragma Assert (Is_Cons(Operand));
-
-declare
-w: object_word;
-for w'address use interp.stack'address;
-begin
-ada.text_io.put_line ("Frame" & object_word'image(w) & " " & Opcode_Type'Image(Get_Frame_Opcode(Interp.Stack)));
-ada.text_io.put ("                      OPERAND TO APPLY => ");
-print (Interp, Operand);
-ada.text_io.put ("                      CURRENT RESULT => ");
-print (Interp, get_frame_result(interp.stack));
-end;
---	Func := Get_Car(Operand);
-Func := Get_Frame_Operand(Interp.Stack);
+	Func := Get_Frame_Operand(Interp.Stack);
 	if not Is_Normal_Pointer(Func) then
 		Ada.Text_IO.Put_Line ("INVALID FUNCTION TYPE");
 		raise Evaluation_Error;
 	end if;
 
---	Args := Get_Cdr(Operand);
-Args := Get_Frame_Intermediate(Interp.Stack);
+	Args := Get_Frame_Intermediate(Interp.Stack);
+
+--declare
+--w: object_word;
+--for w'address use interp.stack'address;
+--begin
+--ada.text_io.put_line ("Frame" & object_word'image(w) & " " & Opcode_Type'Image(Get_Frame_Opcode(Interp.Stack)));
+--ada.text_io.put ("                      FUNCTION => ");
+--print (Interp, Func);
+--ada.text_io.put ("                      ARGUMENTS => ");
+--print (Interp, Args);
+--ada.text_io.put ("                      CURRENT RESULT => ");
+--print (Interp, get_frame_result(interp.stack));
+--end;
+
 
 	case Func.Tag is
 		when Procedure_Object => 
@@ -539,5 +527,5 @@ Args := Get_Frame_Intermediate(Interp.Stack);
 
 	end case;
 
-	Pop_Tops (Interp, 3);
+	Pop_Tops (Interp, 2);
 end Apply;
