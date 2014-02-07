@@ -27,6 +27,7 @@ procedure Execute (Interp: in out Interpreter_Record) is
 	procedure Evaluate_Up_To  is
 		X: Object_Pointer;
 		Y: Object_Pointer;
+		Opcode: Opcode_Type;
 	begin	
 		X := Get_Frame_Operand(Interp.Stack);
 		Y := Get_Frame_Result(Interp.Stack);
@@ -38,9 +39,12 @@ procedure Execute (Interp: in out Interpreter_Record) is
 		if Y /= V and then Is_Cons(X) then
 			-- The result is not what I look for.
 			-- Yet there are still more tests to evaluate.
-			Set_Frame_Operand (Interp.Stack, Get_Cdr(X));
-			Clear_Frame_Result (Interp.Stack);
-			Push_Frame (Interp, Opcode_Evaluate_Object, Get_Car(X));
+			--Switch_Frame (Interp.Stack, Get_Frame_Opcode(Interp.Stack), Get_Cdr(X), Nil_Pointer);
+			--Push_Frame (Interp, Opcode_Evaluate_Object, Get_Car(X));
+
+			Opcode := Get_Frame_Opcode(Interp.Stack);
+			Switch_Frame (Interp.Stack, Opcode_Evaluate_Object, Get_Car(X), Nil_Pointer);
+			Push_SubFrame (Interp, Opcode, Get_Cdr(X));
 		else
 			-- Return the result of the last expression evaluated.
 			Return_Frame (Interp, Y);
@@ -48,11 +52,11 @@ procedure Execute (Interp: in out Interpreter_Record) is
 	end Evaluate_Up_To;
 
 	procedure Finish_And_Syntax is new Evaluate_Up_To(False_Pointer);
-	procedure Finish_Or_Syntax is new Evaluate_Up_To(True_Pointer);
+	procedure Finish_Or_Syntax is new Evaluate_Up_To(True_Pointer); -----> this is wrong, it shoudl be able to specify "/= False_Pointer".
 	-- ----------------------------------------------------------------
 
-	procedure Finish_Define_Symbol is
-		pragma Inline (Finish_Define_Symbol);
+	procedure Do_Define_Finish is
+		pragma Inline (Do_Define_Finish);
 		X: Object_Pointer;
 		Y: aliased Object_Pointer;
 	begin
@@ -63,21 +67,18 @@ procedure Execute (Interp: in out Interpreter_Record) is
 		pragma Assert (Is_Symbol(X));
 
 		Y := Get_Frame_Result(Interp.Stack);  -- value list
-
 		Put_Environment (Interp, X, Y);  -- gc point
-
 		Return_Frame (Interp, Y); -- Y is referenced here.
 		Pop_Tops (Interp, 1); -- Unmanage Y
-	end Finish_Define_Symbol;
+	end Do_Define_Finish;
 
-	procedure Finish_If_Syntax is
-		pragma Inline (Finish_If_Syntax);
-		X: aliased Object_Pointer;
-		Y: aliased Object_Pointer;
+	-- ----------------------------------------------------------------
+
+	procedure Do_If_Finish is
+		pragma Inline (Do_If_Finish);
+		X: Object_Pointer;
+		Y: Object_Pointer;
 	begin
-		Push_Top (Interp, X'Unchecked_Access);
-		Push_Top (Interp, Y'Unchecked_Access);
-
 		X := Get_Frame_Operand(Interp.Stack); -- cons cell containing <consequent>
 		pragma Assert (Is_Cons(X)); 
 
@@ -87,26 +88,37 @@ procedure Execute (Interp: in out Interpreter_Record) is
 			-- <test> evaluated to #f.
 			X := Get_Cdr(X); -- cons cell containing <alternate>
 			if Is_Cons(X) then
-				-- Switch the current current to evaluate <alternate>
-				-- Keep the environment untouched.
-				Set_Frame_Opcode (Interp.Stack, Opcode_Evaluate_Object);
-				Set_Frame_Operand (Interp.Stack, Get_Car(X));
-				Clear_Frame_Result (Interp.Stack);
+				-- Switch the current current to evaluate <alternate> 
+				-- keeping the environment untouched. Use Pop_Frame and 
+				-- Push_Frame instead of Switch_Frame for continuation.
+				-- If continuation has been created in <test>, continuation
+				-- can be made to this frame. 
+				--
+				-- For example,
+				--   (if (define xx (call/cc call/cc)) 
+				--       (+ 10 20) (* 1 2 3 4))
+				--   (xx 99)
+				-- When (xx 99) is evaluated, continuation is made to
+				-- this frame. For this frame to evaluate <consequent> or 
+				-- <alternate>, its opcode must remain as Opcode_If_Finish.
+
+				--Switch_Frame (Interp.Stack, Opcode_Evaluate_Object, Get_Car(X), Nil_Pointer);
+				Pop_Frame (Interp);
+				Push_Frame (Interp, Opcode_Evaluate_Object, Get_Car(X));
 			else
 				-- Return nil if no <alternate> is specified
 				Return_Frame (Interp, Nil_Pointer);
 			end if;
 		else
-			-- All values except #f are true values. evaluate <consequent>
-			-- Switch the current current to evaluate <consequent>
-			-- Keep the environment untouched.
-			Set_Frame_Opcode (Interp.Stack, Opcode_Evaluate_Object);
-			Set_Frame_Operand (Interp.Stack, Get_Car(X));
-			Clear_Frame_Result (Interp.Stack);
+			-- All values except #f are true values. evaluate <consequent>.
+			-- Switch the current current to evaluate <consequent> keeping
+			-- the environment untouched. Use Pop_Frame and Push_Frame
+			-- instead of Switch_Frame for continuation to work.
+			--Switch_Frame (Interp.Stack, Opcode_Evaluate_Object, Get_Car(X), Nil_Pointer);
+			Pop_Frame (Interp);
+			Push_Frame (Interp, Opcode_Evaluate_Object, Get_Car(X));
 		end if;
-
-		Pop_Tops (Interp, 2);
-	end Finish_If_Syntax;
+	end Do_If_Finish;
 
 	-- ----------------------------------------------------------------
 
@@ -165,7 +177,6 @@ procedure Execute (Interp: in out Interpreter_Record) is
 		R := Make_Cons(Interp.Self, Get_Frame_Result(Interp.Stack), Nil_Pointer);
 		X := Get_Frame_Operand(Interp.Stack);
 
-		pragma Assert (Is_Continuation(X)); -- this procedure can be called for continuation only.
 		Pop_Frame (Interp);
 		Push_Frame_With_Intermediate (Interp, Opcode_Apply, X, R);
 
@@ -912,7 +923,7 @@ begin
 	pragma Assert (Interp.Stack /= Nil_Pointer);
 
 	loop
---ada.text_io.put_line (Opcode_Type'Image(Get_Frame_Opcode(Interp.Stack)));
+ada.text_io.put_line (Opcode_Type'Image(Get_Frame_Opcode(Interp.Stack)));
 		case Get_Frame_Opcode(Interp.Stack) is
 			when Opcode_Exit =>
 				exit;
@@ -929,15 +940,12 @@ begin
 			--when Opcode_Finish_Case_Syntax => 
 			--when Opcode_Finish_Cond_Syntax => 
 
-			when Opcode_Finish_Define_Symbol =>
-				Finish_Define_Symbol;
-
-			when Opcode_Finish_If_Syntax =>
-				Finish_If_Syntax; -- Conditional
-
+			when Opcode_Define_Finish =>
+				Do_Define_Finish;
 			when Opcode_Grouped_Call =>
 				Do_Grouped_Call;
-
+			when Opcode_If_Finish =>
+				Do_If_Finish; -- Conditional
 			when Opcode_Let_Binding =>
 				Do_Let_Binding; 
 			when Opcode_Letast_Binding =>

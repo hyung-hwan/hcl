@@ -31,12 +31,10 @@ procedure Evaluate is
 			Ada.Text_IO.Put_LINE ("FUCKING cDR FOR DEFINE");
 			raise Syntax_Error;	
 		else
-			Set_Frame_Opcode (Interp.Stack, Opcode);
-			Set_Frame_Operand (Interp.Stack, Get_Cdr(Operand)); -- <test2> onwards
-			Clear_Frame_Result (Interp.Stack);
-
-			-- arrange to evaluate <test1>
-			Push_Frame (Interp, Opcode_Evaluate_Object, Get_Car(Operand)); 
+			--Switch_Frame (Interp.Stack, Opcode, Get_Cdr(Operand), Nil_Pointer); -- <test2> onwards
+			--Push_Frame (Interp, Opcode_Evaluate_Object, Get_Car(Operand)); -- <test1>
+			Switch_Frame (Interp.Stack, Opcode_Evaluate_Object, Get_Car(Operand), Nil_Pointer); -- <test2> onwards
+			Push_Subframe (Interp, Opcode, Get_Cdr(Operand)); -- <test1> onwards
 		end if;
 	end Generic_And_Or_Syntax;
 
@@ -64,7 +62,8 @@ procedure Evaluate is
 		Cdr := Get_Cdr(Operand);
 		if Is_Cons(Car) then
 			-- define a function:  (define (add x y) ...) 
-			null;
+ada.text_io.put_line ("NOT IMPLEMENTED YET");
+raise Syntax_Error;
 		elsif Is_Symbol(Car) then
 			-- define a symbol: (define x ...)
 			if Get_Cdr(Cdr) /= Nil_Pointer then
@@ -73,13 +72,12 @@ procedure Evaluate is
 			end if;
 			Cdr := Get_Car(Cdr); -- Value
 
-			-- Arrange to finish defining after value evaluation.
-			Set_Frame_Opcode (Interp.Stack, Opcode_Finish_Define_Symbol);
-			Set_Frame_Operand (Interp.Stack, Car); 
-			Clear_Frame_Result (Interp.Stack);
-
-			-- Arrange to evalaute the value part
-			Push_Frame (Interp, Opcode_Evaluate_Object, Cdr); 
+			-- Arrange to finish defining after value evaluation 
+			-- and to evaluate the value part.
+			--Switch_Frame (Interp.Stack, Opccode_Define_Finish, Car);
+			--Push_Frame (Interp, Opcode_Evaluate_Object, Cdr); 
+			Switch_Frame (Interp.Stack, Opcode_Evaluate_Object, Cdr, Nil_Pointer);
+			Push_Subframe (Interp, Opcode_Define_Finish, Car);
 		else
 			Ada.Text_IO.Put_LINE ("NO SYMBOL NOR ARGUMENT LIST AFTER DEFINE");
 			raise Syntax_Error;	
@@ -128,14 +126,13 @@ Ada.Text_IO.Put_Line ("NO ALTERNATE");
 			raise Syntax_Error;
 		end if;
 
-		-- Switch the current frame to execute action after <test> evaluation.
-		Set_Frame_Opcode (Interp.Stack, Opcode_Finish_If_Syntax);
-		Set_Frame_Operand (Interp.Stack, Operand); 
-		Clear_Frame_Result (Interp.Stack);
-
-		-- Arrange to evalaute the conditional
-		Push_Frame (Interp, Opcode_Evaluate_Object, Car); 
-
+		-- Arrange to evaluate <consequent> or <alternate> after <test> 
+		-- evaluation and to evaluate <test>. Use Switch_Frame/Push_Subframe
+		-- instead of Switch_Frame/Push_Frame for continuation to work.
+		--Switch_Frame (Interp.Stack, Opcode_If_Finish, Operand, Nil_Pointer); 
+		--Push_Frame (Interp, Opcode_Evaluate_Object, Car); 
+		Switch_Frame (Interp.Stack, Opcode_Evaluate_Object, Car, Nil_Pointer);
+		Push_Subframe (Interp, Opcode_If_Finish, Operand);
 	end Evaluate_If_Syntax;
 
 	procedure Evaluate_Lambda_Syntax is
@@ -573,7 +570,6 @@ end;
 
 				-- Switch the current frame to evaluate <operator>
 				Switch_Frame (Interp.Stack, Opcode_Evaluate_Object, Car, Nil_Pointer);
-
 				-- Push a new frame to evaluate arguments.
 				Push_Subframe (Interp, Opcode_Procedure_Call, Cdr);
 			end if;

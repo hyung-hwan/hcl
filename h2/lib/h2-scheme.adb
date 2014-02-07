@@ -98,11 +98,11 @@ package body H2.Scheme is
 		Opcode_Evaluate_Result,
 		Opcode_Evaluate_Object,
 		Opcode_Finish_And_Syntax,
-		Opcode_Finish_Define_Symbol,
-		Opcode_Finish_If_Syntax,
 		Opcode_Finish_Or_Syntax,
 	
+		Opcode_Define_Finish,
 		Opcode_Grouped_Call,  -- (begin ...), closure apply, let body
+		Opcode_If_Finish,
 		Opcode_Let_Binding,
 		Opcode_Letast_Binding,
 		Opcode_Letast_Binding_Finish,
