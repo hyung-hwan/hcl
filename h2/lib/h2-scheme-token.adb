@@ -108,6 +108,15 @@ package body Token is
 	begin
 		Interp.Token.Kind := Kind;	
 		Clear_Buffer (Interp.Token.Value);
+		if Interp.Token.Value.Ptr = null then
+			declare
+				Tmp: Object_Character_Array(1..1);
+			begin
+				-- Ensure that the buffer is allocated if Set has been
+				-- called at least once.
+				Append_Buffer (Interp, Interp.Token.Value, Tmp(1..0)); 
+			end;
+		end if;
 	end Set;
 
 	procedure Set (Interp: in out Interpreter_Record;
@@ -127,17 +136,13 @@ package body Token is
 	begin
 		Interp.Token.Kind := Kind;	
 		Clear_Buffer (Interp.Token.Value);
-		if Value'Length > 0 then
-			Append_Buffer (Interp, Interp.Token.Value, Value);
-		end if;
+		Append_Buffer (Interp, Interp.Token.Value, Value);
 	end Set;
 
 	procedure Append_String (Interp: in out Interpreter_Record;
 	                         Value:  in     Object_Character_Array) is
 	begin
-		if Value'Length > 0 then
-			Append_Buffer (Interp, Interp.Token.Value, Value);	
-		end if;
+		Append_Buffer (Interp, Interp.Token.Value, Value);	
 	end Append_String;
 
 	procedure Append_Character (Interp: in out Interpreter_Record;

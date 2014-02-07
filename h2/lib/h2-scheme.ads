@@ -230,7 +230,7 @@ package H2.Scheme is
 				Pointer_Slot: Object_Pointer_Array(1 .. Size) := (others => null);
 			when Character_Object =>
 				Character_Slot: Object_Character_Array(1 .. Size) := (others => Object_Character'First);
-				Character_Terminator: Object_Character := Object_Character'First; -- TODO: can this guarantee termining NULL? require some attribute for it to work?
+				Character_Terminator: Object_Character := Object_Character'First; -- TODO: can this guarantee terminating NULL? require some attribute for it to work?
 			when Byte_Object =>
 				Byte_Slot: Object_Byte_Array(1 .. Size) := (others => 0);
 			when Word_Object =>

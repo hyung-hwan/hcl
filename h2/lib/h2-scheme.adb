@@ -500,6 +500,10 @@ package body H2.Scheme is
 			-- Guarantee the minimum object size to be greater than or 
 			-- equal to the size of a moved object for GC to work.
 			Real_Bytes := Moved_Object_Record'Max_Size_In_Storage_Elements;	
+
+			-- Note: Extra attention must be paid when calculating the 
+			-- actual bytes allocated for an object. Scan_New_Heap() also 
+			-- makes similar adjustment to skip actual allocated bytes.
 		end if;
 
 		Avail := Heap.Size - Heap.Bound;
@@ -567,7 +571,8 @@ ada.text_io.put_line ("HEAP SOURCE IS NIL");
 	procedure Copy_Object_With_Size (Source: in Object_Pointer;
 	                                 Target: in Heap_Element_Pointer;
 	                                 Bytes:  in Heap_Size) is
-		--pragma Inline (Copy_Object_With_Size);
+		pragma Inline (Copy_Object_With_Size);
+		pragma Assert (Bytes > 0);
 		-- This procedure uses a more crude type for copying objects.
 		-- It's the result of an effort to work around some compiler
 		-- issues mentioned above.
@@ -639,6 +644,13 @@ ada.text_io.put_line ("HEAP SOURCE IS NIL");
 					-- allocate more objects than in the old heap.
 					pragma Assert (Ptr /= null);
 
+					-- This minimum size adjustment is not needed when copying
+					-- an object as it's ok to have garbage in the trailing space.
+					-- See Allocate_Bytes_In_Heap() and Scan_New_Heap() for more info.
+					--if Bytes < Moved_Object_Record'Max_Size_In_Storage_Elements then
+					--	Bytes := Moved_Object_Record'Max_Size_In_Storage_Elements;	
+					--end  if;
+
 					-- Copy the payload to the new object
 					--Copy_Object (Object, Ptr); -- not reliable with some compilers
 					Copy_Object_With_Size (Source, Ptr, Bytes); -- use this instead
@@ -684,6 +696,11 @@ ada.text_io.put_line ("HEAP SOURCE IS NIL");
 				begin
 					--Bytes := Target_Object_Record'Max_Size_In_Storage_Elements;
 					Bytes := Object.all'Size / System.Storage_Unit;
+					if Bytes < Moved_Object_Record'Max_Size_In_Storage_Elements then
+						-- Allocate_Bytes_In_Heap() guarantee the minimum object size.
+						-- The size must be guaranteed here when scanning a heap.
+						Bytes := Moved_Object_Record'Max_Size_In_Storage_Elements;	
+					end if;
 
 					if Object.Kind = Pointer_Object then
 --Ada.Text_IO.Put_Line (">>> Scanning Obj " & Object_Kind'Image(Object.Kind) & " Size: " & Object_Size'Image(Object.Size) & " At " & Object_Word'Image(Pointer_To_Word(Object)) & " Bytes " & Heap_Size'Image(Bytes));
@@ -1806,6 +1823,7 @@ Ada.Text_IO.Put_Line ("Make_String...");
 		Interp.Base_Input.Stream := null;
 		Interp.Input := Interp.Base_Input'Unchecked_Access;
 		Interp.Token := (End_Token, (null, 0, 0));
+
 		Interp.Top := (Interp.Top.Data'First - 1, (others => null));
 
 -- TODO: disallow garbage collecion during initialization.
