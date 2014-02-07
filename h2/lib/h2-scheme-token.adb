@@ -24,9 +24,16 @@ package body Token is
 
 				package Pool is new H2.Pool (New_String, New_String_Pointer, Interp.Storage_Pool);
 
-				Tmp: New_String_Pointer;
-				for Tmp'Address use Buffer.Ptr'Address;
-				pragma Import (Ada, Tmp);
+				-- Pointer overlay doesn't work well in gnat-3.15p
+				-- The pointer is initialized to null despite pragma Import.
+				--Tmp: New_String_Pointer;
+				--for Tmp'Address use Buffer.Ptr'Address;
+				--pragma Import (Ada, Tmp);
+
+				-- So let me use unchecked conversion instead.
+				function Conv1 is new Ada.Unchecked_Conversion (Thin_Object_Character_Array_Pointer, New_String_Pointer);	
+				Tmp: New_String_Pointer := Conv1(Buffer.Ptr);
+
 			begin
 				Pool.Deallocate (Tmp);
 			end;
@@ -58,16 +65,26 @@ package body Token is
 				package Pool is new H2.Pool (New_String, New_String_Pointer, Interp.Storage_Pool);
 
 				T1: New_String_Pointer;
-				T2: New_String_Pointer;
-				for T2'Address use Buffer.Ptr'Address;
-				pragma Import (Ada, T2);
+
+				-- Pointer overlay doesn't work well in gnat-3.15p
+				-- The pointer is initialized to null despite pragma Import.
+				--T2: New_String_Pointer;
+				--for T2'Address use Buffer.Ptr'Address;
+				--pragma Import (Ada, T2);
+
+				-- So let me use unchecked conversion instead.
+				function Conv1 is new Ada.Unchecked_Conversion (Thin_Object_Character_Array_Pointer, New_String_Pointer);	
+				function Conv2 is new Ada.Unchecked_Conversion (New_String_Pointer, Thin_Object_Character_Array_Pointer);
+				T2: New_String_Pointer := Conv1(Buffer.Ptr);
 			begin
 				T1 := Pool.Allocate;
 				if Buffer.Last > 0 then
-					T1(1 .. Buffer.Last) := Buffer.Ptr(1 .. Buffer.Last);
+					T1(1 .. Buffer.Last) := T2(1 .. Buffer.Last);
 				end if;
 				Pool.Deallocate (T2);
-				T2 := T1;
+
+				--T2 := T1; -- uncomment this line if using overlay.
+				Buffer.Ptr := Conv2(T1); -- uncomment this line if using unchecked conversion.
 			end;
 
 			Buffer.Len := Buffer.Len + Incr;

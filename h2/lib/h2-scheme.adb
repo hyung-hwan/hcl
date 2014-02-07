@@ -308,37 +308,6 @@ package body H2.Scheme is
 		return Object_Byte(Word / (2 ** Object_Pointer_Type_Bits));
 	end Pointer_To_Byte;
 
--- TODO: move away these utilities routines
-	--function To_Thin_Object_String_Pointer (Source: in Object_Pointer) return Thin_Object_String_Pointer is
-	--	type Character_Pointer is access all Object_Character;
-	--	Ptr: Thin_Object_String_Pointer;
-		
-	--	X: Character_Pointer;
-	--	for X'Address use Ptr'Address;
-	--	pragma Import (Ada, X);
-	--begin
-		-- this method requires Object_Character_Array to have aliased Object_Character.
-		-- So i've commented out this function and turn to a different method below.
-	--	X := Source.Character_Slot(Source.Character_Slot'First)'Access; 
-	--	return Ptr;
-	--end To_Thin_Object_String_Pointer;	
-
-	--function To_Thin_Object_String_Pointer (Source: in Object_Pointer) return Thin_Object_String_Pointer is
-	--	function To_Thin_Pointer is new Ada.Unchecked_Conversion (System.Address, Thin_Object_String_Pointer);
-	--begin
-	--	return To_Thin_Pointer(Source.Character_Slot'Address);
-	--end To_Thin_Object_String_Pointer;	
-
-	--function To_Thin_Object_String_Pointer (Source: in Object_Pointer) return Thin_Object_String_Pointer is
-	--	X: aliased Thin_Object_String;
-	--	for X'Address use Source.Character_Slot'Address;
-	--begin
-	--	return X'Unchecked_Access;
-	--end To_Thin_Object_String_Pointer;	
-
-	--procedure Put_String (TS: in Thin_Object_String_Pointer);
-	--pragma Import (C, Put_String, "puts");
-
 	-- TODO: delete this procedure 
 	procedure Print_Object_Pointer (Msg: in Standard.String; Source: in Object_Pointer) is
 		W: Object_Word;
@@ -595,22 +564,32 @@ ada.text_io.put_line ("HEAP SOURCE IS NIL");
 		pragma Assert (Source.all'Size = Target_Object.all'Size);
 	end Copy_Object;
 
-	procedure Copy_Object_With_Size (Source: in     Object_Pointer;
-	                                 Target: in out Heap_Element_Pointer;
-	                                 Bytes:  in     Heap_Size) is
-		pragma Inline (Copy_Object_With_Size);
+	procedure Copy_Object_With_Size (Source: in Object_Pointer;
+	                                 Target: in Heap_Element_Pointer;
+	                                 Bytes:  in Heap_Size) is
+		--pragma Inline (Copy_Object_With_Size);
 		-- This procedure uses a more crude type for copying objects.
 		-- It's the result of an effort to work around some compiler
 		-- issues mentioned above.
-		Tgt: Thin_Heap_Element_Array_Pointer;
-		for Tgt'Address use Target'Address;
-		pragma Import (Ada, Tgt);
 
-		Src: Thin_Heap_Element_Array_Pointer;
-		for Src'Address use Source'Address;
-		pragma Import (Ada, Src);
+
+		-- The work around, however, still didn't work well with gnat-3.15p.
+		-- The overlaying(thus overlaid)  pointer is initialized to null
+		-- despite pragma Import.
+		--Tgt: Thin_Heap_Element_Array_Pointer;
+		--for Tgt'Address use Target'Address;
+		--pragma Import (Ada, Tgt);
+		--Src: Thin_Heap_Element_Array_Pointer;
+		--for Src'Address use Source'Address;
+		--pragma Import (Ada, Src);
+
+		-- So let me turn to unchecked conversion instead.
+		function Conv1 is new Ada.Unchecked_Conversion (Object_Pointer, Thin_Heap_Element_Array_Pointer);
+		function Conv2 is new Ada.Unchecked_Conversion (Heap_Element_Pointer, Thin_Heap_Element_Array_Pointer);
+		Src: Thin_Heap_Element_Array_Pointer := Conv1(Source);
+		Tgt: Thin_Heap_Element_Array_Pointer := Conv2(Target);
 	begin
-		Tgt(Tgt'First .. Tgt'First + Bytes) := Src(Src'First .. Src'First + Bytes);
+		Tgt(Tgt'First .. Tgt'First + Bytes - 1) := Src(Src'First .. Src'First + Bytes - 1);
 	end Copy_Object_With_Size;
 
 	procedure Collect_Garbage (Interp: in out Interpreter_Record) is
@@ -690,9 +669,15 @@ ada.text_io.put_line ("HEAP SOURCE IS NIL");
 				Ptr := Interp.Heap(New_Heap).Space(Position)'Unchecked_Access;
 
 				declare
-					Object: Object_Pointer;
-					for Object'Address use Ptr'Address;
-					pragma Import (Ada, Object); -- not really needed
+					-- There is a overlaid pointer initialization problem despite 
+					-- "pragma Import()" in gnat-3.15p.
+					--Object: Object_Pointer;
+					--for Object'Address use Ptr'Address;
+					--pragma Import (Ada, Object); 
+
+					-- So let me turn to unchecked conversion.
+					function Conv1 is new Ada.Unchecked_Conversion (Heap_Element_Pointer, Object_Pointer);
+					Object: Object_Pointer := Conv1(Ptr);
 
 					--subtype Target_Object_Record is Object_Record (Object.Kind, Object.Size);
 					Bytes: Heap_Size;
@@ -754,6 +739,7 @@ ada.text_io.put_line ("HEAP SOURCE IS NIL");
 
 	begin
 
+ada.text_io.put_line ("[GC BEGIN]");
 --declare
 --Avail: Heap_Size;
 --begin
@@ -835,6 +821,7 @@ ada.text_io.put_line ("HEAP SOURCE IS NIL");
 --Ada.Text_IO.Put_Line (">>> [GC DONE] BOUND: " & Heap_Size'Image(Interp.Heap(Interp.Current_Heap).Bound) & " AVAIL: " & Heap_Size'Image(Avail));
 --Ada.Text_IO.Put_Line (">>> [GC DONE] ----------------------------------------------------------");
 --end;
+ada.text_io.put_line ("[GC END]");
 	end Collect_Garbage;
 
 	function Allocate_Bytes (Interp: access Interpreter_Record;
@@ -2137,7 +2124,7 @@ end if;
 	                      Operand: in     Object_Pointer) is
 		pragma Inline (Push_Frame);
 	begin
-		Interp.Stack :=Insert_Frame(Interp.Self, Interp.Stack, Opcode, Operand, Get_Frame_Environment(Interp.Stack), Nil_Pointer);
+		Interp.Stack := Insert_Frame(Interp.Self, Interp.Stack, Opcode, Operand, Get_Frame_Environment(Interp.Stack), Nil_Pointer);
 	end Push_Frame;
 
 	procedure Push_Frame_With_Environment (Interp:  in out Interpreter_Record;
