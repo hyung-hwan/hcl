@@ -97,9 +97,9 @@ package body H2.Scheme is
 		Opcode_Exit,
 		Opcode_Evaluate_Result,
 		Opcode_Evaluate_Object,
-		Opcode_Finish_And_Syntax,
-		Opcode_Finish_Or_Syntax,
 	
+		Opcode_And_Finish,
+		Opcode_Or_Finish,
 		Opcode_Define_Finish,
 		Opcode_Grouped_Call,  -- (begin ...), closure apply, let body
 		Opcode_If_Finish,

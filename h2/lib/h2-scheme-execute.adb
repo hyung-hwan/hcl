@@ -21,10 +21,10 @@ procedure Execute (Interp: in out Interpreter_Record) is
 
 	-- ----------------------------------------------------------------
 	generic
-		V: Object_Pointer;
-	procedure Evaluate_Up_To;
+		with function Is_Bool (X: in Object_Pointer) return Standard.Boolean;
+	procedure Evaluate_While;
 
-	procedure Evaluate_Up_To  is
+	procedure Evaluate_While  is
 		X: Object_Pointer;
 		Y: Object_Pointer;
 		Opcode: Opcode_Type;
@@ -36,7 +36,7 @@ procedure Execute (Interp: in out Interpreter_Record) is
 		-- evaluate <test1>. Y must be valid even at the first time 
 		-- this procedure is called.
 
-		if Y /= V and then Is_Cons(X) then
+		if Is_Bool(Y) and then Is_Cons(X) then
 			-- The result is not what I look for.
 			-- Yet there are still more tests to evaluate.
 			--Switch_Frame (Interp.Stack, Get_Frame_Opcode(Interp.Stack), Get_Cdr(X), Nil_Pointer);
@@ -49,10 +49,22 @@ procedure Execute (Interp: in out Interpreter_Record) is
 			-- Return the result of the last expression evaluated.
 			Return_Frame (Interp, Y);
 		end if;
-	end Evaluate_Up_To;
+	end Evaluate_While;
 
-	procedure Finish_And_Syntax is new Evaluate_Up_To(False_Pointer);
-	procedure Finish_Or_Syntax is new Evaluate_Up_To(True_Pointer); -----> this is wrong, it shoudl be able to specify "/= False_Pointer".
+	function Is_False (X: in Object_Pointer) return Standard.Boolean is
+		pragma Inline (Is_False);
+	begin
+		return X = False_Pointer;
+	end Is_False;
+
+	function Is_True (X: in Object_Pointer) return Standard.Boolean is
+		pragma Inline (Is_True);
+	begin
+		return X /= False_Pointer;
+	end Is_True;
+
+	procedure Do_And_Finish is new Evaluate_While(Is_True);
+	procedure Do_Or_Finish is new Evaluate_While(Is_False);
 	-- ----------------------------------------------------------------
 
 	procedure Do_Define_Finish is
@@ -934,39 +946,48 @@ ada.text_io.put_line (Opcode_Type'Image(Get_Frame_Opcode(Interp.Stack)));
 			when Opcode_Evaluate_Object =>
 				Evaluate;
 
-			when Opcode_Finish_And_Syntax => 
-				Finish_And_Syntax; -- Conditional
+			when Opcode_And_Finish => 
+				Do_And_Finish;
 
 			--when Opcode_Finish_Case_Syntax => 
 			--when Opcode_Finish_Cond_Syntax => 
 
 			when Opcode_Define_Finish =>
 				Do_Define_Finish;
+
 			when Opcode_Grouped_Call =>
 				Do_Grouped_Call;
+
 			when Opcode_If_Finish =>
 				Do_If_Finish; -- Conditional
+
 			when Opcode_Let_Binding =>
 				Do_Let_Binding; 
+
 			when Opcode_Letast_Binding =>
 				Do_Letast_Binding; 
+
 			when Opcode_Letast_Binding_Finish =>
 				Do_Letast_Binding_Finish; 
+
 			when Opcode_Let_Evaluation =>
 				Do_Let_Evaluation;
+
 			when Opcode_Let_Finish =>
 				Do_Let_Finish; 
 
+			when Opcode_Or_Finish => 
+				Do_Or_Finish;
+
 			when Opcode_Procedure_Call =>
 				Do_Procedure_Call;
+
 			when Opcode_Procedure_Call_Finish =>
 				Do_Procedure_Call_Finish;
 
 			when Opcode_Set_Finish =>
 				Do_Set_Finish; -- Assignment
 
-			when Opcode_Finish_Or_Syntax => 
-				Finish_Or_Syntax; -- Conditional
 
 			when Opcode_Apply =>
 				Apply;

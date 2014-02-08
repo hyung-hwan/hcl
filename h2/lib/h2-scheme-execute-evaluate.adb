@@ -8,8 +8,8 @@ procedure Evaluate is
 	Cdr: aliased Object_Pointer;
 
 	generic
-		V: Object_Pointer;
-		Opcode: Opcode_Type;
+		Result: Object_Pointer; -- Result to return if no <test> expressions exist.
+		Opcode: Opcode_Type; -- Switch to this opcode to evaluate the next <test>.
 	procedure Generic_And_Or_Syntax;
 
 	procedure Generic_And_Or_Syntax is
@@ -17,14 +17,14 @@ procedure Evaluate is
 		-- (and <test1> <test2> ...)
 		--   (and (= 2 2) (> 2 1))                  ==>  #t
 		--   (and (= 2 2) (< 2 1))                  ==>  #f
-		--   (and (= 2 2) (< 2 1) (= 3 3))                  ==>  #f
+		--   (and (= 2 2) (< 2 1) (= 3 3))          ==>  #f
 		--   (and 1 2 'c '(f g))                    ==>  (f g)
 		--   (and)                                  ==>  #t
 
 		Operand := Cdr;  -- Skip "And"
 		if Operand = Nil_Pointer then
 			-- (and)
-			Return_Frame (Interp, V);
+			Return_Frame (Interp, Result);
 		elsif not Is_Cons(Operand) or else Get_Last_Cdr(Operand) /= Nil_Pointer then
 			-- (and . 10)
 			-- (and 1 2 . 10)
@@ -38,8 +38,8 @@ procedure Evaluate is
 		end if;
 	end Generic_And_Or_Syntax;
 
-	procedure Evaluate_And_Syntax is new Generic_And_Or_Syntax(True_Pointer, Opcode_Finish_And_Syntax);
-	procedure Evaluate_Or_Syntax is new Generic_And_Or_Syntax(False_Pointer, Opcode_Finish_Or_Syntax);
+	procedure Evaluate_And_Syntax is new Generic_And_Or_Syntax(True_Pointer, Opcode_And_Finish);
+	procedure Evaluate_Or_Syntax is new Generic_And_Or_Syntax(False_Pointer, Opcode_Or_Finish);
 
 	procedure Evaluate_Define_Syntax is
 		pragma Inline (Evaluate_Define_Syntax);
