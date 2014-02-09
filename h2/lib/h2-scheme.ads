@@ -230,7 +230,13 @@ package H2.Scheme is
 				Pointer_Slot: Object_Pointer_Array(1 .. Size) := (others => null);
 			when Character_Object =>
 				Character_Slot: Object_Character_Array(1 .. Size) := (others => Object_Character'First);
-				Character_Terminator: Object_Character := Object_Character'First; -- TODO: can this guarantee terminating NULL? require some attribute for it to work?
+				-- The character terminator is to ease integration with 
+				-- other languages using a terminating null.
+				-- TODO: can this guarantee terminating NULL? is this 
+				--       terminator guaranteed to be placed after the 
+				--       character_slot without any gaps in between 
+				--       under the current alignement condition?
+				Character_Terminator: Object_Character := Object_Character'First; 
 			when Byte_Object =>
 				Byte_Slot: Object_Byte_Array(1 .. Size) := (others => 0);
 			when Word_Object =>

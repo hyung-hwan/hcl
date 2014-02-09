@@ -21,7 +21,7 @@ procedure Execute (Interp: in out Interpreter_Record) is
 
 	-- ----------------------------------------------------------------
 	generic
-		with function Is_Bool (X: in Object_Pointer) return Standard.Boolean;
+		with function Is_Good_Result (X: in Object_Pointer) return Standard.Boolean;
 	procedure Evaluate_While;
 
 	procedure Evaluate_While  is
@@ -36,7 +36,7 @@ procedure Execute (Interp: in out Interpreter_Record) is
 		-- evaluate <test1>. Y must be valid even at the first time 
 		-- this procedure is called.
 
-		if Is_Bool(Y) and then Is_Cons(X) then
+		if Is_Good_Result(Y) and then Is_Cons(X) then
 			-- The result is not what I look for.
 			-- Yet there are still more tests to evaluate.
 			--Switch_Frame (Interp.Stack, Get_Frame_Opcode(Interp.Stack), Get_Cdr(X), Nil_Pointer);
@@ -72,14 +72,14 @@ procedure Execute (Interp: in out Interpreter_Record) is
 		X: Object_Pointer;
 		Y: aliased Object_Pointer;
 	begin
-		-- Keep Y managed as Y is referenced beyond the gc point. 
+		-- Manage Y as it's referenced after the gc point. 
 		Push_Top (Interp, Y'Unchecked_Access); 
 
 		X := Get_Frame_Operand(Interp.Stack); -- symbol
 		pragma Assert (Is_Symbol(X));
 
 		Y := Get_Frame_Result(Interp.Stack);  -- value list
-		Put_Environment (Interp, X, Y);  -- gc point
+		Set_Current_Environment (Interp, X, Y);  -- gc point
 		Return_Frame (Interp, Y); -- Y is referenced here.
 		Pop_Tops (Interp, 1); -- Unmanage Y
 	end Do_Define_Finish;
@@ -101,10 +101,10 @@ procedure Execute (Interp: in out Interpreter_Record) is
 			X := Get_Cdr(X); -- cons cell containing <alternate>
 			if Is_Cons(X) then
 				-- Switch the current current to evaluate <alternate> 
-				-- keeping the environment untouched. Use Pop_Frame and 
-				-- Push_Frame instead of Switch_Frame for continuation.
-				-- If continuation has been created in <test>, continuation
-				-- can be made to this frame. 
+				-- keeping the environment untouched. Use Reload_Frame
+				-- instead of Switch_Frame for continuation. If continuation
+				-- has been created in <test>, continuation can be made to 
+				-- this frame. 
 				--
 				-- For example,
 				--   (if (define xx (call/cc call/cc)) 
@@ -115,8 +115,7 @@ procedure Execute (Interp: in out Interpreter_Record) is
 				-- <alternate>, its opcode must remain as Opcode_If_Finish.
 
 				--Switch_Frame (Interp.Stack, Opcode_Evaluate_Object, Get_Car(X), Nil_Pointer);
-				Pop_Frame (Interp);
-				Push_Frame (Interp, Opcode_Evaluate_Object, Get_Car(X));
+				Reload_Frame (Interp, Opcode_Evaluate_Object, Get_Car(X));
 			else
 				-- Return nil if no <alternate> is specified
 				Return_Frame (Interp, Nil_Pointer);
@@ -124,11 +123,10 @@ procedure Execute (Interp: in out Interpreter_Record) is
 		else
 			-- All values except #f are true values. evaluate <consequent>.
 			-- Switch the current current to evaluate <consequent> keeping
-			-- the environment untouched. Use Pop_Frame and Push_Frame
-			-- instead of Switch_Frame for continuation to work.
+			-- the environment untouched. Use Reload_Frame instead of
+			-- Switch_Frame for continuation to work.
 			--Switch_Frame (Interp.Stack, Opcode_Evaluate_Object, Get_Car(X), Nil_Pointer);
-			Pop_Frame (Interp);
-			Push_Frame (Interp, Opcode_Evaluate_Object, Get_Car(X));
+			Reload_Frame (Interp, Opcode_Evaluate_Object, Get_Car(X));
 		end if;
 	end Do_If_Finish;
 
@@ -189,8 +187,7 @@ procedure Execute (Interp: in out Interpreter_Record) is
 		R := Make_Cons(Interp.Self, Get_Frame_Result(Interp.Stack), Nil_Pointer);
 		X := Get_Frame_Operand(Interp.Stack);
 
-		Pop_Frame (Interp);
-		Push_Frame_With_Intermediate (Interp, Opcode_Apply, X, R);
+		Reload_Frame_With_Intermediate (Interp, Opcode_Apply, X, R);
 
 		--Pop_Tops (Interp, 2);
 	end Do_Procedure_Call_Finish;
@@ -218,95 +215,55 @@ procedure Execute (Interp: in out Interpreter_Record) is
 	end Do_Grouped_Call;
 
 	-- ----------------------------------------------------------------
-
-	procedure Do_Let_Evaluation is
-		pragma Inline (Do_Let_Evaluation);
-		X: aliased Object_Pointer;
-		S: aliased Object_Pointer;
-		R: aliased Object_Pointer;
-	begin	
-		Push_Top (Interp, X'Unchecked_Access);
-		Push_Top (Interp, S'Unchecked_Access);
-		Push_Top (Interp, R'Unchecked_Access);
-
-		X := Get_Frame_Operand(Interp.Stack); 
-		pragma Assert (Is_Array(X));
-
-		R := X.Pointer_Slot(3);
-		if R = Nil_Pointer then
-			-- First call;
-			X.Pointer_Slot(2) := X.Pointer_Slot(1);
-		else
-			-- Subsequent calls. Store the result in the room created 
-			-- in the previous call.
-			pragma Assert (Is_Cons(R));
-			Set_Car (R, Get_Frame_Result(Interp.Stack));
-		end if;
-		S := X.Pointer_Slot(2);
-
-		if Is_Cons(S) then
-			-- Handle each binding.
-
-			-- Make an empty room to hold the result on the next call
-			R := Make_Cons (Interp.Self, Nil_Pointer, R);
-			X.Pointer_Slot(3) := R;
-
-			-- Remember the next <operator> to evaluate
-			X.Pointer_Slot(2) := Get_Cdr(S);
-
-			-- Say, <bindings> is ((x 2) (y 2)).
-			-- for the first call, Get_Car(S) is (x 2).
-			-- To get x, Get_Car(Get_Car(S))
-			-- To get 2, Get_Car(Get_Cdr(Get_Car(S)))
-			Push_Frame (Interp, Opcode_Evaluate_Object, Get_Car(Get_Cdr(Get_Car(S))));
-
-		else
-			-- No more binding to handle.
-			Pop_Frame (Interp);
-
-			-- The operands at the Let_Evaluation and the Let_Binding frame
-			-- must be the identical objects. this way, i don't need to carry
-			-- over the binding result to the Let_Binding frame.
-			pragma Assert (X = Get_Frame_Operand(Interp.Stack));
-			pragma Assert (Get_Frame_Opcode(Interp.Stack) = Opcode_Let_Binding);
-			--X := Get_Frame_Operand(Interp.Stack);
-			--pragma Assert (Is_Array(X));
-			--pragma Assert (X.Pointer_Slot(3) = Nil_Pointer);
-			--X.Pointer_Slot(3) := R;
-		end if;
-
-		Pop_Tops (Interp, 3);
-	end Do_Let_Evaluation;
-
 	procedure Do_Let_Binding is
 		pragma Inline (Do_Let_Binding);
-		X: aliased Object_Pointer;
-		S: aliased Object_Pointer;
-		R: aliased Object_Pointer;
+		O: aliased Object_Pointer;
 	begin
-		Push_Top (Interp, X'Unchecked_Access);
-		Push_Top (Interp, S'Unchecked_Access);
-		Push_Top (Interp, R'Unchecked_Access);
+		-- Perform binding in the parent environment.
+		Set_Parent_Environment (Interp, Get_Frame_Intermediate(Interp.Stack), Get_Frame_Result(Interp.Stack));
 
-		X := Get_Frame_Operand(Interp.Stack); -- <bindings> and onward
-		pragma Assert (Is_Array(X));
+		O := Get_Frame_Operand(Interp.Stack);	
 
-		S := X.Pointer_Slot(1);
-		R := X.Pointer_Slot(3);
-		R := Reverse_Cons(R);
+		-- Say, <bindings> is ((x 2) (y 2)).
+		-- Get_Car(O) is (x 2).
+		-- To get x, Get_Car(Get_Car(O))
+		-- To get 2, Get_Car(Get_Cdr(Get_Car(O)))
+		if Is_Cons(O) then
+			Push_Top (Interp, O'Unchecked_Access);
 
-		while Is_Cons(S) loop
-			pragma Assert (Is_Cons(R));
-			Put_Environment (Interp, Get_Car(Get_Car(S)), Get_Car(R));
-			S := Get_Cdr(S);
-			R := Get_Cdr(R);
-		end loop;
+			Reload_Frame (Interp, Opcode_Evaluate_Object, Get_Car(Get_Cdr(Get_Car(O))));
+			Push_Subframe_With_Intermediate (Interp, Opcode_Let_Binding, Get_Cdr(O), Get_Car(Get_Car(O)));
 
-		Pop_Frame (Interp); -- done. 
-		pragma Assert (Get_Frame_Opcode(Interp.Stack) = Opcode_Let_Finish);
-
-		Pop_Tops (Interp, 3);
+			Pop_Tops (Interp, 1);
+		else
+			Pop_Frame (Interp); -- done. 
+		end if;
 	end Do_Let_Binding;
+
+	procedure Do_Letrec_Binding is
+		pragma Inline (Do_Letrec_Binding);
+		O: aliased Object_Pointer;
+	begin
+		-- Perform binding in the parent environment.
+		Set_Current_Environment (Interp, Get_Frame_Intermediate(Interp.Stack), Get_Frame_Result(Interp.Stack));
+
+		O := Get_Frame_Operand(Interp.Stack);	
+
+		-- Say, <bindings> is ((x 2) (y 2)).
+		-- Get_Car(O) is (x 2).
+		-- To get x, Get_Car(Get_Car(O))
+		-- To get 2, Get_Car(Get_Cdr(Get_Car(O)))
+		if Is_Cons(O) then
+			Push_Top (Interp, O'Unchecked_Access);
+
+			Reload_Frame (Interp, Opcode_Evaluate_Object, Get_Car(Get_Cdr(Get_Car(O))));
+			Push_Subframe_With_Intermediate (Interp, Opcode_Letrec_Binding, Get_Cdr(O), Get_Car(Get_Car(O)));
+
+			Pop_Tops (Interp, 1);
+		else
+			Pop_Frame (Interp);
+		end if;
+	end Do_Letrec_Binding;
 
 	procedure Do_Letast_Binding is
 		pragma Inline (Do_Letast_Binding);
@@ -336,7 +293,7 @@ procedure Execute (Interp: in out Interpreter_Record) is
 		-- Push a new environment for each binding.
 		Envir := Make_Environment(Interp.Self, Get_Frame_Environment(Interp.Stack));
 		Set_Frame_Environment (Interp.Stack, Envir);
-		Put_Environment (Interp, Get_Car(Get_Car(X)), Get_Frame_Result(Interp.Stack));
+		Set_Current_Environment (Interp, Get_Car(Get_Car(X)), Get_Frame_Result(Interp.Stack));
 
 		X := Get_Cdr(X); -- next binding
 		if Is_Cons(X) then
@@ -352,37 +309,28 @@ procedure Execute (Interp: in out Interpreter_Record) is
 			Pop_Frame (Interp); -- Done
 
 			-- Update the environment of the Let_Finish frame.
-			pragma Assert (Get_Frame_Opcode(Interp.Stack) = Opcode_Let_Finish);
+			--pragma Assert (Get_Frame_Opcode(Interp.Stack) = Opcode_Let_Finish);
 			Set_Frame_Environment (Interp.Stack, Envir);
 		end if;
 
 		Pop_Tops (Interp, 2);
 	end Do_Letast_Binding_Finish;
 
-	procedure Do_Let_Finish is
-		pragma Inline (Do_Let_Finish);
-	begin
-		pragma Assert (Get_Frame_Result(Interp.Stack) = Nil_Pointer);
-		-- Evaluate_Let_Syntax has places <body> in the operand of this frame.
-		-- <body> can be evaluated as if it's in 'begin'.
-		--Set_Frame_Opcode (Interp.Stack, Opcode_Evaluate_Group);
-		Set_Frame_Opcode (Interp.Stack, Opcode_Grouped_Call);
-	end Do_Let_Finish;
-
 	-- --------------------------------------------------------------------
 
 	procedure Do_Set_Finish is
 		pragma Inline (Do_Set_Finish);
-		X: aliased Object_Pointer;
+		X: Object_Pointer;
 		Y: aliased Object_Pointer;
 	begin
-		Push_Top (Interp, X'Unchecked_Access);
 		Push_Top (Interp, Y'Unchecked_Access);
 
 		X := Get_Frame_Operand(Interp.Stack); -- symbol
 		Y := Get_Frame_Result(Interp.Stack);  -- value
-ada.text_io.put ("%%%%% FINISH SET SYNTAX => ");
-print (interp, Get_Frame_Result(Interp.Stack));
+ada.text_io.put ("%%%%% FINISH SET SYNTAX => [");
+print (interp, X);
+print (interp, Y);
+ada.text_io.put_line ("]");
 		pragma Assert (Is_Symbol(X));
 
 		if Set_Environment(Interp.Self, X, Y) = null then
@@ -392,7 +340,7 @@ print (interp, Get_Frame_Result(Interp.Stack));
 
 		Return_Frame (Interp, Y);
 
-		Pop_Tops (Interp, 2);
+		Pop_Tops (Interp, 1);
 	end Do_Set_Finish;
 
 	procedure Evaluate is separate;
@@ -970,11 +918,8 @@ ada.text_io.put_line (Opcode_Type'Image(Get_Frame_Opcode(Interp.Stack)));
 			when Opcode_Letast_Binding_Finish =>
 				Do_Letast_Binding_Finish; 
 
-			when Opcode_Let_Evaluation =>
-				Do_Let_Evaluation;
-
-			when Opcode_Let_Finish =>
-				Do_Let_Finish; 
+			when Opcode_Letrec_Binding =>
+				Do_Letrec_Binding; 
 
 			when Opcode_Or_Finish => 
 				Do_Or_Finish;

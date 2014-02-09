@@ -7,6 +7,8 @@ procedure Evaluate is
 	Car: aliased Object_Pointer;
 	Cdr: aliased Object_Pointer;
 
+     -- ----------------------------------------------------------------
+
 	generic
 		Result: Object_Pointer; -- Result to return if no <test> expressions exist.
 		Opcode: Opcode_Type; -- Switch to this opcode to evaluate the next <test>.
@@ -40,6 +42,8 @@ procedure Evaluate is
 
 	procedure Evaluate_And_Syntax is new Generic_And_Or_Syntax(True_Pointer, Opcode_And_Finish);
 	procedure Evaluate_Or_Syntax is new Generic_And_Or_Syntax(False_Pointer, Opcode_Or_Finish);
+
+     -- ----------------------------------------------------------------
 
 	procedure Evaluate_Define_Syntax is
 		pragma Inline (Evaluate_Define_Syntax);
@@ -83,6 +87,8 @@ raise Syntax_Error;
 			raise Syntax_Error;	
 		end if;
 	end Evaluate_Define_Syntax;
+
+     -- ----------------------------------------------------------------
 
 	procedure Evaluate_If_Syntax is
 		pragma Inline (Evaluate_If_Syntax);
@@ -134,6 +140,8 @@ Ada.Text_IO.Put_Line ("NO ALTERNATE");
 		Switch_Frame (Interp.Stack, Opcode_Evaluate_Object, Car, Nil_Pointer);
 		Push_Subframe (Interp, Opcode_If_Finish, Operand);
 	end Evaluate_If_Syntax;
+
+     -- ----------------------------------------------------------------
 
 	procedure Evaluate_Lambda_Syntax is
 		pragma Inline (Evaluate_Lambda_Syntax);
@@ -212,6 +220,8 @@ Ada.Text_IO.Put_Line ("NO ALTERNATE");
 		-- Create a closure object and return it the the upper frame.
 		Return_Frame (Interp, Make_Closure(Interp.Self, Operand, Get_Frame_Environment(Interp.Stack)));
 	end Evaluate_Lambda_Syntax;
+
+     -- ----------------------------------------------------------------
 
 	procedure Check_Let_Syntax is
 		pragma Inline (Check_Let_Syntax);
@@ -297,20 +307,6 @@ Ada.Text_IO.Put_Line ("NO ALTERNATE");
 		pragma Inline (Evaluate_Let_Syntax);
 		Envir: aliased Object_Pointer;
 	begin
-		Check_Let_Syntax;
-		-- Car: <bindings>, Cdr: <body>
-
-		Set_Frame_Opcode (Interp.Stack, Opcode_Let_Finish);
-		Set_Frame_Operand (Interp.Stack, Cdr); 
-		Clear_Frame_Result (Interp.Stack);
-
-		-- Push a new environment onto the current frame.
-		-- It's pushed even if <bindings> is empty because
-		-- the new environment is still needed in such a case
-		-- as shown in the first sample below.
-		Envir := Make_Environment(Interp.Self, Get_Frame_Environment(Interp.Stack));
-		Set_Frame_Environment (Interp.Stack, Envir);
-
 		-- Some let samples:
 		-- #1.
 		--    (define x 99) ; define x in the root environment
@@ -327,22 +323,37 @@ Ada.Text_IO.Put_Line ("NO ALTERNATE");
 		--   (define x (let ((x x)) x))
 		--    
 
+		Check_Let_Syntax;
+		-- Car: <bindings>, Cdr: <body>
+
+		-- Switch the frame to Opcode_Grouped_Call and let its environment
+		-- be the new environment created. Use Reload_Frame() instead
+		-- of Switch_Frame() for continuation. This frame is executed once
+		-- the Opcode_Let_Binding frame pushed in the 'if' block is finished.
+		Reload_Frame (Interp, Opcode_Grouped_Call, Cdr);
+
+		-- Create a new environment over the current environment.
+		Envir := Make_Environment(Interp.Self, Get_Frame_Environment(Interp.Stack));
+		Set_Frame_Environment (Interp.Stack, Envir); -- update the environment
+
 		if Car /= Nil_Pointer then
 			-- <bindings> is not empty
+
 			Push_Top (Interp, Envir'Unchecked_Access);
 			Envir := Get_Frame_Environment(Get_Frame_Parent(Interp.Stack));
 
-			-- Create an array to hold the binding list and the evaluation result
-			Cdr := Make_Array (Interp.Self, 3);
-			Cdr.Pointer_Slot(1) := Car;
+			-- Say, <bindings> is ((x 2) (y 2)).
+			-- Get_Car(Car) is (x 2).
+			-- To get x, Get_Car(Get_Car(Car))
+			-- To get 2, Get_Car(Get_Cdr(Get_Car(Car)))
 
-			-- The actual binding after evaluation must be performed in the 
-			-- new environment.
-			Push_Frame (Interp, Opcode_Let_Binding, Cdr);
+			-- Arrange to evaluate the first <binding> expression in the parent environment.
+			Push_Frame_With_Environment (Interp, Opcode_Evaluate_Object, Get_Car(Get_Cdr(Get_Car(Car))), Envir);
 
-			-- But evaluation must be done in the current environment which is 
-			-- the environment before the environment update above.
-			Push_Frame_With_Environment (Interp, Opcode_Let_Evaluation, Cdr, Envir); 
+			-- Arrange to perform actual binding. Pass the <binding> name as an intermediate 
+			-- and the next remaing <binding> list as an operand.
+			Push_Subframe_With_Environment_And_Intermediate (Interp, Opcode_Let_Binding, Get_Cdr(Car), Envir, Get_Car(Get_Car(Car)));
+
 			Pop_Tops (Interp, 1);
 		end if;
 	end Evaluate_Let_Syntax;
@@ -354,7 +365,7 @@ Ada.Text_IO.Put_Line ("NO ALTERNATE");
 		Check_Let_Syntax;
 		-- Car: <bindings>, Cdr: <body>
 
-		Set_Frame_Opcode (Interp.Stack, Opcode_Let_Finish);
+		Set_Frame_Opcode (Interp.Stack, Opcode_Grouped_Call);
 		Set_Frame_Operand (Interp.Stack, Cdr); 
 		Clear_Frame_Result (Interp.Stack);
 
@@ -376,25 +387,34 @@ Ada.Text_IO.Put_Line ("NO ALTERNATE");
 		Check_Let_Syntax;
 		-- Car: <bindings>, Cdr: <body>
 
-		Set_Frame_Opcode (Interp.Stack, Opcode_Let_Finish);
-		Set_Frame_Operand (Interp.Stack, Cdr); 
-		Clear_Frame_Result (Interp.Stack);
+		-- Switch the frame to Opcode_Grouped_Call and let its environment
+		-- be the new environment created. Use Reload_Frame() instead
+		-- of Switch_Frame() for continuation. This frame is executed once
+		-- the Opcode_Letrec_Binding frame pushed in the 'if' block is finished.
+		Reload_Frame (Interp, Opcode_Grouped_Call, Cdr);
 
-		-- Push a new environment.
+		-- Create a new environment over the current environment.
 		Envir := Make_Environment(Interp.Self, Get_Frame_Environment(Interp.Stack));
-		Set_Frame_Environment (Interp.Stack, Envir);
+		Set_Frame_Environment (Interp.Stack, Envir); -- update the environment
 
 		if Car /= Nil_Pointer then
 			-- <bindings> is not empty
-			-- Arrange to perform evaluataion and binding in the
-			-- new environment created.
-			Cdr := Make_Array (Interp.Self, 3);
-			Cdr.Pointer_Slot(1) := Car;
 
-			Push_Frame (Interp, Opcode_Let_Binding, Cdr);
-			Push_Frame (Interp, Opcode_Let_Evaluation, Cdr); 
+			-- Say, <bindings> is ((x 2) (y 2)).
+			-- Get_Car(Car) is (x 2).
+			-- To get x, Get_Car(Get_Car(Car))
+			-- To get 2, Get_Car(Get_Cdr(Get_Car(Car)))
+
+			-- Arrange to evaluate the first <binding> expression in the parent environment.
+			Push_Frame (Interp, Opcode_Evaluate_Object, Get_Car(Get_Cdr(Get_Car(Car))));
+
+			-- Arrange to perform actual binding. Pass the <binding> name as an intermediate 
+			-- and the next remaing <binding> list as an operand.
+			Push_Subframe_With_Intermediate (Interp, Opcode_Letrec_Binding, Get_Cdr(Car), Get_Car(Get_Car(Car)));
 		end if;
 	end Evaluate_Letrec_Syntax;
+
+     -- ----------------------------------------------------------------
 
 	procedure Evaluate_Quote_Syntax is
 		pragma Inline (Evaluate_Quote_Syntax);
@@ -411,6 +431,8 @@ Ada.Text_IO.Put_Line ("NO ALTERNATE");
 		end if;
 		Return_Frame (Interp, Get_Car(Operand));
 	end Evaluate_Quote_Syntax;
+
+     -- ----------------------------------------------------------------
 
 	procedure Evaluate_Set_Syntax is
 		pragma Inline (Evaluate_Set_Syntax);
@@ -450,6 +472,8 @@ Ada.Text_IO.Put_Line ("NO ALTERNATE");
 			raise Syntax_Error;	
 		end if;
 	end Evaluate_Set_Syntax;
+
+     -- ----------------------------------------------------------------
 
 begin
 	Push_Top (Interp, Operand'Unchecked_Access);

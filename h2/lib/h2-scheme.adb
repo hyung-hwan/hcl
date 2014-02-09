@@ -106,8 +106,7 @@ package body H2.Scheme is
 		Opcode_Let_Binding,
 		Opcode_Letast_Binding,
 		Opcode_Letast_Binding_Finish,
-		Opcode_Let_Evaluation,
-		Opcode_Let_Finish,
+		Opcode_Letrec_Binding,
 		Opcode_Procedure_Call,
 		Opcode_Procedure_Call_Finish,
 		Opcode_Set_Finish,
@@ -1440,7 +1439,7 @@ Ada.Text_IO.Put_Line ("Make_String...");
 		Envir: Object_Pointer;
 		Arr: Object_Pointer;
 	begin
-		-- Search the whole environment chain unlike Put_Environment().
+		-- Search the whole environment chain unlike Set_Current_Environment().
 		-- It is mainly for set!.
 		pragma Assert (Is_Symbol(Key));
 
@@ -1462,13 +1461,11 @@ Ada.Text_IO.Put_Line ("Make_String...");
 	end Set_Environment;
 
 	procedure Put_Environment (Interp: in out Interpreter_Record;
+	                           Envir:  in     Object_Pointer;
 	                           Key:    in     Object_Pointer;
 	                           Value:  in     Object_Pointer) is
 		Arr: Object_Pointer;
-		Envir: aliased Object_Pointer;
 	begin
-		Envir := Get_Frame_Environment(Interp.Stack);
-
 		-- Search the current environment only. It doesn't search the 
 		-- environment. If no key is found, add a new pair
 		-- This is mainly for define.
@@ -1483,10 +1480,11 @@ Ada.Text_IO.Put_Line ("Make_String...");
 			-- Add a new key/value pair in the current environment
 			-- if no existing pair has been found.
 			declare 
+				Aliased_Envir: aliased Object_Pointer := Envir;
 				Aliased_Key: aliased Object_Pointer := Key;
 				Aliased_Value: aliased Object_Pointer := Value;
 			begin
-				Push_Top (Interp, Envir'Unchecked_Access);
+				Push_Top (Interp, Aliased_Envir'Unchecked_Access);
 				Push_Top (Interp, Aliased_Key'Unchecked_Access);
 				Push_Top (Interp, Aliased_Value'Unchecked_Access);
 
@@ -1495,13 +1493,29 @@ Ada.Text_IO.Put_Line ("Make_String...");
 				Arr.Pointer_Slot(2) := Aliased_Value;
 
 				-- Chain the pair to the head of the list
-				Arr.Pointer_Slot(3) := Get_Car(Envir);	
-				Set_Car (Envir, Arr);
+				Arr.Pointer_Slot(3) := Get_Car(Aliased_Envir);	
+				Set_Car (Aliased_Envir, Arr);
 	
 				Pop_Tops (Interp, 3);
 			end;
 		end if;
 	end Put_Environment;
+
+	procedure Set_Current_Environment (Interp: in out Interpreter_Record;
+	                                   Key:    in     Object_Pointer;
+	                                   Value:  in     Object_Pointer) is
+		pragma Inline (Set_Current_Environment);
+	begin
+		Put_Environment (Interp, Get_Frame_Environment(Interp.Stack), Key, Value);
+	end Set_Current_Environment;
+
+	procedure Set_Parent_Environment (Interp: in out Interpreter_Record;
+	                                   Key:    in     Object_Pointer;
+	                                   Value:  in     Object_Pointer) is
+		pragma Inline (Set_Parent_Environment);
+	begin
+		Put_Environment (Interp, Get_Frame_Environment(Get_Frame_Parent(Interp.Stack)), Key, Value);
+	end Set_Parent_Environment;
 
 	-----------------------------------------------------------------------------
 
@@ -1545,7 +1559,7 @@ Ada.Text_IO.Put_Line ("Make_String...");
 		-- Link it to the top environement
 		pragma Assert (Get_Frame_Environment(Interp.Stack) = Interp.Root_Environment); 
 		pragma Assert (Get_Environment(Interp.Self, Symbol) = null);
-		Put_Environment (Interp.all, Symbol, Proc);
+		Set_Current_Environment (Interp.all, Symbol, Proc);
 
 		Pop_Tops (Interp.all, 2);
 		return Proc;
@@ -2154,6 +2168,16 @@ end if;
 		Interp.Stack := Insert_Frame(Interp.Self, Interp.Stack, Opcode, Operand, Envir, Nil_Pointer);
 	end Push_Frame_With_Environment;
 
+	procedure Push_Frame_With_Environment_And_Intermediate (Interp:  in out Interpreter_Record;
+	                                                        Opcode:  in     Opcode_Type; 
+	                                                        Operand: in     Object_Pointer;
+	                                                        Envir:   in     Object_Pointer;
+	                                                        Interm:  in     Object_Pointer) is
+		pragma Inline (Push_Frame_With_Environment_And_Intermediate);
+	begin
+		Interp.Stack := Insert_Frame(Interp.Self, Interp.Stack, Opcode, Operand, Envir, Interm);
+	end Push_Frame_With_Environment_And_Intermediate;
+
 	procedure Push_Frame_With_Intermediate (Interp:  in out Interpreter_Record;
 	                                        Opcode:  in     Opcode_Type; 
 	                                        Operand: in     Object_Pointer;
@@ -2193,6 +2217,17 @@ end if;
 		Set_Frame_Parent (Interp.Stack, Insert_Frame(Interp.Self, Get_Frame_Parent(Interp.Stack), Opcode, Operand, Get_Frame_Environment(Interp.Stack), Interm));
 	end Push_Subframe_With_Intermediate;
 
+	procedure Push_Subframe_With_Environment_And_Intermediate (Interp:  in out Interpreter_Record;
+	                                                           Opcode:  in     Opcode_Type; 
+	                                                           Operand: in     Object_Pointer;
+	                                                           Envir:   in     Object_Pointer;
+	                                                           Interm:  in     Object_Pointer) is
+		pragma Inline (Push_Subframe_With_Environment_And_Intermediate);
+	begin
+		-- Place a new frame below the existing top frame.
+		Set_Frame_Parent (Interp.Stack, Insert_Frame(Interp.Self, Get_Frame_Parent(Interp.Stack), Opcode, Operand, Envir, Interm));
+	end Push_Subframe_With_Environment_And_Intermediate;
+
 	procedure Pop_Frame (Interp: in out Interpreter_Record) is
 		pragma Inline (Pop_Frame);
 	begin
@@ -2210,6 +2245,31 @@ end if;
 		Pop_Frame (Interp);
 		Set_Frame_Result (Interp.Stack, Value);
 	end Return_Frame;
+
+	procedure Reload_Frame (Interp:  in out Interpreter_Record;
+	                        Opcode:  in     Opcode_Type; 
+	                        Operand: in     Object_Pointer) is
+		pragma Inline (Reload_Frame);
+		Envir: Object_Pointer;
+	begin
+		-- Change various frame fields keeping the environment.
+		Envir := Get_Frame_Environment (Interp.Stack);
+		Pop_Frame (Interp);
+		Push_Frame_With_Environment (Interp, Opcode, Operand, Envir);
+	end Reload_Frame;
+
+	procedure Reload_Frame_With_Intermediate (Interp:  in out Interpreter_Record;
+	                                          Opcode:  in     Opcode_Type; 
+	                                          Operand: in     Object_Pointer;
+	                                          Interm:  in     Object_Pointer) is
+		pragma Inline (Reload_Frame_With_Intermediate);
+		Envir: Object_Pointer;
+	begin
+		-- Change various frame fields keeping the environment.
+		Envir := Get_Frame_Environment (Interp.Stack);
+		Pop_Frame (Interp);
+		Push_Frame_With_Environment_And_Intermediate (Interp, Opcode, Operand, Envir, Interm);
+	end Reload_Frame_With_Intermediate;
 
 	procedure Execute (Interp: in out Interpreter_Record) is separate;
 

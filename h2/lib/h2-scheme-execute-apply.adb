@@ -316,7 +316,7 @@ Ada.Text_IO.Put_line ("TOO FEW ARGUMETNS FOR COMPARISON");
 			-- Closure made of a lambda expression with a single formal argument
 			-- e.g) (lambda x (car x))
 			-- Apply the whole actual argument list to the closure.
-			Put_Environment (Interp, Formal, Actual);
+			Set_Current_Environment (Interp, Formal, Actual);
 		else
 			while Is_Cons(Formal) loop
 				if not Is_Cons(Actual) then
@@ -325,7 +325,7 @@ Ada.Text_IO.Put_line ("TOO FEW ARGUMETNS FOR COMPARISON");
 				end if;
 
 				-- Insert the key/value pair into the environment
-				Put_Environment (Interp, Get_Car(Formal), Get_Car(Actual));
+				Set_Current_Environment (Interp, Get_Car(Formal), Get_Car(Actual));
 
 				Formal := Get_Cdr(Formal);
 				Actual := Get_Cdr(Actual);
@@ -336,7 +336,7 @@ Ada.Text_IO.Put_line ("TOO FEW ARGUMETNS FOR COMPARISON");
 				-- The last formal argument to the closure is in a CDR.
 				-- Assign the remaining actual arguments to the last formal argument
 				-- e.g) ((lambda (x y . z) z) 1 2 3 4 5)
-				Put_Environment (Interp, Formal, Actual);
+				Set_Current_Environment (Interp, Formal, Actual);
 			else
 				-- The lambda evaluator must ensure all formal arguments are symbols.
 				pragma Assert (Formal = Nil_Pointer); 
