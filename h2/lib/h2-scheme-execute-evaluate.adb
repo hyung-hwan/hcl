@@ -360,23 +360,35 @@ Ada.Text_IO.Put_Line ("NO ALTERNATE");
 
 	procedure Evaluate_Letast_Syntax is
 		pragma Inline (Evaluate_Letast_Syntax);
-		Envir: Object_Pointer;
+		Envir: aliased Object_Pointer;
 	begin
 		Check_Let_Syntax;
 		-- Car: <bindings>, Cdr: <body>
 
-		Set_Frame_Opcode (Interp.Stack, Opcode_Grouped_Call);
-		Set_Frame_Operand (Interp.Stack, Cdr); 
-		Clear_Frame_Result (Interp.Stack);
+		Reload_Frame (Interp, Opcode_Grouped_Call, Cdr);
+
+		-- Create a new environment over the current environment.
+		Envir := Make_Environment(Interp.Self, Get_Frame_Environment(Interp.Stack));
+		Set_Frame_Environment (Interp.Stack, Envir); -- update the environment
 
 		if Car /= Nil_Pointer then
 			-- <bindings> is not empty
-			Push_Frame (Interp, Opcode_Letast_Binding, Car);
-		else
-			-- <bindings> is empty. push the new environment
-			-- for <body> evaluation.
-			Envir := Make_Environment(Interp.Self, Get_Frame_Environment(Interp.Stack));
-			Set_Frame_Environment (Interp.Stack, Envir);
+
+			Push_Top (Interp, Envir'Unchecked_Access);
+
+			-- Say, <bindings> is ((x 2) (y 2)).
+			-- Get_Car(Car) is (x 2).
+			-- To get x, Get_Car(Get_Car(Car))
+			-- To get 2, Get_Car(Get_Cdr(Get_Car(Car)))
+
+			-- Arrange to evaluate the first <binding> expression in the parent environment.
+			Push_Frame_With_Environment (Interp, Opcode_Evaluate_Object, Get_Car(Get_Cdr(Get_Car(Car))), Envir);
+
+			-- Arrange to perform actual binding. Pass the <binding> name as an intermediate 
+			-- and the next remaing <binding> list as an operand.
+			Push_Subframe_With_Environment_And_Intermediate (Interp, Opcode_Letast_Binding, Get_Cdr(Car), Envir, Get_Car(Get_Car(Car)));
+
+			Pop_Tops (Interp, 1);
 		end if;
 	end Evaluate_Letast_Syntax;
 

@@ -105,7 +105,6 @@ package body H2.Scheme is
 		Opcode_If_Finish,
 		Opcode_Let_Binding,
 		Opcode_Letast_Binding,
-		Opcode_Letast_Binding_Finish,
 		Opcode_Letrec_Binding,
 		Opcode_Procedure_Call,
 		Opcode_Procedure_Call_Finish,
@@ -1977,6 +1976,7 @@ Ada.Text_IO.Put_Line ("Make_String...");
 	
 						when Array_Object =>
 							Ada.Text_IO.Put ("#Array");
+				
 
 						when Others =>
 							if Atom.Kind = Character_Object then
@@ -2036,7 +2036,7 @@ Ada.Text_IO.Put_Line ("Make_String...");
 				loop
 					Car := Get_Car(Cons);
 
-					if Is_Cons (Car) then
+					if Is_Cons(Car)  or else Is_Array(Car) then
 						Print_Object (Car);
 					else
 						Print_Atom (Car);
@@ -2057,6 +2057,16 @@ Ada.Text_IO.Put_Line ("Make_String...");
 				end loop;
 
 				Ada.Text_IO.Put (")");
+			elsif Is_Array(Obj) then
+				Ada.Text_IO.Put (" #(");
+				for X in Obj.Pointer_Slot'Range loop
+					if Is_Cons(Obj.Pointer_Slot(X)) or else Is_Array(Obj.Pointer_Slot(X)) then
+						Print_Object (Obj.Pointer_Slot(X));
+					else
+						Print_Atom (Obj.Pointer_Slot(X));
+					end if;
+				end loop;
+				Ada.Text_IO.Put (") ");
 			else
 				Print_Atom (Obj);
 			end if;
@@ -2253,10 +2263,21 @@ end if;
 		Envir: Object_Pointer;
 	begin
 		-- Change various frame fields keeping the environment.
-		Envir := Get_Frame_Environment (Interp.Stack);
+		Envir := Get_Frame_Environment(Interp.Stack);
 		Pop_Frame (Interp);
 		Push_Frame_With_Environment (Interp, Opcode, Operand, Envir);
 	end Reload_Frame;
+
+	procedure Reload_Frame_With_Environment (Interp:  in out Interpreter_Record;
+	                                         Opcode:  in     Opcode_Type; 
+	                                         Operand: in     Object_Pointer;
+	                                         Envir:   in     Object_Pointer) is
+		pragma Inline (Reload_Frame_With_Environment);
+	begin
+		-- Change various frame fields
+		Pop_Frame (Interp);
+		Push_Frame_With_Environment (Interp, Opcode, Operand, Envir);
+	end Reload_Frame_With_Environment;
 
 	procedure Reload_Frame_With_Intermediate (Interp:  in out Interpreter_Record;
 	                                          Opcode:  in     Opcode_Type; 
@@ -2266,7 +2287,7 @@ end if;
 		Envir: Object_Pointer;
 	begin
 		-- Change various frame fields keeping the environment.
-		Envir := Get_Frame_Environment (Interp.Stack);
+		Envir := Get_Frame_Environment(Interp.Stack);
 		Pop_Frame (Interp);
 		Push_Frame_With_Environment_And_Intermediate (Interp, Opcode, Operand, Envir, Interm);
 	end Reload_Frame_With_Intermediate;

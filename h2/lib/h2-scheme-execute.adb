@@ -240,6 +240,55 @@ procedure Execute (Interp: in out Interpreter_Record) is
 		end if;
 	end Do_Let_Binding;
 
+	procedure Do_Letast_Binding is
+		pragma Inline (Do_Letast_Binding);
+		O: aliased Object_Pointer;
+		Envir: Object_Pointer;
+	begin
+		-- Perform binding in the parent environment.
+		Set_Current_Environment (Interp, Get_Frame_Intermediate(Interp.Stack), Get_Frame_Result(Interp.Stack));
+
+		O := Get_Frame_Operand(Interp.Stack);	
+
+		-- Say, <bindings> is ((x 2) (y 2)).
+		-- Get_Car(O) is (x 2).
+		-- To get x, Get_Car(Get_Car(O))
+		-- To get 2, Get_Car(Get_Cdr(Get_Car(O)))
+		if Is_Cons(O) then
+			Push_Top (Interp, O'Unchecked_Access);
+
+         		Envir := Make_Environment(Interp.Self, Get_Frame_Environment(Interp.Stack));
+         		Set_Frame_Environment (Interp.Stack, Envir); 
+
+			Reload_Frame (Interp, Opcode_Evaluate_Object, Get_Car(Get_Cdr(Get_Car(O))));
+			Push_Subframe_With_Intermediate (Interp, Opcode_Letast_Binding, Get_Cdr(O), Get_Car(Get_Car(O)));
+
+			Pop_Tops (Interp, 1);
+		else
+--envir := get_frame_environment(interp.stack);
+--declare
+--w: object_word;
+--for w'address use envir'address;
+--begin
+--ada.text_io.put_line ("i$$$$$$$$$$$$$$$$$$$$$$$$44 ENVIR => " & object_word'image(w));
+--print (interp, envir);
+--end;
+			-- Get the final environment
+			Envir := Get_Frame_Environment(Interp.Stack);
+
+			-- Get <body> stored in the Opcode_Grouped_Call frame
+			-- pushed in Evalute_Letast_Syntax().
+			O := Get_Frame_Operand(Get_Frame_Parent(Interp.Stack));
+
+			Pop_Frame (Interp); -- Current frame
+			pragma Assert (Get_Frame_Opcode(Interp.Stack) = Opcode_Grouped_Call);
+
+			-- Refresh the Opcode_Grouped_Call frame pushed in Evaluate_Letast_Syntax()
+			-- with the final environment.
+			Reload_Frame_With_Environment (Interp, Opcode_Grouped_Call, O, Envir);
+		end if;
+	end Do_Letast_Binding;
+
 	procedure Do_Letrec_Binding is
 		pragma Inline (Do_Letrec_Binding);
 		O: aliased Object_Pointer;
@@ -264,57 +313,6 @@ procedure Execute (Interp: in out Interpreter_Record) is
 			Pop_Frame (Interp);
 		end if;
 	end Do_Letrec_Binding;
-
-	procedure Do_Letast_Binding is
-		pragma Inline (Do_Letast_Binding);
-		X: Object_Pointer;
-	begin
-		X := Get_Frame_Operand(Interp.Stack); -- <bindings> and onward
-
-		-- Don't call this procedure if <bindings> is empty. The caller must ensure this
-		pragma Assert (Is_Cons(X)); 
-
-		Set_Frame_Opcode (Interp.Stack, Opcode_Letast_Binding_Finish);
-		Push_Frame (Interp, Opcode_Evaluate_Object, Get_Car(Get_Cdr(Get_Car(X))));
-	end Do_Letast_Binding;
-
-	procedure Do_Letast_Binding_Finish is
-		pragma Inline (Do_Letast_Binding_Finish);
-		X: aliased Object_Pointer;
-		Envir: aliased Object_Pointer;
-	begin
-		Push_Top (Interp, X'Unchecked_Access);
-		Push_Top (Interp, Envir'Unchecked_Access);
-
-		X := Get_Frame_Operand(Interp.Stack); -- <bindings> and onward
-
-		-- Update the environment while evaluating <bindings>
-
-		-- Push a new environment for each binding.
-		Envir := Make_Environment(Interp.Self, Get_Frame_Environment(Interp.Stack));
-		Set_Frame_Environment (Interp.Stack, Envir);
-		Set_Current_Environment (Interp, Get_Car(Get_Car(X)), Get_Frame_Result(Interp.Stack));
-
-		X := Get_Cdr(X); -- next binding
-		if Is_Cons(X) then
-			-- More bingings to evaluate
-			Set_Frame_Operand (Interp.Stack, X);
-			Clear_Frame_Result (Interp.Stack);
-
-			-- the next evaluation must be done in the environment where the 
-			-- current binding has been made.
-			Push_Frame (Interp, Opcode_Evaluate_Object, Get_Car(Get_Cdr(Get_Car(X))));
-		else
-			-- No more bingings left
-			Pop_Frame (Interp); -- Done
-
-			-- Update the environment of the Let_Finish frame.
-			--pragma Assert (Get_Frame_Opcode(Interp.Stack) = Opcode_Let_Finish);
-			Set_Frame_Environment (Interp.Stack, Envir);
-		end if;
-
-		Pop_Tops (Interp, 2);
-	end Do_Letast_Binding_Finish;
 
 	-- --------------------------------------------------------------------
 
@@ -914,9 +912,6 @@ ada.text_io.put_line (Opcode_Type'Image(Get_Frame_Opcode(Interp.Stack)));
 
 			when Opcode_Letast_Binding =>
 				Do_Letast_Binding; 
-
-			when Opcode_Letast_Binding_Finish =>
-				Do_Letast_Binding_Finish; 
 
 			when Opcode_Letrec_Binding =>
 				Do_Letrec_Binding; 
