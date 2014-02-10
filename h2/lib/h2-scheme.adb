@@ -71,10 +71,12 @@ package body H2.Scheme is
 	Label_SymbolQ:    constant Object_Character_Array := (Ch.LC_S, Ch.LC_Y, Ch.LC_M, Ch.LC_B, Ch.LC_O, Ch.LC_L, Ch.Question); -- "symbol?"
 
 
-	Label_Newline:  constant Object_Character_Array := (Ch.LC_N, Ch.LC_E, Ch.LC_W, Ch.LC_L, Ch.LC_I, Ch.LC_N, Ch.LC_E); -- "newline"
-	Label_Space:    constant Object_Character_Array := (Ch.LC_S, Ch.LC_P, Ch.LC_A, Ch.LC_C, Ch.LC_E); -- "space"
+	Label_Newline:    constant Object_Character_Array := (Ch.LC_N, Ch.LC_E, Ch.LC_W, Ch.LC_L, Ch.LC_I, Ch.LC_N, Ch.LC_E); -- "newline"
+	Label_Space:      constant Object_Character_Array := (Ch.LC_S, Ch.LC_P, Ch.LC_A, Ch.LC_C, Ch.LC_E); -- "space"
 
-	Label_Arrow:    constant Object_Character_Array := (Ch.Equal_Sign, Ch.Greater_Than_Sign); -- "=>"
+	Label_Arrow:      constant Object_Character_Array := (Ch.Equal_Sign, Ch.Greater_Than_Sign); -- "=>"
+	Label_Else:       constant Object_Character_Array := (Ch.LC_E, Ch.LC_L, Ch.LC_S, Ch.LC_E); -- "else"
+	
 	-----------------------------------------------------------------------------
 	-- EXCEPTIONS
 	-----------------------------------------------------------------------------
@@ -105,6 +107,7 @@ package body H2.Scheme is
 	
 		Opcode_And_Finish,
 		Opcode_Or_Finish,
+		Opcode_Cond_Finish,
 		Opcode_Define_Finish,
 		Opcode_Grouped_Call,  -- (begin ...), closure apply, let body
 		Opcode_If_Finish,
@@ -808,9 +811,10 @@ ada.text_io.put_line ("[GC BEGIN]");
 		end loop;
 
 		-- Migrate some known symbols
-		Interp.Symbol.Arrow := Move_One_Object(Interp.Symbol.Arrow);
-		Interp.Symbol.Quasiquote := Move_One_Object(Interp.Symbol.Quasiquote);
-		Interp.Symbol.Quote := Move_One_Object(Interp.Symbol.Quote);
+		Interp.Arrow_Symbol := Move_One_Object(Interp.Arrow_Symbol);
+		Interp.Else_Symbol := Move_One_Object(Interp.Else_Symbol);
+		Interp.Quasiquote_Symbol := Move_One_Object(Interp.Quasiquote_Symbol);
+		Interp.Quote_Symbol := Move_One_Object(Interp.Quote_Symbol);
 
 --Ada.Text_IO.Put_Line (">>> [GC SCANNING NEW HEAP]");
 		-- Scan the heap
@@ -908,7 +912,7 @@ end if;
 			Kind => Pointer_Object,
 			Size => Size,
 			Flags => 0,
-			Scode => 0,
+			Scode => Syntax_Code'Val(0),
 			Tag => Unknown_Object,
 			Pointer_Slot => (others => Initial)
 		);
@@ -939,7 +943,7 @@ end if;
 			Kind => Character_Object,
 			Size => Size,
 			Flags => 0,
-			Scode => 0,
+			Scode => Syntax_Code'Val(0),
 			Tag => Unknown_Object,
 			Character_Slot => (others => Ch.NUL),
 			Character_Terminator => Ch.NUL
@@ -980,7 +984,7 @@ end if;
 			Kind => Byte_Object,
 			Size => Size,
 			Flags => 0,
-			Scode => 0,
+			Scode => Syntax_Code'Val(0),
 			Tag => Unknown_Object,
 			Byte_Slot => (others => 0)
 		);
@@ -1123,10 +1127,8 @@ end if;
 	                      Source: in      Object_Character_Array) return Object_Pointer is
 		Result: Object_Pointer;
 	begin
-Ada.Text_IO.Put_Line ("Make_String...");
 		Result := Allocate_Character_Object(Interp, Source);
 		Result.Tag := String_Object;
---Print_Object_Pointer ("Make_String Result - " & Source, Result);
 		return Result;
 	end Make_String;
 
@@ -1802,8 +1804,8 @@ Ada.Text_IO.Put_Line ("Make_String...");
 			Dummy := Make_Syntax (Interp.Self, Letast_Syntax, Label_Letast); -- "let*"
 			Dummy := Make_Syntax (Interp.Self, Letrec_Syntax, Label_Letrec); -- "letrec"
 			Dummy := Make_Syntax (Interp.Self, Or_Syntax,     Label_Or); -- "or"
-			Interp.Symbol.Quote := Make_Syntax (Interp.Self, Quote_Syntax,  Label_Quote); -- "quote"
-			Interp.Symbol.Quasiquote := Make_Syntax (Interp.Self, Quasiquote_Syntax,  Label_Quasiquote); -- "quasiquote"
+			Interp.Quote_Symbol := Make_Syntax (Interp.Self, Quote_Syntax,  Label_Quote); -- "quote"
+			Interp.Quasiquote_Symbol := Make_Syntax (Interp.Self, Quasiquote_Syntax,  Label_Quasiquote); -- "quasiquote"
 			Dummy := Make_Syntax (Interp.Self, Set_Syntax,    Label_Set); -- "set!"
 		end Make_Syntax_Objects;
 
@@ -1835,7 +1837,8 @@ Ada.Text_IO.Put_Line ("Make_String...");
 
 		procedure Make_Common_Symbol_Objects is
 		begin
-			Interp.Symbol.Arrow := Make_Symbol (Interp.Self, Label_Arrow);	
+			Interp.Arrow_Symbol := Make_Symbol (Interp.Self, Label_Arrow);	
+			Interp.Else_Symbol := Make_Symbol (Interp.Self, Label_Else);	
 		end Make_Common_Symbol_Objects;
 	begin
 		declare

@@ -51,20 +51,61 @@ procedure Execute (Interp: in out Interpreter_Record) is
 		end if;
 	end Evaluate_While;
 
-	function Is_False (X: in Object_Pointer) return Standard.Boolean is
-		pragma Inline (Is_False);
+	function Is_False_Class (X: in Object_Pointer) return Standard.Boolean is
+		pragma Inline (Is_False_Class);
 	begin
 		return X = False_Pointer;
-	end Is_False;
+	end Is_False_Class;
 
-	function Is_True (X: in Object_Pointer) return Standard.Boolean is
-		pragma Inline (Is_True);
+	function Is_True_Class (X: in Object_Pointer) return Standard.Boolean is
+		pragma Inline (Is_True_Class);
 	begin
 		return X /= False_Pointer;
-	end Is_True;
+	end Is_True_Class;
 
-	procedure Do_And_Finish is new Evaluate_While(Is_True);
-	procedure Do_Or_Finish is new Evaluate_While(Is_False);
+	procedure Do_And_Finish is new Evaluate_While(Is_True_Class);
+	procedure Do_Or_Finish is new Evaluate_While(Is_False_Class);
+
+	-- ----------------------------------------------------------------
+	procedure Do_Cond_Finish is
+		pragma Inline (Do_Cond_Finish);
+		R: Object_Pointer;
+		O: Object_Pointer;
+	begin
+		R := Get_Frame_Result(Interp.Stack); -- <test> result
+		O := Get_Frame_Operand(Interp.Stack); -- <clause> list
+		
+		if Is_True_Class(R) then
+			O := Get_Cdr(Get_Car(O)); -- <expression> list in <clause>
+			if Is_Cons(O) then
+				Reload_Frame (Interp, Opcode_Grouped_Call, O);
+			else
+				Pop_Frame (Interp);
+			end if;
+		else
+			O := Get_Cdr(O); -- next <clause> list
+
+			if not Is_Cons(O) then
+				-- no more <clause>
+				Pop_Frame (Interp);
+			else
+				R := Get_Car(O); -- next <clause>
+				if Get_Car(R) = Interp.Else_Symbol then
+					-- else <clause>
+					O := Get_Cdr(R); -- <expression> list in else <clause>
+					if Is_Cons(O) then
+						Reload_Frame (Interp, Opcode_Grouped_Call, O);
+					else
+						Pop_Frame (Interp);
+					end if;
+				else
+					Switch_Frame (Interp.Stack, Opcode_Evaluate_Object, Get_Car(R), Nil_Pointer);
+					Push_Subframe (Interp, Opcode_Cond_Finish, O);
+				end if;
+			end if;
+		end if;
+	end Do_Cond_Finish;
+
 	-- ----------------------------------------------------------------
 
 	procedure Do_Define_Finish is
@@ -766,7 +807,7 @@ Ada.Text_IO.Put_Line ("Right parenthesis expected");
 	begin
 		V := Get_Frame_Result(Interp.Stack);
 		V := Make_Cons(Interp.Self, V, Nil_Pointer);
-		V := Make_Cons(Interp.Self, Interp.Symbol.Quote, V);
+		V := Make_Cons(Interp.Self, Interp.Quote_Symbol, V);
 		Pop_Frame (Interp); 
 		Chain_Frame_Intermediate (Interp, Interp.Stack, V);
 	end Close_Quote_In_List;
@@ -777,7 +818,7 @@ Ada.Text_IO.Put_Line ("Right parenthesis expected");
 	begin
 		V := Get_Frame_Result(Interp.Stack);
 		V := Make_Cons(Interp.Self, V, Nil_Pointer);
-		V := Make_Cons(Interp.Self, Interp.Symbol.Quote, V);
+		V := Make_Cons(Interp.Self, Interp.Quote_Symbol, V);
 		Return_Frame (Interp, V);
 	end Close_Quote;
 
@@ -894,9 +935,9 @@ ada.text_io.put_line (Opcode_Type'Image(Get_Frame_Opcode(Interp.Stack)));
 
 			when Opcode_And_Finish => 
 				Do_And_Finish;
-
-			--when Opcode_Finish_Case_Syntax => 
-			--when Opcode_Finish_Cond_Syntax => 
+ 
+			when Opcode_Cond_Finish => 
+				Do_Cond_Finish;
 
 			when Opcode_Define_Finish =>
 				Do_Define_Finish;

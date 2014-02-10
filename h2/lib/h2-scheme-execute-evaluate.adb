@@ -30,7 +30,7 @@ procedure Evaluate is
 		elsif not Is_Cons(Operand) or else Get_Last_Cdr(Operand) /= Nil_Pointer then
 			-- (and . 10)
 			-- (and 1 2 . 10)
-			Ada.Text_IO.Put_LINE ("FUCKING cDR FOR DEFINE");
+			Ada.Text_IO.Put_LINE ("FUCKING CDR FOR DEFINE");
 			raise Syntax_Error;	
 		else
 			--Switch_Frame (Interp.Stack, Opcode, Get_Cdr(Operand), Nil_Pointer); -- <test2> onwards
@@ -87,6 +87,76 @@ raise Syntax_Error;
 			raise Syntax_Error;	
 		end if;
 	end Evaluate_Define_Syntax;
+
+     -- ----------------------------------------------------------------
+
+	procedure Evaluate_Case_Syntax is
+		pragma Inline (Evaluate_Case_Syntax);
+	begin
+		Ada.Text_IO.Put_LINE ("UNIMPLEMENTED");
+		raise Evaluation_Error;
+	end Evaluate_Case_Syntax;
+
+     -- ----------------------------------------------------------------
+
+	procedure Evaluate_Cond_Syntax is
+		pragma Inline (Evaluate_Cond_Syntax);
+		Ptr: Object_Pointer;
+	begin
+		-- cond <clause 1> <clause 2> ...
+		-- A clause should be of the form:
+		--    (<test> <expression> ...)
+		-- the last clause may be an else clause of the form:
+		--    (else <expression> ...)
+		-- 
+		-- (cond ((> 3 2) 'greater)
+		--       ((< 3 2) 'less))      =>  greater
+		-- (cond ((> 3 3) 'greater)
+		--       ((< 3 3) 'less)
+		--       (else 'equal))        =>  equal
+
+		Operand := Cdr; -- Skip "cond"
+		if Not Is_Cons(Operand) then
+			-- e.g) (cond)
+			--      (cond . 10)
+			Ada.Text_IO.Put_LINE ("NO CLAUSE FOR COND");
+			raise Syntax_Error;
+		end if;
+	
+		-- Check clauses 
+		-- TODO: Skip this check of clauses that have been checked previously.
+		Ptr := Operand;
+		loop
+			Car := Get_Car(Ptr); -- <clause>
+			if not Is_Cons(Car) then
+				Ada.Text_IO.Put_Line ("FUCKING CLAUSE FOR COND");
+				raise Syntax_Error;
+			end if;
+			If Get_Last_Cdr(Car) /= Nil_Pointer then
+				Ada.Text_IO.Put_Line ("FUCKING CDR FOR COND CLAUSE");
+				raise Syntax_Error;
+			end if;
+			Ptr := Get_Cdr(Ptr);
+			exit when not Is_Cons(Ptr);
+		end loop;
+		if Ptr /= Nil_Pointer then
+			Ada.Text_IO.Put_Line ("FUCKING LAST CLAUSE FOR COND");
+			raise Syntax_Error;
+		end if;
+		
+		Car := Get_Car(Operand); -- first <clause>
+		
+		Switch_Frame (Interp.Stack, Opcode_Evaluate_Object, Get_Car(Car), Nil_Pointer); -- first <test>
+		Push_Subframe (Interp, Opcode_Cond_Finish, Operand);
+	end Evaluate_Cond_Syntax;
+
+     -- ----------------------------------------------------------------
+	procedure Evaluate_Do_Syntax is
+		pragma Inline (Evaluate_Do_Syntax);
+	begin
+		Ada.Text_IO.Put_LINE ("UNIMPLEMENTED");
+		raise Evaluation_Error;
+	end Evaluate_Do_Syntax;
 
      -- ----------------------------------------------------------------
 
@@ -427,6 +497,14 @@ Ada.Text_IO.Put_Line ("NO ALTERNATE");
 	end Evaluate_Letrec_Syntax;
 
      -- ----------------------------------------------------------------
+	procedure Evaluate_Quasiquote_Syntax is
+		pragma Inline (Evaluate_Quasiquote_Syntax);
+	begin
+		Ada.Text_IO.Put_LINE ("UNIMPLEMENTED");
+		raise Evaluation_Error;
+	end Evaluate_Quasiquote_Syntax;
+
+     -- ----------------------------------------------------------------
 
 	procedure Evaluate_Quote_Syntax is
 		pragma Inline (Evaluate_Quote_Syntax);
@@ -564,8 +642,17 @@ end;
 						--	goto Start_Over; -- for optimization only. not really needed.
 						--end if;
 
+					when Case_Syntax =>
+						Evaluate_Case_Syntax;
+
+					when Cond_Syntax =>
+						Evaluate_Cond_Syntax;
+
 					when Define_Syntax =>
 						Evaluate_Define_Syntax;
+
+					when Do_Syntax =>
+						Evaluate_Do_Syntax;
 
 					when If_Syntax =>
 						Evaluate_If_Syntax;
@@ -585,16 +672,15 @@ end;
 					when Or_Syntax =>
 						Evaluate_Or_Syntax;
 
+					when Quasiquote_Syntax =>
+						Evaluate_Quasiquote_Syntax;
+
 					when Quote_Syntax =>
 						Evaluate_Quote_Syntax;
 
 					when Set_Syntax => -- set!
 						Evaluate_Set_Syntax;
 
-					when others =>
-						Ada.Text_IO.Put_Line ("Unknown syntax");	
-						--Set_Frame_Opcode (Interp.Stack, Opcode_Evaluate_Syntax);  -- Switch to syntax evaluation
-						raise Internal_Error;
 				end case;
 			else
 				-- procedure call

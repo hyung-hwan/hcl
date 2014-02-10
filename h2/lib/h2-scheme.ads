@@ -164,24 +164,24 @@ package H2.Scheme is
 	type Object_Flags is mod 2 ** 4;
 	Syntax_Object: constant Object_Flags := Object_Flags'(2#0001#); 
 
-	type Syntax_Code is mod 2 ** 4;
-	And_Syntax:        constant Syntax_Code := Syntax_Code'(0);
-	Begin_Syntax:      constant Syntax_Code := Syntax_Code'(1);
-	Case_Syntax:       constant Syntax_Code := Syntax_Code'(2);
-	Cond_Syntax:       constant Syntax_Code := Syntax_Code'(3);
-	Define_Syntax:     constant Syntax_Code := Syntax_Code'(4);
-	Do_Syntax:         constant Syntax_Code := Syntax_Code'(5);
-	If_Syntax:         constant Syntax_Code := Syntax_Code'(6);
-	Lambda_Syntax:     constant Syntax_Code := Syntax_Code'(7);
-	Let_Syntax:        constant Syntax_Code := Syntax_Code'(8);
-	Letast_Syntax:     constant Syntax_Code := Syntax_Code'(9);
-	Letrec_Syntax:     constant Syntax_Code := Syntax_Code'(10);
-	Or_Syntax:         constant Syntax_Code := Syntax_Code'(11);
-	Quasiquote_Syntax: constant Syntax_Code := Syntax_Code'(12);
-	Quote_Syntax:      constant Syntax_Code := Syntax_Code'(13);
-	Set_Syntax:        constant Syntax_Code := Syntax_Code'(14);
+	type Syntax_Code is (
+		And_Syntax,
+		Begin_Syntax,
+		Case_Syntax,
+		Cond_Syntax,
+		Define_Syntax,
+		Do_Syntax,
+		If_Syntax,
+		Lambda_Syntax,
+		Let_Syntax,
+		Letast_Syntax,
+		Letrec_Syntax,
+		Or_Syntax,
+		Quasiquote_Syntax,
+		Quote_Syntax,
+		Set_Syntax
+	);
 
-	--subtype Procedure_Code is Object_Integer;
 	type Procedure_Code is (
 		Add_Procedure,
 		Callcc_Procedure,
@@ -224,7 +224,7 @@ package H2.Scheme is
 
 	type Object_Record(Kind: Object_Kind; Size: Object_Size) is record
 		Flags: Object_Flags := 0;
-		Scode: Syntax_Code := 0;
+		Scode: Syntax_Code := Syntax_Code'Val(0);
 		Tag: Object_Tag := Unknown_Object;
 
 		-- Object payload:
@@ -503,12 +503,6 @@ private
 		Data: Top_Array(1 .. 100) := (others => null);
 	end record;
 
-	type Common_Symbol_Record is record
-		Arrow:      Object_Pointer := Nil_Pointer;
-		Quasiquote: Object_Pointer := Nil_Pointer;
-		Quote:      Object_Pointer := Nil_Pointer;
-	end record;
-
 	--type Interpreter_Record is tagged limited record
 	type Interpreter_Record is limited record
 		Self: Interpreter_Pointer := Interpreter_Record'Unchecked_Access; -- Current instance's pointer
@@ -525,7 +519,11 @@ private
 		Root_Frame: Object_Pointer := Nil_Pointer;
 		Stack: Object_Pointer := Nil_Pointer;
 
-		Symbol: Common_Symbol_Record;
+		Arrow_Symbol:      Object_Pointer := Nil_Pointer;
+		Else_Symbol:       Object_Pointer := Nil_Pointer;
+		Quasiquote_Symbol: Object_Pointer := Nil_Pointer;
+		Quote_Symbol:      Object_Pointer := Nil_Pointer;
+		
 		Top: Top_Record; -- temporary object pointers
 
 		Base_Input: aliased IO_Record;
