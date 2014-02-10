@@ -181,23 +181,32 @@ package H2.Scheme is
 	Quote_Syntax:      constant Syntax_Code := Syntax_Code'(13);
 	Set_Syntax:        constant Syntax_Code := Syntax_Code'(14);
 
-	subtype Procedure_Code is Object_Integer;
-	Add_Procedure:          constant Procedure_Code := Procedure_Code'(0);
-	Callcc_Procedure:       constant Procedure_Code := Procedure_Code'(1);
-	Car_Procedure:          constant Procedure_Code := Procedure_Code'(2);
-	Cdr_Procedure:          constant Procedure_Code := Procedure_Code'(3);
-	Cons_Procedure:         constant Procedure_Code := Procedure_Code'(4);
-	EQ_Procedure:           constant Procedure_Code := Procedure_Code'(5);
-	GT_Procedure:           constant Procedure_Code := Procedure_Code'(6);
-	LT_Procedure:           constant Procedure_Code := Procedure_Code'(7);
-	GE_Procedure:           constant Procedure_Code := Procedure_Code'(8);
-	LE_Procedure:           constant Procedure_Code := Procedure_Code'(9);
-	Multiply_Procedure:     constant Procedure_Code := Procedure_Code'(10);
-	Quotient_Procedure:     constant Procedure_Code := Procedure_Code'(11);
-	Remainder_Procedure:    constant Procedure_Code := Procedure_Code'(12);
-	Setcar_Procedure:       constant Procedure_Code := Procedure_Code'(13);
-	Setcdr_Procedure:       constant Procedure_Code := Procedure_Code'(14);
-	Subtract_Procedure:     constant Procedure_Code := Procedure_Code'(15);
+	--subtype Procedure_Code is Object_Integer;
+	type Procedure_Code is (
+		Add_Procedure,
+		Callcc_Procedure,
+		Car_Procedure,
+		Cdr_Procedure,
+		Cons_Procedure,
+		EQ_Procedure,
+		GT_Procedure,
+		LT_Procedure,
+		GE_Procedure,
+		LE_Procedure,
+		Multiply_Procedure,
+		NullQ_Procedure,
+		NumberQ_Procedure,
+		ProcedureQ_Procedure,
+		Quotient_Procedure,
+		Remainder_Procedure,
+		Setcar_Procedure,
+		Setcdr_Procedure,
+		StringQ_Procedure,
+		Subtract_Procedure,
+		SymbolQ_Procedure
+	);
+	for Procedure_Code'Size use Object_Integer'Size;
+	
 
 	type Object_Tag is (
 		Unknown_Object, 

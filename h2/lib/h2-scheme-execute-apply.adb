@@ -197,6 +197,10 @@ Ada.Text_IO.Put ("NOT INTEGER FOR MULTIPLY"); Print (Interp, Car);
 		Return_Frame (Interp, Integer_To_Pointer(Num));
 	end Apply_Quotient_Procedure;
 
+	-- -------------------------------------------------------------
+	-- Comparions procedures
+	-- -------------------------------------------------------------
+
 	generic 
 		with function Validate (X: in Object_Pointer; Y: in Object_Pointer) return Standard.Boolean;
 		with function Compare (X: in Object_Pointer; Y: in Object_Pointer) return Standard.Boolean;
@@ -279,6 +283,67 @@ Ada.Text_IO.Put_line ("TOO FEW ARGUMETNS FOR COMPARISON");
 	procedure Apply_LT_Procedure is new Apply_Compare_Procedure (Validate_Numeric, Less_Than);
 	procedure Apply_GE_Procedure is new Apply_Compare_Procedure (Validate_Numeric, Greater_Or_Equal);
 	procedure Apply_LE_Procedure is new Apply_Compare_Procedure (Validate_Numeric, Less_Or_Equal);
+
+	-- -------------------------------------------------------------
+	-- Questioning procedures
+	-- -------------------------------------------------------------
+	generic 
+		with function Question (X: in Object_Pointer) return Standard.Boolean;
+	procedure Apply_Question_Procedure;
+
+	procedure Apply_Question_Procedure is
+		Bool: Object_Pointer;
+	begin
+		if Is_Cons(Args) and then not Is_Cons(Get_Cdr(Args)) then
+			-- 1 actual argument
+			if Question(Get_Car(Args)) then
+				Bool := True_Pointer;
+			else
+				Bool := False_Pointer;
+			end if;
+			Return_Frame (Interp, Bool);
+		else
+Ada.Text_IO.Put_line ("WRONG NUMBER OF ARGUMETNS FOR COMPARISON");
+			raise Syntax_Error;
+		end if;
+	end Apply_Question_Procedure;
+	
+	function Is_Null_Class (X: in Object_Pointer) return Standard.Boolean is
+		pragma Inline (Is_Null_Class);
+	begin
+		return X = Nil_Pointer;
+	end Is_Null_Class;
+
+	function Is_Number_Class (X: in Object_Pointer) return Standard.Boolean is
+		pragma Inline (Is_Number_Class);
+	begin
+		return Is_Integer(X); -- TODO bignum
+	end Is_Number_Class;
+
+	function Is_Procedure_Class (X: in Object_Pointer) return Standard.Boolean is
+		pragma Inline (Is_Procedure_Class);
+	begin
+		return Is_Closure(X) or else Is_Procedure(X) or else Is_Continuation(X);
+	end Is_Procedure_Class;
+
+	function Is_String_Class (X: in Object_Pointer) return Standard.Boolean is
+		pragma Inline (Is_String_Class);
+	begin
+		return Is_String(X);
+	end Is_String_Class;
+
+	function Is_Symbol_Class (X: in Object_Pointer) return Standard.Boolean is
+		pragma Inline (Is_Symbol_Class);
+	begin
+		return Is_Symbol(X);
+	end Is_Symbol_Class;
+
+	procedure Apply_NullQ_Procedure is new Apply_Question_Procedure (Is_Null_Class);
+	procedure Apply_NumberQ_Procedure is new Apply_Question_Procedure (Is_Number_Class);
+	procedure Apply_ProcedureQ_Procedure is new Apply_Question_Procedure (Is_Procedure_Class);
+	procedure Apply_StringQ_Procedure is new Apply_Question_Procedure (Is_String_Class);
+	procedure Apply_SymbolQ_Procedure is new Apply_Question_Procedure (Is_Symbol_Class);
+	
 
 	-- -------------------------------------------------------------
 	-- Closure
@@ -498,8 +563,10 @@ begin
 					Apply_Multiply_Procedure;
 				when Quotient_Procedure =>
 					Apply_Quotient_Procedure;
-				--when Remainder_Procedure =>
-				--	Apply_Remainder_Procedure;
+				when Remainder_Procedure =>
+					--Apply_Remainder_Procedure;
+					ada.text_io.put_line ("NOT IMPLEMENTED");
+					raise Evaluation_Error;
 
 				when EQ_Procedure =>
 					Apply_EQ_Procedure;
@@ -511,8 +578,21 @@ begin
 					Apply_GE_Procedure;
 				when LE_Procedure =>
 					Apply_LE_Procedure;
-				when others =>
-					raise Internal_Error;
+
+
+				when NullQ_Procedure =>
+					Apply_NullQ_Procedure;	
+				when NumberQ_Procedure =>
+					Apply_NumberQ_Procedure;	
+				when ProcedureQ_Procedure =>
+					Apply_ProcedureQ_Procedure;	
+				when StringQ_Procedure =>
+					Apply_StringQ_Procedure;	
+				when SymbolQ_Procedure =>
+					Apply_SymbolQ_Procedure;	
+
+--				when others =>
+--					raise Internal_Error;
 			end case;	
 
 		when Closure_Object =>

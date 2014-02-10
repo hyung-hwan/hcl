@@ -49,21 +49,26 @@ package body H2.Scheme is
 	                                                     Ch.LC_C, Ch.LC_U, Ch.LC_R, Ch.LC_R, Ch.LC_E, Ch.LC_N, Ch.LC_T, Ch.Minus_Sign,
 	                                                     Ch.LC_C, Ch.LC_O, Ch.LC_N, Ch.LC_T, Ch.LC_I, Ch.LC_N, Ch.LC_U, Ch.LC_A, 
 	                                                     Ch.LC_T, Ch.LC_I, Ch.LC_O, Ch.LC_N);  -- "call-with-current-continuation"
-	Label_Car:       constant Object_Character_Array := (Ch.LC_C, Ch.LC_A, Ch.LC_R); -- "car"
-	Label_Cdr:       constant Object_Character_Array := (Ch.LC_C, Ch.LC_D, Ch.LC_R); -- "cdr"
-	Label_Cons:      constant Object_Character_Array := (Ch.LC_C, Ch.LC_O, Ch.LC_N, Ch.LC_S); -- "cons"
-	Label_EQ:        constant Object_Character_Array := (1 => Ch.Equal_Sign); -- "="
-	Label_GE:        constant Object_Character_Array := (Ch.Greater_Than_Sign, Ch.Equal_Sign); -- ">="
-	Label_GT:        constant Object_Character_Array := (1 => Ch.Greater_Than_Sign); -- ">"
-	Label_LE:        constant Object_Character_Array := (Ch.Less_Than_Sign, Ch.Equal_Sign); -- "<="
-	Label_LT:        constant Object_Character_Array := (1 => Ch.Less_Than_Sign); -- "<"
-	Label_Minus:     constant Object_Character_Array := (1 => Ch.Minus_Sign); -- "-"
-	Label_Multiply:  constant Object_Character_Array := (1 => Ch.Asterisk); -- "*"
-	Label_Plus:      constant Object_Character_Array := (1 => Ch.Plus_Sign); -- "+"
-	Label_Quotient:  constant Object_Character_Array := (Ch.LC_Q, Ch.LC_U, Ch.LC_O, Ch.LC_T, Ch.LC_I, Ch.LC_E, Ch.LC_N, Ch.LC_T); -- "quotient"
-	Label_Remainder: constant Object_Character_Array := (Ch.LC_R, Ch.LC_E, Ch.LC_M, Ch.LC_A, Ch.LC_I, Ch.LC_N, Ch.LC_D, Ch.LC_E, Ch.LC_R); -- "remainder"
-	Label_Setcar:    constant Object_Character_Array := (Ch.LC_S, Ch.LC_E, Ch.LC_T, Ch.Minus_Sign, Ch.LC_C, Ch.LC_A, Ch.LC_R, Ch.Exclamation); -- "set-car!"
-	Label_Setcdr:    constant Object_Character_Array := (Ch.LC_S, Ch.LC_E, Ch.LC_T, Ch.Minus_Sign, Ch.LC_C, Ch.LC_D, Ch.LC_R, Ch.Exclamation); -- "set-cdr!"
+	Label_Car:        constant Object_Character_Array := (Ch.LC_C, Ch.LC_A, Ch.LC_R); -- "car"
+	Label_Cdr:        constant Object_Character_Array := (Ch.LC_C, Ch.LC_D, Ch.LC_R); -- "cdr"
+	Label_Cons:       constant Object_Character_Array := (Ch.LC_C, Ch.LC_O, Ch.LC_N, Ch.LC_S); -- "cons"
+	Label_EQ:         constant Object_Character_Array := (1 => Ch.Equal_Sign); -- "="
+	Label_GE:         constant Object_Character_Array := (Ch.Greater_Than_Sign, Ch.Equal_Sign); -- ">="
+	Label_GT:         constant Object_Character_Array := (1 => Ch.Greater_Than_Sign); -- ">"
+	Label_LE:         constant Object_Character_Array := (Ch.Less_Than_Sign, Ch.Equal_Sign); -- "<="
+	Label_LT:         constant Object_Character_Array := (1 => Ch.Less_Than_Sign); -- "<"
+	Label_Minus:      constant Object_Character_Array := (1 => Ch.Minus_Sign); -- "-"
+	Label_Multiply:   constant Object_Character_Array := (1 => Ch.Asterisk); -- "*"
+	Label_NullQ:      constant Object_Character_Array := (Ch.LC_N, Ch.LC_U, Ch.LC_L, Ch.LC_L, Ch.Question); -- "null?"
+	Label_NumberQ:    constant Object_Character_Array := (Ch.LC_N, Ch.LC_U, Ch.LC_M, Ch.LC_B, Ch.LC_E, Ch.LC_R, Ch.Question); -- "number?"
+	Label_Plus:       constant Object_Character_Array := (1 => Ch.Plus_Sign); -- "+"
+	Label_ProcedureQ: constant Object_Character_Array := (Ch.LC_P, Ch.LC_R, Ch.LC_O, Ch.LC_C, Ch.LC_E, Ch.LC_D, Ch.LC_U, Ch.LC_R, Ch.LC_E, Ch.Question); -- "procedure?"
+	Label_Quotient:   constant Object_Character_Array := (Ch.LC_Q, Ch.LC_U, Ch.LC_O, Ch.LC_T, Ch.LC_I, Ch.LC_E, Ch.LC_N, Ch.LC_T); -- "quotient"
+	Label_Remainder:  constant Object_Character_Array := (Ch.LC_R, Ch.LC_E, Ch.LC_M, Ch.LC_A, Ch.LC_I, Ch.LC_N, Ch.LC_D, Ch.LC_E, Ch.LC_R); -- "remainder"
+	Label_Setcar:     constant Object_Character_Array := (Ch.LC_S, Ch.LC_E, Ch.LC_T, Ch.Minus_Sign, Ch.LC_C, Ch.LC_A, Ch.LC_R, Ch.Exclamation); -- "set-car!"
+	Label_Setcdr:     constant Object_Character_Array := (Ch.LC_S, Ch.LC_E, Ch.LC_T, Ch.Minus_Sign, Ch.LC_C, Ch.LC_D, Ch.LC_R, Ch.Exclamation); -- "set-cdr!"
+	Label_StringQ:    constant Object_Character_Array := (Ch.LC_S, Ch.LC_T, Ch.LC_R, Ch.LC_I, Ch.LC_N, Ch.LC_G, Ch.Question); -- "string?"
+	Label_SymbolQ:    constant Object_Character_Array := (Ch.LC_S, Ch.LC_Y, Ch.LC_M, Ch.LC_B, Ch.LC_O, Ch.LC_L, Ch.Question); -- "symbol?"
 
 
 	Label_Newline:  constant Object_Character_Array := (Ch.LC_N, Ch.LC_E, Ch.LC_W, Ch.LC_L, Ch.LC_I, Ch.LC_N, Ch.LC_E); -- "newline"
@@ -380,6 +385,19 @@ package body H2.Scheme is
 	begin
 		 return Integer_To_Pointer(Opcode_Type'Pos(Opcode));
 	end Opcode_To_Pointer;
+
+	function Pointer_To_Procedure_Code (Pointer: in Object_Pointer) return Procedure_Code is
+		pragma Inline (Pointer_To_Procedure_Code);
+	begin
+		return Procedure_Code'Val(Pointer_To_Integer(Pointer));
+	end Pointer_To_Procedure_Code;
+
+	function Procedure_Code_To_Pointer (Opcode: in Procedure_Code) return Object_Pointer is
+		pragma Inline (Procedure_Code_To_Pointer);
+	begin
+		 return Integer_To_Pointer(Procedure_Code'Pos(Opcode));
+	end Procedure_Code_To_Pointer;
+
 
 	function Token_To_Pointer (Interp: access Interpreter_Record; 
 	                           Token:  in     Token_Record) return Object_Pointer is
@@ -1094,12 +1112,19 @@ end if;
 	end Reverse_Cons;
 	-----------------------------------------------------------------------------
 
+	function Is_String (Source: in Object_Pointer) return Standard.Boolean is
+		pragma Inline (Is_String);
+	begin
+		return Is_Normal_Pointer(Source) and then 
+		       Source.Tag = String_Object;
+	end Is_String;
+
 	function Make_String (Interp: access  Interpreter_Record;
 	                      Source: in      Object_Character_Array) return Object_Pointer is
 		Result: Object_Pointer;
 	begin
 Ada.Text_IO.Put_Line ("Make_String...");
-		Result := Allocate_Character_Object (Interp, Source);
+		Result := Allocate_Character_Object(Interp, Source);
 		Result.Tag := String_Object;
 --Print_Object_Pointer ("Make_String Result - " & Source, Result);
 		return Result;
@@ -1108,7 +1133,7 @@ Ada.Text_IO.Put_Line ("Make_String...");
 	function Is_Symbol (Source: in Object_Pointer) return Standard.Boolean is
 		pragma Inline (Is_Symbol);
 	begin
-		return Is_Normal_Pointer (Source) and then 
+		return Is_Normal_Pointer(Source) and then 
 		       Source.Tag = Symbol_Object;
 	end Is_Symbol;
 
@@ -1538,7 +1563,7 @@ Ada.Text_IO.Put_Line ("Make_String...");
 	end Is_Syntax;
 
 	function Make_Procedure (Interp: access Interpreter_Record;
-	                         Opcode: in     Procedure_Code;
+	                         Code:   in     Procedure_Code;
 	                         Name:   in     Object_Character_Array) return Object_Pointer is
 		-- this procedure is for internal use only
 		Symbol: aliased Object_Pointer;
@@ -1553,7 +1578,7 @@ Ada.Text_IO.Put_Line ("Make_String...");
 		-- Make the actual procedure object
 		Proc := Allocate_Pointer_Object(Interp, Procedure_Object_Size, Nil_Pointer);
 		Proc.Tag := Procedure_Object;
-		Proc.Pointer_Slot(Procedure_Opcode_Index) := Integer_To_Pointer(Opcode);
+		Proc.Pointer_Slot(Procedure_Opcode_Index) := Procedure_Code_To_Pointer(Code);
 
 		-- Link it to the top environement
 		pragma Assert (Get_Frame_Environment(Interp.Stack) = Interp.Root_Environment); 
@@ -1576,7 +1601,7 @@ Ada.Text_IO.Put_Line ("Make_String...");
 		pragma Assert (Is_Procedure(Proc));
 		pragma Assert (Proc.Size = Procedure_Object_Size);
 	begin
-		return Pointer_To_Integer(Proc.Pointer_Slot(Procedure_Opcode_Index));
+		return Pointer_To_Procedure_Code(Proc.Pointer_Slot(Procedure_Opcode_Index));
 	end Get_Procedure_Opcode;
 	
 	-----------------------------------------------------------------------------
@@ -1796,10 +1821,15 @@ Ada.Text_IO.Put_Line ("Make_String...");
 			Dummy := Make_Procedure (Interp.Self, LE_Procedure,           Label_LE); -- "<="
 			Dummy := Make_Procedure (Interp.Self, LT_Procedure,           Label_LT); -- "<"
 			Dummy := Make_Procedure (Interp.Self, Multiply_Procedure,     Label_Multiply); -- "*"
+			Dummy := Make_Procedure (Interp.Self, NumberQ_Procedure,      Label_NumberQ); -- "number?"
+			Dummy := Make_Procedure (Interp.Self, NullQ_Procedure,        Label_NullQ); -- "null?"
 			Dummy := Make_Procedure (Interp.Self, Quotient_Procedure,     Label_Quotient); -- "quotient"
 			Dummy := Make_Procedure (Interp.Self, Remainder_Procedure,    Label_Remainder); -- "remainder"
 			Dummy := Make_Procedure (Interp.Self, Setcar_Procedure,       Label_Setcar); -- "set-car!"
 			Dummy := Make_Procedure (Interp.Self, Setcdr_Procedure,       Label_Setcdr); -- "set-cdr!"
+			Dummy := Make_Procedure (Interp.Self, ProcedureQ_Procedure,   Label_ProcedureQ); -- "procedure?"
+			Dummy := Make_Procedure (Interp.Self, StringQ_Procedure,      Label_StringQ); -- "string?"
+			Dummy := Make_Procedure (Interp.Self, SymbolQ_Procedure,      Label_SymbolQ); -- "symbol?"
 			Dummy := Make_Procedure (Interp.Self, Subtract_Procedure,     Label_Minus); -- "-"
 		end Make_Procedure_Objects;
 
