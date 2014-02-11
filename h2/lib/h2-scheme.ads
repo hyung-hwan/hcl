@@ -163,6 +163,7 @@ package H2.Scheme is
 	-- represents the value that can be stored in this field.
 	type Object_Flags is mod 2 ** 4;
 	Syntax_Object: constant Object_Flags := Object_Flags'(2#0001#); 
+	Syntax_Checked: constant Object_Flags := Object_Flags'(2#0010#);
 
 	type Syntax_Code is (
 		And_Syntax,
@@ -503,9 +504,13 @@ private
 		Data: Top_Array(1 .. 100) := (others => null);
 	end record;
 
+	type Interpreter_State is mod 2 ** 4;
+	Force_Syntax_Check: constant Interpreter_State := Interpreter_State'(2#0001#); 
+
 	--type Interpreter_Record is tagged limited record
 	type Interpreter_Record is limited record
 		Self: Interpreter_Pointer := Interpreter_Record'Unchecked_Access; -- Current instance's pointer
+		State: Interpreter_State := 0; -- Internal housekeeping state
 
 		Storage_Pool: Storage_Pool_Pointer := null;
 		Trait: Option_Record(Trait_Option);

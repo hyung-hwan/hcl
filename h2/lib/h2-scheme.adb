@@ -1863,6 +1863,7 @@ end if;
 			Interp.Self := Aliased_Interp'Unchecked_Access;
 		end;
 
+		Interp.State := 0;
 		Interp.Storage_Pool := Storage_Pool;
 		Interp.Symbol_Table := Nil_Pointer;
 

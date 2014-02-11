@@ -80,7 +80,7 @@ procedure Execute (Interp: in out Interpreter_Record) is
 			if Is_Cons(O) then
 				Reload_Frame (Interp, Opcode_Grouped_Call, O);
 			else
-				Pop_Frame (Interp);
+				Pop_Frame (Interp); -- no <expression> to evaluate
 			end if;
 		else
 			O := Get_Cdr(O); -- next <clause> list
@@ -96,7 +96,7 @@ procedure Execute (Interp: in out Interpreter_Record) is
 					if Is_Cons(O) then
 						Reload_Frame (Interp, Opcode_Grouped_Call, O);
 					else
-						Pop_Frame (Interp);
+						Pop_Frame (Interp); -- no <expression> to evaluate
 					end if;
 				else
 					Switch_Frame (Interp.Stack, Opcode_Evaluate_Object, Get_Car(R), Nil_Pointer);
