@@ -74,7 +74,79 @@ procedure Evaluate is
 
 	procedure Evaluate_Case_Syntax is
 		pragma Inline (Evaluate_Case_Syntax);
+		Synlist: Object_Pointer;
+		Ptr1: Object_Pointer;
+		Ptr2: Object_Pointer;
+		Ptr3: Object_Pointer;
 	begin
+		-- (case <key> <clause 1> <clause 2> ...)
+		-- <key> is an expression.
+		-- <clause> should be of the form: 
+		--    ((<datum 1> ...) <expression 1> <expression 2> ...)
+		-- the last <clause> may be an else clause of the form:
+		--    (else <expression 1> <expression 2> ...)
+		--
+		-- (case (* 2 3)
+		--       ((2 3 5 7) 'prime)
+		--       ((1 4 6 8 9) 'composite))
+		--
+		-- (case (car '(c d))
+		--     ((a e i o u) 'vowel)
+		--     ((w y) 'semivowel)
+		--     (else 'consonant))
+		--
+
+		Synlist := Operand;
+		Operand := Get_Cdr(Operand); -- Skip "case"
+
+		if (Interp.State and Force_Syntax_Check) /= 0 or else
+		   (Synlist.Flags and Syntax_Checked) = 0 then
+		   
+			if Not Is_Cons(Operand) then
+				-- e.g) (case)
+				--      (case . 10)
+				Ada.Text_IO.Put_LINE ("NO KEY FOR CASE");
+				raise Syntax_Error;
+			end if;
+
+			--Key := Get_Car(Operand);
+
+			Ptr1 := Get_Cdr(Operand); -- <clause> list.
+			while Is_Cons(Ptr1) loop
+				Ptr2 := Get_Car(Ptr1); -- <clause>
+				if Get_Last_Cdr(Ptr2) /= Nil_Pointer then
+					Ada.Text_IO.Put_Line ("FUCKING CDR FOR CASE CLAUSE");
+					raise Syntax_Error;
+				end if;
+				
+				Ptr3 := Get_Car(Ptr2); -- <datum>
+				if Is_Cons(Ptr3) then
+					if Get_Last_Cdr(Ptr3) /= Nil_Pointer then
+						Ada.Text_IO.Put_LINE ("FUCKING CDR FOR CASE DATUM");
+						raise Syntax_Error;
+					end if;
+				elsif Ptr3 = Interp.Else_Symbol then
+					-- check <test>. if it's else, it should be in the last clause.
+					if Is_Cons(Get_Cdr(Ptr1)) then
+						Ada.Text_IO.Put_Line ("ELSE NOT IN THE LAST CASE CLAUSE");
+						raise Syntax_Error;
+					end if;
+				else
+					Ada.Text_IO.Put_LINE ("INVALID DATUM FOR CASE");
+					raise Syntax_Error;
+				end if;
+
+				Ptr1 := Get_Cdr(Ptr1); -- next <clause> list
+			end loop;
+
+			if Ptr1 /= Nil_Pointer then
+				Ada.Text_IO.Put_Line ("FUCKING LAST CLAUSE FOR CASE");
+				raise Syntax_Error;
+			end if;
+
+			Synlist.Flags := Synlist.Flags or Syntax_Checked;
+		end if;
+		
 		Ada.Text_IO.Put_LINE ("UNIMPLEMENTED");
 		raise Evaluation_Error;
 	end Evaluate_Case_Syntax;
@@ -123,6 +195,15 @@ procedure Evaluate is
 						Ada.Text_IO.Put_Line ("FUCKING CDR FOR COND CLAUSE");
 						raise Syntax_Error;
 					end if;
+					
+					if Get_Car(Ptr2) = Interp.Else_Symbol then
+						-- check <test>. if it's else, it should be in the last clause.
+						if Is_Cons(Get_Cdr(Ptr1)) then
+							Ada.Text_IO.Put_Line ("ELSE NOT IN THE LAST COND CLAUSE");
+							raise Syntax_Error;
+						end if;
+					end if;
+					
 					Ptr1 := Get_Cdr(Ptr1); -- next <clause> list
 					exit when not Is_Cons(Ptr1);
 				end loop;
@@ -140,21 +221,31 @@ procedure Evaluate is
 	end Evaluate_Cond_Syntax;
 
      -- ----------------------------------------------------------------
-
+	
 	procedure Evaluate_Define_Syntax is
 		pragma Inline (Evaluate_Define_Syntax);
 		Synlist: Object_Pointer;
-		Ptr: Object_Pointer;
+		Ptr1: Object_Pointer;
+		Ptr2: Object_Pointer;
+		Ptr3: Object_Pointer;
+		Ptr4: Object_Pointer;
 	begin
 -- TODO: limit the context where define can be used.
 
-		-- (define x 10) 
-		-- (define (add x y) (+ x y)) -> (define add (lambda (x y) (+ x y)))
+		-- (define <variable> <expression>)
+		-- (define (<variable> <formals>) <body>)
+		-- (define (<variable> . <formal>) <body>)
+		--
+		-- e.g)
+		--   (define x 10) 
+		--   (define (add x y) (+ x y)) -> (define add (lambda (x y) (+ x y)))
+
 		Synlist := Operand;
 		Operand := Get_Cdr(Operand); -- Skip "define"
 
 		if (Interp.State and Force_Syntax_Check) /= 0 or else 
 		   (Synlist.Flags and Syntax_Checked) = 0 then
+
 			if not Is_Cons(Operand) or else not Is_Cons(Get_Cdr(Operand)) then
 				-- e.g) (define)
 				--      (define . 10)
@@ -163,12 +254,60 @@ procedure Evaluate is
 				raise Syntax_Error;
 			end if;
 			
-			Ptr := Get_Car(Operand);
-			if Is_Cons(Ptr) then
-ada.text_io.put_line ("NOT IMPLEMENTED YET");
-raise Syntax_Error;
-		
-			elsif Is_Symbol(Ptr) then
+			Ptr1 := Get_Car(Operand); 
+			if Is_Cons(Ptr1) then
+				-- (define (add x y) ...)
+
+				Ptr2 := Get_Car(Ptr1); -- <variable> as a function name
+				if not Is_Symbol(Ptr2) then
+					Ada.Text_IO.Put_LINE ("WRONG NAME FOR DEFINE");
+					raise Syntax_Error;
+				end if;
+				
+				Ptr1 := Get_Cdr(Ptr1); -- <formals>
+				Ptr2 := Ptr1;
+
+				while Is_Cons(Ptr2) loop
+					Ptr3 := Get_Car(Ptr2); -- <formal argument>
+					if not Is_Symbol(Ptr3) then
+						Ada.Text_IO.Put_Line ("WRONG FORMAL FOR LAMBDA");
+						raise Syntax_Error;
+					end if;
+
+					-- Check for a duplication formal argument
+					-- TODO: make duplication check optional or change the implementation more efficient so that this check is not repeated 
+					Ptr4 := Ptr1;
+					while Ptr4 /= Ptr2 loop
+						if Get_Car(Ptr4) = Ptr3 then
+							Ada.Text_IO.Put_Line ("DUPLICATE FORMAL FOR DEFINE");
+							raise Syntax_Error;
+						end if;
+						Ptr4 := Get_Cdr(Ptr4);
+					end loop;
+
+					-- Move on to the next formal argument
+					Ptr2 := Get_Cdr(Ptr2);
+					exit when not Is_Cons(Ptr2);
+				end loop;
+
+				if Ptr2 /= Nil_Pointer and then not Is_Symbol(Ptr2) then
+					Ada.Text_IO.Put_Line ("FUCKING CDR IN FORMALS FOR DEFINE");
+					raise Syntax_Error;
+				end if;
+
+				Ptr1 := Get_Cdr(Operand); -- <body>
+				if not Is_Cons(Ptr1) then
+					Ada.Text_IO.Put_Line ("NO BODY");
+					raise Syntax_Error;
+				end if;
+
+				if Get_Last_Cdr(Ptr1) /= Nil_Pointer then
+					-- (lambda (x y) (+ x y) . 99)
+					Ada.Text_IO.Put_Line ("FUCKING CDR IN BODY FOR LAMBDA");
+					raise Syntax_Error;
+				end if;
+
+			elsif Is_Symbol(Ptr1) then
 				if Get_Cdr(Get_Cdr(Operand)) /= Nil_Pointer then
 					Ada.Text_IO.Put_LINE ("TOO MANY ARGUMENTS FOR DEFINE");
 					raise Syntax_Error;
@@ -178,25 +317,34 @@ raise Syntax_Error;
 				raise Syntax_Error;	
 			end if;
 
-
 			Synlist.Flags := Synlist.Flags or Syntax_Checked;
 		end if;
-		
-		Ptr := Get_Car(Operand);
-		if Is_Cons(Ptr) then
+
+		Ptr1 := Get_Car(Operand);
+		if Is_Cons(Ptr1) then
 			-- define a function:  (define (add x y) ...) 
-ada.text_io.put_line ("NOT IMPLEMENTED YET");
-raise Syntax_Error;
+			-- Get_Car(Ptr1) -- <variable>
+			-- Get_Cdr(Ptr1) -- <formals>
+			-- Get_Cdr(Operand) -- <body>
+
+			-- It's ok to not reload but switch because no continuation
+			-- can be created in this form of 'define'. 
+			Switch_Frame (Interp.Stack, Opcode_Define_Finish, Get_Car(Ptr1), Nil_Pointer);
+
+			-- Make closure and set it as a frame result. Note this is done
+			-- after switching in order to avoid GC problems withoug using
+			-- Push_Top/Pop_Tops.
+			Ptr2 := Make_Cons(Interp.Self, Get_Cdr(Ptr1), Get_Cdr(Operand));
+			Ptr2 := Make_Closure(Interp.Self, Ptr2, Get_Frame_Environment(Interp.Stack));
+			Set_Frame_Result (Interp.Stack, Ptr2);
 		else
 			-- define a symbol: (define x ...)
-			pragma Assert (Is_Symbol(Ptr));
+			pragma Assert (Is_Symbol(Ptr1));
 
 			-- Arrange to finish defining after value evaluation 
 			-- and to evaluate the value part.
-			--Switch_Frame (Interp.Stack, Opccode_Define_Finish, Ptr);
-			--Push_Frame (Interp, Opcode_Evaluate_Object, Get_Car(Get_Cdr(Operand))); 
 			Switch_Frame (Interp.Stack, Opcode_Evaluate_Object, Get_Car(Get_Cdr(Operand)), Nil_Pointer);
-			Push_Subframe (Interp, Opcode_Define_Finish, Ptr);
+			Push_Subframe (Interp, Opcode_Define_Finish, Ptr1);
 		end if;
 	end Evaluate_Define_Syntax;
 
@@ -204,7 +352,38 @@ raise Syntax_Error;
 
 	procedure Evaluate_Do_Syntax is
 		pragma Inline (Evaluate_Do_Syntax);
+		Synlist: Object_Pointer;
 	begin
+		-- (do <bindings> <clause> <body>)
+		-- <bindings> should be of the form: ((<variable 1> <init 1> <step 1>) ...)
+		-- <clause> should  be of the form: (<test> <expression> ...)
+		-- <body> is zero or more expressions.
+		--
+		-- (let ((x '(1 3 5 7 9)))
+		--     (do ((x x (cdr x))
+		--          (sum 0 (+ sum (car x)))) ; <bindings>
+		--         ((null? x) sum) ; <clause>. if <test> is true, exit do with sum.
+		--     )
+		-- )
+		--
+		-- (do ((i 0 (+ i 1)))
+		--     ((= i 5) i)     
+		--     (display i) ; <body> downwards
+		--     (newline)
+		-- )
+		
+		Synlist := Operand;
+		Operand := Get_Cdr(Operand); -- Skip "do"
+
+		if (Interp.State and Force_Syntax_Check) /= 0 or else 
+		   (Synlist.Flags and Syntax_Checked) = 0 then
+
+			Ada.Text_IO.Put_LINE ("UNIMPLEMENTED");
+			raise Evaluation_Error;
+
+			Synlist.Flags := Synlist.Flags or Syntax_Checked;
+		end if; 
+
 		Ada.Text_IO.Put_LINE ("UNIMPLEMENTED");
 		raise Evaluation_Error;
 	end Evaluate_Do_Syntax;
@@ -220,10 +399,10 @@ raise Syntax_Error;
 		-- e.g) (if (> 3 2) 'yes)
 		--      (if (> 3 2) 'yes 'no)
 		--      (if (> 3 2) (- 3 2) (+ 3 2))
-		
+
 		Synlist := Operand;
 		Operand := Get_Cdr(Operand); -- Skip "if".
-		
+
 		if (Interp.State and Force_Syntax_Check) /= 0 or else 
 		   (Synlist.Flags and Syntax_Checked) = 0 then
 			declare
@@ -259,10 +438,9 @@ raise Syntax_Error;
 					raise Syntax_Error;
 				end if;
 			end;
-			
+
 			Synlist.Flags := Synlist.Flags or Syntax_Checked;
 		end if;
-		
 		
 		-- Arrange to evaluate <consequent> or <alternate> after <test> 
 		-- evaluation and to evaluate <test>. Use Switch_Frame/Push_Subframe
@@ -298,8 +476,8 @@ raise Syntax_Error;
 				Ptr2: Object_Pointer;
 				Ptr3: Object_Pointer;
 				Ptr4: Object_Pointer;
-			begin	
-	
+			begin
+
 				Ptr1 := Get_Car(Operand);  -- <formals>
 				if Ptr1 = Nil_Pointer or else Is_Symbol(Ptr1) then
 					-- (lambda () ...) or (lambda x ...)
@@ -313,7 +491,7 @@ raise Syntax_Error;
 							Ada.Text_IO.Put_Line ("WRONG FORMAL FOR LAMBDA");
 							raise Syntax_Error;
 						end if;
-		
+
 						-- Check for a duplication formal argument
 						-- TODO: make duplication check optional or change the implementation more efficient so that this check is not repeated 
 						Ptr4 := Ptr1;
@@ -324,12 +502,12 @@ raise Syntax_Error;
 							end if;
 							Ptr4 := Get_Cdr(Ptr4);
 						end loop;
-		
+
 						-- Move on to the next formal argument
 						Ptr2 := Get_Cdr(Ptr2);
 						exit when not Is_Cons(Ptr2);
 					end loop;
-		
+
 					if Ptr2 /= Nil_Pointer and then not Is_Symbol(Ptr2) then
 						Ada.Text_IO.Put_Line ("FUCKING CDR IN FORMALS FOR LAMBDA");
 						raise Syntax_Error;
@@ -338,13 +516,13 @@ raise Syntax_Error;
 					Ada.Text_IO.Put_Line ("INVALID FORMALS FOR LAMBDA");
 					raise Syntax_Error;
 				end if;
-		
+
 				Ptr1 := Get_Cdr(Operand); -- cons cell containing <body>
 				if not Is_Cons(Ptr1) then
 					Ada.Text_IO.Put_Line ("NO BODY");
 					raise Syntax_Error;
 				end if;
-		
+
 				if Get_Last_Cdr(Ptr1) /= Nil_Pointer then
 					-- (lambda (x y) (+ x y) . 99)
 					Ada.Text_IO.Put_Line ("FUCKING CDR IN BODY FOR LAMBDA");
@@ -402,13 +580,13 @@ raise Syntax_Error;
 						Ada.Text_IO.Put_Line ("WRONG BINDING FOR LET");
 						raise Syntax_Error;
 					end if;
-		
+
 					Ptr2 := Get_Car(Ptr2); -- <binding> name
 					if not Is_Symbol(Ptr2) then
 						Ada.Text_IO.Put_Line ("WRONG BINDING NAME FOR LET");
 						raise Syntax_Error;
 					end if;
-		
+
 					-- Check for a duplicate binding name
 					-- TODO: make duplication check optional or change the implementation more efficient so that this check is not repeated 
 					Ptr3 := Bindings;
@@ -419,12 +597,12 @@ raise Syntax_Error;
 						end if;
 						Ptr3 := Get_Cdr(Ptr3);
 					end loop;
-		
+
 					-- Move on to the next binding
 					Ptr1 := Get_Cdr(Ptr1);
 					exit when not Is_Cons(Ptr1);
 				end loop;
-		
+
 				if Ptr1 /= Nil_Pointer then
 					-- The last cdr is not nil.
 					Ada.Text_IO.Put_Line ("FUCKING CDR FOR LET BINDING");
