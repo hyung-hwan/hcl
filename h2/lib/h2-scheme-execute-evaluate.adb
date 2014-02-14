@@ -109,7 +109,7 @@ procedure Evaluate is
 				raise Syntax_Error;
 			end if;
 
-			--Key := Get_Car(Operand);
+			--Key := Get_Car(Operand); -- <key>
 
 			Ptr1 := Get_Cdr(Operand); -- <clause> list.
 			while Is_Cons(Ptr1) loop
@@ -119,7 +119,7 @@ procedure Evaluate is
 					raise Syntax_Error;
 				end if;
 				
-				Ptr3 := Get_Car(Ptr2); -- <datum>
+				Ptr3 := Get_Car(Ptr2); -- <datum> list or 'else'
 				if Is_Cons(Ptr3) then
 					if Get_Last_Cdr(Ptr3) /= Nil_Pointer then
 						Ada.Text_IO.Put_LINE ("FUCKING CDR FOR CASE DATUM");
@@ -135,6 +135,11 @@ procedure Evaluate is
 					Ada.Text_IO.Put_LINE ("INVALID DATUM FOR CASE");
 					raise Syntax_Error;
 				end if;
+				
+				if Get_Cdr(Ptr2) = Nil_Pointer then
+					Ada.Text_IO.Put_Line ("NO EXPRESSION IN CASE CLAUSE");
+					raise Syntax_Error;
+				end if;
 
 				Ptr1 := Get_Cdr(Ptr1); -- next <clause> list
 			end loop;
@@ -146,9 +151,9 @@ procedure Evaluate is
 
 			Synlist.Flags := Synlist.Flags or Syntax_Checked;
 		end if;
-		
-		Ada.Text_IO.Put_LINE ("UNIMPLEMENTED");
-		raise Evaluation_Error;
+
+		Switch_Frame (Interp.Stack, Opcode_Evaluate_Object, Get_Car(Operand), Nil_Pointer); -- <key>
+		Push_Subframe (Interp, Opcode_Case_Finish, Get_Cdr(Operand)); -- <clause> list
 	end Evaluate_Case_Syntax;
 
      -- ----------------------------------------------------------------

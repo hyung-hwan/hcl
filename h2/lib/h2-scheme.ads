@@ -183,32 +183,6 @@ package H2.Scheme is
 		Set_Syntax
 	);
 
-	type Procedure_Code is (
-		Add_Procedure,
-		Callcc_Procedure,
-		Car_Procedure,
-		Cdr_Procedure,
-		Cons_Procedure,
-		EQ_Procedure,
-		GT_Procedure,
-		LT_Procedure,
-		GE_Procedure,
-		LE_Procedure,
-		Multiply_Procedure,
-		NullQ_Procedure,
-		NumberQ_Procedure,
-		ProcedureQ_Procedure,
-		Quotient_Procedure,
-		Remainder_Procedure,
-		Setcar_Procedure,
-		Setcdr_Procedure,
-		StringQ_Procedure,
-		Subtract_Procedure,
-		SymbolQ_Procedure
-	);
-	for Procedure_Code'Size use Object_Integer'Size;
-	
-
 	type Object_Tag is (
 		Unknown_Object, 
 		Cons_Object,

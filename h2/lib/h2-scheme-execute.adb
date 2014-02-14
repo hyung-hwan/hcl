@@ -67,6 +67,41 @@ procedure Execute (Interp: in out Interpreter_Record) is
 	procedure Do_Or_Finish is new Evaluate_While(Is_False_Class);
 
 	-- ----------------------------------------------------------------
+	procedure Do_Case_Finish is
+		pragma Inline (Do_Case_Finish);
+		
+		R: Object_Pointer;
+		O: Object_Pointer;
+		C: Object_Pointer;
+		D: Object_Pointer;
+	begin
+		R := Get_Frame_Result(Interp.Stack); -- <test> result
+		O := Get_Frame_Operand(Interp.Stack); -- <clause> list
+		
+		while Is_Cons(O) loop
+			C := Get_Car(O); -- <clause>
+			D := Get_Car(C); -- <datum> list
+			if D = Interp.Else_Symbol then
+				Reload_Frame (Interp, Opcode_Grouped_Call, Get_Cdr(C));
+				return;
+			end if;
+
+			while Is_Cons(D) loop
+				if Equal_Values(R, Get_Car(D)) then -- <datum>
+					Reload_Frame (Interp, Opcode_Grouped_Call, Get_Cdr(C));
+					return;
+				end if;
+				D := Get_Cdr(D);
+			end loop;
+
+			O := Get_Cdr(O);
+		end loop;
+
+		-- no match found;
+		Pop_Frame (Interp);
+	end Do_Case_Finish;
+	
+	-- ----------------------------------------------------------------
 	procedure Do_Cond_Finish is
 		pragma Inline (Do_Cond_Finish);
 		R: Object_Pointer;
@@ -936,6 +971,9 @@ ada.text_io.put_line (Opcode_Type'Image(Get_Frame_Opcode(Interp.Stack)));
 			when Opcode_And_Finish => 
 				Do_And_Finish;
  
+			when Opcode_Case_Finish =>
+				Do_Case_Finish;
+				
 			when Opcode_Cond_Finish => 
 				Do_Cond_Finish;
 

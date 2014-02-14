@@ -106,6 +106,7 @@ Ada.Text_IO.Put_Line ("EXPECTED CONS-CELL FOR Setcdr");
 		Return_Frame (Interp, A);
 	end Apply_Setcdr_Procedure;
 
+
 	-- -------------------------------------------------------------
 	-- Arithmetic procedures
 	-- -------------------------------------------------------------
@@ -278,11 +279,11 @@ Ada.Text_IO.Put_line ("TOO FEW ARGUMETNS FOR COMPARISON");
 		return Pointer_To_Integer(X) <= Pointer_To_Integer(Y);
 	end Less_Or_Equal;
 
-	procedure Apply_EQ_Procedure is new Apply_Compare_Procedure (Validate_Numeric, Equal_To);
-	procedure Apply_GT_Procedure is new Apply_Compare_Procedure (Validate_Numeric, Greater_Than);
-	procedure Apply_LT_Procedure is new Apply_Compare_Procedure (Validate_Numeric, Less_Than);
-	procedure Apply_GE_Procedure is new Apply_Compare_Procedure (Validate_Numeric, Greater_Or_Equal);
-	procedure Apply_LE_Procedure is new Apply_Compare_Procedure (Validate_Numeric, Less_Or_Equal);
+	procedure Apply_N_EQ_Procedure is new Apply_Compare_Procedure (Validate_Numeric, Equal_To);
+	procedure Apply_N_GT_Procedure is new Apply_Compare_Procedure (Validate_Numeric, Greater_Than);
+	procedure Apply_N_LT_Procedure is new Apply_Compare_Procedure (Validate_Numeric, Less_Than);
+	procedure Apply_N_GE_Procedure is new Apply_Compare_Procedure (Validate_Numeric, Greater_Or_Equal);
+	procedure Apply_N_LE_Procedure is new Apply_Compare_Procedure (Validate_Numeric, Less_Or_Equal);
 
 	-- -------------------------------------------------------------
 	-- Questioning procedures
@@ -338,13 +339,29 @@ Ada.Text_IO.Put_line ("WRONG NUMBER OF ARGUMETNS FOR COMPARISON");
 		return Is_Symbol(X);
 	end Is_Symbol_Class;
 
-	procedure Apply_NullQ_Procedure is new Apply_Question_Procedure (Is_Null_Class);
-	procedure Apply_NumberQ_Procedure is new Apply_Question_Procedure (Is_Number_Class);
-	procedure Apply_ProcedureQ_Procedure is new Apply_Question_Procedure (Is_Procedure_Class);
-	procedure Apply_StringQ_Procedure is new Apply_Question_Procedure (Is_String_Class);
-	procedure Apply_SymbolQ_Procedure is new Apply_Question_Procedure (Is_Symbol_Class);
-	
 
+	procedure Apply_Q_Null_Procedure is new Apply_Question_Procedure (Is_Null_Class);
+	procedure Apply_Q_Number_Procedure is new Apply_Question_Procedure (Is_Number_Class);
+	procedure Apply_Q_Procedure_Procedure is new Apply_Question_Procedure (Is_Procedure_Class);
+	procedure Apply_Q_String_Procedure is new Apply_Question_Procedure (Is_String_Class);
+	procedure Apply_Q_Symbol_Procedure is new Apply_Question_Procedure (Is_Symbol_Class);
+
+	procedure Apply_Q_Eq_Procedure is
+	begin
+		null;
+	end Apply_Q_Eq_Procedure;
+	
+	procedure Apply_Q_Eqv_Procedure is
+	begin
+		null;
+	end Apply_Q_Eqv_Procedure;
+	
+	
+	procedure Apply_Not_Procedure is
+	begin
+		null;
+	end Apply_Not_Procedure;
+	
 	-- -------------------------------------------------------------
 	-- Closure
 	-- -------------------------------------------------------------
@@ -555,44 +572,50 @@ begin
 				when Setcdr_Procedure =>
 					Apply_Setcdr_Procedure;
 
-				when Add_Procedure =>
+				when N_Add_Procedure =>
 					Apply_Add_Procedure;
-				when Subtract_Procedure =>
+				when N_Subtract_Procedure =>
 					Apply_Subtract_Procedure;
-				when Multiply_Procedure =>
+				when N_Multiply_Procedure =>
 					Apply_Multiply_Procedure;
-				when Quotient_Procedure =>
+				when N_Quotient_Procedure =>
 					Apply_Quotient_Procedure;
-				when Remainder_Procedure =>
+				when N_Remainder_Procedure =>
 					--Apply_Remainder_Procedure;
 					ada.text_io.put_line ("NOT IMPLEMENTED");
 					raise Evaluation_Error;
 
-				when EQ_Procedure =>
-					Apply_EQ_Procedure;
-				when GT_Procedure =>
-					Apply_GT_Procedure;
-				when LT_Procedure =>
-					Apply_LT_Procedure;
-				when GE_Procedure =>
-					Apply_GE_Procedure;
-				when LE_Procedure =>
-					Apply_LE_Procedure;
+				when N_EQ_Procedure =>
+					Apply_N_EQ_Procedure;
+				when N_GT_Procedure =>
+					Apply_N_GT_Procedure;
+				when N_LT_Procedure =>
+					Apply_N_LT_Procedure;
+				when N_GE_Procedure =>
+					Apply_N_GE_Procedure;
+				when N_LE_Procedure =>
+					Apply_N_LE_Procedure;
 
 
-				when NullQ_Procedure =>
-					Apply_NullQ_Procedure;	
-				when NumberQ_Procedure =>
-					Apply_NumberQ_Procedure;	
-				when ProcedureQ_Procedure =>
-					Apply_ProcedureQ_Procedure;	
-				when StringQ_Procedure =>
-					Apply_StringQ_Procedure;	
-				when SymbolQ_Procedure =>
-					Apply_SymbolQ_Procedure;	
+				when Q_Eq_Procedure =>
+					Apply_Q_Eq_Procedure;
+				when Q_Eqv_Procedure =>
+					Apply_Q_Eqv_Procedure;
+				when Q_Null_Procedure =>
+					Apply_Q_Null_Procedure;	
+				when Q_Number_Procedure =>
+					Apply_Q_Number_Procedure;	
+				when Q_Procedure_Procedure =>
+					Apply_Q_Procedure_Procedure;	
+				when Q_String_Procedure =>
+					Apply_Q_String_Procedure;	
+				when Q_Symbol_Procedure =>
+					Apply_Q_Symbol_Procedure;	
 
---				when others =>
---					raise Internal_Error;
+
+				when Not_Procedure =>
+					Apply_Not_Procedure;
+
 			end case;	
 
 		when Closure_Object =>
