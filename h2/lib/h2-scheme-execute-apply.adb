@@ -7,7 +7,27 @@ procedure Apply is
 	Func: aliased Object_Pointer;
 	Args: aliased Object_Pointer;
 
+	-- -------------------------------------------------------------
+	-- Boolean procedures
+	-- -------------------------------------------------------------
+	procedure Apply_Not_Procedure is
+	begin
+		null;
+	end Apply_Not_Procedure;
 
+	procedure Apply_Q_Boolean_Procedure is
+	begin
+		null;
+	end Apply_Q_Boolean_Procedure;
+
+	-- -------------------------------------------------------------
+	-- Equivalence predicates
+	-- -------------------------------------------------------------
+	procedure Apply_Q_Eqv_Procedure is
+	begin
+		null;
+	end Apply_Q_Eqv_Procedure;
+	
 	-- -------------------------------------------------------------
 	-- List manipulation procedures
 	-- -------------------------------------------------------------
@@ -105,7 +125,6 @@ Ada.Text_IO.Put_Line ("EXPECTED CONS-CELL FOR Setcdr");
 
 		Return_Frame (Interp, A);
 	end Apply_Setcdr_Procedure;
-
 
 	-- -------------------------------------------------------------
 	-- Arithmetic procedures
@@ -351,16 +370,6 @@ Ada.Text_IO.Put_line ("WRONG NUMBER OF ARGUMETNS FOR COMPARISON");
 		null;
 	end Apply_Q_Eq_Procedure;
 	
-	procedure Apply_Q_Eqv_Procedure is
-	begin
-		null;
-	end Apply_Q_Eqv_Procedure;
-	
-	
-	procedure Apply_Not_Procedure is
-	begin
-		null;
-	end Apply_Not_Procedure;
 	
 	-- -------------------------------------------------------------
 	-- Closure
@@ -567,24 +576,11 @@ begin
 					Apply_Cdr_Procedure;
 				when Cons_Procedure =>
 					Apply_Cons_Procedure;
-				when Setcar_Procedure =>
-					Apply_Setcar_Procedure;
-				when Setcdr_Procedure =>
-					Apply_Setcdr_Procedure;
+				when Not_Procedure =>
+					Apply_Not_Procedure;
 
 				when N_Add_Procedure =>
 					Apply_Add_Procedure;
-				when N_Subtract_Procedure =>
-					Apply_Subtract_Procedure;
-				when N_Multiply_Procedure =>
-					Apply_Multiply_Procedure;
-				when N_Quotient_Procedure =>
-					Apply_Quotient_Procedure;
-				when N_Remainder_Procedure =>
-					--Apply_Remainder_Procedure;
-					ada.text_io.put_line ("NOT IMPLEMENTED");
-					raise Evaluation_Error;
-
 				when N_EQ_Procedure =>
 					Apply_N_EQ_Procedure;
 				when N_GT_Procedure =>
@@ -595,8 +591,19 @@ begin
 					Apply_N_GE_Procedure;
 				when N_LE_Procedure =>
 					Apply_N_LE_Procedure;
+				when N_Multiply_Procedure =>
+					Apply_Multiply_Procedure;
+				when N_Quotient_Procedure =>
+					Apply_Quotient_Procedure;
+				when N_Remainder_Procedure =>
+					--Apply_Remainder_Procedure;
+					ada.text_io.put_line ("NOT IMPLEMENTED");
+					raise Evaluation_Error;
+				when N_Subtract_Procedure =>
+					Apply_Subtract_Procedure;
 
-
+				when Q_Boolean_Procedure =>
+					Apply_Q_Boolean_Procedure;
 				when Q_Eq_Procedure =>
 					Apply_Q_Eq_Procedure;
 				when Q_Eqv_Procedure =>
@@ -613,8 +620,10 @@ begin
 					Apply_Q_Symbol_Procedure;	
 
 
-				when Not_Procedure =>
-					Apply_Not_Procedure;
+				when Setcar_Procedure =>
+					Apply_Setcar_Procedure;
+				when Setcdr_Procedure =>
+					Apply_Setcdr_Procedure;
 
 			end case;	
 
