@@ -8,29 +8,147 @@ procedure Apply is
 	Args: aliased Object_Pointer;
 
 	-- -------------------------------------------------------------
+	-- Questioning procedures
+	-- -------------------------------------------------------------
+	generic 
+		with function Question (X: in Object_Pointer) return Standard.Boolean;
+	procedure Apply_Question_Procedure;
+
+	procedure Apply_Question_Procedure is
+		Bool: Object_Pointer;
+	begin
+		if Is_Cons(Args) and then not Is_Cons(Get_Cdr(Args)) then
+			-- 1 actual argument
+			if Question(Get_Car(Args)) then
+				Bool := True_Pointer;
+			else
+				Bool := False_Pointer;
+			end if;
+			Return_Frame (Interp, Bool);
+		else
+Ada.Text_IO.Put_line ("WRONG NUMBER OF ARGUMETNS FOR COMPARISON");
+			raise Syntax_Error;
+		end if;
+	end Apply_Question_Procedure;
+	
+
+	function Is_Number_Class (X: in Object_Pointer) return Standard.Boolean is
+		pragma Inline (Is_Number_Class);
+	begin
+		return Is_Integer(X); -- TODO bignum
+	end Is_Number_Class;
+
+	function Is_Procedure_Class (X: in Object_Pointer) return Standard.Boolean is
+		pragma Inline (Is_Procedure_Class);
+	begin
+		return Is_Closure(X) or else Is_Procedure(X) or else Is_Continuation(X);
+	end Is_Procedure_Class;
+
+	procedure Apply_Q_Number_Procedure is new Apply_Question_Procedure (Is_Number_Class);	
+	procedure Apply_Q_Procedure_Procedure is new Apply_Question_Procedure (Is_Procedure_Class);
+	
+	
+	-- -------------------------------------------------------------
 	-- Boolean procedures
 	-- -------------------------------------------------------------
 	procedure Apply_Not_Procedure is
+		Ptr: Object_Pointer;
 	begin
-		null;
+		-- (not obj)
+		-- 'not' returns #t if obj is false, and returns #f otherwise.
+		--   (not #t) ; #f
+		--   (not 0) ; #f
+		--   (not #f) ; #t
+		
+		if not Is_Cons(Args) or else Get_Cdr(Args) /= Nil_Pointer then
+Ada.Text_IO.Put_Line ("WRONG NUMBER OF ARGUMETNS FOR NOT?"); 
+			raise Syntax_Error;
+		end if;
+
+		Ptr := Get_Car(Args);
+		if Is_True_Class(Ptr) then
+			Ptr := False_Pointer;
+		else
+			Ptr := True_Pointer;
+		end if;
+		Return_Frame (Interp, Ptr);
 	end Apply_Not_Procedure;
 
 	procedure Apply_Q_Boolean_Procedure is
+		Ptr: Object_Pointer;
 	begin
-		null;
+		-- (boolean? obj)
+		-- it returns #t if obj is either #t or #f and 
+		-- returns #f otherwise.
+		--  (boolean? #f) ; #t
+		--  (boolean? 0)  ; #f
+
+		if not Is_Cons(Args) or else Get_Cdr(Args) /= Nil_Pointer then
+Ada.Text_IO.Put_Line ("WRONG NUMBER OF ARGUMETNS FOR BOOLEAN?"); 
+			raise Syntax_Error;
+		end if;
+
+		Ptr := Get_Car(Args);
+		if Ptr = True_Pointer or else Ptr = False_Pointer then
+			Ptr := True_Pointer;
+		else
+			Ptr := False_Pointer;
+		end if;
+		Return_Frame (Interp, Ptr);
 	end Apply_Q_Boolean_Procedure;
 
 	-- -------------------------------------------------------------
 	-- Equivalence predicates
 	-- -------------------------------------------------------------
-	procedure Apply_Q_Eqv_Procedure is
+	procedure Apply_Q_Eq_Procedure is
+		Ptr: Object_Pointer;
 	begin
-		null;
+		if not Is_Cons(Args) or else Get_Cdr(Args) = Nil_Pointer or else Get_Cdr(Get_Cdr(Args)) /= Nil_Pointer then
+Ada.Text_IO.Put_Line ("WRONG NUMBER OF ARGUMETNS FOR EQ?"); 
+			raise Syntax_Error;
+		end if;
+		if Get_Car(Args) = Get_Car(Get_Cdr(Args)) then
+			Ptr := True_Pointer;
+		else
+			Ptr := False_Pointer;
+		end if;
+		Return_Frame (Interp, Ptr);
+	end Apply_Q_Eq_Procedure;
+
+	procedure Apply_Q_Eqv_Procedure is
+		Ptr: Object_Pointer;
+	begin
+		if not Is_Cons(Args) or else Get_Cdr(Args) = Nil_Pointer or else Get_Cdr(Get_Cdr(Args)) /= Nil_Pointer then
+Ada.Text_IO.Put_Line ("WRONG NUMBER OF ARGUMETNS FOR EQV?"); 
+			raise Syntax_Error;
+		end if;
+
+		if Equal_Values(Get_Car(Args), Get_Car(Get_Cdr(Args))) then
+			Ptr := True_Pointer;
+		else
+			Ptr := False_Pointer;
+		end if;
+		Return_Frame (Interp, Ptr);
 	end Apply_Q_Eqv_Procedure;
 	
 	-- -------------------------------------------------------------
 	-- List manipulation procedures
 	-- -------------------------------------------------------------
+	function Is_Null_Class (X: in Object_Pointer) return Standard.Boolean is
+		pragma Inline (Is_Null_Class);
+	begin
+		return X = Nil_Pointer;
+	end Is_Null_Class;
+
+	function Is_Pair_Class (X: in Object_Pointer) return Standard.Boolean is
+		pragma Inline (Is_Pair_Class);
+	begin
+		return Is_Cons(X);
+	end Is_Pair_Class;
+	
+	procedure Apply_Q_Null_Procedure is new Apply_Question_Procedure (Is_Null_Class);
+	procedure Apply_Q_Pair_Procedure is new Apply_Question_Procedure (Is_Pair_Class);
+
 	procedure Apply_Car_Procedure is
 		Ptr: Object_Pointer := Args;
 		A: Object_Pointer;
@@ -126,6 +244,41 @@ Ada.Text_IO.Put_Line ("EXPECTED CONS-CELL FOR Setcdr");
 		Return_Frame (Interp, A);
 	end Apply_Setcdr_Procedure;
 
+	-- -------------------------------------------------------------
+	-- Symbol procedures
+	-- -------------------------------------------------------------
+	procedure Apply_Q_Symbol_Procedure is new Apply_Question_Procedure (Is_Symbol);
+
+	-- -------------------------------------------------------------
+	-- String procedures
+	-- -------------------------------------------------------------
+	procedure Apply_Q_String_Procedure is new Apply_Question_Procedure (Is_String);
+	
+	procedure Apply_Q_String_EQ_Procedure is
+		Ptr1: Object_Pointer;
+		Ptr2: Object_Pointer;
+	begin
+		if not Is_Cons(Args) or else Get_Cdr(Args) = Nil_Pointer or else Get_Cdr(Get_Cdr(Args)) /= Nil_Pointer then
+Ada.Text_IO.Put_Line ("WRONG NUMBER OF ARGUMETNS FOR STRING=?"); 
+			raise Syntax_Error;
+		end if;
+
+		Ptr1 := Get_Car(Args);
+		Ptr2 := Get_Car(Get_Cdr(Args));
+		if not Is_String(Ptr1) or else not Is_String(Ptr2) then
+Ada.Text_IO.Put_Line ("STRING EXPECTED FOR STRING=?");
+			raise Evaluation_Error;
+		end if;
+		
+		if Ptr1.Character_Slot = Ptr2.Character_Slot then
+			Ptr1 := True_Pointer;
+		else
+			Ptr1 := False_Pointer;
+		end if;
+		
+		Return_Frame (Interp, Ptr1);
+	end Apply_Q_String_EQ_Procedure;
+	
 	-- -------------------------------------------------------------
 	-- Arithmetic procedures
 	-- -------------------------------------------------------------
@@ -304,72 +457,7 @@ Ada.Text_IO.Put_line ("TOO FEW ARGUMETNS FOR COMPARISON");
 	procedure Apply_N_GE_Procedure is new Apply_Compare_Procedure (Validate_Numeric, Greater_Or_Equal);
 	procedure Apply_N_LE_Procedure is new Apply_Compare_Procedure (Validate_Numeric, Less_Or_Equal);
 
-	-- -------------------------------------------------------------
-	-- Questioning procedures
-	-- -------------------------------------------------------------
-	generic 
-		with function Question (X: in Object_Pointer) return Standard.Boolean;
-	procedure Apply_Question_Procedure;
 
-	procedure Apply_Question_Procedure is
-		Bool: Object_Pointer;
-	begin
-		if Is_Cons(Args) and then not Is_Cons(Get_Cdr(Args)) then
-			-- 1 actual argument
-			if Question(Get_Car(Args)) then
-				Bool := True_Pointer;
-			else
-				Bool := False_Pointer;
-			end if;
-			Return_Frame (Interp, Bool);
-		else
-Ada.Text_IO.Put_line ("WRONG NUMBER OF ARGUMETNS FOR COMPARISON");
-			raise Syntax_Error;
-		end if;
-	end Apply_Question_Procedure;
-	
-	function Is_Null_Class (X: in Object_Pointer) return Standard.Boolean is
-		pragma Inline (Is_Null_Class);
-	begin
-		return X = Nil_Pointer;
-	end Is_Null_Class;
-
-	function Is_Number_Class (X: in Object_Pointer) return Standard.Boolean is
-		pragma Inline (Is_Number_Class);
-	begin
-		return Is_Integer(X); -- TODO bignum
-	end Is_Number_Class;
-
-	function Is_Procedure_Class (X: in Object_Pointer) return Standard.Boolean is
-		pragma Inline (Is_Procedure_Class);
-	begin
-		return Is_Closure(X) or else Is_Procedure(X) or else Is_Continuation(X);
-	end Is_Procedure_Class;
-
-	function Is_String_Class (X: in Object_Pointer) return Standard.Boolean is
-		pragma Inline (Is_String_Class);
-	begin
-		return Is_String(X);
-	end Is_String_Class;
-
-	function Is_Symbol_Class (X: in Object_Pointer) return Standard.Boolean is
-		pragma Inline (Is_Symbol_Class);
-	begin
-		return Is_Symbol(X);
-	end Is_Symbol_Class;
-
-
-	procedure Apply_Q_Null_Procedure is new Apply_Question_Procedure (Is_Null_Class);
-	procedure Apply_Q_Number_Procedure is new Apply_Question_Procedure (Is_Number_Class);
-	procedure Apply_Q_Procedure_Procedure is new Apply_Question_Procedure (Is_Procedure_Class);
-	procedure Apply_Q_String_Procedure is new Apply_Question_Procedure (Is_String_Class);
-	procedure Apply_Q_Symbol_Procedure is new Apply_Question_Procedure (Is_Symbol_Class);
-
-	procedure Apply_Q_Eq_Procedure is
-	begin
-		null;
-	end Apply_Q_Eq_Procedure;
-	
 	
 	-- -------------------------------------------------------------
 	-- Closure
@@ -608,17 +696,21 @@ begin
 					Apply_Q_Eq_Procedure;
 				when Q_Eqv_Procedure =>
 					Apply_Q_Eqv_Procedure;
-				when Q_Null_Procedure =>
-					Apply_Q_Null_Procedure;	
-				when Q_Number_Procedure =>
-					Apply_Q_Number_Procedure;	
-				when Q_Procedure_Procedure =>
-					Apply_Q_Procedure_Procedure;	
-				when Q_String_Procedure =>
-					Apply_Q_String_Procedure;	
-				when Q_Symbol_Procedure =>
-					Apply_Q_Symbol_Procedure;	
 
+				when Q_Null_Procedure =>
+					Apply_Q_Null_Procedure;
+				when Q_Number_Procedure =>
+					Apply_Q_Number_Procedure;
+				when Q_Pair_Procedure =>
+					Apply_Q_Pair_Procedure;
+				when Q_Procedure_Procedure =>
+					Apply_Q_Procedure_Procedure;
+				when Q_String_Procedure =>
+					Apply_Q_String_Procedure;
+				when Q_String_EQ_Procedure =>
+					Apply_Q_String_EQ_Procedure;
+				when Q_Symbol_Procedure =>
+					Apply_Q_Symbol_Procedure;
 
 				when Setcar_Procedure =>
 					Apply_Setcar_Procedure;

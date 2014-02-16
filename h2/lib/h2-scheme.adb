@@ -44,8 +44,10 @@ package body H2.Scheme is
 		Q_Eqv_Procedure,
 		Q_Null_Procedure,
 		Q_Number_Procedure,
+		Q_Pair_Procedure,
 		Q_Procedure_Procedure,
 		Q_String_Procedure,
+		Q_String_EQ_Procedure,
 		Q_Symbol_Procedure,
 
 		Setcar_Procedure,
@@ -76,11 +78,11 @@ package body H2.Scheme is
 	Label_Set:        constant Object_Character_Array := (Ch.LC_S, Ch.LC_E, Ch.LC_T, Ch.Exclamation); -- "set!"
 
 
-	Label_Callcc:    constant Object_Character_Array := (Ch.LC_C, Ch.LC_A, Ch.LC_L, Ch.LC_L, Ch.Minus_Sign,
-	                                                     Ch.LC_W, Ch.LC_I, Ch.LC_T, Ch.LC_H, Ch.Minus_Sign,
-	                                                     Ch.LC_C, Ch.LC_U, Ch.LC_R, Ch.LC_R, Ch.LC_E, Ch.LC_N, Ch.LC_T, Ch.Minus_Sign,
-	                                                     Ch.LC_C, Ch.LC_O, Ch.LC_N, Ch.LC_T, Ch.LC_I, Ch.LC_N, Ch.LC_U, Ch.LC_A, 
-	                                                     Ch.LC_T, Ch.LC_I, Ch.LC_O, Ch.LC_N);  -- "call-with-current-continuation"
+	Label_Callcc:     constant Object_Character_Array := (Ch.LC_C, Ch.LC_A, Ch.LC_L, Ch.LC_L, Ch.Minus_Sign,
+	                                                      Ch.LC_W, Ch.LC_I, Ch.LC_T, Ch.LC_H, Ch.Minus_Sign,
+	                                                      Ch.LC_C, Ch.LC_U, Ch.LC_R, Ch.LC_R, Ch.LC_E, Ch.LC_N, Ch.LC_T, Ch.Minus_Sign,
+	                                                      Ch.LC_C, Ch.LC_O, Ch.LC_N, Ch.LC_T, Ch.LC_I, Ch.LC_N, Ch.LC_U, Ch.LC_A, 
+	                                                      Ch.LC_T, Ch.LC_I, Ch.LC_O, Ch.LC_N);  -- "call-with-current-continuation"
 	Label_Car:        constant Object_Character_Array := (Ch.LC_C, Ch.LC_A, Ch.LC_R); -- "car"
 	Label_Cdr:        constant Object_Character_Array := (Ch.LC_C, Ch.LC_D, Ch.LC_R); -- "cdr"
 	Label_Cons:       constant Object_Character_Array := (Ch.LC_C, Ch.LC_O, Ch.LC_N, Ch.LC_S); -- "cons"
@@ -102,8 +104,10 @@ package body H2.Scheme is
 	Label_Q_Eqv:       constant Object_Character_Array := (Ch.LC_E, Ch.LC_Q, Ch.LC_V, Ch.Question); -- "eqv?"
 	Label_Q_Null:      constant Object_Character_Array := (Ch.LC_N, Ch.LC_U, Ch.LC_L, Ch.LC_L, Ch.Question); -- "null?"
 	Label_Q_Number:    constant Object_Character_Array := (Ch.LC_N, Ch.LC_U, Ch.LC_M, Ch.LC_B, Ch.LC_E, Ch.LC_R, Ch.Question); -- "number?"
+	Label_Q_Pair:      constant Object_Character_Array := (Ch.LC_P, Ch.LC_A, Ch.LC_I, Ch.LC_R, Ch.Question); -- "pair?"
 	Label_Q_Procedure: constant Object_Character_Array := (Ch.LC_P, Ch.LC_R, Ch.LC_O, Ch.LC_C, Ch.LC_E, Ch.LC_D, Ch.LC_U, Ch.LC_R, Ch.LC_E, Ch.Question); -- "procedure?"
 	Label_Q_String:    constant Object_Character_Array := (Ch.LC_S, Ch.LC_T, Ch.LC_R, Ch.LC_I, Ch.LC_N, Ch.LC_G, Ch.Question); -- "string?"
+	Label_Q_String_EQ: constant Object_Character_Array := (Ch.LC_S, Ch.LC_T, Ch.LC_R, Ch.LC_I, Ch.LC_N, Ch.LC_G, Ch.Equal_Sign, Ch.Question); -- "string=?"
 	Label_Q_Symbol:    constant Object_Character_Array := (Ch.LC_S, Ch.LC_Y, Ch.LC_M, Ch.LC_B, Ch.LC_O, Ch.LC_L, Ch.Question); -- "symbol?"
 	
 	Label_Setcar:      constant Object_Character_Array := (Ch.LC_S, Ch.LC_E, Ch.LC_T, Ch.Minus_Sign, Ch.LC_C, Ch.LC_A, Ch.LC_R, Ch.Exclamation); -- "set-car!"
@@ -499,10 +503,12 @@ package body H2.Scheme is
 
 			when others =>
 				-- TODO: BIGNUM, OTHER NUMERIC DATA.
-				if Get_Pointer_Type(Y) /= Ptr_Type then
+				if Is_Special_Pointer(X) then
+					return X = Y;
+				elsif Get_Pointer_Type(Y) /= Ptr_Type then
 					return Standard.False;
 				end if;
-				
+
 				case X.Kind is
 					when Character_Object =>
 						if Y.Kind = X.Kind then
@@ -531,8 +537,6 @@ package body H2.Scheme is
 					when Moved_Object =>
 						raise Internal_Error;
 				end case;
-
-				return X = Y;
 		end case;
 
 	end Equal_Values;
@@ -1943,8 +1947,10 @@ end if;
 			Dummy := Make_Procedure (Interp.Self, Q_Eqv_Procedure,        Label_Q_Eqv); -- "eqv?"
 			Dummy := Make_Procedure (Interp.Self, Q_Null_Procedure,       Label_Q_Null); -- "null?"
 			Dummy := Make_Procedure (Interp.Self, Q_Number_Procedure,     Label_Q_Number); -- "number?"
+			Dummy := Make_Procedure (Interp.Self, Q_Pair_Procedure,       Label_Q_Pair); -- "pair?"
 			Dummy := Make_Procedure (Interp.Self, Q_Procedure_Procedure,  Label_Q_Procedure); -- "procedure?"
 			Dummy := Make_Procedure (Interp.Self, Q_String_Procedure,     Label_Q_String); -- "string?"
+			Dummy := Make_Procedure (Interp.Self, Q_String_EQ_Procedure,  Label_Q_String_EQ); -- "string=?"
 			Dummy := Make_Procedure (Interp.Self, Q_Symbol_Procedure,     Label_Q_Symbol); -- "symbol?"
 
 			Dummy := Make_Procedure (Interp.Self, Setcar_Procedure,       Label_Setcar); -- "set-car!"
