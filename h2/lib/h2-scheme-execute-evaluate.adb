@@ -358,24 +358,44 @@ procedure Evaluate is
 	procedure Evaluate_Do_Syntax is
 		pragma Inline (Evaluate_Do_Syntax);
 		Synlist: Object_Pointer;
+		Ptr1: Object_Pointer;
+		Ptr2: Object_Pointer;
+		Ptr3: Object_Pointer;
 	begin
 		-- (do <bindings> <clause> <body>)
 		-- <bindings> should be of the form: ((<variable 1> <init 1> <step 1>) ...)
 		-- <clause> should  be of the form: (<test> <expression> ...)
 		-- <body> is zero or more expressions.
 		--
+		-- * evaluate <init>.
+		-- * bind <variable> with the result.
+		-- * evaluate <test>
+		-- * if the result is false, evaluate <body>. evaluate <step>. 
+		--   store it into <variable> and go back to evaluate <test>
+		-- * if the result is true, evaluate <expression> and exit.
+		-- 
 		-- (let ((x '(1 3 5 7 9)))
 		--     (do ((x x (cdr x))
-		--          (sum 0 (+ sum (car x)))) ; <bindings>
+		--          (sum 0 (+ sum (car x)))) ; <bindings> x and sum
 		--         ((null? x) sum) ; <clause>. if <test> is true, exit do with sum.
 		--     )
 		-- )
 		--
-		-- (do ((i 0 (+ i 1)))
-		--     ((= i 5) i)     
-		--     (display i) ; <body> downwards
+		-- (do (
+		--         (i 0 (+ i 1)) ; i = 0, for each iteration, +1
+		--         (j 0 (+ j 2)) ; j = 0, for each iteration, +2
+		--     )
+		--
+		--     ((= i 5) i) ; exit returning i if i becomes 5 
+		--
+		--     (display (* i j)) ; evaluate these until it exits
 		--     (newline)
 		-- )
+		--
+		-- Infinite loop samples:
+		--   (do () (#f) (display i))
+		--   (do ((i 0)) (#f) (display i))
+		--   (do ((i 0)) (#f) (display i))
 		
 		Synlist := Operand;
 		Operand := Get_Cdr(Operand); -- Skip "do"
@@ -383,9 +403,88 @@ procedure Evaluate is
 		if (Interp.State and Force_Syntax_Check) /= 0 or else 
 		   (Synlist.Flags and Syntax_Checked) = 0 then
 
-			Ada.Text_IO.Put_LINE ("UNIMPLEMENTED");
-			raise Evaluation_Error;
+			Ptr1 := Operand; -- <bindings> list
+			if not Is_Cons(Ptr1) then
+				-- (do)
+				-- (do . 10)
+				Ada.Text_IO.Put_LINE ("NO BIDNIGNS FOR DO");
+				raise Syntax_Error;
+			end if;
 
+			Ptr2 := Get_Car(Ptr1); -- <bindings>
+			while Is_Cons(Ptr2) loop
+				Ptr3 := Get_Car(Ptr2); -- <binding>
+				if not Is_Cons(Ptr3) then
+					-- (do (i) (#f))
+					Ada.Text_IO.Put_Line ("INVALID BINDING FOR DO");
+					raise Syntax_Error;
+				end if;
+				
+				if not Is_Symbol(Get_Car(Ptr3)) then -- <variable>
+					-- (do ((10 10)) (#f))
+					Ada.Text_IO.Put_Line ("INVALID BINDING VARIABLE FOR DO");
+					raise Syntax_Error;
+				end if;
+
+				Ptr3 := Get_Cdr(Ptr3); -- <init> cons
+				if not Is_Cons(Ptr3) then
+					-- (do ((i . 10)) (#f))
+					Ada.Text_IO.Put_Line ("NO INIT IN DO BINDING");
+					raise Syntax_Error;
+				end if;
+				-- Get_Car(Ptr3); -- <init>
+				
+				Ptr3 := Get_Cdr(Ptr3); -- <step> cons
+				if Is_Cons(Ptr3) then
+					-- Get_Car(Ptr3); -- <step>
+					if Get_Cdr(Ptr3) /= Nil_Pointer then
+						-- (do ((i 0 10 20)) ... )
+						Ada.Text_IO.PUT_Line ("TOO MANY STEP EXPRESSIONS IN DO BINDING");
+						raise Syntax_Error;
+					end if;
+				elsif Ptr3 /= Nil_Pointer then
+					-- (do ((i 0 . 10)) ... )
+					Ada.Text_IO.Put_Line ("FUCKING CDR in DO BIDNING");
+					raise Syntax_Error;
+				end if;
+
+				Ptr2 := Get_Cdr(Ptr2);
+			end loop;
+			if Ptr2 /= Nil_Pointer then
+				-- (do 10 . 10)
+				-- (do 10 (#f))
+				-- (do ((i 10) (j 20) . 10) (#f))
+				Ada.Text_IO.Put_LINE ("INVALID BINDINGS FOR DO");
+				raise Syntax_Error;
+			end if;
+			
+			Ptr1 := Get_Cdr(Ptr1); -- <clause>
+			if not Is_Cons(Ptr1) then
+				-- (do ( (i 10) (j 20)))
+				-- (do ( (i 10) (j 20)) . #f)
+				Ada.Text_IO.Put_LINE ("NO CLAUSE FOR DO");
+				raise Syntax_Error;
+			end if;
+			
+			Ptr2 := Get_Car(Ptr1); -- <test> in clause;
+			if not Is_Cons(Ptr2) then
+				-- (do ( (i 10) (j 20)) #f)
+				Ada.Text_IO.Put_Line ("INVALID CLAUSE TEST FOR DO");
+				raise Syntax_Error;
+			end if;
+			if Get_Last_Cdr(Ptr2) /= Nil_Pointer then
+				-- (do ( (i 10) (j 20)) (#f . 10))
+				-- (do ( (i 10) (j 20)) (#f 20 . 10))
+				Ada.Text_IO.Put_LINE ("FUCKING CDR IN CLAUSE FOR DO");
+				raise Syntax_Error;
+			end if;
+
+			if Get_Last_Cdr(Ptr1) /= Nil_Pointer then
+				-- (do ( (i 10) (j 20 10))  (#f 20) . 10)
+				Ada.Text_IO.Put_LINE ("FUCKING CDR IN BODY FOR DO");
+				raise Syntax_Error;
+			end if;
+			
 			Synlist.Flags := Synlist.Flags or Syntax_Checked;
 		end if; 
 
