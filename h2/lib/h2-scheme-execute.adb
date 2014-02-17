@@ -162,6 +162,86 @@ procedure Execute (Interp: in out Interpreter_Record) is
 
 	-- ----------------------------------------------------------------
 
+	procedure Do_Do_Binding is
+		pragma Inline (Do_Do_Binding);
+		X: aliased Object_Pointer;
+	begin
+		Push_Top (Interp, X'Unchecked_Access);
+		X := Get_Frame_Operand(Interp.StacK);
+		Set_Parent_Environment (Interp, Get_Car(Get_Car(X)), Get_Frame_Result(Interp.Stack));
+		
+		X := Get_Cdr(X);
+		if Is_Cons(X) then
+			declare
+				Envir: aliased Object_Pointer;
+			begin
+				pragma Assert (Get_Frame_Opcode(Get_Frame_Parent(Interp.Stack)) = Opcode_Do_Test);
+				
+				Push_top (Interp, Envir'Unchecked_Access);
+				Envir := Get_Frame_Environment(Get_Frame_Parent(Get_Frame_Parent(Interp.Stack))); 
+				Reload_Frame (Interp, Opcode_Do_Binding, X);
+				Push_Frame_With_Environment (Interp, Opcode_Evaluate_Object, Get_Car(Get_Cdr(Get_Car(X))), Envir); -- <init>
+				Pop_Tops (Interp, 1);
+			end;
+		else 
+			Pop_Frame (Interp);
+		end if;
+		
+		Pop_Tops (Interp, 1);
+	end Do_Do_Binding;
+	
+	procedure Do_Do_Test is
+		pragma Inline (Do_Do_Test);
+		X: aliased Object_Pointer;
+	begin
+		Push_Top (Interp, X'Unchecked_Access);
+		X := Get_Frame_Operand(Interp.Stack);
+		Reload_Frame (Interp, Opcode_Do_Break, X);
+		Push_Frame (Interp, Opcode_Evaluate_Object, Get_Car(Get_Car(Get_Cdr(X)))); -- <test>
+		Pop_Tops (Interp, 1);
+	end Do_Do_Test;
+	
+	procedure Do_Do_Break is
+		X: aliased Object_Pointer;
+	begin
+		X := Get_Frame_Operand(Interp.Stack);
+		if Is_True_Class(Get_Frame_Result(Interp.Stack)) then
+			-- <test> is true
+			X := Get_Cdr(Get_Car(Get_Cdr(X)));
+			if X = Nil_Pointer then
+				-- no expression after <test>
+				-- (do ((x 1)) (#t))
+				Pop_Frame (Interp);
+			else
+				Reload_Frame (Interp, Opcode_Grouped_Call, X);
+			end if;
+		else
+			-- <test> is false
+			Push_Top (Interp, X'Unchecked_Access);
+			Reload_Frame (Interp, Opcode_Do_Step, X);
+			X := Get_Cdr(Get_Cdr(X));
+			if X /= Nil_Pointer then
+				Push_Frame (Interp, Opcode_Grouped_Call, X);
+			end if;
+
+			Pop_Tops (Interp, 1);
+		end if;
+	end Do_Do_Break;
+	
+	procedure Do_Do_Step is
+	begin
+		-- arrange to evaluate <step> and update binding <variable>.
+		print (interp, Get_Car(Get_Frame_Operand(Interp.Stack)));
+		Pop_Frame (Interp);
+	end Do_Do_Step;
+
+	procedure Do_Do_Update is
+	begin
+		Pop_Frame (Interp);
+		null;
+	end Do_Do_Update;
+	-- ----------------------------------------------------------------
+	
 	procedure Do_If_Finish is
 		pragma Inline (Do_If_Finish);
 		X: Object_Pointer;
@@ -979,6 +1059,21 @@ ada.text_io.put_line (Opcode_Type'Image(Get_Frame_Opcode(Interp.Stack)));
 
 			when Opcode_Define_Finish =>
 				Do_Define_Finish;
+
+			when Opcode_Do_Binding =>
+				Do_Do_Binding;
+
+			when Opcode_Do_Break =>
+				Do_Do_Break;
+
+			when Opcode_Do_Step =>
+				Do_Do_Step;
+
+			when Opcode_Do_Test =>
+				Do_Do_Test;
+
+			when Opcode_Do_Update =>
+				Do_Do_Update;
 
 			when Opcode_Grouped_Call =>
 				Do_Grouped_Call;

@@ -164,6 +164,7 @@ package H2.Scheme is
 	type Object_Flags is mod 2 ** 4;
 	Syntax_Object: constant Object_Flags := Object_Flags'(2#0001#); 
 	Syntax_Checked: constant Object_Flags := Object_Flags'(2#0010#);
+	Argument_Checked: constant Object_Flags := Object_Flags'(2#0100#);
 
 	type Syntax_Code is (
 		And_Syntax,

@@ -152,6 +152,11 @@ package body H2.Scheme is
 		Opcode_Case_Finish,
 		Opcode_Cond_Finish,
 		Opcode_Define_Finish,
+		Opcode_Do_Binding,
+		Opcode_Do_Break,
+		Opcode_Do_Step,
+		Opcode_Do_Test,
+		Opcode_Do_Update,
 		Opcode_Grouped_Call,  -- (begin ...), closure apply, let body
 		Opcode_If_Finish,
 		Opcode_Let_Binding,

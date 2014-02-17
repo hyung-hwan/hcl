@@ -355,12 +355,99 @@ procedure Evaluate is
 
      -- ----------------------------------------------------------------
 
-	procedure Evaluate_Do_Syntax is
-		pragma Inline (Evaluate_Do_Syntax);
-		Synlist: Object_Pointer;
+	procedure Check_Do_Syntax is
 		Ptr1: Object_Pointer;
 		Ptr2: Object_Pointer;
 		Ptr3: Object_Pointer;
+	begin
+		Ptr1 := Operand; -- <bindings> list
+		if not Is_Cons(Ptr1) then
+			-- (do)
+			-- (do . 10)
+			Ada.Text_IO.Put_LINE ("NO BIDNIGNS FOR DO");
+			raise Syntax_Error;
+		end if;
+
+		Ptr2 := Get_Car(Ptr1); -- <bindings>
+		while Is_Cons(Ptr2) loop
+			Ptr3 := Get_Car(Ptr2); -- <binding>
+			if not Is_Cons(Ptr3) then
+				-- (do (i) (#f))
+				Ada.Text_IO.Put_Line ("INVALID BINDING FOR DO");
+				raise Syntax_Error;
+			end if;
+			
+			if not Is_Symbol(Get_Car(Ptr3)) then -- <variable>
+				-- (do ((10 10)) (#f))
+				Ada.Text_IO.Put_Line ("INVALID BINDING VARIABLE FOR DO");
+				raise Syntax_Error;
+			end if;
+
+			Ptr3 := Get_Cdr(Ptr3); -- <init> cons
+			if not Is_Cons(Ptr3) then
+				-- (do ((i . 10)) (#f))
+				Ada.Text_IO.Put_Line ("NO INIT IN DO BINDING");
+				raise Syntax_Error;
+			end if;
+			-- Get_Car(Ptr3); -- <init>
+			
+			Ptr3 := Get_Cdr(Ptr3); -- <step> cons
+			if Is_Cons(Ptr3) then
+				-- Get_Car(Ptr3); -- <step>
+				if Get_Cdr(Ptr3) /= Nil_Pointer then
+					-- (do ((i 0 10 20)) ... )
+					Ada.Text_IO.PUT_Line ("TOO MANY STEP EXPRESSIONS IN DO BINDING");
+					raise Syntax_Error;
+				end if;
+			elsif Ptr3 /= Nil_Pointer then
+				-- (do ((i 0 . 10)) ... )
+				Ada.Text_IO.Put_Line ("FUCKING CDR in DO BIDNING");
+				raise Syntax_Error;
+			end if;
+
+			Ptr2 := Get_Cdr(Ptr2);
+		end loop;
+		if Ptr2 /= Nil_Pointer then
+			-- (do 10 . 10)
+			-- (do 10 (#f))
+			-- (do ((i 10) (j 20) . 10) (#f))
+			Ada.Text_IO.Put_LINE ("INVALID BINDINGS FOR DO");
+			raise Syntax_Error;
+		end if;
+		
+		Ptr1 := Get_Cdr(Ptr1); -- <clause>
+		if not Is_Cons(Ptr1) then
+			-- (do ( (i 10) (j 20)))
+			-- (do ( (i 10) (j 20)) . #f)
+			Ada.Text_IO.Put_LINE ("NO CLAUSE FOR DO");
+			raise Syntax_Error;
+		end if;
+		
+		Ptr2 := Get_Car(Ptr1); -- <test> in clause;
+		if not Is_Cons(Ptr2) then
+			-- (do ( (i 10) (j 20)) #f)
+			Ada.Text_IO.Put_Line ("INVALID CLAUSE TEST FOR DO");
+			raise Syntax_Error;
+		end if;
+		if Get_Last_Cdr(Ptr2) /= Nil_Pointer then
+			-- (do ( (i 10) (j 20)) (#f . 10))
+			-- (do ( (i 10) (j 20)) (#f 20 . 10))
+			Ada.Text_IO.Put_LINE ("FUCKING CDR IN CLAUSE FOR DO");
+			raise Syntax_Error;
+		end if;
+
+		if Get_Last_Cdr(Ptr1) /= Nil_Pointer then
+			-- (do ( (i 10) (j 20 10))  (#f 20) . 10)
+			Ada.Text_IO.Put_LINE ("FUCKING CDR IN BODY FOR DO");
+			raise Syntax_Error;
+		end if;
+	end Check_Do_Syntax;
+	
+	procedure Evaluate_Do_Syntax is
+		pragma Inline (Evaluate_Do_Syntax);
+		Synlist: Object_Pointer;
+		Bindings: aliased Object_Pointer;
+		Envir: aliased Object_Pointer;
 	begin
 		-- (do <bindings> <clause> <body>)
 		-- <bindings> should be of the form: ((<variable 1> <init 1> <step 1>) ...)
@@ -402,94 +489,28 @@ procedure Evaluate is
 
 		if (Interp.State and Force_Syntax_Check) /= 0 or else 
 		   (Synlist.Flags and Syntax_Checked) = 0 then
-
-			Ptr1 := Operand; -- <bindings> list
-			if not Is_Cons(Ptr1) then
-				-- (do)
-				-- (do . 10)
-				Ada.Text_IO.Put_LINE ("NO BIDNIGNS FOR DO");
-				raise Syntax_Error;
-			end if;
-
-			Ptr2 := Get_Car(Ptr1); -- <bindings>
-			while Is_Cons(Ptr2) loop
-				Ptr3 := Get_Car(Ptr2); -- <binding>
-				if not Is_Cons(Ptr3) then
-					-- (do (i) (#f))
-					Ada.Text_IO.Put_Line ("INVALID BINDING FOR DO");
-					raise Syntax_Error;
-				end if;
-				
-				if not Is_Symbol(Get_Car(Ptr3)) then -- <variable>
-					-- (do ((10 10)) (#f))
-					Ada.Text_IO.Put_Line ("INVALID BINDING VARIABLE FOR DO");
-					raise Syntax_Error;
-				end if;
-
-				Ptr3 := Get_Cdr(Ptr3); -- <init> cons
-				if not Is_Cons(Ptr3) then
-					-- (do ((i . 10)) (#f))
-					Ada.Text_IO.Put_Line ("NO INIT IN DO BINDING");
-					raise Syntax_Error;
-				end if;
-				-- Get_Car(Ptr3); -- <init>
-				
-				Ptr3 := Get_Cdr(Ptr3); -- <step> cons
-				if Is_Cons(Ptr3) then
-					-- Get_Car(Ptr3); -- <step>
-					if Get_Cdr(Ptr3) /= Nil_Pointer then
-						-- (do ((i 0 10 20)) ... )
-						Ada.Text_IO.PUT_Line ("TOO MANY STEP EXPRESSIONS IN DO BINDING");
-						raise Syntax_Error;
-					end if;
-				elsif Ptr3 /= Nil_Pointer then
-					-- (do ((i 0 . 10)) ... )
-					Ada.Text_IO.Put_Line ("FUCKING CDR in DO BIDNING");
-					raise Syntax_Error;
-				end if;
-
-				Ptr2 := Get_Cdr(Ptr2);
-			end loop;
-			if Ptr2 /= Nil_Pointer then
-				-- (do 10 . 10)
-				-- (do 10 (#f))
-				-- (do ((i 10) (j 20) . 10) (#f))
-				Ada.Text_IO.Put_LINE ("INVALID BINDINGS FOR DO");
-				raise Syntax_Error;
-			end if;
-			
-			Ptr1 := Get_Cdr(Ptr1); -- <clause>
-			if not Is_Cons(Ptr1) then
-				-- (do ( (i 10) (j 20)))
-				-- (do ( (i 10) (j 20)) . #f)
-				Ada.Text_IO.Put_LINE ("NO CLAUSE FOR DO");
-				raise Syntax_Error;
-			end if;
-			
-			Ptr2 := Get_Car(Ptr1); -- <test> in clause;
-			if not Is_Cons(Ptr2) then
-				-- (do ( (i 10) (j 20)) #f)
-				Ada.Text_IO.Put_Line ("INVALID CLAUSE TEST FOR DO");
-				raise Syntax_Error;
-			end if;
-			if Get_Last_Cdr(Ptr2) /= Nil_Pointer then
-				-- (do ( (i 10) (j 20)) (#f . 10))
-				-- (do ( (i 10) (j 20)) (#f 20 . 10))
-				Ada.Text_IO.Put_LINE ("FUCKING CDR IN CLAUSE FOR DO");
-				raise Syntax_Error;
-			end if;
-
-			if Get_Last_Cdr(Ptr1) /= Nil_Pointer then
-				-- (do ( (i 10) (j 20 10))  (#f 20) . 10)
-				Ada.Text_IO.Put_LINE ("FUCKING CDR IN BODY FOR DO");
-				raise Syntax_Error;
-			end if;
-			
+			Check_Do_Syntax;
 			Synlist.Flags := Synlist.Flags or Syntax_Checked;
 		end if; 
 
-		Ada.Text_IO.Put_LINE ("UNIMPLEMENTED");
-		raise Evaluation_Error;
+		Reload_Frame (Interp, Opcode_Do_Test, Operand);
+		Envir := Make_Environment(Interp.Self, Get_Frame_Environment(Interp.Stack));
+		Set_Frame_Environment (Interp.Stack, Envir); -- update the environment
+
+		Bindings := Get_Car(Operand); -- <binding> list
+		if Is_Cons(Bindings) then -- <binding> list
+			-- <binding> list is not nil.
+			Push_Top (Interp, Envir'Unchecked_Access);
+			Push_Top (Interp, Bindings'Unchecked_Access);
+			Envir := Get_Frame_Environment(Get_Frame_Parent(Interp.Stack));
+			Push_Frame (Interp, Opcode_Do_Binding, Bindings); -- first <binding>
+			Push_Frame_With_Environment (Interp, Opcode_Evaluate_Object, Get_Car(Get_Cdr(Get_Car(Bindings))), Envir); -- first <init>
+			Pop_Tops (Interp, 2);
+		--else
+		--	-- <binding> list is nil/empty.
+		--	-- (do () (#f ... ) ...)
+		--	Push_Frame (Interp, Opcode_Evaluate_Object, Get_Car(Get_Car(Get_Cdr(Operand)))); -- <test>
+		end if;
 	end Evaluate_Do_Syntax;
 
      -- ----------------------------------------------------------------
