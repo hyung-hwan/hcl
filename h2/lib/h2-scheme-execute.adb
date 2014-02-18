@@ -206,7 +206,8 @@ procedure Execute (Interp: in out Interpreter_Record) is
 	begin
 		X := Get_Frame_Operand(Interp.Stack);
 		if Is_True_Class(Get_Frame_Result(Interp.Stack)) then
-			-- <test> is true
+			-- <test> is true. arrange to break out of 'do'.
+			
 			X := Get_Cdr(Get_Car(Get_Cdr(X)));
 			if X = Nil_Pointer then
 				-- no expression after <test>
@@ -216,29 +217,73 @@ procedure Execute (Interp: in out Interpreter_Record) is
 				Reload_Frame (Interp, Opcode_Grouped_Call, X);
 			end if;
 		else
-			-- <test> is false
+			-- <test> is false. 
 			Push_Top (Interp, X'Unchecked_Access);
 			Reload_Frame (Interp, Opcode_Do_Step, X);
 			X := Get_Cdr(Get_Cdr(X));
 			if X /= Nil_Pointer then
 				Push_Frame (Interp, Opcode_Grouped_Call, X);
 			end if;
-
 			Pop_Tops (Interp, 1);
 		end if;
 	end Do_Do_Break;
 	
 	procedure Do_Do_Step is
+		X: aliased Object_Pointer;
+		Y: aliased Object_Pointer;
 	begin
 		-- arrange to evaluate <step> and update binding <variable>.
-		print (interp, Get_Car(Get_Frame_Operand(Interp.Stack)));
-		Pop_Frame (Interp);
+		Push_Top (Interp, X'Unchecked_Access);
+		X := Get_Frame_Operand(Interp.Stack);
+
+		Reload_Frame (Interp, Opcode_Do_Test, X);
+
+		X := Get_Car(X);
+		while Is_Cons(X) loop
+			Y := Get_Cdr(Get_Cdr(Get_Car(X)));
+			if Is_Cons(Y) then
+				Push_Top (Interp, Y'Unchecked_Access);
+				Push_Frame (Interp, Opcode_Do_Update, X);
+				Push_Frame (Interp, Opcode_Evaluate_Object, Get_Car(Y)); -- first <step>
+				Pop_Tops (Interp, 1);
+				exit;
+			else
+				-- no <step>
+				X := Get_Cdr(X);
+			end if;
+		end loop;
+		
+		Pop_Tops (Interp, 1);
 	end Do_Do_Step;
 
 	procedure Do_Do_Update is
+		X: aliased Object_Pointer;
+		Y: aliased Object_Pointer;
 	begin
-		Pop_Frame (Interp);
-		null;
+		Push_Top (Interp, X'Unchecked_Access);
+		X := Get_Frame_Operand(Interp.StacK);
+		Set_Parent_Environment (Interp, Get_Car(Get_Car(X)), Get_Frame_Result(Interp.Stack));
+		
+		loop
+			X := Get_Cdr(X);
+			if Is_Cons(X) then
+				Y := Get_Cdr(Get_Cdr(Get_Car(X)));
+				if Is_Cons(Y) then
+					-- if <step> is specified
+					Push_Top (Interp, Y'Unchecked_Access);
+					Reload_Frame (Interp, Opcode_Do_Update, X);
+					Push_Frame (Interp, Opcode_Evaluate_Object, Get_Car(Y)); -- <step>
+					Pop_Tops (Interp, 1);
+					exit;
+				end if;
+			else 
+				-- no more <bindings>
+				Pop_Frame (Interp);
+				exit;
+			end if;
+		end loop;
+		
+		Pop_Tops (Interp, 1);
 	end Do_Do_Update;
 	-- ----------------------------------------------------------------
 	
