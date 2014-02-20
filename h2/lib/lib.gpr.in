@@ -14,6 +14,7 @@ project Lib is
 		"h2-pool.ads",
 		"h2-scheme.adb",
 		"h2-scheme.ads",
+		"h2-scheme-bigint.adb",
 		"h2-scheme-execute.adb",
 		"h2-scheme-execute-apply.adb",
 		"h2-scheme-execute-evaluate.adb",

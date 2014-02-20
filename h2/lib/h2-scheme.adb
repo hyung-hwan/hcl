@@ -13,6 +13,7 @@ with ada.exceptions;
 
 package body H2.Scheme is
 
+	package body Bigint is separate;
 	package body Token is separate;
 	package Ch is new Ascii(Object_Character);
 
@@ -536,6 +537,13 @@ package body H2.Scheme is
 							return Standard.False;
 						end if;
 
+					when Half_Word_Object =>
+						if Y.Kind = X.Kind then
+							return X.Half_Word_Slot = Y.Half_Word_Slot;
+						else
+							return Standard.False;
+						end if;
+
 					when Pointer_Object =>
 						return X = Y;
 
@@ -1028,8 +1036,9 @@ end if;
 			Kind => Pointer_Object,
 			Size => Size,
 			Flags => 0,
-			Scode => Syntax_Code'Val(0),
 			Tag => Unknown_Object,
+			Scode => Syntax_Code'Val(0),
+			Sign => Positive_Sign,
 			Pointer_Slot => (others => Initial)
 		);
 
@@ -1059,8 +1068,9 @@ end if;
 			Kind => Character_Object,
 			Size => Size,
 			Flags => 0,
-			Scode => Syntax_Code'Val(0),
 			Tag => Unknown_Object,
+			Scode => Syntax_Code'Val(0),
+			Sign => Positive_Sign,
 			Character_Slot => (others => Ch.NUL),
 			Character_Terminator => Ch.NUL
 		);
@@ -1100,12 +1110,67 @@ end if;
 			Kind => Byte_Object,
 			Size => Size,
 			Flags => 0,
-			Scode => Syntax_Code'Val(0),
 			Tag => Unknown_Object,
+			Scode => Syntax_Code'Val(0),
+			Sign => Positive_Sign,
 			Byte_Slot => (others => 0)
 		);
 		return Result;
 	end Allocate_Byte_Object;
+
+	function Allocate_Word_Object (Interp: access Interpreter_Record;
+	                               Size:   in     Word_Object_Size) return Object_Pointer is
+
+		subtype Word_Object_Record is Object_Record (Word_Object, Size);
+		type Word_Object_Pointer is access all Word_Object_Record;
+
+		Ptr: Heap_Element_Pointer;
+		Obj_Ptr: Word_Object_Pointer;
+		for Obj_Ptr'Address use Ptr'Address;
+		pragma Import (Ada, Obj_Ptr);
+		Result: Object_Pointer;
+		for Result'Address use Ptr'Address;
+		pragma Import (Ada, Result);
+	begin
+		Ptr := Allocate_Bytes (Interp.Self, Heap_Size'(Word_Object_Record'Max_Size_In_Storage_Elements));
+		Obj_Ptr.all := (
+			Kind => Word_Object,
+			Size => Size,
+			Flags => 0,
+			Tag => Unknown_Object,
+			Scode => Syntax_Code'Val(0),
+			Sign => Positive_Sign,
+			Word_Slot => (others => 0)
+		);
+		return Result;
+	end Allocate_Word_Object;
+
+	function Allocate_Half_Word_Object (Interp: access Interpreter_Record;
+	                                    Size:   in     Half_Word_Object_Size) return Object_Pointer is
+
+		subtype Half_Word_Object_Record is Object_Record (Half_Word_Object, Size);
+		type Half_Word_Object_Pointer is access all Half_Word_Object_Record;
+
+		Ptr: Heap_Element_Pointer;
+		Obj_Ptr: Half_Word_Object_Pointer;
+		for Obj_Ptr'Address use Ptr'Address;
+		pragma Import (Ada, Obj_Ptr);
+		Result: Object_Pointer;
+		for Result'Address use Ptr'Address;
+		pragma Import (Ada, Result);
+	begin
+		Ptr := Allocate_Bytes (Interp.Self, Heap_Size'(Half_Word_Object_Record'Max_Size_In_Storage_Elements));
+		Obj_Ptr.all := (
+			Kind => Half_Word_Object,
+			Size => Size,
+			Flags => 0,
+			Tag => Unknown_Object,
+			Scode => Syntax_Code'Val(0),
+			Sign => Positive_Sign,
+			Half_Word_Slot => (others => 0)
+		);
+		return Result;
+	end Allocate_Half_Word_Object;
 
 	-----------------------------------------------------------------------------
 
@@ -1301,11 +1366,11 @@ end if;
 
 	function Make_Array (Interp: access Interpreter_Record;
 	                     Size:   in     Pointer_Object_Size) return Object_Pointer is
-		Arr: Object_Pointer;
+		Ptr: Object_Pointer;
 	begin
-		Arr := Allocate_Pointer_Object (Interp, Size, Nil_Pointer);
-		Arr.Tag := Array_Object;
-		return Arr;
+		Ptr := Allocate_Pointer_Object(Interp, Size, Nil_Pointer);
+		Ptr.Tag := Array_Object;
+		return Ptr;
 	end Make_Array;
 
 	function Is_Array (Source: in Object_Pointer) return Standard.Boolean is
@@ -1314,6 +1379,61 @@ end if;
 		return Is_Normal_Pointer(Source) and then 
 		       Source.Tag = Array_Object;
 	end Is_Array;
+
+	-----------------------------------------------------------------------------
+
+	function Make_Bigint (Interp: access Interpreter_Record;
+	                      Size:   in     Pointer_Object_Size) return Object_Pointer is
+		Ptr: Object_Pointer;
+	begin
+		Ptr := Allocate_Half_Word_Object(Interp, Size);
+		Ptr.Tag := Bigint_Object;
+		return Ptr;
+	end Make_Bigint;
+
+	function Make_Bigint (Interp: access Interpreter_Record;
+	                      Value:  in     Object_Integer) return Object_Pointer is
+		Size: Pointer_Object_Size;
+		Ptr: Object_Pointer;
+		W: Object_Word;
+		H: Object_Half_Word;
+	begin
+		if Value < 0 then
+			W := Object_Word(-(Object_Signed_Word(Value)));
+		else 
+			W := Object_Word(Value);
+		end if;
+		
+		H := Bigint.Get_High(W);
+		if H > 0 then
+			Size := 2;
+		else
+			Size := 1;
+		end if;
+
+		Ptr := Allocate_Half_Word_Object(Interp, Size);
+		Ptr.Tag := Bigint_Object;
+		Ptr.Half_Word_Slot(1) := Bigint.Get_Low(W);
+
+		if H > 0 then
+			Ptr.Half_Word_Slot(2) := H;
+		end if;
+
+		if Value < 0 then
+			Ptr.Sign := Negative_Sign;
+		end if;
+
+ada.text_io.put_line (Object_Half_Word'image(bigint.get_high(w)));
+ada.text_io.put_line (Object_Half_Word'image(bigint.get_low(w)));
+		return Ptr;
+	end Make_Bigint;
+
+	function Is_Bigint (Source: in Object_Pointer) return Standard.Boolean is
+		pragma Inline (Is_Bigint);
+	begin
+		return Is_Normal_Pointer(Source) and then 
+		       Source.Tag = Bigint_Object;
+	end Is_Bigint;
 
 	-----------------------------------------------------------------------------
 
@@ -2517,6 +2637,7 @@ Ada.Text_IO.Put ("RESULT: ");
 Print (Interp, Aliased_Result);
 Ada.Text_IO.Put_Line (">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> LOOP ITERATION XXXXXX CHECKPOINT"); 
 		end loop;
+
 
 		-- Jump into the exception handler not to repeat the same code here.
 		-- In fact, this part must not be reached since the loop above can't

@@ -82,6 +82,9 @@ package H2.Scheme is
 	type Object_Word is mod 2 ** Object_Pointer_Bits;
 	for Object_Word'Size use Object_Pointer_Bits;
 
+	type Object_Half_Word is mod 2 ** (Object_Pointer_Bits / 2);
+	for Object_Half_Word'Size use (Object_Pointer_Bits / 2);
+
 	-- Object_Signed_Word is the signed version of Object_Word.
 	-- Note Object_Word is a modular type while this is a signed range.
 	type Object_Signed_Word is range -(2 ** (Object_Pointer_Bits - 1)) ..
@@ -132,6 +135,7 @@ package H2.Scheme is
 	type Object_Character_Array is array(Object_Index range <>) of Object_Character;
 	type Object_Byte_Array is array(Object_Index range <>) of Object_Byte;
 	type Object_Word_Array is array(Object_Index range <>) of Object_Word;
+	type Object_Half_Word_Array is array(Object_Index range <>) of Object_Half_Word;
 
 	type Object_Character_Array_Pointer is access all Object_Character_Array;
 	for Object_Character_Array_Pointer'Size use Object_Pointer_Bits;
@@ -146,14 +150,16 @@ package H2.Scheme is
 		Pointer_Object,
 		Character_Object,
 		Byte_Object,
-		Word_Object
+		Word_Object,
+		Half_Word_Object
 	);
 	for Object_Kind use (
 		Moved_Object => 0,
 		Pointer_Object => 1,
 		Character_Object => 2,
 		Byte_Object => 3,
-		Word_Object => 4
+		Word_Object => 4,
+		Half_Word_Object => 5
 	);
 
 	-- -----------------------------------------------------------------------
@@ -165,6 +171,19 @@ package H2.Scheme is
 	Syntax_Object: constant Object_Flags := Object_Flags'(2#0001#); 
 	Syntax_Checked: constant Object_Flags := Object_Flags'(2#0010#);
 	Argument_Checked: constant Object_Flags := Object_Flags'(2#0100#);
+
+	type Object_Tag is (
+		Unknown_Object, 
+		Cons_Object,
+		String_Object,
+		Symbol_Object,
+		Array_Object,
+		Bigint_Object,
+		Procedure_Object,
+		Closure_Object,
+		Continuation_Object,
+		Frame_Object
+	);
 
 	type Syntax_Code is (
 		And_Syntax,
@@ -184,24 +203,16 @@ package H2.Scheme is
 		Set_Syntax
 	);
 
-	type Object_Tag is (
-		Unknown_Object, 
-		Cons_Object,
-		String_Object,
-		Symbol_Object,
-		Number_Object,
-		Array_Object,
-		Table_Object,
-		Procedure_Object,
-		Closure_Object,
-		Continuation_Object,
-		Frame_Object
+	type Object_Sign is (
+		Positive_Sign,
+		Negative_Sign
 	);
 
 	type Object_Record(Kind: Object_Kind; Size: Object_Size) is record
 		Flags: Object_Flags := 0;
-		Scode: Syntax_Code := Syntax_Code'Val(0);
 		Tag: Object_Tag := Unknown_Object;
+		Scode: Syntax_Code := Syntax_Code'Val(0); -- Used if Flags contain Syntax_Object
+		Sign: Object_Sign := Positive_Sign; -- Used for Bigint_Object
 
 		-- Object payload:
 		--  I assume that the smallest payload is able to hold an 
@@ -211,8 +222,10 @@ package H2.Scheme is
 		case Kind is
 			when Moved_Object =>
 				New_Pointer: Object_Pointer := null;
+
 			when Pointer_Object =>
 				Pointer_Slot: Object_Pointer_Array(1 .. Size) := (others => null);
+
 			when Character_Object =>
 				Character_Slot: Object_Character_Array(1 .. Size) := (others => Object_Character'First);
 				-- The character terminator is to ease integration with 
@@ -222,17 +235,23 @@ package H2.Scheme is
 				--       character_slot without any gaps in between 
 				--       under the current alignement condition?
 				Character_Terminator: Object_Character := Object_Character'First; 
+
 			when Byte_Object =>
 				Byte_Slot: Object_Byte_Array(1 .. Size) := (others => 0);
+
 			when Word_Object =>
 				Word_Slot: Object_Word_Array(1 .. Size) := (others => 0);
+
+			when Half_Word_Object =>
+				Half_Word_Slot: Object_Half_Word_Array(1 .. Size) := (others => 0);
 		end case;
 	end record;
 	for Object_Record use record
-		Kind  at 0 range 0 .. 3; -- 4 bits (0 .. 15)
-		Flags at 0 range 4 .. 7; -- 4 bits 
-		Scode at 0 range 8 .. 11; -- 4 bits (0 .. 15)
-		Tag   at 0 range 12 .. 15; -- 4 bits (0 .. 15)
+		Kind  at 0 range 0 .. 2; -- 3 bits (0 .. 7)
+		Flags at 0 range 3 .. 6; -- 4 bits 
+		Tag   at 0 range 7 .. 10; -- 4 bits (0 .. 15)
+		Scode at 0 range 11 .. 14; -- 4 bits (0 .. 15)
+		Sign  at 0 range 15 .. 15; -- 1 bit (0 or 1)
 		-- there are still some space unused in the first word. What can i do?
 	end record;
 	for Object_Record'Alignment use Object_Pointer_Bytes;
@@ -257,6 +276,8 @@ package H2.Scheme is
 		Object_Size'First .. (Object_Payload_Max_Bytes / (Object_Pointer'Max_Size_In_Storage_Elements * System.Storage_Unit));
 	subtype Word_Object_Size is Object_Size range
 		Object_Size'First .. (Object_Payload_Max_Bytes / (Object_Word'Max_Size_In_Storage_Elements * System.Storage_Unit));
+	subtype Half_Word_Object_Size is Object_Size range
+		Object_Size'First .. (Object_Payload_Max_Bytes / (Object_Half_Word'Max_Size_In_Storage_Elements * System.Storage_Unit));
 
 	-- -----------------------------------------------------------------------------
 	-- Various pointer classification and conversion procedures
@@ -286,6 +307,11 @@ package H2.Scheme is
 	pragma Inline (Pointer_To_Integer);
 	pragma Inline (Pointer_To_Character);
 	pragma Inline (Pointer_To_Byte);
+
+	-- -----------------------------------------------------------------------------
+
+	function Is_Cons (Source: in Object_Pointer) return Standard.Boolean;
+	function Is_Bigint (Source: in Object_Pointer) return Standard.Boolean;
 
 	-- -----------------------------------------------------------------------------
 
@@ -539,5 +565,18 @@ private
 
 	end Token;
 
+	package Bigint is
+
+		function Get_Low (W: Object_Word) return Object_Half_Word;
+		function Get_High (W: Object_Word) return Object_Half_Word;
+
+		pragma Inline (Get_High);
+		pragma Inline (Get_Low);
+
+		function Add (Interp: access Interpreter_Record;
+		              X:      in     Object_Pointer;
+		              Y:      in     Object_Pointer) return Object_Pointer;
+
+	end Bigint;
 
 end H2.Scheme;

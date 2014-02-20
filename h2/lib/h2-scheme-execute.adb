@@ -353,12 +353,6 @@ procedure Execute (Interp: in out Interpreter_Record) is
 			-- apply the evaluated arguments to the evaluated operator.
 			R := Reverse_Cons(R);
 
---ada.text_io.put_line ("xxxxxxxxxxxxxxxxxx");
---print (interp, r);
---print (interp, get_car(r));
---print (interp, get_cdr(r));
---ada.text_io.put_line ("xxxxxxxxxxxxxxxxxx");
-
 			-- This frame can be resumed. Switching the current frame to Opcode_Apply
 			-- affects continuation objects that point to the current frame. However,
 			-- keeping it unchanged causes this frame to repeat actions that has been 
@@ -526,10 +520,7 @@ procedure Execute (Interp: in out Interpreter_Record) is
 
 		X := Get_Frame_Operand(Interp.Stack); -- symbol
 		Y := Get_Frame_Result(Interp.Stack);  -- value
-ada.text_io.put ("%%%%% FINISH SET SYNTAX => [");
-print (interp, X);
-print (interp, Y);
-ada.text_io.put_line ("]");
+
 		pragma Assert (Is_Symbol(X));
 
 		if Set_Environment(Interp.Self, X, Y) = null then
