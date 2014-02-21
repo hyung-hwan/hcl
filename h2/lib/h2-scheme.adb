@@ -1383,7 +1383,7 @@ end if;
 	-----------------------------------------------------------------------------
 
 	function Make_Bigint (Interp: access Interpreter_Record;
-	                      Size:   in     Pointer_Object_Size) return Object_Pointer is
+	                      Size:   in     Half_Word_Object_Size) return Object_Pointer is
 		Ptr: Object_Pointer;
 	begin
 		Ptr := Allocate_Half_Word_Object(Interp, Size);
@@ -2647,6 +2647,22 @@ Ada.Text_IO.Put_Line (">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> LOOP ITERATION XXXXXX C
 	exception
 		when Stream_End_Error =>
 			-- this is not a real error. this indicates the end of input stream.
+declare
+A: aliased Object_Pointer;
+B: aliased Object_Pointer;
+begin
+Push_Top (Interp, A'Unchecked_Access);
+Push_Top (Interp, B'Unchecked_Access);
+--A := Make_Bigint (Interp.Self, Value => 16#0FFFFFFF_FFFFFFFF#);
+--B := Make_Bigint (Interp.Self, Value => 16#0FFFFFFF_FFFFFFFF#);
+--for I in 1 .. 11 loop
+--A := Bigint.Add (Interp.Self, A, B);
+--end loop;
+A := Make_Bigint (Interp.Self, Value => 16#FFFF_00000001#);
+B := Make_Bigint (Interp.Self, Value => 16#0000_0000000F#);
+A := Bigint.Subtract (Interp.Self, A, B);
+Pop_tops (Interp, 2);
+end;
 			Ada.Text_IO.Put_LINE ("=== BYE ===");
 			Pop_Tops (Interp, 1);
 			if Aliased_Result /= null then
