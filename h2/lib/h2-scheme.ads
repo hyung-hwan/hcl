@@ -467,6 +467,9 @@ package H2.Scheme is
 	function Make_Bigint (Interp: access Interpreter_Record;
 	                      Size:   Half_Word_Object_Size) return Object_Pointer;
 
+	function Make_Bigint (Interp: access Interpreter_Record;
+	                      Value:  Object_Integer) return Object_Pointer;
+
 	-- -----------------------------------------------------------------------------
 
 
@@ -579,9 +582,12 @@ private
 
 		function Get_Low (W: Object_Word) return Object_Half_Word;
 		function Get_High (W: Object_Word) return Object_Half_Word;
+		function Make_Word (L: Object_Half_Word;
+		                    H: Object_Half_Word) return Object_Word;
 
 		pragma Inline (Get_High);
 		pragma Inline (Get_Low);
+		pragma Inline (Make_Word);
 
 		function Add (Interp: access Interpreter_Record;
 		              X:      in     Object_Pointer;

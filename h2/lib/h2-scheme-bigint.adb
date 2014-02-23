@@ -49,13 +49,21 @@ package body Bigint is
 		return R.High;	
 	end Get_High;
 
-	function Is_Less (X: in Object_Pointer;
-	                  Y: in Object_Pointer) return Standard.Boolean is
+	function Make_Word (L: in Object_Half_Word;
+	                    H: in Object_Half_Word) return Object_Word is
+		W: Object_Word;
+		R: Word_Record;
+		for R'Address use W'Address;		
 	begin
-		if X.Sign /= Y.Sign then
-			return X.Sign = Negative_Sign;
-		end if;
+		R.Low := L;
+		R.High := H;
+		return W;	
+	end Make_Word;
 
+	function Is_Less_Unsigned (X: in Object_Pointer;
+	                           Y: in Object_Pointer) return Standard.Boolean is
+		pragma Inline (Is_Less_Unsigned);
+	begin
 		if X.Size /= Y.Size then
 			return X.Size < Y.Size;
 		end if;
@@ -67,6 +75,15 @@ package body Bigint is
 		end loop;
 
 		return Standard.False;
+	end Is_Less_Unsigned;
+
+	function Is_Less (X: in Object_Pointer;
+	                  Y: in Object_Pointer) return Standard.Boolean is
+	begin
+		if X.Sign /= Y.Sign then
+			return X.Sign = Negative_Sign;
+		end if;
+		return Is_Less_Unsigned (X, Y);
 	end Is_Less;
 
 	function Is_Equal (X: in Object_Pointer;
@@ -77,9 +94,48 @@ package body Bigint is
 		       X.Half_Word_Slot = Y.Half_Word_Slot;
 	end Is_Equal;
 
-	function Add (Interp: access Interpreter_Record;
-	              X:      in     Object_Pointer;
-	              Y:      in     Object_Pointer) return Object_Pointer is
+	function Is_Zero (X: in Object_Pointer) return Standard.Boolean is
+	begin
+		return X.Size = 1 and then X.Half_Word_Slot(1) = 0;
+	end Is_Zero;
+
+	function Normalize (X: in Object_Pointer) return Object_Pointer is
+	begin
+		case X.Size is
+			when 1 =>
+				if X.Sign = Negative_Sign then
+					return Integer_To_Pointer(-Object_Integer(X.Half_Word_Slot(1)));
+				else
+					return Integer_To_Pointer(Object_Integer(X.Half_Word_Slot(1)));
+				end if;
+			when 2 =>
+				declare
+					W: Object_Word := Make_Word (X.Half_Word_Slot(1), X.Half_Word_Slot(2));
+				begin
+					if X.Sign = Negative_Sign then
+						if W in 0 .. Object_Word(-Object_Signed_Word(Object_Integer'First)) then
+							return Integer_To_Pointer(-Object_Integer(W));
+						else
+							return X;
+						end if;
+					else
+						if W in 0 .. Object_Word(Object_Integer'Last) then
+							return Integer_To_Pointer(Object_Integer(W));
+						else
+							return X;
+						end if;
+					end if;
+				end;
+
+			when others =>
+				return X;
+		end case;
+
+	end Normalize;
+
+	function Add_Unsigned (Interp: access Interpreter_Record;
+	                       X:      in     Object_Pointer;
+	                       Y:      in     Object_Pointer) return Object_Pointer is
 		--pragma Assert (Is_Integer(X) or else Is_Bigint(X));
 		--pragma Assert (Is_Integer(Y) or else Is_Bigint(Y));
 		pragma Assert (Is_Bigint(X));
@@ -94,7 +150,7 @@ package body Bigint is
 		Push_Top (Interp.all, B'Unchecked_Access);
 		Push_Top (Interp.all, Z'Unchecked_Access);
 
-		if X.Size > Y.Size then
+		if X.Size >= Y.Size then
 			A := X;
 			B := Y;
 			Last := X.Size + 1;
@@ -141,11 +197,11 @@ end loop;
 end;
 		Pop_Tops (Interp.all, 3);
 		return Z;
-	end Add;
+	end Add_Unsigned;
 
-	function Subtract (Interp: access Interpreter_Record;
-	                   X:      in     Object_Pointer;
-	                   Y:      in     Object_Pointer) return Object_Pointer is
+	function Subtract_Unsigned (Interp: access Interpreter_Record;
+	                            X:      in     Object_Pointer;
+	                            Y:      in     Object_Pointer) return Object_Pointer is
 		A, B, Z: aliased Object_Pointer;
 		Last: Half_Word_Object_Size;
 		Borrow: Object_Signed_Word; 
@@ -155,7 +211,7 @@ end;
 		Push_Top (Interp.all, B'Unchecked_Access);
 		Push_Top (Interp.all, Z'Unchecked_Access);
 
-		if X.Size > Y.Size then
+		if X.Size >= Y.Size then
 			A := X;
 			B := Y;
 			Last := X.Size;
@@ -190,7 +246,7 @@ end;
 			end if;
 		end loop;
 		
-ada.text_io.put_line ("-------------");
+ada.text_io.put_line ("------------SUBTRACT-");
 declare
 package Int_IO is new ada.text_io.modular_IO(object_half_word); 
 begin
@@ -200,7 +256,120 @@ ada.text_io.new_line;
 end loop;
 end;
 		return Z;
-	end Subtract;	
+	end Subtract_Unsigned;	
 
+	function Add (Interp: access Interpreter_Record;
+	              X:      in     Object_Pointer;
+	              Y:      in     Object_Pointer) return Object_Pointer is
+
+		Z: Object_Pointer;
+		A: aliased Object_Pointer;
+		B: aliased Object_Pointer;
+	begin
+		if Is_Integer(X) and then Is_Integer(Y) then
+			declare
+				G: Object_Integer := Pointer_To_Integer(X);
+				H: Object_Integer := Pointer_To_Integer(Y);
+				T: Object_Integer;
+			begin
+				T := G + H;
+				return Integer_To_Pointer(T);
+			exception
+				when Constraint_Error =>
+					Push_Top (Interp.all, A'Unchecked_Access);
+					Push_Top (Interp.all, B'Unchecked_Access);
+					A := Make_Bigint(Interp, G);	
+					B := Make_Bigint(Interp, H);	
+			end;
+		else
+			Push_Top (Interp.all, A'Unchecked_Access);
+			Push_Top (Interp.all, B'Unchecked_Access);
+			A := X;
+			B := Y;
+			if Is_Integer(A) then
+				A := Make_Bigint(Interp, Pointer_To_Integer(A));	
+			end if;
+			if Is_Integer(B) then
+				B := Make_Bigint(Interp, Pointer_To_Integer(B));	
+			end if;		
+		end if;
+
+		if A.Sign /= B.Sign then
+			if A.Sign = Negative_Sign then
+				Z := Subtract (Interp, B, A);
+			else
+				Z := Subtract (Interp, A, B);
+			end if;
+		else
+			Z := Add_Unsigned (Interp, A, B);
+			Z.Sign := A.Sign;
+		end if;
+
+		Pop_Tops (Interp.all, 2);
+		return Normalize(Z);
+	end Add;
+
+	function Subtract (Interp: access Interpreter_Record;
+	                   X:      in     Object_Pointer;
+	                   Y:      in     Object_Pointer) return Object_Pointer is
+		Z: Object_Pointer;
+		A: aliased Object_Pointer;
+		B: aliased Object_Pointer;
+	begin
+		if Is_Integer(X) and then Is_Integer(Y) then
+			declare
+				G: Object_Integer := Pointer_To_Integer(X);
+				H: Object_Integer := Pointer_To_Integer(Y);
+				T: Object_Integer;
+			begin
+				T := G + H;
+				return Integer_To_Pointer(T);
+			exception
+				when Constraint_Error =>
+					Push_Top (Interp.all, A'Unchecked_Access);
+					Push_Top (Interp.all, B'Unchecked_Access);
+					A := Make_Bigint(Interp, G);	
+					B := Make_Bigint(Interp, H);	
+			end;
+		else
+			Push_Top (Interp.all, A'Unchecked_Access);
+			Push_Top (Interp.all, B'Unchecked_Access);
+			A := X;
+			B := Y;
+			if Is_Integer(A) then
+				A := Make_Bigint(Interp, Pointer_To_Integer(A));	
+			end if;
+			if Is_Integer(B) then
+				B := Make_Bigint(Interp, Pointer_To_Integer(B));	
+			end if;		
+		end if;
+
+		if A.Sign /= B.Sign then
+			Z := Add_Unsigned (Interp, A, B);
+			Z.Sign := A.Sign;
+			--if A.Sign = Negative_Sign then
+			--	Z.Sign := Negative_Sign;
+			--	Z.Sign := Negative_Sign;
+			--else
+			--	Z := Add_Unsigned (Interp, A, B);
+			--end if;
+		else
+			if Is_Less_Unsigned(A, B) then	
+				Z := Subtract_Unsigned (Interp, B, A);
+				--Z.Sign := Object_Sign'Val(not Object_Sign'Pos(A.Sign)); -- opposite A.Sign
+				if A.Sign = Negative_Sign then
+					Z.Sign := Positive_Sign;
+				else
+					Z.Sign := Negative_Sign;
+				end if;
+			else
+				Z := Subtract_Unsigned (Interp, A, B);
+				Z.Sign := A.Sign;
+			end if;
+		end if;
+
+		Pop_Tops (Interp.all, 2);
+		return Normalize(Z);
+	end Subtract;
 end Bigint;
 
