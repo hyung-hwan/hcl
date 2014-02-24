@@ -273,12 +273,12 @@ package body H2.Scheme is
 		return Get_Pointer_Type(Pointer) = Object_Pointer_Type_Byte;
 	end Is_Byte;
 
-	function Integer_To_Pointer (Int: in Object_Integer) return Object_Pointer is
+	function Integer_To_Pointer (Value: in Object_Integer) return Object_Pointer is
 		Pointer: Object_Pointer;
 		Word: Object_Word;
 		for Word'Address use Pointer'Address;
 	begin
-		if Int < 0 then
+		if Value < 0 then
 			-- change the sign of a negative number.
 			-- '-Int' may violate the range of Object_Integer
 			-- if it is Object_Integer'First. So I add 1 to 'Int'
@@ -287,22 +287,21 @@ package body H2.Scheme is
 			--Word := Object_Word (-(Int + 1)) + 1;
 
 			-- Let me use Object_Signed_Word instead of the trick shown above
-			Word := Object_Word(-Object_Signed_Word(Int));
+			Word := Object_Word(-Object_Signed_Word(Value));
 
 			-- shift the number to the left by 2 and
 			-- set the highest bit on by force.
 			Word := (Word * (2 ** Object_Pointer_Type_Bits)) or Object_Word(Object_Pointer_Type_Integer) or (2 ** (Word'Size - 1));
 		else
-			Word := Object_Word(Int);
+			Word := Object_Word(Value);
 			-- Shift 'Word' to the left by 2 and set the integer mark.
 			Word := (Word * (2 ** Object_Pointer_Type_Bits)) or Object_Word(Object_Pointer_Type_Integer);
 		end if;
 
-		--return Object_Label_To_Object_Pointer (Word);
 		return Pointer;
 	end Integer_To_Pointer;
 
-	function Character_To_Pointer (Char: in Object_Character) return Object_Pointer is
+	function Character_To_Pointer (Value: in Object_Character) return Object_Pointer is
 		Pointer: Object_Pointer;
 		Word: Object_Word;
 		for Word'Address use Pointer'Address;
@@ -313,18 +312,17 @@ package body H2.Scheme is
 		--   or short. In reality, the last Unicode code point assigned is far
 		--   less than #16#7FFFFFFF# as of this writing. So I should not be
 		--   worried about it for the time being.
-		Word := Object_Character'Pos(Char);
+		Word := Object_Character'Pos(Value);
 		Word := (Word * (2 ** Object_Pointer_Type_Bits)) or Object_Word(Object_Pointer_Type_Character);
-		--return Object_Label_To_Object_Pointer (Word);
 		return Pointer;
 	end Character_To_Pointer;
 
-	function Byte_To_Pointer (Byte: in Object_Byte) return Object_Pointer is
+	function Byte_To_Pointer (Value: in Object_Byte) return Object_Pointer is
 		Pointer: Object_Pointer;
 		Word: Object_Word;
 		for Word'Address use Pointer'Address;
 	begin
-		Word := Object_Word(Byte);
+		Word := Object_Word(Value);
 		Word := (Word * (2 ** Object_Pointer_Type_Bits)) or Object_Word(Object_Pointer_Type_Byte);
 		return Pointer;
 	end Byte_To_Pointer;
@@ -339,7 +337,7 @@ package body H2.Scheme is
 	--end Pointer_To_Word;
 
 	function Pointer_To_Integer (Pointer: in Object_Pointer) return Object_Integer is
-		Word: Object_Word := Pointer_To_Word (Pointer);
+		Word: Object_Word := Pointer_To_Word(Pointer);
 	begin
 		if (Word and (2 ** (Word'Size - 1))) /= 0 then
 			-- if the highest bit is set, it's a negative number
@@ -1423,8 +1421,24 @@ end if;
 			Ptr.Sign := Negative_Sign;
 		end if;
 
-ada.text_io.put_line (Object_Half_Word'image(bigint.get_high(w)));
-ada.text_io.put_line (Object_Half_Word'image(bigint.get_low(w)));
+		return Ptr;
+	end Make_Bigint;
+
+	function Make_Bigint (Interp: access Interpreter_Record;
+	                      Source: in     Object_Pointer;
+	                      Last:   in     Half_Word_Object_Size) return Object_Pointer is
+		pragma Assert (Is_Bigint(Source));
+		pragma Assert (Last <= Source.Size);
+
+		X: aliased Object_Pointer := Source;
+		Ptr: Object_Pointer;
+	begin
+		Push_Top (Interp.all, X'Unchecked_Access);
+		Ptr := Allocate_Half_Word_Object(Interp, Last);
+		Ptr.Tag := Bigint_Object;
+		Ptr.Sign := Source.Sign;
+		Ptr.Half_Word_Slot := X.Half_Word_Slot(1 .. Last);
+		Pop_Tops (Interp.all, 1);
 		return Ptr;
 	end Make_Bigint;
 
@@ -2260,6 +2274,25 @@ ada.text_io.put_line (Object_Half_Word'image(bigint.get_low(w)));
 							Ada.Text_IO.Put ("#Array");
 				
 
+						when Bigint_Object => 
+							Ada.Text_IO.Put ("#Bigint(");
+declare
+package Int_IO is new ada.text_io.modular_IO(object_half_word);
+begin
+if Atom.Sign = Negative_Sign then
+ada.text_io.put ("-");
+else
+ada.text_io.put ("+");
+end if;
+for I in reverse Atom.Half_Word_Slot'Range loop
+ada.text_io.put (" ");
+int_io.put (Atom.Half_Word_Slot(I), base=>16);
+end loop;
+end;
+
+							Ada.Text_IO.Put(")");
+
+
 						when Others =>
 							if Atom.Kind = Character_Object then
 								Output_Character_Array (Atom.Character_Slot);
@@ -2659,9 +2692,12 @@ Push_Top (Interp, B'Unchecked_Access);
 --A := Bigint.Add (Interp.Self, A, B);
 --end loop;
 A := Make_Bigint (Interp.Self, Value => 16#FFFF_00000001#);
-B := Make_Bigint (Interp.Self, Value => 16#FFFF_0000000F#);
+--B := Make_Bigint (Interp.Self, Value => 16#FFFF_0000000F#);
+B := Make_Bigint (Interp.Self, Value => 16#FFFFFF_00000001#);
+B.sign := Negative_Sign;
 --A := Bigint.Subtract (Interp.Self, integer_to_pointer(16), B);
-A := Bigint.Subtract (Interp.Self, B, integer_to_pointer(16));
+--A := Bigint.Multiply (Interp.Self, B, integer_to_pointer(2));
+A := Bigint.Add (Interp.Self, integer_to_pointer(object_integer'first), integer_to_pointer(-1));
 print (interp, A);
 Pop_tops (Interp, 2);
 end;

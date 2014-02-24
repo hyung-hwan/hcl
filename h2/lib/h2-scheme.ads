@@ -113,6 +113,7 @@ package H2.Scheme is
 	-- -----------------------------------------------------------------------
 	-- What is a better choice? TODO: decide what to use
 	-- -----------------------------------------------------------------------
+
 	-- Let Object_Integer take up as large a space as Object_Pointer
 	-- despite the actual range of Object_Integer.
 	for Object_Integer'Size use Object_Pointer_Bits;
@@ -289,9 +290,9 @@ package H2.Scheme is
 	function Is_Character (Pointer: in Object_Pointer) return Standard.Boolean;
 	function Is_Byte (Pointer: in Object_Pointer) return Standard.Boolean;
 
-	function Integer_To_Pointer (Int: in Object_Integer) return Object_Pointer;
-	function Character_To_Pointer (Char: in Object_Character) return Object_Pointer;
-	function Byte_To_Pointer (Byte: in Object_Byte) return Object_Pointer;
+	function Integer_To_Pointer (Value: in Object_Integer) return Object_Pointer;
+	function Character_To_Pointer (Value: in Object_Character) return Object_Pointer;
+	function Byte_To_Pointer (Value: in Object_Byte) return Object_Pointer;
 
 	function Pointer_To_Integer (Pointer: in Object_Pointer) return Object_Integer;
 	function Pointer_To_Character (Pointer: in Object_Pointer) return Object_Character;
@@ -304,7 +305,7 @@ package H2.Scheme is
 	pragma Inline (Integer_To_Pointer);
 	pragma Inline (Character_To_Pointer);
 	pragma Inline (Byte_To_Pointer);
-	pragma Inline (Pointer_To_Integer);
+	--pragma Inline (Pointer_To_Integer);
 	pragma Inline (Pointer_To_Character);
 	pragma Inline (Pointer_To_Byte);
 
@@ -470,6 +471,10 @@ package H2.Scheme is
 	function Make_Bigint (Interp: access Interpreter_Record;
 	                      Value:  Object_Integer) return Object_Pointer;
 
+	function Make_Bigint (Interp:  access Interpreter_Record;
+	                      Source:  in     Object_Pointer;
+	                      Last:    in     Half_Word_Object_Size) return Object_Pointer;
+
 	-- -----------------------------------------------------------------------------
 
 
@@ -594,6 +599,10 @@ private
 		              Y:      in     Object_Pointer) return Object_Pointer;
 
 		function Subtract (Interp: access Interpreter_Record;
+		                   X:      in     Object_Pointer;
+		                   Y:      in     Object_Pointer) return Object_Pointer;
+
+		function Multiply (Interp: access Interpreter_Record;
 		                   X:      in     Object_Pointer;
 		                   Y:      in     Object_Pointer) return Object_Pointer;
 
