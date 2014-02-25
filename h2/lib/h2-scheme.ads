@@ -305,7 +305,11 @@ package H2.Scheme is
 	pragma Inline (Integer_To_Pointer);
 	pragma Inline (Character_To_Pointer);
 	pragma Inline (Byte_To_Pointer);
-	--pragma Inline (Pointer_To_Integer);
+
+	-- this caused GNAT 4.6.3 to end up with an internal bug when used in  the generirc Plain_Integer_Op function.
+	-- let me comment it out temporarily.
+	--pragma Inline (Pointer_To_Integer); 
+
 	pragma Inline (Pointer_To_Character);
 	pragma Inline (Pointer_To_Byte);
 
@@ -466,11 +470,13 @@ package H2.Scheme is
                            Source: in      Object_Character_Array) return Object_Pointer;
 
 	function Make_Bigint (Interp: access Interpreter_Record;
-	                      Size:   Half_Word_Object_Size) return Object_Pointer;
+	                      Size:   in     Half_Word_Object_Size) return Object_Pointer;
 
 	function Make_Bigint (Interp: access Interpreter_Record;
-	                      Value:  Object_Integer) return Object_Pointer;
+	                      Value:  in     Object_Integer) return Object_Pointer;
 
+	-- Copy as many Half_Word_Slots as Last from the Source 
+	-- and create a Bigint object.
 	function Make_Bigint (Interp:  access Interpreter_Record;
 	                      Source:  in     Object_Pointer;
 	                      Last:    in     Half_Word_Object_Size) return Object_Pointer;

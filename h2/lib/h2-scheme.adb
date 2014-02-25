@@ -2695,9 +2695,12 @@ A := Make_Bigint (Interp.Self, Value => 16#FFFF_00000001#);
 --B := Make_Bigint (Interp.Self, Value => 16#FFFF_0000000F#);
 B := Make_Bigint (Interp.Self, Value => 16#FFFFFF_00000001#);
 B.sign := Negative_Sign;
---A := Bigint.Subtract (Interp.Self, integer_to_pointer(16), B);
---A := Bigint.Multiply (Interp.Self, B, integer_to_pointer(2));
-A := Bigint.Add (Interp.Self, integer_to_pointer(object_integer'first), integer_to_pointer(-1));
+
+A := Make_Bigint (Interp.Self, Size => 10);
+A.Half_Word_Slot(10) := 16#FFFFFFFF#;
+--A := Bigint.Multiply (Interp.Self, A, integer_to_pointer(2));
+A := Bigint.Add (Interp.Self, A, A);
+
 print (interp, A);
 Pop_tops (Interp, 2);
 end;
