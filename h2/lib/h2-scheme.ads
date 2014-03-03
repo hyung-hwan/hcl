@@ -43,6 +43,17 @@ generic
 	type Character_Type is (<>);
 package H2.Scheme is
 
+	-----------------------------------------------------------------------------
+	-- EXCEPTIONS
+	-----------------------------------------------------------------------------
+	Allocation_Error: exception;
+	Size_Error: exception;
+	Syntax_Error: exception;
+	Evaluation_Error: exception;
+	Internal_Error: exception;
+	IO_Error: exception;
+	Divide_By_Zero_Error: exception;
+
 	type Interpreter_Record is limited private;
 	type Interpreter_Pointer is access all Interpreter_Record;
 
@@ -475,12 +486,6 @@ package H2.Scheme is
 	function Make_Bigint (Interp: access Interpreter_Record;
 	                      Value:  in     Object_Integer) return Object_Pointer;
 
-	-- Copy as many Half_Word_Slots as Last from the Source 
-	-- and create a Bigint object.
-	function Make_Bigint (Interp:  access Interpreter_Record;
-	                      Source:  in     Object_Pointer;
-	                      Last:    in     Half_Word_Object_Size) return Object_Pointer;
-
 	-- -----------------------------------------------------------------------------
 
 
@@ -611,6 +616,12 @@ private
 		function Multiply (Interp: access Interpreter_Record;
 		                   X:      in     Object_Pointer;
 		                   Y:      in     Object_Pointer) return Object_Pointer;
+
+		procedure Divide (Interp: access Interpreter_Record;
+		                  X:      in     Object_Pointer;
+		                  Y:      in     Object_Pointer;
+		                  Q:      out    Object_Pointer;
+		                  R:      out    Object_Pointer);
 
 	end Bigint;
 

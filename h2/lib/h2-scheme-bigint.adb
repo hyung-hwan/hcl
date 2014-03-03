@@ -65,21 +65,30 @@ package body Bigint is
 
 	-----------------------------------------------------------------------------
 
+	function Is_Less_Unsigned_Array (X:  in Object_Half_Word_Array;
+	                                 XS: in Half_Word_Object_Size;
+	                                 Y:  in Object_Half_Word_Array;
+	                                 YS: in Half_Word_Object_Size) return Standard.Boolean is
+		pragma Inline (Is_Less_Unsigned_Array);
+	begin
+		if XS /= YS then
+			return XS < YS;
+		end if;
+
+		for I in reverse X'Range loop
+			if X(I) /= Y(I) then
+				return X(I) < Y(I);
+			end if;
+		end loop;
+
+		return Standard.False;
+	end Is_Less_Unsigned_Array;
+	
 	function Is_Less_Unsigned (X: in Object_Pointer;
 	                           Y: in Object_Pointer) return Standard.Boolean is
 		pragma Inline (Is_Less_Unsigned);
 	begin
-		if X.Size /= Y.Size then
-			return X.Size < Y.Size;
-		end if;
-
-		for I in reverse X.Half_Word_Slot'Range loop
-			if X.Half_Word_Slot(I) /= Y.Half_Word_Slot(I) then
-				return X.Half_Word_Slot(I) < Y.Half_Word_Slot(I);
-			end if;	
-		end loop;
-
-		return Standard.False;
+		return Is_Less_Unsigned_Array (X.Half_Word_Slot, X.Size, Y.Half_Word_Slot, Y.Size);
 	end Is_Less_Unsigned;
 
 	function Is_Less (X: in Object_Pointer;
@@ -88,7 +97,7 @@ package body Bigint is
 		if X.Sign /= Y.Sign then
 			return X.Sign = Negative_Sign;
 		end if;
-		return Is_Less_Unsigned (X, Y);
+		return Is_Less_Unsigned(X, Y);
 	end Is_Less;
 
 	function Is_Equal (X: in Object_Pointer;
@@ -100,14 +109,35 @@ package body Bigint is
 	end Is_Equal;
 
 	function Is_Zero (X: in Object_Pointer) return Standard.Boolean is
+		pragma Inline (Is_Zero);
 	begin
 		return X.Size = 1 and then X.Half_Word_Slot(1) = 0;
 	end Is_Zero;
 
-	-----------------------------------------------------------------------------
+	function Is_One_Unsigned (X: in Object_Pointer) return Standard.Boolean is
+		pragma Inline (Is_One_Unsigned);
+	begin
+		return X.Size = 1 and then X.Half_Word_Slot(1) = 1;
+	end Is_One_Unsigned;
 
-	function Normalize (Interp: access Interpreter_Record;
-	                    X:      in     Object_Pointer) return Object_Pointer is
+	-----------------------------------------------------------------------------
+	function Copy_Upto (Interp: access Interpreter_Record;
+	                    X:      in     Object_Pointer;
+	                    Last:   in     Half_Word_Object_Size) return Object_Pointer is
+		pragma Assert (Last < X.Size);
+		A: aliased Object_Pointer := X;
+		Z: Object_Pointer;
+	begin
+		Push_Top (Interp.all, A'Unchecked_Access);
+		Z := Make_Bigint(Interp, Size => Last);	
+		Pop_Tops  (Interp.all, 1);
+		Z.Sign := A.Sign;
+		Z.Half_Word_Slot := A.Half_Word_Slot(1 .. Last);
+		return Z;
+	end Copy_Upto;
+
+	function Count_Effective_Slots (X: in Object_Pointer) return Half_Word_Object_Size is
+		pragma Inline (Count_Effective_Slots);
 		Last: Half_Word_Object_Size := 1;
 	begin
 		for I in reverse 1 .. X.Size loop
@@ -116,6 +146,14 @@ package body Bigint is
 				exit;
 			end if;
 		end loop;
+		return Last;
+	end Count_Effective_Slots;
+	
+	function Normalize (Interp: access Interpreter_Record;
+	                    X:      in     Object_Pointer) return Object_Pointer is
+		Last: Half_Word_Object_Size;
+	begin
+		Last := Count_Effective_Slots(X);
 
 		case Last is
 			when 1 =>
@@ -124,6 +162,7 @@ package body Bigint is
 				else
 					return Integer_To_Pointer(Object_Integer(X.Half_Word_Slot(1)));
 				end if;
+
 			when 2 =>
 				declare
 					W: Object_Word := Make_Word (X.Half_Word_Slot(1), X.Half_Word_Slot(2));
@@ -144,11 +183,12 @@ package body Bigint is
 		end case;
 
 		if X.Size = Last then
+			-- No compaction is needed. return it as it is
 			return X;
-		else
-			return Make_Bigint(Interp, X, Last);
 		end if;
 
+		-- Remove unneeded slots and clone meaningful contents only.
+		return Copy_Upto(Interp, X, Last);
 	end Normalize;
 
 	-----------------------------------------------------------------------------
@@ -185,7 +225,7 @@ package body Bigint is
 -- I know that pointers returned by Make_Bigint here are short-lived
 -- and not needed after actual operation. non-GC heap is a better choice.
 					A := Make_Bigint(Interp, Value => G);	
-					B := Make_Bigint(Interp, Value => H);	
+					B := Make_Bigint(Interp, Value => H);
 					Pop_Tops (Interp.all, 2);
 			end;
 		else
@@ -196,7 +236,7 @@ package body Bigint is
 			end if;
 			if Is_Integer(B) then
 				B := Make_Bigint(Interp, Value => Pointer_To_Integer(B));
-			end if;		
+			end if;
 			Pop_Tops (Interp.all, 2);
 		end if;
 
@@ -215,30 +255,26 @@ package body Bigint is
 	function Add_Unsigned (Interp: access Interpreter_Record;
 	                       X:      in     Object_Pointer;
 	                       Y:      in     Object_Pointer) return Object_Pointer is
-		pragma Assert (Is_Bigint(X));
-		pragma Assert (Is_Bigint(Y));
-
-		A, B, Z: aliased Object_Pointer;
+		A, B: aliased Object_Pointer;
+		Z: Object_Pointer;
 		W: Object_Word;
-		Carry: Object_Half_Word; 
+		Carry: Object_Half_Word := 0;
 		Last: Half_Word_Object_Size;
 	begin
-		Push_Top (Interp.all, A'Unchecked_Access);
-		Push_Top (Interp.all, B'Unchecked_Access);
-		Push_Top (Interp.all, Z'Unchecked_Access);
-
 		if X.Size >= Y.Size then
 			A := X;
 			B := Y;
 			Last := X.Size + 1;
 		else
 			A := Y;
-			B := X;	
+			B := X;
 			Last := Y.Size + 1;
 		end if;
 			
+		Push_Top (Interp.all, A'Unchecked_Access);
+		Push_Top (Interp.all, B'Unchecked_Access);
 		Z := Make_Bigint (Interp.Self, Last);
-		Carry := 0;
+		Pop_Tops (Interp.all, 2);
 
 		for I in 1 .. B.Size loop
 			W := Object_Word(A.Half_Word_Slot(I)) + Object_Word(B.Half_Word_Slot(I)) + Object_Word(Carry);
@@ -253,113 +289,225 @@ package body Bigint is
 		end loop;
 
 		Z.Half_Word_Slot(Last) := Carry;
-
-		Pop_Tops (Interp.all, 3);
 		return Z;
 	end Add_Unsigned;
-
-	function Subtract_Unsigned (Interp: access Interpreter_Record;
-	                            X:      in     Object_Pointer;
-	                            Y:      in     Object_Pointer) return Object_Pointer is
-		A, B, Z: aliased Object_Pointer;
-		T: Object_Word;
+	
+	procedure Subtract_Unsigned_Array (X:      in     Object_Half_Word_Array;
+	                                   XS:     in     Half_Word_Object_Size;
+	                                   Y:      in     Object_Half_Word_Array;
+	                                   YS:     in     Half_Word_Object_Size;
+	                                   Z:      in out Object_Half_Word_Array) is
+		W: Object_Word;
 		Borrowed_Word: constant Object_Word := Object_Word(Object_Half_Word'Last) + 1;
-		Borrow: Object_Half_Word := 0; 
+		Borrow: Object_Half_Word := 0;
 	begin
-		Push_Top (Interp.all, A'Unchecked_Access);
-		Push_Top (Interp.all, B'Unchecked_Access);
-		Push_Top (Interp.all, Z'Unchecked_Access);
-
-		A := X;
-		B := Y;
-		pragma Assert (not Is_Less_Unsigned(A, B)); -- The caller must ensure that X >= Y
-			
-		Z := Make_Bigint (Interp.Self, A.Size); -- Assume X.Size >= Y.Size.
-
-		for I in 1 .. B.Size loop
-			T := Object_Word(B.Half_Word_Slot(I)) + Object_Word(Borrow);
-			if Object_Word(A.Half_Word_Slot(I)) >= T then
-				Z.Half_Word_Slot(I) := A.Half_Word_Slot(I) - Object_Half_Word(T);
+		for I in 1 .. YS loop
+			W := Object_Word(Y(I)) + Object_Word(Borrow);
+			if Object_Word(X(I)) >= W then
+				Z(I) := X(I) - Object_Half_Word(W);
 				Borrow := 0;
 			else
-				Z.Half_Word_Slot(I) := Object_Half_Word(Borrowed_Word + Object_Word(A.Half_Word_Slot(I)) - T);
+				Z(I) := Object_Half_Word(Borrowed_Word + Object_Word(X(I)) - W);
 				Borrow := 1;
 			end if;
 		end loop;
 
-		for I in B.Size + 1 .. A.Size loop
-			if A.Half_Word_Slot(I) >= Borrow then
-				Z.Half_Word_Slot(I) := A.Half_Word_Slot(I) - Object_Half_Word(Borrow);
+		for I in YS + 1 .. XS loop
+			if X(I) >= Borrow then
+				Z(I) := X(I) - Object_Half_Word(Borrow);
 				Borrow := 0;
 			else
-				Z.Half_Word_Slot(I) := Object_Half_Word(Borrowed_Word + Object_Word(A.Half_Word_Slot(I)) - Object_Word(Borrow));
+				Z(I) := Object_Half_Word(Borrowed_Word + Object_Word(X(I)) - Object_Word(Borrow));
 				Borrow := 1;
 			end if;
 		end loop;
 
 		pragma Assert (Borrow = 0);
-		return Z;
-	end Subtract_Unsigned;	
+	end Subtract_Unsigned_Array;
 
-	function Multiply_Unsigned (Interp: access Interpreter_Record;
+
+	function Subtract_Unsigned (Interp: access Interpreter_Record;
 	                            X:      in     Object_Pointer;
 	                            Y:      in     Object_Pointer) return Object_Pointer is
-		A, B, Z: aliased Object_Pointer;
+		pragma Inline (Subtract_Unsigned);
+
+		A: aliased Object_Pointer := X;
+		B: aliased Object_Pointer := Y;
+		Z: Object_Pointer;
+		W: Object_Word;
+		Borrowed_Word: constant Object_Word := Object_Word(Object_Half_Word'Last) + 1;
+		Borrow: Object_Half_Word := 0; 
+	begin
+		pragma Assert (not Is_Less_Unsigned(A, B)); -- The caller must ensure that X >= Y
+
+		Push_Top (Interp.all, A'Unchecked_Access);
+		Push_Top (Interp.all, B'Unchecked_Access);
+		Z := Make_Bigint (Interp.Self, A.Size); -- Assume X.Size >= Y.Size.
+		Pop_Tops (Interp.all, 2);
+		
+		Subtract_Unsigned_Array (A.Half_Word_Slot, A.Size, B.Half_Word_SLot, B.Size, Z.Half_Word_Slot);
+		return Z;
+	end Subtract_Unsigned;
+
+	procedure Multiply_Unsigned_Array (X:      in     Object_Half_Word_Array;
+	                                   XS:     in     Half_Word_Object_Size;
+	                                   Y:      in     Object_Half_Word_Array;
+	                                   YS:     in     Half_Word_Object_Size;
+	                                   Z:      in out Object_Half_Word_Array) is
 		W: Object_Word;
 		Low, High: Object_Half_Word;
 		Carry: Object_Half_Word;
 		Index: Half_Word_Object_Size;
 	begin
-		Push_Top (Interp.all, A'Unchecked_Access);
-		Push_Top (Interp.all, B'Unchecked_Access);
-		Push_Top (Interp.all, Z'Unchecked_Access);
-
-		A := X;
-		B := Y;
-		Z := Make_Bigint (Interp.Self, A.Size + B.Size);
-
-		--for I in B.Half_Word_Slot'Range loop
-		for I in 1 .. B.Size loop
-			if B.Half_Word_Slot(I) = 0 then
-				Z.Half_Word_Slot(A.Size + I) := 0;
+		for I in 1 .. YS loop
+			if Y(I) = 0 then
+				Z(XS + I) := 0;
 			else
-				Carry := 0;	
+				Carry := 0;
 
-				--for J in A.Half_Word_Slot'Range loop
-				for J in 1 .. A.Size loop
-					W := Object_Word(A.Half_Word_Slot(J)) * Object_Word(B.Half_Word_Slot(I));
-					Low := Get_Low(W);	
-					High := Get_High(W);	
+				for J in 1 .. XS loop
+					W := Object_Word(X(J)) * Object_Word(Y(I));
+					Low := Get_Low(W);
+					High := Get_High(W);
 
 					Low := Low + Carry;
 					if Low < Carry then
 						High := High + 1;
 					end if;
-			
+
 					Index := J + I - 1;
-					Low := Low + Z.Half_Word_Slot(Index);
-					if Low < Z.Half_Word_SLot(Index) then
+					Low := Low + Z(Index);
+					if Low < Z(Index) then
 						High := High + 1;
 					end if;
-					Z.Half_Word_Slot(Index) := Low;
+					Z(Index) := Low;
 
 					Carry := High;
 				end loop;
 
-				Z.Half_Word_Slot(A.Size + I) := Carry;
+				Z(XS + I) := Carry;
 			end if;
 		end loop;
+	end Multiply_Unsigned_Array;
+	
+	function Multiply_Unsigned (Interp: access Interpreter_Record;
+	                            X:      in     Object_Pointer;
+	                            Y:      in     Object_Pointer) return Object_Pointer is
+		pragma Inline (Multiply_Unsigned);
+		
+		A: aliased Object_Pointer := X;
+		B: aliased Object_Pointer := Y;
+		Z: Object_Pointer;
+	begin
+		Push_Top (Interp.all, A'Unchecked_Access);
+		Push_Top (Interp.all, B'Unchecked_Access);
+		Z := Make_Bigint (Interp.Self, A.Size + B.Size);
+		Pop_Tops (Interp.all, 2);
 
-		Pop_Tops (Interp.all, 3);
+		Multiply_Unsigned_Array (A.Half_Word_Slot, A.Size, B.Half_Word_Slot, B.Size, Z.Half_Word_Slot);
 		return Z;
 	end Multiply_Unsigned;
 
-	function Divide_Unsigned (Interp: access Interpreter_Record;
-	                          X:      in     Object_Pointer;
-	                          Y:      in     Object_Pointer) return Object_Pointer is
+	procedure Divide_Unsigned (Interp: access Interpreter_Record;
+	                           X:      in     Object_Pointer;
+	                           Y:      in     Object_Pointer;
+	                           Q:      out    Object_Pointer;
+	                           R:      out    Object_Pointer) is
+		A: aliased Object_Pointer := X;
+		B: aliased Object_Pointer := Y;
+
+		Quo: aliased Object_Pointer;
+		Remn: aliased Object_Pointer;
+		Dend: aliased Object_Pointer; -- Dividend
+		Sor: aliased Object_Pointer; -- Divisor
+		Tmp: Object_Pointer;
+
+		Diff: Half_Word_Object_Size;
+		Dend_Size: Half_Word_Object_Size;
+		Sor_Size: Half_Word_Object_Size;
+		Tmp_Size: Half_Word_Object_Size;
+		Cand_Size: Half_Word_Object_Size;
+		
+		Cand_W: Object_Word;
+		Cand: Object_Half_Word_Array (1 .. 2);
 	begin
-		return null;
+		pragma Assert (not Is_Less_Unsigned(A, B)); -- The caller must ensure that X >= Y
+
+
+		-- 823456 / 93
+
+		-- 823456  930000 : (8 / 9) => 0,
+		-- 823456   93000 : (82 / 9) => 9, 
+		--                  9 * 93000 => 837000
+	     --                  837000 > 823456
+		--                  8 * 93000 => 664000
+		--                  664000 <= 823456
+
+		Push_Top (Interp.all, A'Unchecked_Access);
+		Push_Top (Interp.all, B'Unchecked_Access);
+		Push_Top (Interp.all, Quo'Unchecked_Access);
+		Push_Top (Interp.all, Remn'Unchecked_Access);
+		Push_Top (Interp.all, Dend'Unchecked_Access);
+		Push_Top (Interp.all, Sor'Unchecked_Access);
+		Quo := Make_Bigint (Interp.Self, A.Size);
+		Remn := Make_Bigint (Interp.Self, A.Size);
+		Dend := Make_Bigint (Interp.Self, A.Size);
+		Sor := Make_Bigint (Interp.Self, A.Size);
+		Tmp := Make_Bigint (Interp.Self, A.Size + B.Size);
+		Pop_Tops (Interp.all, 6);
+
+		Dend_Size := A.Size;
+		Sor_Size := A.Size;
+		Diff := A.Size - B.Size;
+		Dend.Half_Word_Slot := A.Half_Word_Slot;
+		Sor.Half_Word_Slot(1 + Diff .. B.Size + Diff) := B.Half_Word_Slot;
+
+		for I in reverse B.Size .. A.Size loop
+			if Is_Less_Unsigned_Array(Dend.Half_Word_Slot, Dend_Size, Sor.Half_Word_Slot, Sor_Size) then
+				Quo.Half_Word_Slot(I) := 0;
+			else
+				if Dend_Size > Sor_Size then
+					Cand_W := Make_Word(Dend.Half_Word_Slot(Dend_Size - 1), Dend.Half_Word_Slot(Dend_Size));
+					Cand_W := Cand_W / Object_Word(Sor.Half_Word_Slot(Sor_Size));
+					Cand(1) := Get_Low(Cand_W);
+					Cand(2) := Get_High(Cand_W);
+					if Cand(2) > 0 then
+						Cand_Size := 2;
+					else
+						Cand_Size := 1;
+					end if;
+				else
+					Cand(1) := Dend.Half_Word_Slot(Dend_Size) / Sor.Half_Word_Slot(Sor_Size);
+					Cand_Size := 1;
+				end if;
+
+				Tmp.Half_Word_Slot := (others => 0);
+				Multiply_Unsigned_Array (Cand, Cand_Size, Sor.Half_Word_Slot, Sor_Size, Tmp.Half_Word_Slot);
+				Tmp_Size := Count_Effective_Slots(Tmp);
+				if Is_Less_Unsigned_Array(Dend.Half_Word_Slot, Dend_Size, Tmp.Half_Word_Slot, Tmp_Size) then
+					Quo.Half_Word_Slot(I) := Cand(1) - 1;
+					Subtract_Unsigned_Array (Dend.Half_Word_Slot, Dend_Size, Tmp.Half_Word_Slot, Tmp_Size, Dend.Half_Word_Slot);
+					Dend_Size := Count_Effective_Slots(Dend);
+					Subtract_Unsigned_Array (Dend.Half_Word_Slot, Dend_Size, Sor.Half_Word_Slot, Sor_Size, Dend.Half_Word_Slot);
+					Dend_Size := Count_Effective_Slots(Dend);
+				else
+					Quo.Half_Word_Slot(I) := Cand(1);
+					Subtract_Unsigned_Array (Dend.Half_Word_Slot, Dend_Size, Tmp.Half_Word_Slot, Tmp_Size, Dend.Half_Word_Slot);
+					Dend_Size := Count_Effective_Slots(Dend);
+				end if;
+			end if;
+			
+			-- Shift the divisor right by 1 slot
+			pragma Assert (I = Sor_Size);
+			Sor_Size := Sor_Size - 1;
+			Sor.Half_Word_Slot(1 .. Sor_Size) := Sor.Half_Word_Slot(2 .. I);
+			Sor.Half_Word_Slot(I) := 0;
+		end loop;
+		
+		Q := Quo;
+		R := Remn;
 	end Divide_Unsigned;
+
 	-----------------------------------------------------------------------------
 
 	function Add (Interp: access Interpreter_Record;
@@ -394,9 +542,9 @@ package body Bigint is
 	function Subtract (Interp: access Interpreter_Record;
 	                   X:      in     Object_Pointer;
 	                   Y:      in     Object_Pointer) return Object_Pointer is
-		Z: Object_Pointer;
 		A: Object_Pointer := X;
 		B: Object_Pointer := Y;
+		Z: Object_Pointer;
 		Sign: Object_Sign;
 	begin
 		Subtract_Integers (Interp, A, B, Z);
@@ -409,7 +557,7 @@ package body Bigint is
 			Z := Add_Unsigned (Interp, A, B);
 			Z.Sign := Sign;
 		else
-			if Is_Less_Unsigned(A, B) then	
+			if Is_Less_Unsigned(A, B) then
 				--Sign := Object_Sign'Val(not Object_Sign'Pos(A.Sign)); -- opposite A.Sign
 				if A.Sign = Negative_Sign then
 					Sign := Positive_Sign;
@@ -432,9 +580,9 @@ package body Bigint is
 	                   X:      in     Object_Pointer;
 	                   Y:      in     Object_Pointer) return Object_Pointer is
 
-		Z: Object_Pointer;
 		A: Object_Pointer := X;
 		B: Object_Pointer := Y;
+		Z: Object_Pointer;
 		Sign: Object_Sign;
 	begin
 		Multiply_Integers (Interp, A, B, Z);
@@ -456,17 +604,37 @@ package body Bigint is
 		return Normalize(Interp, Z);
 	end Multiply;
 
-	function Divide (Interp: access Interpreter_Record;
-	                 X:      in     Object_Pointer;
-	                 Y:      in     Object_Pointer) return Object_Pointer is
-		Z: Object_Pointer;
+	procedure Divide (Interp: access Interpreter_Record;
+	                  X:      in     Object_Pointer;
+	                  Y:      in     Object_Pointer;
+	                  Q:      out    Object_Pointer;
+	                  R:      out    Object_Pointer) is
 		A: Object_Pointer := X;
 		B: Object_Pointer := Y;
+		C: aliased Object_Pointer;
+		D: aliased Object_Pointer;
 		Sign: Object_Sign;
 	begin
-		Divide_Integers (Interp, A, B, Z);
-		if Z /= null then
-			return Z;
+		if (Is_Integer(Y) and then Pointer_To_Integer(Y) = 0) or else
+		   (Is_Bigint(Y) and then Is_Zero(Y)) then
+			raise Divide_By_Zero_Error;
+		end if;
+
+		Divide_Integers (Interp, A, B, Q);
+		if Q /= null then
+			-- remainder operation must succeed if division was ok.
+			R :=  Integer_To_Pointer(Pointer_To_Integer(A) rem Pointer_To_Integer(B));
+			return;
+		end if;
+
+		if Is_Equal(A, B) then
+			Q := Integer_To_Pointer(1);
+			R := Integer_To_Pointer(0);
+			return;
+		elsif Is_Less_Unsigned(A, B) then
+			Q := Integer_To_Pointer(0);
+			R := A;
+			return;
 		end if;
 
 		-- Determine the sign earlier than any object allocation
@@ -477,10 +645,18 @@ package body Bigint is
 		else
 			Sign := Negative_Sign;
 		end if;
-		Z := Divide_Unsigned (Interp, A, B);
-		Z.Sign := Sign;
+		Divide_Unsigned (Interp, A, B, C, D);
+		C.Sign := Sign;
+		D.Sign := Sign;
 
-		return Normalize(Interp, Z);
+		Push_Top (Interp.all, C'Unchecked_Access);
+		Push_Top (Interp.all, D'Unchecked_Access);
+		C := Normalize(Interp, C);
+		D := Normalize(Interp, D);
+		Pop_Tops (Interp.all, 2);
+
+		Q := C;
+		R := D;
 	end Divide;
 
 end Bigint;

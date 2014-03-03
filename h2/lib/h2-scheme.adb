@@ -121,14 +121,8 @@ package body H2.Scheme is
 	Label_Else:       constant Object_Character_Array := (Ch.LC_E, Ch.LC_L, Ch.LC_S, Ch.LC_E); -- "else"
 
 	-----------------------------------------------------------------------------
-	-- EXCEPTIONS
+	-- INTERNAL EXCEPTIONS
 	-----------------------------------------------------------------------------
-	Allocation_Error: exception;
-	Size_Error: exception;
-	Syntax_Error: exception;
-	Evaluation_Error: exception;
-	Internal_Error: exception;
-	IO_Error: exception;
 	Stream_End_Error: exception;
 
 	-----------------------------------------------------------------------------
@@ -200,7 +194,6 @@ package body H2.Scheme is
 	Closure_Object_Size: constant Pointer_Object_Size := 2;
 	Closure_Code_Index: constant Pointer_Object_Size := 1;
 	Closure_Environment_Index: constant Pointer_Object_Size := 2;
-
 	Continuation_Object_Size: constant Pointer_Object_Size := 1;
 	Continuation_Frame_Index: constant Pointer_Object_Size := 1;
 
@@ -1421,24 +1414,6 @@ end if;
 			Ptr.Sign := Negative_Sign;
 		end if;
 
-		return Ptr;
-	end Make_Bigint;
-
-	function Make_Bigint (Interp: access Interpreter_Record;
-	                      Source: in     Object_Pointer;
-	                      Last:   in     Half_Word_Object_Size) return Object_Pointer is
-		pragma Assert (Is_Bigint(Source));
-		pragma Assert (Last <= Source.Size);
-
-		X: aliased Object_Pointer := Source;
-		Ptr: Object_Pointer;
-	begin
-		Push_Top (Interp.all, X'Unchecked_Access);
-		Ptr := Allocate_Half_Word_Object(Interp, Last);
-		Ptr.Tag := Bigint_Object;
-		Ptr.Sign := Source.Sign;
-		Ptr.Half_Word_Slot := X.Half_Word_Slot(1 .. Last);
-		Pop_Tops (Interp.all, 1);
 		return Ptr;
 	end Make_Bigint;
 
@@ -2698,10 +2673,21 @@ B.sign := Negative_Sign;
 
 A := Make_Bigint (Interp.Self, Size => 10);
 A.Half_Word_Slot(10) := 16#FFFFFFFF#;
---A := Bigint.Multiply (Interp.Self, A, integer_to_pointer(2));
+A := Bigint.Multiply (Interp.Self, A, integer_to_pointer(2));
 A := Bigint.Add (Interp.Self, A, A);
 
+--A := Bigint.Divide (Interp.Self, A, integer_to_pointer(0));
+
 print (interp, A);
+
+declare
+q, r: object_Pointer;
+begin
+	--Bigint.Divide (Interp.Self, integer_to_pointer(-10), integer_to_pointer(6), Q, R);
+	Bigint.Divide (Interp.Self, A, integer_to_pointer(-2), Q, R);
+print (interp, Q);
+print (interp, R);
+end;
 Pop_tops (Interp, 2);
 end;
 			Ada.Text_IO.Put_LINE ("=== BYE ===");
