@@ -196,12 +196,12 @@ package body Bigint is
 	generic
 		with function Operator (X: in Object_Integer; 
 		                        Y: in Object_Integer) return Object_Integer;
-	procedure Plain_Integer_Op (Interp: access Interpreter_Record;
+	procedure Plain_Integer_Op (Interp: in out Interpreter_Record;
 	                            X:      in out Object_Pointer;
 	                            Y:      in out Object_Pointer;
 	                            Z:      out    Object_Pointer);
 
-	procedure Plain_Integer_Op (Interp: access Interpreter_Record;
+	procedure Plain_Integer_Op (Interp: in out Interpreter_Record;
 	                            X:      in out Object_Pointer;
 	                            Y:      in out Object_Pointer;
 	                            Z:      out    Object_Pointer) is
@@ -219,25 +219,25 @@ package body Bigint is
 				return;
 			exception
 				when Constraint_Error =>
-					Push_Top (Interp.all, A'Unchecked_Access);
-					Push_Top (Interp.all, B'Unchecked_Access);
+					Push_Top (Interp, A'Unchecked_Access);
+					Push_Top (Interp, B'Unchecked_Access);
 -- TODO: allocate A and B from a non-GC heap.
 -- I know that pointers returned by Make_Bigint here are short-lived
 -- and not needed after actual operation. non-GC heap is a better choice.
-					A := Make_Bigint(Interp, Value => G);	
-					B := Make_Bigint(Interp, Value => H);
-					Pop_Tops (Interp.all, 2);
+					A := Make_Bigint(Interp.Self, Value => G);	
+					B := Make_Bigint(Interp.Self, Value => H);
+					Pop_Tops (Interp, 2);
 			end;
 		else
-			Push_Top (Interp.all, A'Unchecked_Access);
-			Push_Top (Interp.all, B'Unchecked_Access);
+			Push_Top (Interp, A'Unchecked_Access);
+			Push_Top (Interp, B'Unchecked_Access);
 			if Is_Integer(A) then
-				A := Make_Bigint(Interp, Value => Pointer_To_Integer(A));
+				A := Make_Bigint(Interp.Self, Value => Pointer_To_Integer(A));
 			end if;
 			if Is_Integer(B) then
-				B := Make_Bigint(Interp, Value => Pointer_To_Integer(B));
+				B := Make_Bigint(Interp.Self, Value => Pointer_To_Integer(B));
 			end if;
-			Pop_Tops (Interp.all, 2);
+			Pop_Tops (Interp, 2);
 		end if;
 
 		X := A;
@@ -252,43 +252,51 @@ package body Bigint is
 
 	-----------------------------------------------------------------------------
 
+	procedure Add_Unsigned_Array (X:      in     Object_Half_Word_Array;
+	                              XS:     in     Half_Word_Object_Size;
+	                              Y:      in     Object_Half_Word_Array;
+	                              YS:     in     Half_Word_Object_Size;
+	                              Z:      in out Object_Half_Word_Array) is
+		pragma Inline (Add_Unsigned_Array);
+		pragma Assert (XS >= YS);
+		W: Object_Word;
+		Carry: Object_Half_Word := 0;
+	begin
+		for I in 1 .. YS loop
+			W := Object_Word(X(I)) + Object_Word(Y(I)) + Object_Word(Carry);
+			Carry := Get_High(W);
+			Z(I)	:= Get_Low(W);
+		end loop;
+
+		for I in YS + 1 .. XS loop
+			W := Object_Word(X(I)) + Object_Word(Carry);
+			Carry := Get_High(W);
+			Z(I)	:= Get_Low(W);
+		end loop;
+
+		Z(XS + 1) := Carry;
+	end Add_Unsigned_Array;
+	
 	function Add_Unsigned (Interp: access Interpreter_Record;
 	                       X:      in     Object_Pointer;
 	                       Y:      in     Object_Pointer) return Object_Pointer is
 		A, B: aliased Object_Pointer;
 		Z: Object_Pointer;
-		W: Object_Word;
-		Carry: Object_Half_Word := 0;
-		Last: Half_Word_Object_Size;
 	begin
 		if X.Size >= Y.Size then
 			A := X;
 			B := Y;
-			Last := X.Size + 1;
 		else
 			A := Y;
 			B := X;
-			Last := Y.Size + 1;
 		end if;
-			
+
 		Push_Top (Interp.all, A'Unchecked_Access);
 		Push_Top (Interp.all, B'Unchecked_Access);
-		Z := Make_Bigint (Interp.Self, Last);
+		Z := Make_Bigint (Interp.Self, A.Size + 1);
 		Pop_Tops (Interp.all, 2);
 
-		for I in 1 .. B.Size loop
-			W := Object_Word(A.Half_Word_Slot(I)) + Object_Word(B.Half_Word_Slot(I)) + Object_Word(Carry);
-			Carry := Get_High(W);
-			Z.Half_Word_Slot(I)	:= Get_Low(W);
-		end loop;
-
-		for I in B.Size + 1 .. A.Size loop
-			W := Object_Word(A.Half_Word_Slot(I)) + Object_Word(Carry);
-			Carry := Get_High(W);
-			Z.Half_Word_Slot(I)	:= Get_Low(W);
-		end loop;
-
-		Z.Half_Word_Slot(Last) := Carry;
+		Add_Unsigned_Array (A.Half_Word_Slot, A.Size, B.Half_Word_Slot, B.Size, Z.Half_Word_Slot);
 		return Z;
 	end Add_Unsigned;
 	
@@ -325,7 +333,6 @@ package body Bigint is
 		pragma Assert (Borrow = 0);
 	end Subtract_Unsigned_Array;
 
-
 	function Subtract_Unsigned (Interp: access Interpreter_Record;
 	                            X:      in     Object_Pointer;
 	                            Y:      in     Object_Pointer) return Object_Pointer is
@@ -344,7 +351,7 @@ package body Bigint is
 		Push_Top (Interp.all, B'Unchecked_Access);
 		Z := Make_Bigint (Interp.Self, A.Size); -- Assume X.Size >= Y.Size.
 		Pop_Tops (Interp.all, 2);
-		
+
 		Subtract_Unsigned_Array (A.Half_Word_Slot, A.Size, B.Half_Word_SLot, B.Size, Z.Half_Word_Slot);
 		return Z;
 	end Subtract_Unsigned;
@@ -408,7 +415,7 @@ package body Bigint is
 		return Z;
 	end Multiply_Unsigned;
 
-	procedure Divide_Unsigned (Interp: access Interpreter_Record;
+	procedure Divide_Unsigned (Interp: in out Interpreter_Record;
 	                           X:      in     Object_Pointer;
 	                           Y:      in     Object_Pointer;
 	                           Q:      out    Object_Pointer;
@@ -417,7 +424,6 @@ package body Bigint is
 		B: aliased Object_Pointer := Y;
 
 		Quo: aliased Object_Pointer;
-		Remn: aliased Object_Pointer;
 		Dend: aliased Object_Pointer; -- Dividend
 		Sor: aliased Object_Pointer; -- Divisor
 		Tmp: Object_Pointer;
@@ -426,35 +432,24 @@ package body Bigint is
 		Dend_Size: Half_Word_Object_Size;
 		Sor_Size: Half_Word_Object_Size;
 		Tmp_Size: Half_Word_Object_Size;
-		Cand_Size: Half_Word_Object_Size;
-		
+
 		Cand_W: Object_Word;
 		Cand: Object_Half_Word_Array (1 .. 2);
+		Cand_Size: Half_Word_Object_Size;
 	begin
 		pragma Assert (not Is_Less_Unsigned(A, B)); -- The caller must ensure that X >= Y
 
 
-		-- 823456 / 93
-
-		-- 823456  930000 : (8 / 9) => 0,
-		-- 823456   93000 : (82 / 9) => 9, 
-		--                  9 * 93000 => 837000
-	     --                  837000 > 823456
-		--                  8 * 93000 => 664000
-		--                  664000 <= 823456
-
-		Push_Top (Interp.all, A'Unchecked_Access);
-		Push_Top (Interp.all, B'Unchecked_Access);
-		Push_Top (Interp.all, Quo'Unchecked_Access);
-		Push_Top (Interp.all, Remn'Unchecked_Access);
-		Push_Top (Interp.all, Dend'Unchecked_Access);
-		Push_Top (Interp.all, Sor'Unchecked_Access);
+		Push_Top (Interp, A'Unchecked_Access);
+		Push_Top (Interp, B'Unchecked_Access);
+		Push_Top (Interp, Quo'Unchecked_Access);
+		Push_Top (Interp, Dend'Unchecked_Access);
+		Push_Top (Interp, Sor'Unchecked_Access);
 		Quo := Make_Bigint (Interp.Self, A.Size);
-		Remn := Make_Bigint (Interp.Self, A.Size);
 		Dend := Make_Bigint (Interp.Self, A.Size);
 		Sor := Make_Bigint (Interp.Self, A.Size);
-		Tmp := Make_Bigint (Interp.Self, A.Size + B.Size);
-		Pop_Tops (Interp.all, 6);
+		Tmp := Make_Bigint (Interp.Self, A.Size + 2); -- Is it enough? A.Size + B.Size is safer
+		Pop_Tops (Interp, 5);
 
 		Dend_Size := A.Size;
 		Sor_Size := A.Size;
@@ -463,10 +458,10 @@ package body Bigint is
 		Sor.Half_Word_Slot(1 + Diff .. B.Size + Diff) := B.Half_Word_Slot;
 
 		for I in reverse B.Size .. A.Size loop
-			if Is_Less_Unsigned_Array(Dend.Half_Word_Slot, Dend_Size, Sor.Half_Word_Slot, Sor_Size) then
-				Quo.Half_Word_Slot(I) := 0;
-			else
+			if not Is_Less_Unsigned_Array(Dend.Half_Word_Slot, Dend_Size, Sor.Half_Word_Slot, Sor_Size) then
 				if Dend_Size > Sor_Size then
+					-- Take the 2 high digits from the dividend and 
+					-- the highest digit from the divisor and guess the quotient digits.
 					Cand_W := Make_Word(Dend.Half_Word_Slot(Dend_Size - 1), Dend.Half_Word_Slot(Dend_Size));
 					Cand_W := Cand_W / Object_Word(Sor.Half_Word_Slot(Sor_Size));
 					Cand(1) := Get_Low(Cand_W);
@@ -477,21 +472,34 @@ package body Bigint is
 						Cand_Size := 1;
 					end if;
 				else
+					-- Take the highest digit from the dividend and the divisor 
+					-- and guess the quotient digit.
 					Cand(1) := Dend.Half_Word_Slot(Dend_Size) / Sor.Half_Word_Slot(Sor_Size);
 					Cand_Size := 1;
 				end if;
 
+				-- Multiply the divisor and the quotient candidate.
 				Tmp.Half_Word_Slot := (others => 0);
 				Multiply_Unsigned_Array (Cand, Cand_Size, Sor.Half_Word_Slot, Sor_Size, Tmp.Half_Word_Slot);
 				Tmp_Size := Count_Effective_Slots(Tmp);
+				
+				-- Check if the divident is less than the multiplication result.
 				if Is_Less_Unsigned_Array(Dend.Half_Word_Slot, Dend_Size, Tmp.Half_Word_Slot, Tmp_Size) then
+					-- If so, decrement  the candidate by 1.
 					Quo.Half_Word_Slot(I) := Cand(1) - 1;
+					
+					-- Dividend := Dividend - Tmp
 					Subtract_Unsigned_Array (Dend.Half_Word_Slot, Dend_Size, Tmp.Half_Word_Slot, Tmp_Size, Dend.Half_Word_Slot);
 					Dend_Size := Count_Effective_Slots(Dend);
+
+					-- Divident := Dividdent - Divisor
 					Subtract_Unsigned_Array (Dend.Half_Word_Slot, Dend_Size, Sor.Half_Word_Slot, Sor_Size, Dend.Half_Word_Slot);
 					Dend_Size := Count_Effective_Slots(Dend);
 				else
+					-- If not, the candidate is the right guess.
 					Quo.Half_Word_Slot(I) := Cand(1);
+
+					-- Dividend := Dividend - Tmp
 					Subtract_Unsigned_Array (Dend.Half_Word_Slot, Dend_Size, Tmp.Half_Word_Slot, Tmp_Size, Dend.Half_Word_Slot);
 					Dend_Size := Count_Effective_Slots(Dend);
 				end if;
@@ -505,106 +513,95 @@ package body Bigint is
 		end loop;
 		
 		Q := Quo;
-		R := Remn;
+		R := Dend;
 	end Divide_Unsigned;
 
 	-----------------------------------------------------------------------------
 
-	function Add (Interp: access Interpreter_Record;
-	              X:      in     Object_Pointer;
-	              Y:      in     Object_Pointer) return Object_Pointer is
-
-		Z: Object_Pointer;
+	procedure Add (Interp: in out Interpreter_Record;
+	               X:      in     Object_Pointer;
+	               Y:      in     Object_Pointer;
+	               Z:      out    Object_Pointer) is
 		A: Object_Pointer := X;
 		B: Object_Pointer := Y;
 		Sign: Object_Sign;
 	begin
 		Add_Integers (Interp, A, B, Z);
-		if Z /= null then
-			return Z;
-		end if;
-
-		if A.Sign /= B.Sign then
-			if A.Sign = Negative_Sign then
-				Z := Subtract (Interp, B, A);
+		if Z = null then
+			if A.Sign /= B.Sign then
+				if A.Sign = Negative_Sign then
+					Subtract (Interp, B, A, Z);
+				else
+					Subtract (Interp, A, B, Z);
+				end if;
 			else
-				Z := Subtract (Interp, A, B);
+				Sign := A.Sign;
+				Z := Add_Unsigned (Interp.Self, A, B);
+				Z.Sign := Sign;
 			end if;
-		else
-			Sign := A.Sign;
-			Z := Add_Unsigned (Interp, A, B);
-			Z.Sign := Sign;
+			Z := Normalize(Interp.Self, Z);
 		end if;
-
-		return Normalize(Interp, Z);
 	end Add;
 
-	function Subtract (Interp: access Interpreter_Record;
-	                   X:      in     Object_Pointer;
-	                   Y:      in     Object_Pointer) return Object_Pointer is
+	procedure Subtract (Interp: in out Interpreter_Record;
+	                    X:      in     Object_Pointer;
+	                    Y:      in     Object_Pointer;
+	                    Z:      out    Object_Pointer) is
 		A: Object_Pointer := X;
 		B: Object_Pointer := Y;
-		Z: Object_Pointer;
 		Sign: Object_Sign;
 	begin
 		Subtract_Integers (Interp, A, B, Z);
-		if Z /= null then
-			return Z;
-		end if;
-
-		if A.Sign /= B.Sign then
-			Sign := A.Sign;
-			Z := Add_Unsigned (Interp, A, B);
-			Z.Sign := Sign;
-		else
-			if Is_Less_Unsigned(A, B) then
-				--Sign := Object_Sign'Val(not Object_Sign'Pos(A.Sign)); -- opposite A.Sign
-				if A.Sign = Negative_Sign then
-					Sign := Positive_Sign;
-				else
-					Sign := Negative_Sign;
-				end if;
-				Z := Subtract_Unsigned (Interp, B, A);
+		if Z = null then
+			if A.Sign /= B.Sign then
+				Sign := A.Sign;
+				Z := Add_Unsigned(Interp.Self, A, B);
 				Z.Sign := Sign;
 			else
-				Sign := A.Sign;
-				Z := Subtract_Unsigned (Interp, A, B);
-				Z.Sign := Sign;
+				if Is_Less_Unsigned(A, B) then
+					--Sign := Object_Sign'Val(not Object_Sign'Pos(A.Sign)); -- opposite A.Sign
+					if A.Sign = Negative_Sign then
+						Sign := Positive_Sign;
+					else
+						Sign := Negative_Sign;
+					end if;
+					Z := Subtract_Unsigned(Interp.Self, B, A);
+					Z.Sign := Sign;
+				else
+					Sign := A.Sign;
+					Z := Subtract_Unsigned(Interp.Self, A, B);
+					Z.Sign := Sign;
+				end if;
 			end if;
+			Z := Normalize(Interp.Self, Z);
 		end if;
-
-		return Normalize(Interp, Z);
 	end Subtract;
 
-	function Multiply (Interp: access Interpreter_Record;
-	                   X:      in     Object_Pointer;
-	                   Y:      in     Object_Pointer) return Object_Pointer is
-
+	procedure Multiply (Interp: in out Interpreter_Record;
+	                    X:      in     Object_Pointer;
+	                    Y:      in     Object_Pointer;
+	                    Z:      out    Object_Pointer) is
 		A: Object_Pointer := X;
 		B: Object_Pointer := Y;
-		Z: Object_Pointer;
 		Sign: Object_Sign;
 	begin
 		Multiply_Integers (Interp, A, B, Z);
-		if Z /= null then
-			return Z;
+		if Z = null then
+			-- Determine the sign earlier than any object allocation
+			-- to avoid GC side-effects because A and B are not pushed
+			-- as temporarry object pointers.
+			if A.Sign = B.Sign then
+				Sign := Positive_Sign;
+			else
+				Sign := Negative_Sign;
+			end if;
+			Z := Multiply_Unsigned (Interp.Self, A, B);
+			Z.Sign := Sign;
+			Z := Normalize(Interp.Self, Z);
 		end if;
-
-		-- Determine the sign earlier than any object allocation
-		-- to avoid GC side-effects because A and B are not pushed
-		-- as temporarry object pointers.
-		if A.Sign = B.Sign then
-			Sign := Positive_Sign;
-		else
-			Sign := Negative_Sign;
-		end if;
-		Z := Multiply_Unsigned (Interp, A, B);
-		Z.Sign := Sign;
-
-		return Normalize(Interp, Z);
 	end Multiply;
 
-	procedure Divide (Interp: access Interpreter_Record;
+	procedure Divide (Interp: in out Interpreter_Record;
 	                  X:      in     Object_Pointer;
 	                  Y:      in     Object_Pointer;
 	                  Q:      out    Object_Pointer;
@@ -649,15 +646,22 @@ package body Bigint is
 		C.Sign := Sign;
 		D.Sign := Sign;
 
-		Push_Top (Interp.all, C'Unchecked_Access);
-		Push_Top (Interp.all, D'Unchecked_Access);
-		C := Normalize(Interp, C);
-		D := Normalize(Interp, D);
-		Pop_Tops (Interp.all, 2);
+		Push_Top (Interp, C'Unchecked_Access);
+		Push_Top (Interp, D'Unchecked_Access);
+		C := Normalize(Interp.Self, C);
+		D := Normalize(Interp.Self, D);
+		Pop_Tops (Interp, 2);
 
 		Q := C;
 		R := D;
 	end Divide;
 
+	procedure To_String (Interp: in out Interpreter_Record;
+	                     X:      in     Object_Pointer;
+	                     Radix:  in     Object_Half_Word;
+	                     Z:      out    Object_Pointer) is
+	begin
+		null;
+	end To_String;
 end Bigint;
 

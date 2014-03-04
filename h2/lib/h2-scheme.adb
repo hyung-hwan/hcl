@@ -2661,32 +2661,35 @@ B: aliased Object_Pointer;
 begin
 Push_Top (Interp, A'Unchecked_Access);
 Push_Top (Interp, B'Unchecked_Access);
---A := Make_Bigint (Interp.Self, Value => 16#0FFFFFFF_FFFFFFFF#);
---B := Make_Bigint (Interp.Self, Value => 16#0FFFFFFF_FFFFFFFF#);
+--A := Make_Bigint(Interp.Self, Value => 16#0FFFFFFF_FFFFFFFF#);
+--B := Make_Bigint(Interp.Self, Value => 16#0FFFFFFF_FFFFFFFF#);
 --for I in 1 .. 11 loop
---A := Bigint.Add (Interp.Self, A, B);
+--A := Bigint.Add(Interp.Self, A, B);
 --end loop;
-A := Make_Bigint (Interp.Self, Value => 16#FFFF_00000001#);
---B := Make_Bigint (Interp.Self, Value => 16#FFFF_0000000F#);
-B := Make_Bigint (Interp.Self, Value => 16#FFFFFF_00000001#);
+A := Make_Bigint(Interp.Self, Value => 16#FFFF_00000001#);
+--B := Make_Bigint(Interp.Self, Value => 16#FFFF_0000000F#);
+B := Make_Bigint(Interp.Self, Value => 16#FFFFFF_00000001#);
 B.sign := Negative_Sign;
 
-A := Make_Bigint (Interp.Self, Size => 10);
-A.Half_Word_Slot(10) := 16#FFFFFFFF#;
-A := Bigint.Multiply (Interp.Self, A, integer_to_pointer(2));
-A := Bigint.Add (Interp.Self, A, A);
+A := Make_Bigint(Interp.Self, Size => 4);
+A.Half_Word_Slot(4) := 16#11FFFFFF#;
+Bigint.Multiply(Interp, A, integer_to_pointer(2), A);
+Bigint.Add(Interp, A, A, A);
 
---A := Bigint.Divide (Interp.Self, A, integer_to_pointer(0));
+B := Make_Bigint(Interp.Self, Size => 4);
+B.Half_Word_Slot(4) := 16#22FFFFFF#;
+Bigint.Subtract(Interp, B, integer_to_pointer(1), B);
+--A := Bigint.Divide(Interp, A, integer_to_pointer(0));
 
 print (interp, A);
-
+print (interp, B);
 declare
 q, r: object_Pointer;
 begin
-	--Bigint.Divide (Interp.Self, integer_to_pointer(-10), integer_to_pointer(6), Q, R);
-	Bigint.Divide (Interp.Self, A, integer_to_pointer(-2), Q, R);
-print (interp, Q);
-print (interp, R);
+	--Bigint.Divide (Interp, integer_to_pointer(-10), integer_to_pointer(6), Q, R);
+	Bigint.Divide (Interp, A, B, Q, R);
+ada.text_io.put ("Q => "); print (interp, Q);
+ada.text_io.put ("R => "); print (interp, R);
 end;
 Pop_tops (Interp, 2);
 end;

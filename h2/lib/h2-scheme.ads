@@ -402,7 +402,6 @@ package H2.Scheme is
 		end case;
 	end record;  
 
-
 	-- -----------------------------------------------------------------------------
 
 	-- The nil/true/false object are represented by special pointer values.
@@ -605,19 +604,22 @@ private
 		pragma Inline (Get_Low);
 		pragma Inline (Make_Word);
 
-		function Add (Interp: access Interpreter_Record;
-		              X:      in     Object_Pointer;
-		              Y:      in     Object_Pointer) return Object_Pointer;
+		procedure Add (Interp: in out Interpreter_Record;
+		               X:      in     Object_Pointer;
+		               Y:      in     Object_Pointer;
+		               Z:      out    Object_Pointer);
 
-		function Subtract (Interp: access Interpreter_Record;
-		                   X:      in     Object_Pointer;
-		                   Y:      in     Object_Pointer) return Object_Pointer;
+		procedure Subtract (Interp: in out Interpreter_Record;
+		                    X:      in     Object_Pointer;
+		                    Y:      in     Object_Pointer;
+		                    Z:      out    Object_Pointer);
 
-		function Multiply (Interp: access Interpreter_Record;
-		                   X:      in     Object_Pointer;
-		                   Y:      in     Object_Pointer) return Object_Pointer;
+		procedure Multiply (Interp: in out Interpreter_Record;
+		                    X:      in     Object_Pointer;
+		                    Y:      in     Object_Pointer;
+		                    Z:      out    Object_Pointer);
 
-		procedure Divide (Interp: access Interpreter_Record;
+		procedure Divide (Interp: in out Interpreter_Record;
 		                  X:      in     Object_Pointer;
 		                  Y:      in     Object_Pointer;
 		                  Q:      out    Object_Pointer;
