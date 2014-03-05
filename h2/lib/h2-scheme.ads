@@ -38,6 +38,7 @@
 with System;
 with System.Storage_Pools;
 with Ada.Unchecked_Conversion;
+with H2.Ascii;
 
 generic
 	type Character_Type is (<>);
@@ -484,11 +485,11 @@ package H2.Scheme is
 
 	function Make_Bigint (Interp: access Interpreter_Record;
 	                      Value:  in     Object_Integer) return Object_Pointer;
-
 	-- -----------------------------------------------------------------------------
 
-
 private
+	package Ch is new Ascii(Object_Character);
+	
 	type Heap_Element_Array is array(Heap_Size range <>) of aliased Heap_Element;
 
 	type Heap_Record(Size: Heap_Size) is record
@@ -625,6 +626,10 @@ private
 		                  Q:      out    Object_Pointer;
 		                  R:      out    Object_Pointer);
 
+		procedure To_String (Interp: in out Interpreter_Record;
+		                     X:      in     Object_Pointer;
+		                     Radix:  in     Object_Half_Word;
+		                     Z:      out    Object_Pointer);
 	end Bigint;
 
 end H2.Scheme;

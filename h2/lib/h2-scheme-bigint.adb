@@ -88,7 +88,7 @@ package body Bigint is
 	                           Y: in Object_Pointer) return Standard.Boolean is
 		pragma Inline (Is_Less_Unsigned);
 	begin
-		return Is_Less_Unsigned_Array (X.Half_Word_Slot, X.Size, Y.Half_Word_Slot, Y.Size);
+		return Is_Less_Unsigned_Array(X.Half_Word_Slot, X.Size, Y.Half_Word_Slot, Y.Size);
 	end Is_Less_Unsigned;
 
 	function Is_Less (X: in Object_Pointer;
@@ -124,13 +124,13 @@ package body Bigint is
 	function Copy_Upto (Interp: access Interpreter_Record;
 	                    X:      in     Object_Pointer;
 	                    Last:   in     Half_Word_Object_Size) return Object_Pointer is
-		pragma Assert (Last < X.Size);
+		pragma Assert (Last <= X.Size);
 		A: aliased Object_Pointer := X;
 		Z: Object_Pointer;
 	begin
 		Push_Top (Interp.all, A'Unchecked_Access);
-		Z := Make_Bigint(Interp, Size => Last);	
-		Pop_Tops  (Interp.all, 1);
+		Z := Make_Bigint(Interp, Size => Last);
+		Pop_Tops (Interp.all, 1);
 		Z.Sign := A.Sign;
 		Z.Half_Word_Slot := A.Half_Word_Slot(1 .. Last);
 		return Z;
@@ -148,7 +148,7 @@ package body Bigint is
 		end loop;
 		return Last;
 	end Count_Effective_Slots;
-	
+
 	function Normalize (Interp: access Interpreter_Record;
 	                    X:      in     Object_Pointer) return Object_Pointer is
 		Last: Half_Word_Object_Size;
@@ -165,7 +165,7 @@ package body Bigint is
 
 			when 2 =>
 				declare
-					W: Object_Word := Make_Word (X.Half_Word_Slot(1), X.Half_Word_Slot(2));
+					W: Object_Word := Make_Word(X.Half_Word_Slot(1), X.Half_Word_Slot(2));
 				begin
 					if X.Sign = Negative_Sign then
 						if W in 0 .. Object_Word(-Object_Signed_Word(Object_Integer'First)) then
@@ -309,6 +309,9 @@ package body Bigint is
 		Borrowed_Word: constant Object_Word := Object_Word(Object_Half_Word'Last) + 1;
 		Borrow: Object_Half_Word := 0;
 	begin
+	
+		pragma Assert (not Is_Less_Unsigned_Array(X, XS, Y, YS)); -- The caller must ensure that X >= Y
+		
 		for I in 1 .. YS loop
 			W := Object_Word(Y(I)) + Object_Word(Borrow);
 			if Object_Word(X(I)) >= W then
@@ -439,7 +442,6 @@ package body Bigint is
 	begin
 		pragma Assert (not Is_Less_Unsigned(A, B)); -- The caller must ensure that X >= Y
 
-
 		Push_Top (Interp, A'Unchecked_Access);
 		Push_Top (Interp, B'Unchecked_Access);
 		Push_Top (Interp, Quo'Unchecked_Access);
@@ -482,27 +484,23 @@ package body Bigint is
 				Tmp.Half_Word_Slot := (others => 0);
 				Multiply_Unsigned_Array (Cand, Cand_Size, Sor.Half_Word_Slot, Sor_Size, Tmp.Half_Word_Slot);
 				Tmp_Size := Count_Effective_Slots(Tmp);
-				
-				-- Check if the divident is less than the multiplication result.
-				if Is_Less_Unsigned_Array(Dend.Half_Word_Slot, Dend_Size, Tmp.Half_Word_Slot, Tmp_Size) then
-					-- If so, decrement  the candidate by 1.
-					Quo.Half_Word_Slot(I) := Cand(1) - 1;
-					
-					-- Dividend := Dividend - Tmp
-					Subtract_Unsigned_Array (Dend.Half_Word_Slot, Dend_Size, Tmp.Half_Word_Slot, Tmp_Size, Dend.Half_Word_Slot);
-					Dend_Size := Count_Effective_Slots(Dend);
 
-					-- Divident := Dividdent - Divisor
-					Subtract_Unsigned_Array (Dend.Half_Word_Slot, Dend_Size, Sor.Half_Word_Slot, Sor_Size, Dend.Half_Word_Slot);
-					Dend_Size := Count_Effective_Slots(Dend);
+				-- Check if the dividend is less than the multiplication result. Dividend < Tmp
+				if Is_Less_Unsigned_Array(Dend.Half_Word_Slot, Dend_Size, Tmp.Half_Word_Slot, Tmp_Size) then
+					-- If so, decrement the candidate by 1.
+					Quo.Half_Word_Slot(I - B.Size + 1) := Cand(1) - 1;
+
+					-- Tmp := Tmp - Divisor
+					Subtract_Unsigned_Array (Tmp.Half_Word_Slot, Tmp_Size, Sor.Half_Word_Slot, Sor_Size, Tmp.Half_Word_Slot);
+					Tmp_Size := Count_Effective_Slots(Tmp);
 				else
 					-- If not, the candidate is the right guess.
-					Quo.Half_Word_Slot(I) := Cand(1);
-
-					-- Dividend := Dividend - Tmp
-					Subtract_Unsigned_Array (Dend.Half_Word_Slot, Dend_Size, Tmp.Half_Word_Slot, Tmp_Size, Dend.Half_Word_Slot);
-					Dend_Size := Count_Effective_Slots(Dend);
+					Quo.Half_Word_Slot(I - B.Size + 1) := Cand(1);
 				end if;
+				
+				-- Dividend := Dividend - Tmp
+				Subtract_Unsigned_Array (Dend.Half_Word_Slot, Dend_Size, Tmp.Half_Word_Slot, Tmp_Size, Dend.Half_Word_Slot);
+				Dend_Size := Count_Effective_Slots(Dend);
 			end if;
 			
 			-- Shift the divisor right by 1 slot
@@ -642,7 +640,9 @@ package body Bigint is
 		else
 			Sign := Negative_Sign;
 		end if;
+
 		Divide_Unsigned (Interp, A, B, C, D);
+
 		C.Sign := Sign;
 		D.Sign := Sign;
 
@@ -658,10 +658,127 @@ package body Bigint is
 
 	procedure To_String (Interp: in out Interpreter_Record;
 	                     X:      in     Object_Pointer;
-	                     Radix:  in     Object_Half_Word;
+	                     Radix:  in     Object_Half_Word; -- TODO define the radix type to a subtype range 2 .. 32
 	                     Z:      out    Object_Pointer) is
+	                     
+		A: aliased Object_Pointer;
+		B: aliased Object_Pointer;
+		R: aliased Object_Pointer;
+		W, V: Object_Word;
+
+		Sign: Object_Sign;
+		Radlen: Object_Word;
+		Seglen: Object_Word;
+
+-- TODO: estimate the length of the character array and create a temporary string object instead of this array.
+		QQQ: Object_Character_Array (1.. X.Size * Object_Half_Word'Size);
+		QL: Character_Object_Size := 0;
+	begin
+		if Is_Integer(X) then
+			-- TODO: change this
+			ada.text_io.put_line(Object_Integer'Image(Pointer_To_Integer(X)));
+			return;
+		end if;
+		
+		if X.Size <= 2 then
+		--TODO: sign;
+			if X.Size = 2 then
+				W := Make_Word(X.Half_Word_Slot(1), X.Half_Word_Slot(2));
+			else
+				W := Object_Word(X.Half_Word_Slot(1));
+			end if;
+			
+			ada.text_io.put_line(Object_Word'Image(W));
+			return;
+		end if;
+
+		-- Find the largest multiple of Radix that is less than or 
+		-- equal to Object_Word'Last.
+		Radlen := 1;
+		W := Object_Word(Radix);
+		loop
+			V := W * Object_Word(Radix);
+			if V = W then
+				Radlen := Radlen + 1;
+				W := V;
+				exit;
+			elsif V < W then
+				exit;
+			end if;
+			Radlen := Radlen + 1;
+			W := V;
+		end loop;
+
+		Push_Top (Interp, R'Unchecked_Access);
+		Push_Top (Interp, B'Unchecked_Access);
+		Push_Top (Interp, A'Unchecked_Access);
+		
+		A := Copy_Upto(Interp.Self, X, X.Size);
+		B := Make_Bigint(Interp.Self, Size => 2);
+		B.Half_Word_Slot(1) := Get_Low(W);
+		B.Half_Word_Slot(2) := Get_High(W);
+
+		Sign := A.Sign;
+		A.Sign := Positive_Sign;
+		loop
+			if Is_Less_Unsigned(B, A) then
+				Divide_Unsigned (Interp, A, B, A, R);
+				A := Copy_Upto(Interp.Self, A, Count_Effective_Slots(A)); -- partial normalization
+			else
+				R := A;
+			end if;
+
+			if R.Size = 1 then
+				W := Object_Word(R.Half_Word_Slot(1));
+			else
+				W := Make_Word(R.Half_Word_Slot(1), R.Half_Word_Slot(2));
+			end if;
+		
+			Seglen := 0;
+			loop
+				V := W rem Object_Word(Radix);
+
+				Seglen := Seglen + 1;
+				QL := QL + 1;
+				if V in 0 .. 9 then
+					QQQ(QL) := Object_Character'Val(Object_Character'Pos(Ch.Zero) + V);
+				else
+					QQQ(QL) := Object_Character'Val(Object_Character'Pos(Ch.UC_A) + V - 10);
+				end if;
+
+				W := W / Object_Word(Radix);
+				exit when W = 0;
+			end loop;
+
+			exit when R = A; -- Reached the last block
+
+			-- Fill with zeros if it's not the last block
+			for I in Seglen + 1 .. Radlen loop
+				QL := QL + 1;
+				QQQ(QL) := Object_Character'Val(Object_Character'Pos(Ch.Zero));
+			end loop;
+		end loop;
+
+if Sign = Negative_Sign then
+	Ada.Text_IO.Put ('-');
+end if;
+for I in reverse 1 .. QL loop
+	Ada.Text_IO.Put (Standard.Character'Val(Object_Character'Pos(QQQ(I))));
+end loop;
+ada.text_io.new_line;
+
+		Pop_Tops (Interp, 3);
+		
+		-- TODO:
+		--Z := Make_String_Object (...);
+	end To_String;
+	
+	procedure From_String (Interp: in out Interpreter_Record;
+	                       X:      in     Object_Pointer;
+	                       Radix:  in     Object_Half_Word;
+	                       Z:      out    Object_Pointer) is
 	begin
 		null;
-	end To_String;
+	end From_String;
 end Bigint;
 

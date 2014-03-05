@@ -1,4 +1,3 @@
-with H2.Ascii;
 with H2.Pool;
 
 -- XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXx
@@ -15,7 +14,7 @@ package body H2.Scheme is
 
 	package body Bigint is separate;
 	package body Token is separate;
-	package Ch is new Ascii(Object_Character);
+
 
 	DEBUG_GC: Standard.Boolean := Standard.False;
 	-----------------------------------------------------------------------------
@@ -760,7 +759,6 @@ ada.text_io.put_line ("HEAP SOURCE IS NIL");
 					for New_Object'Address use Ptr'Address;
 					pragma Import (Ada, New_Object); 
 				begin
-
 					-- Target_Object_Record'Max_Size_In_Storage_Elements gave 
 					-- some erroneous values when compiled with GNAT 4.3.2 on 
 					-- WII(ppc) Debian.
@@ -2687,9 +2685,14 @@ declare
 q, r: object_Pointer;
 begin
 	--Bigint.Divide (Interp, integer_to_pointer(-10), integer_to_pointer(6), Q, R);
+	
 	Bigint.Divide (Interp, A, B, Q, R);
 ada.text_io.put ("Q => "); print (interp, Q);
 ada.text_io.put ("R => "); print (interp, R);
+
+bigint.to_string (interp, r, 16, r);
+--bigint.to_string (interp, r, 10, r);
+
 end;
 Pop_tops (Interp, 2);
 end;
