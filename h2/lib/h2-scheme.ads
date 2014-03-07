@@ -467,18 +467,19 @@ package H2.Scheme is
 
 	procedure Collect_Garbage (Interp: in out Interpreter_Record);
 
-     procedure Push_Top (Interp: in out Interpreter_Record;
-                         Source: access Object_Pointer);
+	procedure Push_Top (Interp: in out Interpreter_Record;
+	                    Source: access Object_Pointer);
 
-     procedure Pop_Tops (Interp: in out Interpreter_Record;
-                         Count:  in     Object_Size);
+	procedure Pop_Tops (Interp: in out Interpreter_Record;
+	                    Count:  in     Object_Size);
 
+	function Make_String (Interp: access  Interpreter_Record;
+	                      Source: in      Object_Character_Array;
+	                      Invert: in      Standard.Boolean := Standard.False) return Object_Pointer;
 
-     function Make_String (Interp: access  Interpreter_Record;
-                           Source: in      Object_Character_Array) return Object_Pointer;
-
-     function Make_Symbol (Interp: access  Interpreter_Record;
-                           Source: in      Object_Character_Array) return Object_Pointer;
+	function Make_Symbol (Interp: access  Interpreter_Record;
+	                      Source: in      Object_Character_Array;
+	                      Invert: in      Standard.Boolean := Standard.False) return Object_Pointer;
 
 	function Make_Bigint (Interp: access Interpreter_Record;
 	                      Size:   in     Half_Word_Object_Size) return Object_Pointer;
@@ -596,6 +597,8 @@ private
 
 	package Bigint is
 
+		subtype Object_Radix is Object_Word range 2 .. 36;
+		
 		function Get_Low (W: Object_Word) return Object_Half_Word;
 		function Get_High (W: Object_Word) return Object_Half_Word;
 		function Make_Word (L: Object_Half_Word;
@@ -628,7 +631,7 @@ private
 
 		procedure To_String (Interp: in out Interpreter_Record;
 		                     X:      in     Object_Pointer;
-		                     Radix:  in     Object_Half_Word;
+		                     Radix:  in     Object_Radix;
 		                     Z:      out    Object_Pointer);
 	end Bigint;
 

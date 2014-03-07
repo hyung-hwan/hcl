@@ -454,10 +454,10 @@ package body H2.Scheme is
 				return Character_To_Pointer(Token.Value.Ptr.all(1));
 		
 			when String_Token =>
-				return Make_String (Interp, Token.Value.Ptr.all(1..Token.Value.Last));
+				return Make_String(Interp, Token.Value.Ptr.all(1..Token.Value.Last));
 
 			when Identifier_Token =>	
-				return Make_Symbol (Interp, Token.Value.Ptr.all(1..Token.Value.Last));
+				return Make_Symbol(Interp, Token.Value.Ptr.all(1..Token.Value.Last));
 
 			when True_Token =>
 				return True_Pointer;
@@ -1068,17 +1068,26 @@ end if;
 	end Allocate_Character_Object;
 
 	function Allocate_Character_Object (Interp: access Interpreter_Record;
-	                                    Source: in     Object_Character_Array) return Object_Pointer is
+	                                    Source: in     Object_Character_Array;
+	                                    Invert: in     Standard.Boolean) return Object_Pointer is
 		Result: Object_Pointer;
 	begin
 		if Source'Length > Character_Object_Size'Last then
 			raise Size_Error;
 		end if;
 		
-		Result := Allocate_Character_Object (Interp, Character_Object_Size'(Source'Length));
-		Result.Character_Slot := Source;
+		Result := Allocate_Character_Object (Interp, Size => Character_Object_Size'(Source'Length));
+		if Invert then
+			for I in Source'Range loop
+				Result.Character_Slot(Result.Character_Slot'Last - (I - Source'First)) := Source(I);
+			end loop;
+		else
+			Result.Character_Slot := Source;
+		end if;
 		return Result;
 	end Allocate_Character_Object;
+	
+	
 
 	function Allocate_Byte_Object (Interp: access Interpreter_Record;
 	                               Size:   in     Byte_Object_Size) return Object_Pointer is
@@ -1294,13 +1303,15 @@ end if;
 	end Is_String;
 
 	function Make_String (Interp: access  Interpreter_Record;
-	                      Source: in      Object_Character_Array) return Object_Pointer is
+	                      Source: in      Object_Character_Array;
+	                      Invert: in      Standard.Boolean := Standard.False) return Object_Pointer is
 		Result: Object_Pointer;
 	begin
-		Result := Allocate_Character_Object(Interp, Source);
+		Result := Allocate_Character_Object(Interp, Source, Invert);
 		Result.Tag := String_Object;
 		return Result;
 	end Make_String;
+	
 
 	function Is_Symbol (Source: in Object_Pointer) return Standard.Boolean is
 		pragma Inline (Is_Symbol);
@@ -1310,7 +1321,8 @@ end if;
 	end Is_Symbol;
 
 	function Make_Symbol (Interp: access Interpreter_Record;
-	                      Source: in     Object_Character_Array) return Object_Pointer is
+	                      Source: in     Object_Character_Array;
+	                      Invert: in     Standard.Boolean := Standard.False) return Object_Pointer is
 		Ptr: aliased Object_Pointer;
 	begin
 		-- TODO: the current linked list implementation isn't efficient.
@@ -1337,7 +1349,7 @@ end if;
 		end loop;
 
 		-- Create a symbol object
-		Ptr := Allocate_Character_Object(Interp, Source);
+		Ptr := Allocate_Character_Object(Interp, Source, Invert);
 		Ptr.Tag := Symbol_Object;
 
 		-- Make Ptr safe from GC
@@ -2072,8 +2084,8 @@ end if;
 
 		procedure Make_Common_Symbol_Objects is
 		begin
-			Interp.Arrow_Symbol := Make_Symbol (Interp.Self, Label_Arrow);	
-			Interp.Else_Symbol := Make_Symbol (Interp.Self, Label_Else);	
+			Interp.Arrow_Symbol := Make_Symbol(Interp.Self, Label_Arrow);	
+			Interp.Else_Symbol := Make_Symbol(Interp.Self, Label_Else);	
 		end Make_Common_Symbol_Objects;
 	begin
 		declare
@@ -2664,18 +2676,18 @@ Push_Top (Interp, B'Unchecked_Access);
 --for I in 1 .. 11 loop
 --A := Bigint.Add(Interp.Self, A, B);
 --end loop;
-A := Make_Bigint(Interp.Self, Value => 16#FFFF_00000001#);
+A := Make_Bigint(Interp.Self, Value => Object_Integer'Last - 16#FFFF#);
 --B := Make_Bigint(Interp.Self, Value => 16#FFFF_0000000F#);
-B := Make_Bigint(Interp.Self, Value => 16#FFFFFF_00000001#);
+B := Make_Bigint(Interp.Self, Value => Object_Integer'Last);
 B.sign := Negative_Sign;
 
-A := Make_Bigint(Interp.Self, Size => 4);
-A.Half_Word_Slot(4) := 16#11FFFFFF#;
+A := Make_Bigint(Interp.Self, Size => 10); 
+A.Half_Word_Slot(10) := Object_Half_Word'Last;
 Bigint.Multiply(Interp, A, integer_to_pointer(2), A);
 Bigint.Add(Interp, A, A, A);
 
 B := Make_Bigint(Interp.Self, Size => 4);
-B.Half_Word_Slot(4) := 16#22FFFFFF#;
+B.Half_Word_Slot(4) := Object_Half_Word'Last / 2;
 Bigint.Subtract(Interp, B, integer_to_pointer(1), B);
 --A := Bigint.Divide(Interp, A, integer_to_pointer(0));
 
@@ -2690,7 +2702,9 @@ begin
 ada.text_io.put ("Q => "); print (interp, Q);
 ada.text_io.put ("R => "); print (interp, R);
 
-bigint.to_string (interp, r, 16, r);
+bigint.to_string (interp, r, 16,r);
+--bigint.to_string (interp, integer_to_pointer(-2), 10, r);
+print (interp, r);
 --bigint.to_string (interp, r, 10, r);
 
 end;

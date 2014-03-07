@@ -2,14 +2,17 @@ with H2.Pool;
 
 separate (H2.Scheme)
 
+-- The code here assumes that Half_Word_Slot'First is 1. 
+-- The code breaks if you change the array range to something else, 
+
 package body Bigint is
 
 	use type System.Bit_Order;
 
-	Big_Endian : constant := Standard.Boolean'Pos (
+	Big_Endian: constant := Standard.Boolean'Pos (
 		System.Default_Bit_Order = System.High_Order_First
 	);
-	Little_Endian : constant := Standard.Boolean'Pos (
+	Little_Endian: constant := Standard.Boolean'Pos (
 		System.Default_Bit_Order = System.Low_Order_First
 	);
 
@@ -35,6 +38,12 @@ package body Bigint is
 	--for Word_Record'Scalar_Storage_Order use System.High_Order_First;
 	--for Word_Record'Bit_Order use System.High_Order_First;
 	--for Word_Record'Bit_Order use System.Low_Order_First;
+
+	type Object_Bit is mod 2 ** 1;
+	--for Object_Bit'Size use 1;
+	type Half_Word_Bit_Array is array(1 .. Half_Word_Bits) of Object_Bit;
+	pragma Pack (Half_Word_Bit_Array);
+	for Half_Word_Bit_Array'Size use Half_Word_Bits;
 
 	-----------------------------------------------------------------------------
 
@@ -63,6 +72,61 @@ package body Bigint is
 		return W;	
 	end Make_Word;
 
+	function Decode_To_Word (X:    in     Object_Pointer;
+	                         Word: access Object_Word;
+	                         Sign: access Object_Sign) return Standard.Boolean is
+	begin
+		if Is_Integer(X) then
+			declare
+				I: Object_Integer := Pointer_To_Integer(X);
+			begin
+				if I < 0 then
+					-- Convert the negative number to a positive word.
+					Word.all := Object_Word(-(I + 1)) + 1;
+					Sign.all := Negative_Sign; 
+				else
+					Word.all := Object_Word(I);
+					Sign.all := Positive_Sign;
+				end if;
+			end;
+		else
+			case X.Size is
+				when 1 =>
+					Word.all := Object_Word(X.Half_Word_Slot(1));
+				when 2 =>
+					Word.all := Make_Word(X.Half_Word_Slot(1), X.Half_Word_Slot(2));				
+				when others =>
+					return Standard.False;
+			end case;
+			Sign.all := X.Sign;
+		end if;
+		return Standard.True;
+	end Decode_To_Word;
+	
+	procedure Convert_Word_To_Text (Word:   in     Object_Word; 
+	                                Radix:  in     Object_Radix;
+	                                Buffer: in out Object_Character_Array;
+	                                Length: out    Object_Size) is
+		V: Object_Word;
+		W: Object_Word := Word;
+		Len: Object_Size := 0;
+	begin
+		loop
+			V := W rem Object_Word(Radix);
+			
+			if V in 0 .. 9 then
+				Buffer(Buffer'First + Len) := Object_Character'Val(Object_Character'Pos(Ch.Zero) + V);
+			else
+				Buffer(Buffer'First + Len) := Object_Character'Val(Object_Character'Pos(Ch.UC_A) + V - 10);
+			end if;
+			Len := Len + 1;
+			
+			W := W / Object_Word(Radix);
+			exit when W <= 0;
+		end loop;
+			
+		Length := Len; 
+	end Convert_Word_To_Text;
 	-----------------------------------------------------------------------------
 
 	function Is_Less_Unsigned_Array (X:  in Object_Half_Word_Array;
@@ -75,7 +139,7 @@ package body Bigint is
 			return XS < YS;
 		end if;
 
-		for I in reverse X'Range loop
+		for I in reverse 1 .. XS loop
 			if X(I) /= Y(I) then
 				return X(I) < Y(I);
 			end if;
@@ -136,17 +200,33 @@ package body Bigint is
 		return Z;
 	end Copy_Upto;
 
-	function Count_Effective_Slots (X: in Object_Pointer) return Half_Word_Object_Size is
-		pragma Inline (Count_Effective_Slots);
+	function Count_Effective_Array_Slots (X:  in Object_Half_Word_Array; 
+	                                      XS: in Half_Word_Object_Size) return Half_Word_Object_Size is
+		pragma Inline (Count_Effective_Array_Slots);
 		Last: Half_Word_Object_Size := 1;
 	begin
-		for I in reverse 1 .. X.Size loop
-			if X.Half_Word_Slot(I) /= 0 then
+		for I in reverse 1 .. XS loop
+			if X(I) /= 0 then
 				Last := I;
 				exit;
 			end if;
 		end loop;
 		return Last;
+	end Count_Effective_Array_Slots;
+	
+	function Count_Effective_Slots (X: in Object_Pointer) return Half_Word_Object_Size is
+		pragma Inline (Count_Effective_Slots);
+		--Last: Half_Word_Object_Size := 1;
+	begin
+		return Count_Effective_Array_Slots (X.Half_Word_Slot, X.Size);
+		
+		--for I in reverse 1 .. X.Size loop
+		--	if X.Half_Word_Slot(I) /= 0 then
+		--		Last := I;
+		--		exit;
+		--	end if;
+		--end loop;
+		--return Last;
 	end Count_Effective_Slots;
 
 	function Normalize (Interp: access Interpreter_Record;
@@ -252,6 +332,126 @@ package body Bigint is
 
 	-----------------------------------------------------------------------------
 
+	function Half_Word_Bit_Position (Pos: in Standard.Positive) return Standard.Natural is
+		pragma Inline (Half_Word_Bit_Position);
+	begin
+		return (Pos * Little_Endian) + ((Half_Word_Bits - Pos + 1) * Big_Endian);
+	end Half_Word_Bit_Position;
+	
+	function Get_Half_Word_Bit (X:   in Object_Half_Word;
+	                            Pos: in Standard.Positive) return Object_Bit is
+		pragma Inline (Get_Half_Word_Bit);
+		BA: Half_Word_Bit_Array;
+		for BA'Address use X'Address;
+	begin
+		return BA(Half_Word_Bit_Position(Pos));
+	end Get_Half_Word_Bit;
+	
+	procedure Set_Half_Word_Bit (X:   in out Object_Half_Word;
+	                             Pos: in     Standard.Positive;
+	                             Bit: in     Object_Bit) is
+		pragma Inline (Set_Half_Word_Bit);
+		BA: Half_Word_Bit_Array;
+		for BA'Address use X'Address;
+	begin
+		BA(Half_Word_Bit_Position(Pos)) := Bit;
+	end Set_Half_Word_Bit;
+	
+	function Shift_Half_Word_Left (W:    in Object_Half_Word; 
+	                               Bits: in Standard.Natural) return Object_Half_Word is
+		pragma Inline (Shift_Half_Word_Left);
+	begin
+		--if Bits >= W'Size then 
+		--	return 0;
+		--end if;
+		return W * (2 ** Bits);
+	end Shift_Half_Word_Left;
+
+	function Shift_Half_Word_Right (W:    in Object_Half_Word; 
+	                                Bits: in Standard.Natural) return Object_Half_Word is
+		pragma Inline (Shift_Half_Word_Right);
+	begin
+		if Bits >= W'Size then
+			-- prevent divide-by-zero in case 2 ** Bits becomes 0 
+			-- for overflow.
+			return 0;
+		end if;
+		return W / (2 ** Bits);
+	end Shift_Half_Word_Right;
+
+	procedure Shift_Left_Unsigned_Array (X:    in out Object_Half_Word_Array;
+	                                     XS:   in     Half_Word_Object_Size;
+	                                     Bits: in     Object_Size) is
+		Word_Shifts: Object_Size; -- half-word shift count
+		Bit_Shifts: Standard.Natural; -- bit shift count
+		Bit_Shifts_Right: Standard.Natural;
+		SI: Half_Word_Object_Size;
+	begin
+		-- This function doesn't grow/shrink the array. Shifting is performed
+		-- within the given array size only.
+
+		-- Get how many half-words to shift.
+		Word_Shifts := Bits / Half_Word_Bits;
+		if Word_Shifts >= XS then
+			X(1 .. XS) := (others => 0);
+			return;
+		end if;
+
+		-- Get how many remaining bits to shift
+		Bit_Shifts := Standard.Natural(Bits rem Half_Word_Bits);
+		Bit_Shifts_Right := Half_Word_Bits - Bit_Shifts;
+
+		-- Shift words and bits
+		SI := XS - Word_Shifts;
+		X(XS) := Shift_Half_Word_Left(X(SI), Bit_Shifts);
+		for DI in reverse Object_Size(Word_Shifts) + 1 .. XS - 1 loop
+			SI := DI - Word_Shifts; -- Source Index
+			X(DI + 1) := X(DI + 1) or Shift_Half_Word_Right(X(SI), Bit_Shifts_Right);
+			X(DI) := Shift_Half_Word_Left(X(SI), Bit_Shifts);
+		end loop;
+
+		-- Fill the remaining part with zeros
+		X(1 .. Object_Size(Word_Shifts)) := (others => 0);
+	end Shift_Left_Unsigned_Array;
+
+	procedure Shift_Right_Unsigned_Array (X:    in out Object_Half_Word_Array;
+	                                      XS:   in     Half_Word_Object_Size;
+	                                      Bits: in     Object_Size) is
+	                                     
+		Word_Shifts: Object_Size; -- half-word shift count
+		Bit_Shifts: Standard.Natural; -- bit shift count
+		Bit_Shifts_Left: Standard.Natural;
+		SI: Half_Word_Object_Size;
+	begin
+		-- This function doesn't grow/shrink the array. Shifting is performed
+		-- within the given array size only.
+
+		-- Get how many half-words to shift.
+		Word_Shifts := Bits / Half_Word_Bits;
+		if Word_Shifts >= XS then
+			X(1 .. XS) := (others => 0);
+			return;
+		end if;
+		
+		-- Get how many remaining bits to shift
+		Bit_Shifts := Standard.Natural(Bits rem Half_Word_Bits);
+		Bit_Shifts_Left := Half_Word_Bits - Bit_Shifts;
+
+		-- Shift words and bits
+		SI := 1 + Word_Shifts;
+		X(1) := Shift_Half_Word_Right(X(SI), Bit_Shifts);
+		for DI in 2 .. XS - 1 loop
+			SI := DI + Word_Shifts; -- Source Index
+			X(DI - 1) := X(DI - 1) or Shift_Half_Word_Right(X(SI), Bit_Shifts_Left);
+			X(DI) := Shift_Half_Word_Right(X(SI), Bit_Shifts);
+		end loop;
+
+		-- Fill the remaining part with zeros
+		X(XS - Half_Word_Object_Size(Word_Shifts) + 1 .. XS) := (others => 0);
+	end Shift_Right_Unsigned_Array;
+
+	-----------------------------------------------------------------------------
+
 	procedure Add_Unsigned_Array (X:      in     Object_Half_Word_Array;
 	                              XS:     in     Half_Word_Object_Size;
 	                              Y:      in     Object_Half_Word_Array;
@@ -309,7 +509,6 @@ package body Bigint is
 		Borrowed_Word: constant Object_Word := Object_Word(Object_Half_Word'Last) + 1;
 		Borrow: Object_Half_Word := 0;
 	begin
-	
 		pragma Assert (not Is_Less_Unsigned_Array(X, XS, Y, YS)); -- The caller must ensure that X >= Y
 		
 		for I in 1 .. YS loop
@@ -344,9 +543,6 @@ package body Bigint is
 		A: aliased Object_Pointer := X;
 		B: aliased Object_Pointer := Y;
 		Z: Object_Pointer;
-		W: Object_Word;
-		Borrowed_Word: constant Object_Word := Object_Word(Object_Half_Word'Last) + 1;
-		Borrow: Object_Half_Word := 0; 
 	begin
 		pragma Assert (not Is_Less_Unsigned(A, B)); -- The caller must ensure that X >= Y
 
@@ -418,7 +614,63 @@ package body Bigint is
 		return Z;
 	end Multiply_Unsigned;
 
+	procedure Divide_Unsigned_Array (X:  in     Object_Half_Word_Array;
+	                                 XS: in     Half_Word_Object_Size;
+	                                 Y:  in out Object_Half_Word_Array;
+	                                 YS: in     Half_Word_Object_Size;
+	                                 Q:  in out Object_Half_Word_Array;
+	                                 R:  in out Object_Half_Word_Array) is
+		Bits: constant Object_Size := XS * Half_Word_Bits;
+		Word_Pos: Object_Size;
+		Bit_Pos: Standard.Positive;
+		RS: Half_Word_Object_Size;
+	begin
+		Q := (others => 0);
+		R := (others => 0);
+
+		for I in reverse 1 .. Bits loop
+			Word_Pos := (I - 1) / Half_Word_Bits + 1;
+			Bit_Pos := Standard.Positive((I - 1) rem Half_Word_Bits + 1);
+
+			Shift_Left_Unsigned_Array (R, XS, 1);
+			Set_Half_Word_Bit (R(1), 1, Get_Half_Word_Bit(X(Word_Pos), Bit_Pos));
+
+			RS := Count_Effective_Array_Slots (R, XS);
+			if not Is_Less_Unsigned_Array(R, RS, Y, YS) then
+				Subtract_Unsigned_Array (R, RS, Y, YS, R);
+				Set_Half_Word_Bit (Q(Word_Pos), Bit_Pos, 1);
+			end if;
+		end loop;
+	end Divide_Unsigned_Array;
+	
+	                                 
 	procedure Divide_Unsigned (Interp: in out Interpreter_Record;
+	                           X:      in     Object_Pointer;
+	                           Y:      in     Object_Pointer;
+	                           Q:      out    Object_Pointer;
+	                           R:      out    Object_Pointer) is
+		A: aliased Object_Pointer := X;
+		B: aliased Object_Pointer := Y;
+		C: aliased Object_Pointer;
+		D: aliased Object_Pointer;
+	begin
+		pragma Assert (not Is_Less_Unsigned(A, B)); -- The caller must ensure that X >= Y
+
+		Push_Top (Interp, A'Unchecked_Access);
+		Push_Top (Interp, B'Unchecked_Access);
+		Push_Top (Interp, C'Unchecked_Access);
+		Push_Top (Interp, D'Unchecked_Access);
+		C := Make_Bigint(Interp.Self, Size => A.Size);
+		D := Make_Bigint(Interp.Self, Size => A.Size);
+		Pop_Tops (Interp, 4);
+
+		Divide_Unsigned_Array (A.Half_Word_Slot, A.Size, B.Half_Word_Slot, B.Size, C.Half_Word_Slot, D.Half_Word_Slot);
+
+		Q := C;
+		R := D;
+	end Divide_Unsigned;
+
+	procedure Divide_Unsigned_2 (Interp: in out Interpreter_Record;
 	                           X:      in     Object_Pointer;
 	                           Y:      in     Object_Pointer;
 	                           Q:      out    Object_Pointer;
@@ -460,6 +712,7 @@ package body Bigint is
 		Sor.Half_Word_Slot(1 + Diff .. B.Size + Diff) := B.Half_Word_Slot;
 
 		for I in reverse B.Size .. A.Size loop
+			-- TODO: Optimize the alogrighm further. the adjustment loop may take very long.
 			if not Is_Less_Unsigned_Array(Dend.Half_Word_Slot, Dend_Size, Sor.Half_Word_Slot, Sor_Size) then
 				if Dend_Size > Sor_Size then
 					-- Take the 2 high digits from the dividend and 
@@ -485,20 +738,19 @@ package body Bigint is
 				Multiply_Unsigned_Array (Cand, Cand_Size, Sor.Half_Word_Slot, Sor_Size, Tmp.Half_Word_Slot);
 				Tmp_Size := Count_Effective_Slots(Tmp);
 
-				-- Check if the dividend is less than the multiplication result. Dividend < Tmp
-				if Is_Less_Unsigned_Array(Dend.Half_Word_Slot, Dend_Size, Tmp.Half_Word_Slot, Tmp_Size) then
-					-- If so, decrement the candidate by 1.
-					Quo.Half_Word_Slot(I - B.Size + 1) := Cand(1) - 1;
+				-- Adjust down the guess while the dividend is less than the multiplication result. 
+				while Is_Less_Unsigned_Array(Dend.Half_Word_Slot, Dend_Size, Tmp.Half_Word_Slot, Tmp_Size) loop
+					Cand(1) := Cand(1) - 1;
 
-					-- Tmp := Tmp - Divisor
+					-- Tmp := Tmp - Divisor		
 					Subtract_Unsigned_Array (Tmp.Half_Word_Slot, Tmp_Size, Sor.Half_Word_Slot, Sor_Size, Tmp.Half_Word_Slot);
 					Tmp_Size := Count_Effective_Slots(Tmp);
-				else
-					-- If not, the candidate is the right guess.
-					Quo.Half_Word_Slot(I - B.Size + 1) := Cand(1);
-				end if;
+				end loop;
+
+				-- Set the guess to the quotient.
+				Quo.Half_Word_Slot(I - B.Size + 1) := Cand(1);
 				
-				-- Dividend := Dividend - Tmp
+				-- Dividend := Dividend - Tmp			
 				Subtract_Unsigned_Array (Dend.Half_Word_Slot, Dend_Size, Tmp.Half_Word_Slot, Tmp_Size, Dend.Half_Word_Slot);
 				Dend_Size := Count_Effective_Slots(Dend);
 			end if;
@@ -512,7 +764,7 @@ package body Bigint is
 		
 		Q := Quo;
 		R := Dend;
-	end Divide_Unsigned;
+	end Divide_Unsigned_2;
 
 	-----------------------------------------------------------------------------
 
@@ -617,7 +869,7 @@ package body Bigint is
 
 		Divide_Integers (Interp, A, B, Q);
 		if Q /= null then
-			-- remainder operation must succeed if division was ok.
+			-- Remainder operation must succeed if division was ok.
 			R :=  Integer_To_Pointer(Pointer_To_Integer(A) rem Pointer_To_Integer(B));
 			return;
 		end if;
@@ -658,119 +910,160 @@ package body Bigint is
 
 	procedure To_String (Interp: in out Interpreter_Record;
 	                     X:      in     Object_Pointer;
-	                     Radix:  in     Object_Half_Word; -- TODO define the radix type to a subtype range 2 .. 32
+	                     Radix:  in     Object_Radix;
 	                     Z:      out    Object_Pointer) is
-	                     
-		A: aliased Object_Pointer;
-		B: aliased Object_Pointer;
-		R: aliased Object_Pointer;
-		W, V: Object_Word;
-
-		Sign: Object_Sign;
-		Radlen: Object_Word;
-		Seglen: Object_Word;
-
--- TODO: estimate the length of the character array and create a temporary string object instead of this array.
-		QQQ: Object_Character_Array (1.. X.Size * Object_Half_Word'Size);
-		QL: Character_Object_Size := 0;
+		W: aliased Object_Word;
+		Sign: aliased Object_Sign;
 	begin
-		if Is_Integer(X) then
-			-- TODO: change this
-			ada.text_io.put_line(Object_Integer'Image(Pointer_To_Integer(X)));
+		-- Perform simple conversion if the object can be decoded 
+		-- to a single word.
+		if Decode_To_Word(X, W'Access, Sign'Access) then
+			declare
+				-- Use a static buffer for simple conversion as the largest
+				-- size is known. The largest buffer is required for radix 2.
+				-- For a binary conversion(radix 2), the number of bits is
+				-- the maximum number of digits that can be produced. +1 is
+				-- needed for the sign.
+				Buf: Object_Character_Array (1 .. Object_Word'Size + 1);
+				Len: Object_Size;
+			begin
+				Convert_Word_To_Text (W, Radix, Buf, Len);
+				if Sign = Negative_Sign then
+					Len := Len + 1;
+					Buf(Len) := Ch.Minus_Sign;
+				end if;			
+				Z := Make_String(Interp.Self, Source => Buf(1 .. Len), Invert => Standard.True);
+			end;
+			
 			return;
 		end if;
 		
-		if X.Size <= 2 then
-		--TODO: sign;
-			if X.Size = 2 then
-				W := Make_Word(X.Half_Word_Slot(1), X.Half_Word_Slot(2));
+		-- Otherwise, do it in the hard way.
+		declare
+			A: aliased Object_Pointer;
+			B: aliased Object_Pointer;
+			R: aliased Object_Pointer;
+			Q: aliased Object_Pointer;
+			V: Object_Word;			
+			Radlen: Object_Size; -- Maxiumum length of each word conversion
+			Totlen: Object_Size := 0; -- Length of total conversion
+			Seglen: Object_Size; -- Length of each word conversion
+			AS: Half_Word_Object_Size;
+
+			-- TODO: optimize the buffer size depending on the radix value.
+			subtype Static_Buffer is Object_Character_Array (1 .. 16 * Half_Word_Bits + 1);
+			subtype Dynamic_Buffer is Object_Character_Array (1 .. X.Size  * Half_Word_Bits + 1);
+			type Static_Buffer_Pointer is access all Static_Buffer;
+			type Dynamic_Buffer_Pointer is access all Dynamic_Buffer;
+			package Pool is new H2.Pool (Dynamic_Buffer, Dynamic_Buffer_Pointer, Interp.Storage_Pool);
+			Static_Buf: aliased Static_Buffer;
+			Dynamic_Buf: Dynamic_Buffer_Pointer;
+			Buf: Thin_Object_Character_Array_Pointer;
+		begin
+			if X.Size <= 16 then			
+				declare
+					function Conv is new Ada.Unchecked_Conversion (Static_Buffer_Pointer, Thin_Object_Character_Array_Pointer);
+				begin
+					Buf := Conv(Static_Buf'Access);
+				end;
 			else
-				W := Object_Word(X.Half_Word_Slot(1));
+			-- TODO: move this dynamic buffer to Interpreter_Record and let it sustained during the lifetime of Interpreer
+				declare
+					function Conv is new Ada.Unchecked_Conversion (Dynamic_Buffer_Pointer, Thin_Object_Character_Array_Pointer);
+				begin
+					Dynamic_Buf := Pool.Allocate;
+					Buf := Conv(Dynamic_Buf);
+				end;
 			end if;
 			
-			ada.text_io.put_line(Object_Word'Image(W));
-			return;
-		end if;
-
-		-- Find the largest multiple of Radix that is less than or 
-		-- equal to Object_Word'Last.
-		Radlen := 1;
-		W := Object_Word(Radix);
-		loop
-			V := W * Object_Word(Radix);
-			if V = W then
+			-- Find the largest multiple of Radix that is less than or 
+			-- equal to Object_Word'Last.
+			Radlen := 1;
+			W := Object_Word(Radix);
+			loop
+				V := W * Object_Word(Radix);
+				if V = W then
+					Radlen := Radlen + 1;
+					W := V;
+					exit;
+				elsif V < W then
+					exit;
+				end if;
 				Radlen := Radlen + 1;
 				W := V;
-				exit;
-			elsif V < W then
-				exit;
-			end if;
-			Radlen := Radlen + 1;
-			W := V;
-		end loop;
-
-		Push_Top (Interp, R'Unchecked_Access);
-		Push_Top (Interp, B'Unchecked_Access);
-		Push_Top (Interp, A'Unchecked_Access);
+			end loop;
 		
-		A := Copy_Upto(Interp.Self, X, X.Size);
-		B := Make_Bigint(Interp.Self, Size => 2);
-		B.Half_Word_Slot(1) := Get_Low(W);
-		B.Half_Word_Slot(2) := Get_High(W);
+			Push_Top (Interp, Q'Unchecked_Access);
+			Push_Top (Interp, R'Unchecked_Access);
+			Push_Top (Interp, B'Unchecked_Access);
+			Push_Top (Interp, A'Unchecked_Access);
+			
+			-- Clone the value to convert
+			A := Copy_Upto(Interp.Self, X, X.Size);
+			
+			-- Create a block divisor using the value gotten above.
+			B := Make_Bigint(Interp.Self, Size => 2);
+			B.Half_Word_Slot(1) := Get_Low(W);
+			B.Half_Word_Slot(2) := Get_High(W);
 
-		Sign := A.Sign;
-		A.Sign := Positive_Sign;
-		loop
-			if Is_Less_Unsigned(B, A) then
-				Divide_Unsigned (Interp, A, B, A, R);
-				A := Copy_Upto(Interp.Self, A, Count_Effective_Slots(A)); -- partial normalization
-			else
-				R := A;
-			end if;
+			-- Remember the sign to produce the sign symbol later
+			Sign := A.Sign;
+			A.Sign := Positive_Sign;
+			AS := A.Size;
+			
+			Q := Make_Bigint(Interp.Self, Size => A.Size);
+			R := Make_Bigint(Interp.Self, Size => A.Size);
 
-			if R.Size = 1 then
-				W := Object_Word(R.Half_Word_Slot(1));
-			else
-				W := Make_Word(R.Half_Word_Slot(1), R.Half_Word_Slot(2));
-			end if;
-		
-			Seglen := 0;
 			loop
-				V := W rem Object_Word(Radix);
-
-				Seglen := Seglen + 1;
-				QL := QL + 1;
-				if V in 0 .. 9 then
-					QQQ(QL) := Object_Character'Val(Object_Character'Pos(Ch.Zero) + V);
+				-- Get a word block to convert
+				if Is_Less_Unsigned_Array (B.Half_Word_Slot, B.Size, A.Half_Word_Slot, AS) then
+					Divide_Unsigned_Array (A.Half_Word_Slot, AS, B.Half_Word_Slot, B.Size, Q.Half_Word_Slot, R.Half_Word_Slot);
+					A.Half_Word_Slot := Q.Half_Word_Slot;
+					AS := Count_Effective_Slots(A);
 				else
-					QQQ(QL) := Object_Character'Val(Object_Character'Pos(Ch.UC_A) + V - 10);
+					R := A; -- The last block
 				end if;
 
-				W := W / Object_Word(Radix);
-				exit when W = 0;
+				-- Translate up to 2 half-words to a full word.
+				if R.Size = 1 then
+					W := Object_Word(R.Half_Word_Slot(1));
+				else
+					W := Make_Word(R.Half_Word_Slot(1), R.Half_Word_Slot(2));
+				end if;
+			
+				Convert_Word_To_Text (W, Radix, Buf(Totlen + 1 .. Buf'Last), Seglen);
+				Totlen := Totlen + Seglen;
+
+				exit when R = A; -- Reached the last block
+
+				-- Fill unfilled leading digits with zeros if it's not the last block
+				for I in Seglen + 1 .. Radlen loop
+					Totlen := Totlen + 1;
+					Buf(Totlen) := Object_Character'Val(Object_Character'Pos(Ch.Zero));
+				end loop;
+				
 			end loop;
 
-			exit when R = A; -- Reached the last block
+			Pop_Tops (Interp, 4);
+			
+			if Sign = Negative_Sign then
+				Totlen := Totlen + 1;
+				Buf(Totlen) := Ch.Minus_Sign;
+			end if;
+			
+			Z := Make_String(Interp.Self, Source => Buf(1 .. Totlen), Invert => Standard.True);	
 
-			-- Fill with zeros if it's not the last block
-			for I in Seglen + 1 .. Radlen loop
-				QL := QL + 1;
-				QQQ(QL) := Object_Character'Val(Object_Character'Pos(Ch.Zero));
-			end loop;
-		end loop;
+			if Dynamic_Buf /= null then			
+				Pool.Deallocate (Dynamic_Buf);
+			end if;
 
-if Sign = Negative_Sign then
-	Ada.Text_IO.Put ('-');
-end if;
-for I in reverse 1 .. QL loop
-	Ada.Text_IO.Put (Standard.Character'Val(Object_Character'Pos(QQQ(I))));
-end loop;
-ada.text_io.new_line;
-
-		Pop_Tops (Interp, 3);
-		
-		-- TODO:
-		--Z := Make_String_Object (...);
+		exception
+			when others =>
+				if Dynamic_Buf /= null then
+					Pool.Deallocate (Dynamic_Buf);
+				end if;
+				raise;
+		end;
 	end To_String;
 	
 	procedure From_String (Interp: in out Interpreter_Record;
