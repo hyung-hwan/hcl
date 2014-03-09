@@ -1,5 +1,3 @@
-with ada.text_io;
-
 package body H2.Utf8 is
 
 	type Uint8 is mod 2 ** 8;
@@ -64,7 +62,7 @@ package body H2.Utf8 is
 
 
 	function Unicode_To_Utf8 (US: in Unicode_String) return Utf8_String is
-		-- this function has high stack pressur if the input string is too long
+		-- this function has high stack pressure if the input string is too long
 		-- TODO: create a procedure to overcome this problem.
 		Tmp: System_Size;
 	begin
@@ -93,14 +91,14 @@ package body H2.Utf8 is
 		end;
 	end Unicode_To_Utf8;
 
-     procedure Utf8_To_Unicode (Utf8: in Utf8_String;
-                                UC:   out Unicode_Character) is
+	procedure Utf8_To_Unicode (Utf8: in Utf8_String;
+                                   UC:   out Unicode_Character) is
 	begin
 		null;
 	end Utf8_To_Unicode;
 
-     procedure Utf8_To_Unicode (Utf8: in Utf8_String;
-                                US:   in out Unicode_String) is
+	procedure Utf8_To_Unicode (Utf8: in Utf8_String;
+                                   US:   in out Unicode_String) is
 	begin
 		null;
 	end Utf8_To_Unicode;

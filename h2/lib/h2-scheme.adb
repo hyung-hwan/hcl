@@ -403,13 +403,23 @@ package body H2.Scheme is
 			V := V * 10 + Object_Character'Pos(Source(I)) - Object_Character'Pos(Ch.Zero);
 		end loop;	
 
-		if Negative then	
+		if Negative then
 			V := -V;
 		end if;
 
 		return Integer_To_Pointer(V);
 	end String_To_Integer_Pointer;
 
+	-- TODO: remove this function or improve it to handle conversion properly.
+	function String_To_Object_Character_Array (Source: in Standard.String) return Object_Character_Array is
+		Result: Object_Character_Array (1 .. Source'Length);
+	begin
+		for I in Result'Range loop
+			Result(I) := Object_Character'Val(Standard.Character'Pos(Source(Source'First + Standard.Natural(I) - 1)));
+		end loop;
+		return Result;
+	end;
+	
 	-----------------------------------------------------------------------------
 	-- MORE CONVERSIONS
 	-----------------------------------------------------------------------------
@@ -2088,6 +2098,10 @@ end if;
 			Interp.Else_Symbol := Make_Symbol(Interp.Self, Label_Else);	
 		end Make_Common_Symbol_Objects;
 	begin
+		-- Initialize child packages in case library-level initialization
+		-- has been skipped for various reasons.
+		Bigint.Initialize;
+		
 		declare
 			Aliased_Interp: aliased Interpreter_Record;
 			for Aliased_Interp'Address use Interp'Address;
@@ -2681,18 +2695,18 @@ A := Make_Bigint(Interp.Self, Value => Object_Integer'Last - 16#FFFF#);
 B := Make_Bigint(Interp.Self, Value => Object_Integer'Last);
 B.sign := Negative_Sign;
 
-A := Make_Bigint(Interp.Self, Size => 10); 
-A.Half_Word_Slot(10) := Object_Half_Word'Last;
+A := Make_Bigint(Interp.Self, Size => 30); 
+A.Half_Word_Slot(30) := Object_Half_Word'Last;
 Bigint.Multiply(Interp, A, integer_to_pointer(2), A);
 Bigint.Add(Interp, A, A, A);
 
 B := Make_Bigint(Interp.Self, Size => 4);
 B.Half_Word_Slot(4) := Object_Half_Word'Last / 2;
-Bigint.Subtract(Interp, B, integer_to_pointer(1), B);
+Bigint.Subtract(Interp, integer_to_pointer(1), B, B);
 --A := Bigint.Divide(Interp, A, integer_to_pointer(0));
 
-print (interp, A);
-print (interp, B);
+ada.text_io.put ("A => "); print (interp, A);
+ada.text_io.put ("B => "); print (interp, B);
 declare
 q, r: object_Pointer;
 begin
@@ -2702,13 +2716,21 @@ begin
 ada.text_io.put ("Q => "); print (interp, Q);
 ada.text_io.put ("R => "); print (interp, R);
 
-bigint.to_string (interp, r, 16,r);
+bigint.to_string (interp, Q, 16,r);
 --bigint.to_string (interp, integer_to_pointer(-2), 10, r);
 print (interp, r);
 --bigint.to_string (interp, r, 10, r);
 
 end;
 Pop_tops (Interp, 2);
+end;
+
+declare
+q: object_Pointer;
+begin
+bigint.from_string (interp, String_To_Object_Character_Array("FFFFFFFFFFFFFFFFFFFFFFFFFFFF1111111AAAA"), 16, q);
+bigint.to_string (interp, q, 16, q);
+print (interp, q);
 end;
 			Ada.Text_IO.Put_LINE ("=== BYE ===");
 			Pop_Tops (Interp, 1);

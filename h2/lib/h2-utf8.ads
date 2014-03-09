@@ -2,6 +2,7 @@ generic
 	type Utf8_Character_Type is (<>);
 	type Unicode_Character_Type is (<>);
 package H2.Utf8 is
+	pragma Preelaborate (Utf8);
 
 	Invalid_Unicode_Character: exception;
 

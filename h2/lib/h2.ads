@@ -2,6 +2,7 @@ with System;
 with System.Storage_Pools;
 
 package H2 is
+	pragma Preelaborate (H2);
 
 	System_Word_Bits: constant := System.Word_Size;
 	System_Word_Bytes: constant := System_Word_Bits / System.Storage_Unit;

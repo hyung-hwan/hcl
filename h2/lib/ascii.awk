@@ -4,6 +4,7 @@ BEGIN {
 	printf ("-- Generated with ascii.txt and ascii.awk\n");
 	printf ("-- Run qseawk -f ascii.awk ascii.txt > h2-ascii.ads for regeneration\n\n");
 	printf ("generic\n\ttype Character_Type is (<>);\npackage H2.Ascii is\n\n");
+	printf ("\tpragma Preelaborate (Ascii);\n\n");
 	printf ("\tpackage Pos is\n");
 }
 

@@ -89,7 +89,10 @@ package H2.Scheme is
 	type Object_Record;
 	type Object_Pointer is access all Object_Record;
 	for Object_Pointer'Size use Object_Pointer_Bits;
-
+	
+	type Object_Bit is mod 2 ** 1;
+	--for Object_Bit'Size use 1;
+	
 	-- Object_Word is a numeric type as large as Object_Poinetr;
 	type Object_Word is mod 2 ** Object_Pointer_Bits;
 	for Object_Word'Size use Object_Pointer_Bits;
@@ -596,7 +599,8 @@ private
 	end Token;
 
 	package Bigint is
-
+		
+		
 		subtype Object_Radix is Object_Word range 2 .. 36;
 		
 		function Get_Low (W: Object_Word) return Object_Half_Word;
@@ -633,6 +637,13 @@ private
 		                     X:      in     Object_Pointer;
 		                     Radix:  in     Object_Radix;
 		                     Z:      out    Object_Pointer);
+
+		procedure From_String (Interp: in out Interpreter_Record;
+		                       X:      in     Object_Character_Array;
+		                       Radix:  in     Object_Radix;
+		                       Z:      out    Object_Pointer);
+
+		procedure Initialize;
 	end Bigint;
 
 end H2.Scheme;

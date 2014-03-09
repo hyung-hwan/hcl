@@ -13,6 +13,7 @@ generic
 	Storage_Pool: in Storage_Pool_Pointer := null;
 
 package H2.Pool is
+	pragma Preelaborate (Pool);
 
 	function Allocate (Pool: in Storage_Pool_Pointer := null) return Pointer_Type;
 

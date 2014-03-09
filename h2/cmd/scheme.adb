@@ -29,7 +29,12 @@ procedure scheme is
 	--File_Stream: Stream.File_Stream_Record := (Name => File_Name'Unchecked_Access);
 	File_Stream: Stream.File_Stream_Record;
 
+   --procedure h2init;
+   --pragma Import (C, h2init, "h2init");
+
+
 begin
+	--h2init;
 	Ada.Text_Io.Put_Line (S.Object_Word'Image(S.Object_Pointer_Bytes));
 
 	S.Open (SI, 2_000_000, Pool'Unchecked_Access);
