@@ -282,105 +282,178 @@ Ada.Text_IO.Put_Line ("STRING EXPECTED FOR STRING=?");
 	-- -------------------------------------------------------------
 	-- Arithmetic procedures
 	-- -------------------------------------------------------------
+	
+	function Is_Numeric (X: in Object_Pointer) return Standard.Boolean is
+		pragma Inline (Is_Numeric);
+	begin
+		return Is_Integer(X) or else Is_Bigint(X);
+	end Is_Numeric;
+	
 	procedure Apply_Add_Procedure is
-		Ptr: Object_Pointer := Args;
-		Num: Object_Integer := 0; -- TODO: support BIGNUM
+		Ptr: aliased Object_Pointer := Args;
+		Num: Object_Pointer;
 		Car: Object_Pointer;
 	begin
+		Push_Top (Interp, Ptr'Unchecked_Access);
+		
+		Num := Integer_To_Pointer(0);
 		while Is_Cons(Ptr) loop
-			-- TODO: check if car is an integer or bignum or something else.
-			--       if something else, error
 			Car := Get_Car(Ptr);
-			if not Is_Integer(Car) then
-Ada.Text_IO.Put ("NOT INTEGER FOR ADD"); Print (Interp, Car);
+			Ptr := Get_Cdr(Ptr);
+			
+			if not Is_Numeric(Car) then
+Ada.Text_IO.Put ("NOT NUMERIC FOR ADD"); Print (Interp, Car);
 				raise Evaluation_Error;
 			end if;
-			Num := Num + Pointer_To_Integer(Car);
-			Ptr := Get_Cdr(Ptr);
+			Bigint.Add (Interp, Num, Car, Num);
 		end loop;
 
-		Return_Frame (Interp, Integer_To_Pointer(Num));
+		Pop_Tops (Interp, 1);
+		Return_Frame (Interp, Num);
 	end Apply_Add_Procedure;
 
 	procedure Apply_Subtract_Procedure is
-		Ptr: Object_Pointer := Args;
-		Num: Object_Integer := 0; -- TODO: support BIGNUM
+		Ptr: aliased Object_Pointer := Args;
+		Num: Object_Pointer;
 		Car: Object_Pointer;
 	begin
 		if Is_Cons(Ptr) then
+			Push_Top (Interp, Ptr'Unchecked_Access);
+			
 			Car := Get_Car(Ptr);
-			if not Is_Integer(Car) then
+			Ptr := Get_Cdr(Ptr);
+			if not Is_Numeric(Car) then
 				raise Evaluation_Error;
 			end if;
-			Num := Pointer_To_Integer(Car);
+			Num := Car;
 
+			while Is_Cons(Ptr) loop
+				Car := Get_Car(Ptr);
+				Ptr := Get_Cdr(Ptr);
+				if not Is_Numeric(Car) then
+					raise Evaluation_Error;
+				end if;
+				Bigint.Subtract (Interp, Num, Car, Num);
+			end loop;
+			
+			Pop_Tops (Interp, 1);
+		else
+Ada.Text_IO.Put_line ("NO ARGUMETNS FOR SUBNTRATION");
+			raise Evaluation_Error;
+		end if;
+
+		Return_Frame (Interp, Num);
+	end Apply_Subtract_Procedure;
+
+	procedure Apply_Multiply_Procedure is
+		Ptr: aliased Object_Pointer := Args;
+		Num: Object_Pointer;
+		Car: Object_Pointer;
+	begin
+		Push_Top (Interp, Ptr'Unchecked_Access);
+		
+		Num := Integer_To_Pointer(1);
+		while Is_Cons(Ptr) loop
+			Car := Get_Car(Ptr);
 			Ptr := Get_Cdr(Ptr);
+			if not Is_Numeric(Car) then
+Ada.Text_IO.Put ("NOT NUMERIC FOR MULTIPLY"); Print (Interp, Car);
+				raise Evaluation_Error;
+			end if;
+			Bigint.Multiply (Interp, Num, Car, Num);
+		end loop;
+
+		Pop_Tops (Interp, 1);
+		Return_Frame (Interp, Num);
+	end Apply_Multiply_Procedure;
+
+	procedure Apply_Quotient_Procedure is
+		Ptr: aliased Object_Pointer := Args;
+		Num: Object_Pointer;
+		Car: Object_Pointer;
+		Rmn: Object_Pointer;
+	begin
+		if Is_Cons(Ptr) then
+			Push_Top (Interp, Ptr'Unchecked_Access);
+			
+			Car := Get_Car(Ptr);
+			Ptr := Get_Cdr(Ptr);
+			if not Is_Numeric(Car) then
+				raise Evaluation_Error;
+			end if;
+			Num := Car;
+			
 			while Is_Cons(Ptr) loop
 				-- TODO: check if car is an integer or bignum or something else.
 				--       if something else, error
 				Car := Get_Car(Ptr);
-				if not Is_Integer(Car) then
+				Ptr := Get_Cdr(Ptr);
+				if not Is_Numeric(Car) then
+	Ada.Text_IO.Put ("NOT INTEGER FOR QUOTIENT"); Print (Interp, Car);
 					raise Evaluation_Error;
 				end if;
-				Num := Num - Pointer_To_Integer(Car);
-				Ptr := Get_Cdr(Ptr);
+				Bigint.Divide (Interp, Num, Car, Num, Rmn);
 			end loop;
+			
+			Pop_Tops (Interp, 1);
+		else
+			Ada.Text_IO.Put_line ("NO ARGUMETNS FOR QUOTIENT");
+			raise Evaluation_Error;
 		end if;
-
-		Return_Frame (Interp, Integer_To_Pointer(Num));
-	end Apply_Subtract_Procedure;
-
-	procedure Apply_Multiply_Procedure is
-		Ptr: Object_Pointer := Args;
-		Num: Object_Integer := 1; -- TODO: support BIGNUM
-		Car: Object_Pointer;
-	begin
-		while Is_Cons(Ptr) loop
-			-- TODO: check if car is an integer or bignum or something else.
-			--       if something else, error
-			Car := Get_Car(Ptr);
-			if not Is_Integer(Car) then
-Ada.Text_IO.Put ("NOT INTEGER FOR MULTIPLY"); Print (Interp, Car);
-				raise Evaluation_Error;
-			end if;
-			Num := Num * Pointer_To_Integer(Car);
-			Ptr := Get_Cdr(Ptr);
-		end loop;
-
-		Return_Frame (Interp, Integer_To_Pointer(Num));
-	end Apply_Multiply_Procedure;
-
-	procedure Apply_Quotient_Procedure is
-		Ptr: Object_Pointer := Args;
-		Num: Object_Integer := 1; -- TODO: support BIGNUM
-		Car: Object_Pointer;
-	begin
-		while Is_Cons(Ptr) loop
-			-- TODO: check if car is an integer or bignum or something else.
-			--       if something else, error
-			Car := Get_Car(Ptr);
-			if not Is_Integer(Car) then
-Ada.Text_IO.Put ("NOT INTEGER FOR MULTIPLY"); Print (Interp, Car);
-				raise Evaluation_Error;
-			end if;
-			Num := Num * Pointer_To_Integer(Car);
-			Ptr := Get_Cdr(Ptr);
-		end loop;
-
-		Return_Frame (Interp, Integer_To_Pointer(Num));
+		
+		Return_Frame (Interp, Num);
 	end Apply_Quotient_Procedure;
+	
+	procedure Apply_Remainder_Procedure is
+		Ptr: aliased Object_Pointer := Args;
+		Num: Object_Pointer;
+		Car: Object_Pointer;
+		Quo: Object_Pointer;
+	begin
+		if Is_Cons(Ptr) then
+			Push_Top (Interp, Ptr'Unchecked_Access);
+			
+			Car := Get_Car(Ptr);
+			Ptr := Get_Cdr(Ptr);
+			if not Is_Numeric(Car) then
+				raise Evaluation_Error;
+			end if;
+			Num := Car;
+			
+			while Is_Cons(Ptr) loop
+				-- TODO: check if car is an integer or bignum or something else.
+				--       if something else, error
+				Car := Get_Car(Ptr);
+				Ptr := Get_Cdr(Ptr);
+				if not Is_Numeric(Car) then
+	Ada.Text_IO.Put ("NOT INTEGER FOR QUOTIENT"); Print (Interp, Car);
+					raise Evaluation_Error;
+				end if;
+				Bigint.Divide (Interp, Num, Car, Quo, Num);
+			end loop;
+			
+			Pop_Tops (Interp, 1);
+		else
+			Ada.Text_IO.Put_line ("NO ARGUMETNS FOR QUOTIENT");
+			raise Evaluation_Error;
+		end if;
+		
+		Return_Frame (Interp, Num);
+	end Apply_Remainder_Procedure;
 
 	-- -------------------------------------------------------------
 	-- Comparions procedures
 	-- -------------------------------------------------------------
 
 	generic 
-		with function Validate (X: in Object_Pointer; Y: in Object_Pointer) return Standard.Boolean;
-		with function Compare (X: in Object_Pointer; Y: in Object_Pointer) return Standard.Boolean;
+		with function Validate (X: in Object_Pointer;
+		                        Y: in Object_Pointer) return Standard.Boolean;
+		                        
+		with function Compare (X: in Object_Pointer;
+		                       Y: in Object_Pointer) return Standard.Boolean;
 	procedure Apply_Compare_Procedure;
 
 	procedure Apply_Compare_Procedure is
-		-- TODO: support other values
 		Ptr: Object_Pointer := Args;
 		X: Object_Pointer;
 		Y: Object_Pointer;
@@ -395,7 +468,7 @@ Ada.Text_IO.Put ("NOT INTEGER FOR MULTIPLY"); Print (Interp, Car);
 				Y := Get_Car(Ptr);
 
 				if not Validate(X, Y) then
-					ADA.TEXT_IO.PUT_LINE ("NON INTEGER FOR COMPARISION");
+					ADA.TEXT_IO.PUT_LINE ("INVALID TYPE FOR COMPARISION");
 					raise Evaluation_Error;
 				end if;
 
@@ -415,40 +488,40 @@ Ada.Text_IO.Put_line ("TOO FEW ARGUMETNS FOR COMPARISON");
 		end if;
 	end Apply_Compare_Procedure;
 
-	function Validate_Numeric (X: in Object_Pointer; Y: in Object_Pointer) return Standard.Boolean is
-		-- TODO: support BIGNUM, OTHER DATA TYPES
+	function Validate_Numeric (X: in Object_Pointer; 
+	                           Y: in Object_Pointer) return Standard.Boolean is
 	begin
-		return Is_Integer(X) and then Is_Integer(Y);
+		return Is_Numeric(X) and then Is_Numeric(Y);
 	end Validate_Numeric;
 
-	function Equal_To (X: in Object_Pointer; Y: in Object_Pointer) return Standard.Boolean is
-		-- TODO: support BIGNUM, OTHER DATA TYPES
+	function Equal_To (X: in Object_Pointer;
+	                   Y: in Object_Pointer) return Standard.Boolean is
 	begin
-		return Pointer_To_Integer(X) = Pointer_To_Integer(Y);
+		return Bigint.Compare (Interp.Self, X, Y) = 0;
 	end Equal_To;
 
-	function Greater_Than (X: in Object_Pointer; Y: in Object_Pointer) return Standard.Boolean is
-		-- TODO: support BIGNUM, OTHER DATA TYPES
+	function Greater_Than (X: in Object_Pointer;
+	                       Y: in Object_Pointer) return Standard.Boolean is
 	begin
-		return Pointer_To_Integer(X) > Pointer_To_Integer(Y);
+		return Bigint.Compare (Interp.Self, X, Y) > 0;
 	end Greater_Than;
 
-	function Less_Than (X: in Object_Pointer; Y: in Object_Pointer) return Standard.Boolean is
-		-- TODO: support BIGNUM, OTHER DATA TYPES
+	function Less_Than (X: in Object_Pointer;
+	                    Y: in Object_Pointer) return Standard.Boolean is
 	begin
-		return Pointer_To_Integer(X) < Pointer_To_Integer(Y);
+		return Bigint.Compare (Interp.Self, X, Y) < 0;
 	end Less_Than;
 
-	function Greater_Or_Equal (X: in Object_Pointer; Y: in Object_Pointer) return Standard.Boolean is
-		-- TODO: support BIGNUM, OTHER DATA TYPES
+	function Greater_Or_Equal (X: in Object_Pointer;
+	                           Y: in Object_Pointer) return Standard.Boolean is
 	begin
-		return Pointer_To_Integer(X) >= Pointer_To_Integer(Y);
+		return Bigint.Compare (Interp.Self, X, Y) >= 0;
 	end Greater_Or_Equal;
 
-	function Less_Or_Equal (X: in Object_Pointer; Y: in Object_Pointer) return Standard.Boolean is
-		-- TODO: support BIGNUM, OTHER DATA TYPES
+	function Less_Or_Equal (X: in Object_Pointer;
+	                        Y: in Object_Pointer) return Standard.Boolean is
 	begin
-		return Pointer_To_Integer(X) <= Pointer_To_Integer(Y);
+		return Bigint.Compare (Interp.Self, X, Y) <= 0;
 	end Less_Or_Equal;
 
 	procedure Apply_N_EQ_Procedure is new Apply_Compare_Procedure (Validate_Numeric, Equal_To);
@@ -457,8 +530,6 @@ Ada.Text_IO.Put_line ("TOO FEW ARGUMETNS FOR COMPARISON");
 	procedure Apply_N_GE_Procedure is new Apply_Compare_Procedure (Validate_Numeric, Greater_Or_Equal);
 	procedure Apply_N_LE_Procedure is new Apply_Compare_Procedure (Validate_Numeric, Less_Or_Equal);
 
-
-	
 	-- -------------------------------------------------------------
 	-- Closure
 	-- -------------------------------------------------------------
@@ -684,9 +755,7 @@ begin
 				when N_Quotient_Procedure =>
 					Apply_Quotient_Procedure;
 				when N_Remainder_Procedure =>
-					--Apply_Remainder_Procedure;
-					ada.text_io.put_line ("NOT IMPLEMENTED");
-					raise Evaluation_Error;
+					Apply_Remainder_Procedure;
 				when N_Subtract_Procedure =>
 					Apply_Subtract_Procedure;
 

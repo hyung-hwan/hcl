@@ -54,6 +54,8 @@ package H2.Scheme is
 	Internal_Error: exception;
 	IO_Error: exception;
 	Divide_By_Zero_Error: exception;
+	Numeric_String_Error: exception;
+
 
 	type Interpreter_Record is limited private;
 	type Interpreter_Pointer is access all Interpreter_Record;
@@ -632,16 +634,18 @@ private
 		                  Y:      in     Object_Pointer;
 		                  Q:      out    Object_Pointer;
 		                  R:      out    Object_Pointer);
+		                  
+		function Compare (Interp: access Interpreter_Record;
+		                  X:      in     Object_Pointer;
+		                  Y:      in     Object_Pointer) return Standard.Integer;
 
-		procedure To_String (Interp: in out Interpreter_Record;
-		                     X:      in     Object_Pointer;
-		                     Radix:  in     Object_Radix;
-		                     Z:      out    Object_Pointer);
+		function To_String (Interp: access Interpreter_Record;
+		                    X:      in     Object_Pointer;
+		                    Radix:  in     Object_Radix) return Object_Pointer;
 
-		procedure From_String (Interp: in out Interpreter_Record;
-		                       X:      in     Object_Character_Array;
-		                       Radix:  in     Object_Radix;
-		                       Z:      out    Object_Pointer);
+		function From_String (Interp: access Interpreter_Record;
+		                      X:      in     Object_Character_Array;
+		                      Radix:  in     Object_Radix) return Object_Pointer;
 
 		procedure Initialize;
 	end Bigint;

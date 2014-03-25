@@ -457,7 +457,8 @@ package body H2.Scheme is
 		case Token.Kind is
 			when Integer_Token =>
 				-- TODO: bignum
-				return String_To_Integer_Pointer(Token.Value.Ptr.all(1..Token.Value.Last));
+				--return String_To_Integer_Pointer(Token.Value.Ptr.all(1..Token.Value.Last));
+				return Bigint.From_String (Interp, Token.Value.Ptr.all(1..Token.Value.Last),  10);
 
 			when Character_Token =>
 				pragma Assert (Token.Value.Last = 1);
@@ -2680,6 +2681,15 @@ Ada.Text_IO.Put_Line (">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> LOOP ITERATION XXXXXX C
 		when Stream_End_Error =>
 			-- this is not a real error. this indicates the end of input stream.
 declare
+q: object_Pointer;
+begin
+--q := bigint.from_string (interp.self, String_To_Object_Character_Array("20000000000000000000000000000000000000000"), 10);
+q := bigint.from_string (interp.self, String_To_Object_Character_Array("20000000000"), 10);
+q := bigint.to_string (interp.self, q, 10);
+print (interp, q);
+end;
+			goto SKIP;
+declare
 A: aliased Object_Pointer;
 B: aliased Object_Pointer;
 begin
@@ -2716,22 +2726,37 @@ begin
 ada.text_io.put ("Q => "); print (interp, Q);
 ada.text_io.put ("R => "); print (interp, R);
 
-bigint.to_string (interp, Q, 16,r);
---bigint.to_string (interp, integer_to_pointer(-2), 10, r);
+r := bigint.to_string (interp.self, Q, 16);
+--r := bigint.to_string (interp.self, integer_to_pointer(-2), 10);
 print (interp, r);
---bigint.to_string (interp, r, 10, r);
 
 end;
 Pop_tops (Interp, 2);
 end;
 
 declare
+a: object_pointer;
+b: object_pointer;
+begin
+a := Make_Bigint (Interp.Self, Size => 3);
+b := Make_Bigint (Interp.Self, Size => 1);
+a.half_word_slot(1) := Object_Half_Word'Last;
+a.half_word_slot(2) := Object_Half_Word'Last;
+b.half_word_Slot(1) := 16#10#;
+bigint.multiply (interp, a, b, a);
+print (interp, a);
+end;
+declare
 q: object_Pointer;
 begin
-bigint.from_string (interp, String_To_Object_Character_Array("FFFFFFFFFFFFFFFFFFFFFFFFFFFF1111111AAAA"), 16, q);
-bigint.to_string (interp, q, 16, q);
+q := bigint.from_string (interp.self, String_To_Object_Character_Array("-FFFFFFFFFFFFFFFFAAAAAAAAAAAAAAAA11111111222222223333333344444444"), 16);
+--q := bigint.from_string (interp.self, String_To_Object_Character_Array("-123456789123456789123456789A"), 15, q);
+--q := bigint.from_string (interp.self, String_To_Object_Character_Array("123456789012345678901234567890"), 10, q);
+--q := bigint.from_string (interp.self, String_To_Object_Character_Array("+123456701234567012345670123456701234567"), 8, q);
+q := bigint.to_string (interp.self, q, 16);
 print (interp, q);
 end;
+<<SKIP>>
 			Ada.Text_IO.Put_LINE ("=== BYE ===");
 			Pop_Tops (Interp, 1);
 			if Aliased_Result /= null then

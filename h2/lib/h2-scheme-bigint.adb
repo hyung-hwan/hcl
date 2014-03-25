@@ -51,7 +51,7 @@ package body Bigint is
 	Block_Divisors: array (Object_Radix) of Block_Divisor_Record;
 	Block_Divisors_Initialized: Standard.Boolean := Standard.False;
 	
-	-----------------------------------------------------------------------------
+	-------------------------------------------------------------------------
 
 	function Get_Low (W: in Object_Word) return Object_Half_Word is
 		R: Word_Record;
@@ -100,7 +100,7 @@ package body Bigint is
 				when 1 =>
 					Word.all := Object_Word(X.Half_Word_Slot(1));
 				when 2 =>
-					Word.all := Make_Word(X.Half_Word_Slot(1), X.Half_Word_Slot(2));				
+					Word.all := Make_Word(X.Half_Word_Slot(1), X.Half_Word_Slot(2));
 				when others =>
 					return Standard.False;
 			end case;
@@ -133,7 +133,7 @@ package body Bigint is
 			
 		Length := Len; 
 	end Convert_Word_To_Text;
-	-----------------------------------------------------------------------------
+	-------------------------------------------------------------------------
 
 	function Is_Less_Unsigned_Array (X:  in Object_Half_Word_Array;
 	                                 XS: in Half_Word_Object_Size;
@@ -190,7 +190,7 @@ package body Bigint is
 		return X.Size = 1 and then X.Half_Word_Slot(1) = 1;
 	end Is_One_Unsigned;
 
-	-----------------------------------------------------------------------------
+	-------------------------------------------------------------------------
 	function Copy_Upto (Interp: access Interpreter_Record;
 	                    X:      in     Object_Pointer;
 	                    Last:   in     Half_Word_Object_Size) return Object_Pointer is
@@ -268,7 +268,7 @@ package body Bigint is
 		return Copy_Upto(Interp, X, Last);
 	end Normalize;
 
-	-----------------------------------------------------------------------------
+	-------------------------------------------------------------------------
 
 	generic
 		with function Operator (X: in Object_Integer; 
@@ -287,6 +287,9 @@ package body Bigint is
 	begin
 		if Is_Integer(A) and then Is_Integer(B) then
 			declare
+				pragma Unsuppress (Range_Check);
+				pragma Unsuppress (Overflow_Check);
+
 				G: Object_Integer := Pointer_To_Integer(A);
 				H: Object_Integer := Pointer_To_Integer(B);
 			begin
@@ -296,6 +299,7 @@ package body Bigint is
 				return;
 			exception
 				when Constraint_Error =>
+-- TODO: don't count on Constraint_Error exception.
 					Push_Top (Interp, A'Unchecked_Access);
 					Push_Top (Interp, B'Unchecked_Access);
 -- TODO: allocate A and B from a non-GC heap.
@@ -327,7 +331,7 @@ package body Bigint is
 	procedure Multiply_Integers is new Plain_Integer_Op (Operator => "*");
 	procedure Divide_Integers is new Plain_Integer_Op (Operator => "/");
 
-	-----------------------------------------------------------------------------
+	-------------------------------------------------------------------------
 
 	function Half_Word_Bit_Position (Pos: in Standard.Positive) return Standard.Natural is
 		pragma Inline (Half_Word_Bit_Position);
@@ -354,7 +358,7 @@ package body Bigint is
 		BA(Half_Word_Bit_Position(Pos)) := Bit;
 	end Set_Half_Word_Bit;
 	
-	-----------------------------------------------------------------------------
+	-------------------------------------------------------------------------
 
 	function Shift_Half_Word_Left (W:    in Object_Half_Word; 
 	                               Bits: in Standard.Natural) return Object_Half_Word is
@@ -378,7 +382,7 @@ package body Bigint is
 		return W / (2 ** Bits);
 	end Shift_Half_Word_Right;
 	
-	-----------------------------------------------------------------------------
+	-------------------------------------------------------------------------
 
 	procedure Shift_Left_Unsigned_Array (X:    in out Object_Half_Word_Array;
 	                                     XS:   in     Half_Word_Object_Size;
@@ -451,7 +455,7 @@ package body Bigint is
 		X(XS - Half_Word_Object_Size(Word_Shifts) + 1 .. XS) := (others => 0);
 	end Shift_Right_Unsigned_Array;
 
-	-----------------------------------------------------------------------------
+	-------------------------------------------------------------------------
 
 	procedure Add_Unsigned_Array (X:      in     Object_Half_Word_Array;
 	                              XS:     in     Half_Word_Object_Size;
@@ -591,6 +595,7 @@ package body Bigint is
 
 					Carry := High;
 				end loop;
+
 
 				Z(XS + I) := Carry;
 			end if;
@@ -780,7 +785,7 @@ package body Bigint is
 		R := Dend;
 	end Divide_Unsigned_2;
 
-	-----------------------------------------------------------------------------
+	-------------------------------------------------------------------------
 
 	procedure Add (Interp: in out Interpreter_Record;
 	               X:      in     Object_Pointer;
@@ -917,10 +922,75 @@ package body Bigint is
 		R := D;
 	end Divide;
 
-	procedure To_String (Interp: in out Interpreter_Record;
-	                     X:      in     Object_Pointer;
-	                     Radix:  in     Object_Radix;
-	                     Z:      out    Object_Pointer) is
+	-------------------------------------------------------------------------
+
+	function Compare_Bigint_And_Bigint (Interp: access Interpreter_Record;
+	                                    X:      in     Object_Pointer;
+	                                    Y:      in     Object_Pointer) return Standard.Integer is
+	begin
+		if Is_Equal(X, Y) then
+			return 0;
+		elsif Is_Less(X, Y) then
+			return -1;
+		else
+			return 1;
+		end if;
+	end Compare_Bigint_And_Bigint;
+
+	function Compare_Bigint_And_Integer (Interp: access Interpreter_Record;
+	                                     X:      in     Object_Pointer;
+	                                     Y:      in     Object_Pointer) return Standard.Integer is
+		YW: Object_Word := Object_Word(Pointer_To_Integer(Y));
+		Size: Object_Size;
+	begin
+		if YW > Object_Word(Object_Half_Word'Last) then
+			Size := 2;
+		else
+			Size := 1;
+		end if;
+
+		declare
+			YY: aliased Object_Record (Kind => Half_Word_Object, Size => Size);
+		begin
+			YY.Tag := Bigint_Object;
+			YY.Half_Word_Slot(1) := Get_Low(YW);
+			if YY.Size >= 2 then
+				YY.Half_Word_Slot(2) := Get_High(YW);
+			end if;
+			return Compare_Bigint_And_Bigint (Interp, X, YY'Unchecked_Access);
+		end;
+	end Compare_Bigint_And_Integer;
+
+	function Compare (Interp: access Interpreter_Record;
+	                  X:      in     Object_Pointer;
+	                  Y:      in     Object_Pointer) return Standard.Integer is
+	begin
+		if Is_Bigint(X) then
+			if Is_Bigint(Y) then
+				return Compare_Bigint_And_Bigint (Interp, X, Y);
+			else
+				return Compare_Bigint_And_Integer (Interp, X, Y);
+			end if;
+		else
+			if Is_Bigint(Y) then
+				return -Compare_Bigint_And_Integer (Interp, Y, X);
+			else
+				if Pointer_To_Integer(X) = Pointer_To_Integer(Y) then
+					return 0;
+				elsif Pointer_To_Integer(X) < Pointer_To_Integer(Y) then
+					return -1;
+				else
+					return 1;
+				end if;
+			end if;
+		end if;
+	end Compare;
+
+	-------------------------------------------------------------------------
+
+	function To_String (Interp: access Interpreter_Record;
+	                    X:      in     Object_Pointer;
+	                    Radix:  in     Object_Radix) return Object_Pointer is
 		W: aliased Object_Word;
 		Sign: aliased Object_Sign;
 	begin
@@ -941,18 +1011,17 @@ package body Bigint is
 					Len := Len + 1;
 					Buf(Len) := Ch.Minus_Sign;
 				end if;			
-				Z := Make_String(Interp.Self, Source => Buf(1 .. Len), Invert => Standard.True);
+				return Make_String(Interp, Source => Buf(1 .. Len), Invert => Standard.True);
 			end;
-			
-			return;
 		end if;
 		
 		-- Otherwise, do it in a hard way.
 		declare
+			B: aliased Object_Record (Kind => Half_Word_Object, Size => 2);
 			A: aliased Object_Pointer;
-			B: aliased Object_Pointer;
 			R: aliased Object_Pointer;
 			Q: aliased Object_Pointer;
+			Z: Object_Pointer;
 
 			-- TODO: optimize the buffer size depending on the radix value.
 			subtype Static_Buffer is Object_Character_Array (1 .. 16 * Half_Word_Bits + 1);
@@ -989,28 +1058,30 @@ package body Bigint is
 				end;
 			end if;
 
-			Push_Top (Interp, Q'Unchecked_Access);
-			Push_Top (Interp, R'Unchecked_Access);
-			Push_Top (Interp, B'Unchecked_Access);
-			Push_Top (Interp, A'Unchecked_Access);
+			-- Create a block divisor object.
+			B.Tag := Bigint_Object;
+			B.Half_Word_Slot := (1 => BD.Low, 2 => BD.High);
+
+			Push_Top (Interp.all, Q'Unchecked_Access);
+			Push_Top (Interp.all, R'Unchecked_Access);
+			Push_Top (Interp.all, A'Unchecked_Access);
 			
 			-- Clone the value to convert
-			A := Copy_Upto(Interp.Self, X, X.Size);
-			
-			-- Create a block divisor using the value gotten above.
-			B := Make_Bigint(Interp.Self, Size => 2);
-			B.Half_Word_Slot(1) := BD.Low;
-			B.Half_Word_Slot(2) := BD.High;
+			A := Copy_Upto(Interp, X, X.Size);
 
 			-- Remember the sign to produce the sign symbol later
 			Sign := A.Sign;
 			A.Sign := Positive_Sign;
 			AS := A.Size;
-			
-			Q := Make_Bigint(Interp.Self, Size => A.Size);
-			R := Make_Bigint(Interp.Self, Size => A.Size);
+
+			Q := Make_Bigint(Interp, Size => A.Size);
+			R := Make_Bigint(Interp, Size => A.Size);
 
 			loop
+ada.text_io.put ("A => ");
+print (interp.all, A);
+ada.text_io.put ("B => ");
+print (interp.all, B'Unchecked_Access);
 				-- Get a word block to convert
 				if Is_Less_Unsigned_Array (B.Half_Word_Slot, B.Size, A.Half_Word_Slot, AS) then
 					Divide_Unsigned_Array (A.Half_Word_Slot, AS, B.Half_Word_Slot, B.Size, Q.Half_Word_Slot, R.Half_Word_Slot);
@@ -1019,6 +1090,8 @@ package body Bigint is
 				else
 					R := A; -- The last block
 				end if;
+ada.text_io.put ("R => ");
+print (interp.all, R);
 
 				-- Translate up to 2 half-words to a full word.
 				if R.Size = 1 then
@@ -1026,7 +1099,7 @@ package body Bigint is
 				else
 					W := Make_Word(R.Half_Word_Slot(1), R.Half_Word_Slot(2));
 				end if;
-			
+ada.text_io.put_line ("WORD => " & w'img);
 				Convert_Word_To_Text (W, Radix, Buf(Totlen + 1 .. Buf'Last), Seglen);
 				Totlen := Totlen + Seglen;
 
@@ -1038,22 +1111,23 @@ package body Bigint is
 					Totlen := Totlen + 1;
 					Buf(Totlen) := Object_Character'Val(Object_Character'Pos(Ch.Zero));
 				end loop;
-				
 			end loop;
 
-			Pop_Tops (Interp, 4);
+			Pop_Tops (Interp.all, 3);
 			
 			if Sign = Negative_Sign then
 				Totlen := Totlen + 1;
 				Buf(Totlen) := Ch.Minus_Sign;
 			end if;
 			
-			Z := Make_String(Interp.Self, Source => Buf(1 .. Totlen), Invert => Standard.True);	
+			Z := Make_String(Interp.Self, Source => Buf(1 .. Totlen), Invert => Standard.True);
 
 			-- TODO: Move dynamic_buf to interpreter_Record.
 			if Dynamic_Buf /= null then
 				Pool.Deallocate (Dynamic_Buf);
 			end if;
+
+			return Z;
 
 		exception
 			when others =>
@@ -1065,39 +1139,42 @@ package body Bigint is
 	end To_String;
 	
 	
-	procedure From_String (Interp: in out Interpreter_Record;
-	                       X:      in     Object_Character_Array;
-	                       Radix:  in     Object_Radix;
-	                       Z:      out    Object_Pointer) is
-		
+	function From_String (Interp: access Interpreter_Record;
+	                      X:      in     Object_Character_Array;
+	                      Radix:  in     Object_Radix) return Object_Pointer is
+	        
+
 		function Get_Digit_Value (C: in Object_Character) return Object_Integer is
 			Pos: Object_Integer;
 		begin
 			Pos := Object_Character'Pos(C);
 			case Pos is
 				when Ch.Pos.Zero .. Ch.Pos.Nine =>
-					return Pos - Ch.Pos.Zero;
+					Pos := Pos - Ch.Pos.Zero;
 
 				when Ch.Pos.LC_A .. Ch.Pos.LC_Z =>
-					return Pos - Ch.Pos.LC_A + 10;
+					Pos := Pos - Ch.Pos.LC_A + 10;
 
 				when Ch.Pos.UC_A .. Ch.Pos.UC_Z =>
-					return Pos - Ch.Pos.UC_A + 10;
+					Pos := Pos - Ch.Pos.UC_A + 10;
 
 				when others =>
-					return -1;
+					Pos := -1;
 			end case;
+
+			if Pos not in 0 .. Object_Integer(Radix) - 1 then
+				raise Numeric_String_Error;
+			end if;
+
+			return Pos;
 		end Get_Digit_Value;
-		
+
 		Sign: Object_Sign;
 		Idx: Object_Size;
-		ZI: Object_Size;
-		Pos: Object_Word;
 		W: Object_Word;
 		BDLen: Object_Size renames Block_Divisors(Radix).Length;
-		Digit_Len: Object_Size;
+		NDigits: Object_Size;
 		B: Object_Pointer;
-		DV: Object_Integer;
 	begin
 		-- Find the first digit while remembering the sign
 		Sign := Positive_Sign;
@@ -1111,87 +1188,111 @@ package body Bigint is
 			end if;
 		end if;
 
-		pragma Assert (Idx < X'Last); -- the caller ensure at least 1 digit
-		if Idx >= X'Last then
+		pragma Assert (Idx <= X'Last); -- the caller ensure at least 1 digit
+		if Idx > X'Last then
 			-- No digits in the string.
-			-- TODO: raise exception
-			Z := Integer_To_Pointer(0);
-			return;
+			--return Integer_To_Pointer(0);
+			raise Numeric_String_Error;
 		end if;
 		
-		-- Search backward to find the last non-zero digit
+		-- Find the first non-zero digit
 		while Idx <= X'Last loop
 			exit when X(Idx) /= Ch.Zero;
 			Idx := Idx + 1;
 		end loop;
 		if Idx > X'Last then
-			Z := Integer_To_Pointer(0);
-			return;
+			-- All digits are zeros.
+			return Integer_To_Pointer(0);
 		end if;
 
-		Digit_Len := X'Last - Idx + 1; -- number of meaningful digits
-		
-		W := 0;
-		while Idx <= X'Last loop
-			
-			DV := Get_Digit_Value(X(Idx));
-			pragma Assert (DV in 0 .. Object_Integer(Radix));
-			
-			W := W * Radix + Object_Word(DV);
+		NDigits := X'Last - Idx + 1; -- number of effective digits
 
-			exit when W > Object_Word(Object_Integer'Last);
+		-- Attemp to perform conversion within the range of Object_Integer.
+		declare
+			OW: Object_Word;
+			I: Object_Integer;
+		begin
+			W := 0;
+			while Idx <= X'Last loop
+				OW := W;
+				W := W * Radix + Object_Word(Get_Digit_Value(X(Idx)));
 
-			Idx := Idx + 1;
-		end loop;
-		
-		if Idx > X'Last then
-			-- Processed all digits
-			declare
-				I: Object_Integer := Object_Integer(W);
-			begin
-				if Sign = Negative_Sign then
-					I := -I;
+				-- Exit if the accumulated value can't be represented
+				-- in an Object_Integer.
+				if W > Object_Word(Object_Integer'Last) or else W <= OW then
+					W := OW;
+					goto Huge;
 				end if;
-				Z := Integer_To_Pointer(I);
-			end;
-			return;
-		end if;
 
-		B := Make_Bigint(Interp.Self, Size => ((Digit_Len + BDLen - 1) / BDLen) * 2 + 1000); -- TODO: is it the right size?
+				Idx := Idx + 1;
+			end loop;
+			-- Processed all digits. The value can fit
+			-- into an Object_Integer.
+			I := Object_Integer(W);
 
-ada.text_io.put_line ("SWITING TO BIGINT" & B.Size'Img & " IDX => " & Idx'Img);
+			--I := 0;
+			--while Idx <= X'Last loop
+			--	begin
+			--		I := I * Object_Integer(Radix) + Get_Digit_Value(X(Idx));
+			--	exception
+			--		when Constraint_Error =>
+			--			W := Object_Word(I);
+			--			goto Huge;
+			--	end;
+			--	Idx := Idx + 1;
+			--end loop;
 
-		ZI := 1;
-		B.Half_Word_Slot(ZI) := Get_Low(W);
-		W := Object_Word(Get_High(W));
-
-		while Idx <= X'Last loop
-			DV := Get_Digit_Value(X(Idx));
-			pragma Assert (DV in 0 .. Object_Integer(Radix));
-			
-			W := W * Radix + Object_Word(DV);
-
-			if W > Object_Word(Object_Half_Word'Last) then
-				ZI := ZI + 1;
-				B.Half_Word_Slot(ZI) := Get_Low(W);
-				W := Object_Word(Get_High(W));
+			if Sign = Negative_Sign then
+				I := -I;
 			end if;
+			return Integer_To_Pointer(I);
+		end;
 
-			Idx := Idx + 1;
-		end loop;
+	<<Huge>>
+		-- TODO: Optimizations if Radix 2, 4, 16. For there radix, conversion can be done in chunk.
 
-		while W > 0 loop
-			ZI := ZI + 1;
-			B.Half_Word_Slot(ZI) := Get_Low(W);
-			W := Object_Word(Get_High(W));
-		end loop;
+		-- The input string is too large to be converted to an Object_Integer.
+		B := Make_Bigint(Interp, Size => ((NDigits + BDLen - 1) / BDLen) * 2 + 1); -- TODO: is it the right size?
+
+		declare
+			C: Object_Pointer;
+			RB: aliased Object_Record (Kind => Half_Word_Object, Size => 1);
+		begin
+			RB.Tag := Bigint_Object;
+			RB.Half_Word_Slot(1) := Object_Half_Word(Radix);
+
+			C := Make_Bigint(Interp, Size => B.Size);
+
+			B.Half_Word_Slot(1) := Get_Low(W);
+			B.Half_Word_Slot(2) := Get_High(W);
+
+			while Idx <= X'Last loop
+				declare
+					DVB: aliased Object_Record (Kind => Half_Word_Object, Size => 1);
+				begin
+					DVB.Tag := Bigint_Object;
+					DVB.Half_Word_Slot(1) := Object_Half_Word(Get_Digit_Value(X(Idx)));
+
+ada.text_io.put ("B =>");
+print (interp.all, B);
+ada.text_io.put ("RB =>");
+print (interp.all, RB'Unchecked_Access);
+					Multiply_Unsigned_Array (B.Half_Word_Slot, Count_Effective_Array_Slots(B.Half_Word_Slot, B.Size), RB.Half_Word_Slot, RB.Size, C.Half_Word_Slot);
+					B.Half_Word_Slot := (others => 0);
+					Add_Unsigned_Array (C.Half_Word_Slot, Count_Effective_Array_Slots(C.Half_Word_Slot, B.Size), DVB.Half_Word_Slot, DVB.Size, B.Half_Word_Slot);
+					C.Half_Word_Slot := (others => 0);
+				end;
+print (interp.all, B);
+				Idx := Idx + 1;
+			end loop;
+		end;
 
 		B.Sign := Sign;
-		Z := Normalize(Interp.Self, B);
+		return Normalize(Interp.Self, B);
 	end From_String;
-	
-	-----------------------------------------------------------------------------
-	
+
+	-------------------------------------------------------------------------
+
 	function Get_Block_Divisor (Radix: in Object_Radix) return Block_Divisor_Record is
 		V, W: Object_Word;
 		Len: Object_Size;
@@ -1201,18 +1302,27 @@ ada.text_io.put_line ("SWITING TO BIGINT" & B.Size'Img & " IDX => " & Idx'Img);
 
 		loop
 			V := W * Object_Word(Radix);
-			if V = W then
-				Len := Len + 1;
-				W := V;
-				exit;
-			elsif V < W then
-				exit;
-			end if;
+			--if V = W then
+			--	Len := Len + 1;
+			--	W := V;
+			--	exit;
+			--elsif V < W then
+			--	-- Overflow
+			--	exit;
+			--end if;
+			exit when V <= W;
 
 			Len := Len + 1;
 			W := V;
+if Radix = 10 then
+ada.text_io.put_line ("BLOCK_DIVISOR XX=> " & w'img);
+end if;
+
 		end loop;
-		
+
+if Radix = 10 then
+ada.text_io.put_line ("BLOCK_DIVISOR => " & w'img);
+end if;
 		return (Low => Get_Low(W), High => Get_High(W), Length => Len);
 	end Get_Block_Divisor;
 
