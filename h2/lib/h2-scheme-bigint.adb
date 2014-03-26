@@ -287,8 +287,8 @@ package body Bigint is
 	begin
 		if Is_Integer(A) and then Is_Integer(B) then
 			declare
-				pragma Unsuppress (Range_Check);
-				pragma Unsuppress (Overflow_Check);
+				--pragma Unsuppress (Range_Check);
+				--pragma Unsuppress (Overflow_Check);
 
 				G: Object_Integer := Pointer_To_Integer(A);
 				H: Object_Integer := Pointer_To_Integer(B);

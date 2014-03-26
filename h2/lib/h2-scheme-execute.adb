@@ -570,7 +570,7 @@ procedure Execute (Interp: in out Interpreter_Record) is
 					--return;
 					raise IO_Error;
 			end;
-			if Interp.Input.Last < Interp.Input.Data'First then	
+			if Interp.Input.Last < Interp.Input.Data'First then
 				-- The callee must read 0 bytes on EOF 
 				Interp.Input.Flags := Interp.Input.Flags and IO_End_Reached;
 				Interp.Input.Iochar := (End_Character, Object_Character'First);

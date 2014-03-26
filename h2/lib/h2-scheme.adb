@@ -1236,7 +1236,6 @@ end if;
 	end Make_Cons;
 
 	function Is_Cons (Source: in Object_Pointer) return Standard.Boolean is
-		pragma Inline (Is_Cons);
 	begin
 		return Is_Normal_Pointer(Source) and then 
 		       Source.Tag = Cons_Object;
@@ -1439,7 +1438,6 @@ end if;
 	end Make_Bigint;
 
 	function Is_Bigint (Source: in Object_Pointer) return Standard.Boolean is
-		pragma Inline (Is_Bigint);
 	begin
 		return Is_Normal_Pointer(Source) and then 
 		       Source.Tag = Bigint_Object;

@@ -335,6 +335,8 @@ package H2.Scheme is
 	function Is_Cons (Source: in Object_Pointer) return Standard.Boolean;
 	function Is_Bigint (Source: in Object_Pointer) return Standard.Boolean;
 
+	pragma Inline (Is_Cons);
+	pragma Inline (Is_Bigint);
 	-- -----------------------------------------------------------------------------
 
 

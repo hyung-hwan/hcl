@@ -15,8 +15,10 @@ project Scheme is
 	for Source_Files use (
 		"storage.ads",
 		"storage.adb",
-		"stream.ads",
-		"stream.adb",
+		"slim_stream.ads",
+		"slim_stream.adb",
+		"wide_stream.ads",
+		"wide_stream.adb",
 		"scheme.adb"
 	);
 	for Object_Dir use "@ADA_OBJDIR@";

@@ -19,6 +19,7 @@ project Lib is
 		"h2-scheme-execute-apply.adb",
 		"h2-scheme-execute-evaluate.adb",
 		"h2-scheme-token.adb",
+		"h2-slim.ads",
 		"h2-utf8.adb",
 		"h2-utf8.ads",
 		"h2-wide.ads"
@@ -28,6 +29,7 @@ project Lib is
 		"h2.ascii",
 		"h2.pool",
 		"h2.scheme",
+		"h2.slim",
 		"h2.utf8",
 		"h2.wide"
 	);

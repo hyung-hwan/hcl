@@ -3,20 +3,22 @@ with Ada.Unchecked_Conversion;
 
 with Ada.Text_IO; -- for debugging
 
-package body Stream is
+package body Wide_Stream is
+
+	package Utf8 renames H2.Wide.Utf8;
+	use type S.Object_Size;
 
 	------------------------------------------------------------------
-	use type S.Object_Size;
 
 	procedure Open (Stream: in out String_Input_Stream_Record) is
 	begin
-Ada.Text_IO.Put_Line ("****** OPEN STRING STREAM ******");
+Ada.Text_IO.Put_Line ("****** OPEN WIDE STRING STREAM ******");
 		Stream.Pos := 0;
 	end Open;
 
 	procedure Close (Stream: in out String_Input_Stream_Record) is
 	begin
-Ada.Text_IO.Put_Line ("****** CLOSE STRING STREAM ******");
+Ada.Text_IO.Put_Line ("****** CLOSE WIDE STRING STREAM ******");
 		Stream.Pos := Stream.Str'Last;
 	end Close;
 
@@ -52,7 +54,7 @@ Ada.Text_IO.Put_Line ("****** CLOSE STRING STREAM ******");
 
 	procedure Open (Stream: in out File_Stream_Record) is
 	begin
-Ada.Text_IO.Put_Line (">>>>> OPEN File STREAM <<<<< " & Standard.String(Utf8.Unicode_To_Utf8(Utf8.Unicode_String(Stream.Name.all))));
+Ada.Text_IO.Put_Line (">>>>> OPEN WIDE FILE STREAM <<<<< " & Standard.String(Utf8.Unicode_To_Utf8(Utf8.Unicode_String(Stream.Name.all))));
 		--Ada.Wide_Text_IO.Open (Stream.Handle, Ada.Wide_Text_IO.In_File, Ada.Characters.Conversions.To_String(Standard.Wide_String(Stream.Name.all)));
 		Ada.Wide_Text_IO.Open (Stream.Handle, Ada.Wide_Text_IO.In_File, Standard.String(Utf8.Unicode_To_Utf8(Utf8.Unicode_String(Stream.Name.all))));
 	end Open;
@@ -62,7 +64,7 @@ Ada.Text_IO.Put_Line (">>>>> OPEN File STREAM <<<<< " & Standard.String(Utf8.Uni
 		function To_Wide_String is new Ada.Unchecked_Conversion (S.Object_Character_Array, Wide_String);
 	begin
 --Ada.Wide_Text_IO.Put_Line (">>>>> CLOSE File STREAM <<<<< " & Standard.Wide_String(Stream.Name.all));
-Ada.Text_IO.Put_Line (">>>>> CLOSE File STREAM <<<<< " & Standard.String(Utf8.Unicode_To_Utf8(Utf8.Unicode_String(Stream.Name.all))));
+Ada.Text_IO.Put_Line (">>>>> CLOSE WIDE FILE STREAM <<<<< " & Standard.String(Utf8.Unicode_To_Utf8(Utf8.Unicode_String(Stream.Name.all))));
 		Ada.Wide_Text_IO.Close (Stream.Handle);
 	end Close;
 
@@ -100,7 +102,7 @@ Ada.Text_IO.Put_Line (">>>>> CLOSE File STREAM <<<<< " & Standard.String(Utf8.Un
 	procedure Allocate_Stream (Interp: in out S.Interpreter_Record;
 	                           Name:   access S.Object_Character_Array;
 	                           Result: out    S.Stream_Pointer) is
-		subtype FSR is Stream.File_Stream_Record;
+		subtype FSR is File_Stream_Record;
 		type FSP is access all FSR;
 		package P is new H2.Pool (FSR, FSP);
 
@@ -114,7 +116,7 @@ Ada.Text_IO.Put_Line (">>>>> CLOSE File STREAM <<<<< " & Standard.String(Utf8.Un
 
 	procedure Deallocate_Stream (Interp: in out S.Interpreter_Record;
 	                             Source: in out S.Stream_Pointer) is
-		subtype FSR is Stream.File_Stream_Record;
+		subtype FSR is File_Stream_Record;
 		type FSP is access all FSR;
 		package P is new H2.Pool (FSR, FSP);
 
@@ -124,4 +126,4 @@ Ada.Text_IO.Put_Line (">>>>> CLOSE File STREAM <<<<< " & Standard.String(Utf8.Un
 	begin
 		P.Deallocate (X, S.Get_Storage_Pool(Interp));
 	end Deallocate_Stream;
-end Stream;
+end Wide_Stream;

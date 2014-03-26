@@ -1,10 +1,9 @@
 with H2.Wide;
 with Ada.Wide_Text_IO;
 
-package Stream is
+package Wide_Stream is
 
 	package S renames H2.Wide.Scheme;
-	package Utf8 renames H2.Wide.Utf8;
 
 	------------------------------------------------------------
 	--type Object_Character_Array_Pointer is access all S.Object_Character_Array;
@@ -52,5 +51,5 @@ package Stream is
 --		Handle: Ada.Wide_Text_IO.File_Type;
 --	end record;
 
-end Stream;
+end Wide_Stream;
 
