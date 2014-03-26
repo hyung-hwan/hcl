@@ -1010,7 +1010,7 @@ package body Bigint is
 				if Sign = Negative_Sign then
 					Len := Len + 1;
 					Buf(Len) := Ch.Minus_Sign;
-				end if;			
+				end if;
 				return Make_String(Interp, Source => Buf(1 .. Len), Invert => Standard.True);
 			end;
 		end if;
@@ -1078,10 +1078,6 @@ package body Bigint is
 			R := Make_Bigint(Interp, Size => A.Size);
 
 			loop
-ada.text_io.put ("A => ");
-print (interp.all, A);
-ada.text_io.put ("B => ");
-print (interp.all, B'Unchecked_Access);
 				-- Get a word block to convert
 				if Is_Less_Unsigned_Array (B.Half_Word_Slot, B.Size, A.Half_Word_Slot, AS) then
 					Divide_Unsigned_Array (A.Half_Word_Slot, AS, B.Half_Word_Slot, B.Size, Q.Half_Word_Slot, R.Half_Word_Slot);
@@ -1090,8 +1086,6 @@ print (interp.all, B'Unchecked_Access);
 				else
 					R := A; -- The last block
 				end if;
-ada.text_io.put ("R => ");
-print (interp.all, R);
 
 				-- Translate up to 2 half-words to a full word.
 				if R.Size = 1 then
@@ -1099,7 +1093,6 @@ print (interp.all, R);
 				else
 					W := Make_Word(R.Half_Word_Slot(1), R.Half_Word_Slot(2));
 				end if;
-ada.text_io.put_line ("WORD => " & w'img);
 				Convert_Word_To_Text (W, Radix, Buf(Totlen + 1 .. Buf'Last), Seglen);
 				Totlen := Totlen + Seglen;
 
@@ -1207,23 +1200,29 @@ ada.text_io.put_line ("WORD => " & w'img);
 
 		NDigits := X'Last - Idx + 1; -- number of effective digits
 
-		-- Attemp to perform conversion within the range of Object_Integer.
+		-- Attempt to perform conversion within the range of Object_Integer.
 		declare
-			OW: Object_Word;
+			--pragma Unsuppress (Range_Check);
+			--pragma Unsuppress (Overflow_Check);
+
+			V1, V2: Object_Word;
 			I: Object_Integer;
 		begin
 			W := 0;
 			while Idx <= X'Last loop
-				OW := W;
-				W := W * Radix + Object_Word(Get_Digit_Value(X(Idx)));
-
-				-- Exit if the accumulated value can't be represented
-				-- in an Object_Integer.
-				if W > Object_Word(Object_Integer'Last) or else W <= OW then
-					W := OW;
+				V1 := W * Radix;
+				if V1 / Radix /= W then
+					-- Overflow
 					goto Huge;
 				end if;
 
+				V2 := V1 + Object_Word(Get_Digit_Value(X(Idx)));
+				if V2 > Object_Word(Object_Integer'Last) or else V2 < V1 then
+					-- Overflow
+					goto Huge;
+				end if;
+
+				W := V2;
 				Idx := Idx + 1;
 			end loop;
 			-- Processed all digits. The value can fit
@@ -1273,16 +1272,12 @@ ada.text_io.put_line ("WORD => " & w'img);
 					DVB.Tag := Bigint_Object;
 					DVB.Half_Word_Slot(1) := Object_Half_Word(Get_Digit_Value(X(Idx)));
 
-ada.text_io.put ("B =>");
-print (interp.all, B);
-ada.text_io.put ("RB =>");
-print (interp.all, RB'Unchecked_Access);
 					Multiply_Unsigned_Array (B.Half_Word_Slot, Count_Effective_Array_Slots(B.Half_Word_Slot, B.Size), RB.Half_Word_Slot, RB.Size, C.Half_Word_Slot);
 					B.Half_Word_Slot := (others => 0);
 					Add_Unsigned_Array (C.Half_Word_Slot, Count_Effective_Array_Slots(C.Half_Word_Slot, B.Size), DVB.Half_Word_Slot, DVB.Size, B.Half_Word_Slot);
 					C.Half_Word_Slot := (others => 0);
 				end;
-print (interp.all, B);
+
 				Idx := Idx + 1;
 			end loop;
 		end;
@@ -1297,32 +1292,19 @@ print (interp.all, B);
 		V, W: Object_Word;
 		Len: Object_Size;
 	begin
+		-- Get the largest multiples of Radix that can be represented
+		-- in a single Object_Word.
+
 		Len := 1;
 		W := Object_Word(Radix);
 
 		loop
 			V := W * Object_Word(Radix);
-			--if V = W then
-			--	Len := Len + 1;
-			--	W := V;
-			--	exit;
-			--elsif V < W then
-			--	-- Overflow
-			--	exit;
-			--end if;
-			exit when V <= W;
-
+			exit when V / Object_Word(Radix) /= W; -- Overflow
 			Len := Len + 1;
 			W := V;
-if Radix = 10 then
-ada.text_io.put_line ("BLOCK_DIVISOR XX=> " & w'img);
-end if;
-
 		end loop;
 
-if Radix = 10 then
-ada.text_io.put_line ("BLOCK_DIVISOR => " & w'img);
-end if;
 		return (Low => Get_Low(W), High => Get_High(W), Length => Len);
 	end Get_Block_Divisor;
 

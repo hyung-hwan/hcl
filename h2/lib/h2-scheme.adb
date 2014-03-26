@@ -2683,8 +2683,8 @@ Ada.Text_IO.Put_Line (">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> LOOP ITERATION XXXXXX C
 declare
 q: object_Pointer;
 begin
---q := bigint.from_string (interp.self, String_To_Object_Character_Array("20000000000000000000000000000000000000000"), 10);
-q := bigint.from_string (interp.self, String_To_Object_Character_Array("20000000000"), 10);
+q := bigint.from_string (interp.self, String_To_Object_Character_Array("20000000000000000000000000000000000000000"), 10);
+--q := bigint.from_string (interp.self, String_To_Object_Character_Array("20000000000"), 10);
 q := bigint.to_string (interp.self, q, 10);
 print (interp, q);
 end;
