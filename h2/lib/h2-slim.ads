@@ -2,6 +2,8 @@ with H2.Scheme;
 
 package H2.Slim is
 
-	package Scheme is new H2.Scheme (Standard.Character);
+	subtype Character is Standard.Character;
+	type String is array(System_Index range<>) of Character;
+	package Scheme is new H2.Scheme (Character);
 
 end H2.Slim;

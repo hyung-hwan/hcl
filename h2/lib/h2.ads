@@ -18,9 +18,22 @@ package H2 is
 	--for System_Signed_Word'Size use System_Word_Bits;
 
 	type System_Size is new System_Word range 0 .. (2 ** System_Word_Bits) - 1;
+	subtype System_Length is System_Size;
 	subtype System_Index is System_Size range 1 .. System_Size'Last;
 
 	type Storage_Pool_Pointer is
 		access all System.Storage_Pools.Root_Storage_Pool'Class;
 
+	
+	-- TODO: move this to H2.XXXX???
+	type File_Record is tagged null record;
+	type File_Pointer is access all File_Record'Class;
+	
+	type Flag_Record is record
+		x: integer;
+	end record;
+
+	type Mode_Record is record
+		x: integer;
+	end record;
 end H2;

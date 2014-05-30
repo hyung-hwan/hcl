@@ -7,13 +7,15 @@ with Slim_Stream;
 with Wide_Stream;
 with Ada.Text_IO;
 with Ada.Unchecked_Deallocation;
+with H2.Sysapi;
+
+with Interfaces.C;
 
 procedure scheme is
-	--package Stream renames Wide_Stream;
-	--package Scheme renames H2.Wide.Scheme;
-
-	package Stream renames Slim_Stream;
-	package Scheme renames H2.Slim.Scheme;
+	package Stream renames Wide_Stream;
+	package Scheme renames H2.Wide.Scheme;
+	--package Stream renames Slim_Stream;
+	--package Scheme renames H2.Slim.Scheme;
 	
 	Pool: aliased Storage.Global_Pool;
 	SI: Scheme.Interpreter_Record;
@@ -27,7 +29,7 @@ procedure scheme is
 	--String_Stream: Stream.String_Input_Stream_Record := (Len => String'Length, Str => String, Pos => 0);
 
 	--File_Name: aliased S.Object_Character_Array := "test.adb";
-	File_Name: aliased constant Scheme.Object_Character_Array := "test.scm";
+	File_Name: aliased constant Scheme.Object_Character_Array := "시험.scm";
 	--File_Stream: Stream.File_Stream_Record (File_Name'Unchecked_Access);
 	--File_Stream: Stream.File_Stream_Record := (Name => File_Name'Unchecked_Access);
 	File_Stream: Stream.File_Stream_Record;
@@ -35,9 +37,40 @@ procedure scheme is
    --procedure h2init;
    --pragma Import (C, h2init, "h2init");
 
-
 begin
 	--h2init;
+
+declare
+	package Sysapi is new H2.Sysapi (
+		H2.Slim.Character,
+		H2.Wide.Character,
+		H2.Slim.String,
+		H2.Wide.String,
+		H2.Wide.Utf8.To_Unicode_String,
+		H2.Wide.Utf8.From_Unicode_String);
+
+	F: Sysapi.File_Pointer;
+	M: Sysapi.Mode_Record;
+	LG: Sysapi.Flag_Record;
+begin
+	Sysapi.File.Open (F, H2.Slim.String'("/etc/passwd"), LG, M);
+	Sysapi.File.Close (F);
+end;
+
+
+declare
+
+	LC_ALL : constant Interfaces.C.int := 0;
+	procedure setlocale (
+		category : Interfaces.C.int;
+		locale : Interfaces.C.char_array);
+	pragma Import (C, setlocale);
+	Empty : aliased Interfaces.C.char_array := (0 => Interfaces.C.nul);
+
+begin
+	setlocale (LC_ALL, Empty);
+end;
+
 
 	Scheme.Open (SI, 2_000_000, Pool'Unchecked_Access);
 	--Scheme.Open (SI, null);

@@ -35,8 +35,6 @@
 --
 ---------------------------------------------------------------------
 
-with System;
-with System.Storage_Pools;
 with Ada.Unchecked_Conversion;
 with H2.Ascii;
 

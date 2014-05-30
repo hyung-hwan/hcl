@@ -2,6 +2,7 @@ with H2.Pool;
 with Ada.Unchecked_Conversion;
 
 with Ada.Text_IO; -- for debugging
+with Ada.Exceptions;
 
 package body Wide_Stream is
 
@@ -54,9 +55,9 @@ Ada.Text_IO.Put_Line ("****** CLOSE WIDE STRING STREAM ******");
 
 	procedure Open (Stream: in out File_Stream_Record) is
 	begin
-Ada.Text_IO.Put_Line (">>>>> OPEN WIDE FILE STREAM <<<<< " & Standard.String(Utf8.Unicode_To_Utf8(Utf8.Unicode_String(Stream.Name.all))));
+Ada.Text_IO.Put_Line (">>>>> OPEN WIDE FILE STREAM <<<<< " & Standard.String(Utf8.From_Unicode_String(Utf8.Unicode_String(Stream.Name.all))));
 		--Ada.Wide_Text_IO.Open (Stream.Handle, Ada.Wide_Text_IO.In_File, Ada.Characters.Conversions.To_String(Standard.Wide_String(Stream.Name.all)));
-		Ada.Wide_Text_IO.Open (Stream.Handle, Ada.Wide_Text_IO.In_File, Standard.String(Utf8.Unicode_To_Utf8(Utf8.Unicode_String(Stream.Name.all))));
+		Ada.Wide_Text_IO.Open (Stream.Handle, Ada.Wide_Text_IO.In_File, Standard.String(Utf8.From_Unicode_String(Utf8.Unicode_String(Stream.Name.all))));
 	end Open;
 
 	procedure Close (Stream: in out File_Stream_Record) is
@@ -64,7 +65,17 @@ Ada.Text_IO.Put_Line (">>>>> OPEN WIDE FILE STREAM <<<<< " & Standard.String(Utf
 		function To_Wide_String is new Ada.Unchecked_Conversion (S.Object_Character_Array, Wide_String);
 	begin
 --Ada.Wide_Text_IO.Put_Line (">>>>> CLOSE File STREAM <<<<< " & Standard.Wide_String(Stream.Name.all));
-Ada.Text_IO.Put_Line (">>>>> CLOSE WIDE FILE STREAM <<<<< " & Standard.String(Utf8.Unicode_To_Utf8(Utf8.Unicode_String(Stream.Name.all))));
+Ada.Text_IO.Put_Line (">>>>> CLOSE WIDE FILE STREAM <<<<< " & Standard.String(Utf8.From_Unicode_String(Utf8.Unicode_String(Stream.Name.all))));
+begin
+	ada.wide_text_io.put_line (">> " & Standard.Wide_String(Utf8.To_Unicode_String(Utf8.From_Unicode_String(Utf8.Unicode_String(Stream.Name.all)))));
+exception
+	when Ex: others =>
+		ada.text_io.put_line ("fuck - " & Ada.Exceptions.Exception_Name(Ex) & Ada.Exceptions.Exception_Information(Ex));
+end;
+ada.text_io.put_line (">>");
+
+
+
 		Ada.Wide_Text_IO.Close (Stream.Handle);
 	end Close;
 
