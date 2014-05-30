@@ -1,6 +1,9 @@
 project Lib is
 
-	for Source_Dirs use ("@abs_srcdir@");
+	for Source_Dirs use (
+		"@abs_srcdir@",
+		"@abs_srcdir@/posix"
+	);
 	for Library_Name use "h2";
 	for Library_Kind use "dynamic";
 	for Library_Dir use ".";
@@ -20,9 +23,13 @@ project Lib is
 		"h2-scheme-execute-evaluate.adb",
 		"h2-scheme-token.adb",
 		"h2-slim.ads",
+		"h2-sysapi.adb",
+		"h2-sysapi.ads",
+		"h2-sysapi-file.adb",
 		"h2-utf8.adb",
 		"h2-utf8.ads",
-		"h2-wide.ads"
+		"h2-wide.ads",
+		"h2-wide_wide.ads"
 	);
 	for Library_Interface use (
 		"h2",
@@ -30,8 +37,10 @@ project Lib is
 		"h2.pool",
 		"h2.scheme",
 		"h2.slim",
+		"h2.sysapi",
 		"h2.utf8",
-		"h2.wide"
+		"h2.wide",
+		"h2.wide_wide"
 	);
 
 	package Compiler is
