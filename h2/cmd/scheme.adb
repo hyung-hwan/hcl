@@ -16,7 +16,7 @@ procedure scheme is
 	package Scheme renames H2.Wide.Scheme;
 	--package Stream renames Slim_Stream;
 	--package Scheme renames H2.Slim.Scheme;
-	
+
 	Pool: aliased Storage.Global_Pool;
 	SI: Scheme.Interpreter_Record;
 
@@ -50,10 +50,11 @@ declare
 		H2.Wide.Utf8.From_Unicode_String);
 
 	F: Sysapi.File_Pointer;
-	M: Sysapi.Mode_Record;
-	LG: Sysapi.Flag_Record;
+	FL: Sysapi.File_Flag;
 begin
-	Sysapi.File.Open (F, H2.Slim.String'("/etc/passwd"), LG, M);
+	Sysapi.Set_File_Flag_Bits (FL, Sysapi.FILE_FLAG_WRITE);
+	Sysapi.Set_File_Flag_Bits (FL, Sysapi.FILE_FLAG_READ);
+	Sysapi.File.Open (F, H2.Slim.String'("/etc/passwd"), FL);
 	Sysapi.File.Close (F);
 end;
 
@@ -76,8 +77,8 @@ end;
 	--Scheme.Open (SI, null);
 
 	-- Specify the named stream handler
-	Scheme.Set_Option (SI, (Scheme.Stream_Option, 
-	                   Stream.Allocate_Stream'Access, 
+	Scheme.Set_Option (SI, (Scheme.Stream_Option,
+	                   Stream.Allocate_Stream'Access,
 	                   Stream.Deallocate_Stream'Access)
 	);
 

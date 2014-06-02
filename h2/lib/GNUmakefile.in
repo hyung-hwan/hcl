@@ -21,7 +21,7 @@ clean:
 distclean: clean
 
 
-ADAC := $(CC)
+ADAC := @CC@
 ADAFLAGS := -x ada -gnatA -fPIC -gnata -gnato -gnatN -gnatwl -lgnat95 -gnatW8 -g
 BINDFLAGS := -x -shared -n -Lh2
 

@@ -58,7 +58,7 @@ package body H2.Scheme is
 	-- I define these constants to word around the limitation of not being
 	-- able to use a string literal when the string type is a generic parameter.
 	-- Why doesn't ada include a formal type support for different character
-	-- and string types? This limitation is caused because the generic 
+	-- and string types? This limitation is caused because the generic
 	-- type I chosed to use to represent a character type is a discrete type.
 	Label_And:        constant Object_Character_Array := (Ch.LC_A, Ch.LC_N, Ch.LC_D); -- "and"
 	Label_Begin:      constant Object_Character_Array := (Ch.LC_B, Ch.LC_E, Ch.LC_G, Ch.LC_I, Ch.LC_N); -- "begin"
@@ -72,7 +72,7 @@ package body H2.Scheme is
 	Label_Letast:     constant Object_Character_Array := (Ch.LC_L, Ch.LC_E, Ch.LC_T, Ch.Asterisk); -- "let*"
 	Label_Letrec:     constant Object_Character_Array := (Ch.LC_L, Ch.LC_E, Ch.LC_T, Ch.LC_R, Ch.LC_E, Ch.LC_C); -- "letrec"
 	Label_Or:         constant Object_Character_Array := (Ch.LC_O, Ch.LC_R); -- "or"
-	Label_Quasiquote: constant Object_Character_Array := (Ch.LC_Q, Ch.LC_U, Ch.LC_A, Ch.LC_S, Ch.LC_I, 
+	Label_Quasiquote: constant Object_Character_Array := (Ch.LC_Q, Ch.LC_U, Ch.LC_A, Ch.LC_S, Ch.LC_I,
 	                                                      Ch.LC_Q, Ch.LC_U, Ch.LC_O, Ch.LC_T, Ch.LC_E); -- "quasiquote"
 	Label_Quote:      constant Object_Character_Array := (Ch.LC_Q, Ch.LC_U, Ch.LC_O, Ch.LC_T, Ch.LC_E); -- "quote"
 	Label_Set:        constant Object_Character_Array := (Ch.LC_S, Ch.LC_E, Ch.LC_T, Ch.Exclamation); -- "set!"
@@ -81,7 +81,7 @@ package body H2.Scheme is
 	Label_Callcc:     constant Object_Character_Array := (Ch.LC_C, Ch.LC_A, Ch.LC_L, Ch.LC_L, Ch.Minus_Sign,
 	                                                      Ch.LC_W, Ch.LC_I, Ch.LC_T, Ch.LC_H, Ch.Minus_Sign,
 	                                                      Ch.LC_C, Ch.LC_U, Ch.LC_R, Ch.LC_R, Ch.LC_E, Ch.LC_N, Ch.LC_T, Ch.Minus_Sign,
-	                                                      Ch.LC_C, Ch.LC_O, Ch.LC_N, Ch.LC_T, Ch.LC_I, Ch.LC_N, Ch.LC_U, Ch.LC_A, 
+	                                                      Ch.LC_C, Ch.LC_O, Ch.LC_N, Ch.LC_T, Ch.LC_I, Ch.LC_N, Ch.LC_U, Ch.LC_A,
 	                                                      Ch.LC_T, Ch.LC_I, Ch.LC_O, Ch.LC_N);  -- "call-with-current-continuation"
 	Label_Car:        constant Object_Character_Array := (Ch.LC_C, Ch.LC_A, Ch.LC_R); -- "car"
 	Label_Cdr:        constant Object_Character_Array := (Ch.LC_C, Ch.LC_D, Ch.LC_R); -- "cdr"
@@ -98,7 +98,7 @@ package body H2.Scheme is
 	Label_N_Quotient:  constant Object_Character_Array := (Ch.LC_Q, Ch.LC_U, Ch.LC_O, Ch.LC_T, Ch.LC_I, Ch.LC_E, Ch.LC_N, Ch.LC_T); -- "quotient"
 	Label_N_Remainder: constant Object_Character_Array := (Ch.LC_R, Ch.LC_E, Ch.LC_M, Ch.LC_A, Ch.LC_I, Ch.LC_N, Ch.LC_D, Ch.LC_E, Ch.LC_R); -- "remainder"
 	Label_N_Subtract:  constant Object_Character_Array := (1 => Ch.Minus_Sign); -- "-"
-	
+
 	Label_Q_Boolean:   constant Object_Character_Array := (Ch.LC_B, Ch.LC_O, Ch.LC_O, Ch.LC_L, Ch.LC_E, Ch.LC_A, Ch.LC_N, Ch.Question); -- "boolean?"
 	Label_Q_Eq:        constant Object_Character_Array := (Ch.LC_E, Ch.LC_Q, Ch.Question); -- "eq?"
 	Label_Q_Eqv:       constant Object_Character_Array := (Ch.LC_E, Ch.LC_Q, Ch.LC_V, Ch.Question); -- "eqv?"
@@ -109,7 +109,7 @@ package body H2.Scheme is
 	Label_Q_String:    constant Object_Character_Array := (Ch.LC_S, Ch.LC_T, Ch.LC_R, Ch.LC_I, Ch.LC_N, Ch.LC_G, Ch.Question); -- "string?"
 	Label_Q_String_EQ: constant Object_Character_Array := (Ch.LC_S, Ch.LC_T, Ch.LC_R, Ch.LC_I, Ch.LC_N, Ch.LC_G, Ch.Equal_Sign, Ch.Question); -- "string=?"
 	Label_Q_Symbol:    constant Object_Character_Array := (Ch.LC_S, Ch.LC_Y, Ch.LC_M, Ch.LC_B, Ch.LC_O, Ch.LC_L, Ch.Question); -- "symbol?"
-	
+
 	Label_Setcar:      constant Object_Character_Array := (Ch.LC_S, Ch.LC_E, Ch.LC_T, Ch.Minus_Sign, Ch.LC_C, Ch.LC_A, Ch.LC_R, Ch.Exclamation); -- "set-car!"
 	Label_Setcdr:      constant Object_Character_Array := (Ch.LC_S, Ch.LC_E, Ch.LC_T, Ch.Minus_Sign, Ch.LC_C, Ch.LC_D, Ch.LC_R, Ch.Exclamation); -- "set-cdr!"
 
@@ -140,7 +140,7 @@ package body H2.Scheme is
 		Opcode_Exit,
 		Opcode_Evaluate_Result,
 		Opcode_Evaluate_Object,
-	
+
 		Opcode_And_Finish,
 		Opcode_Or_Finish,
 		Opcode_Case_Finish,
@@ -159,7 +159,7 @@ package body H2.Scheme is
 		Opcode_Procedure_Call,
 		Opcode_Procedure_Call_Finish,
 		Opcode_Set_Finish,
-	
+
 		Opcode_Apply,
 		Opcode_Read_Object,
 		Opcode_Read_List,
@@ -227,7 +227,7 @@ package body H2.Scheme is
 
 		Word: Object_Word;
 		for Word'Address use Pointer'Address;
-	begin 
+	begin
 		return Object_Pointer_Type(Word and Object_Word(Object_Pointer_Type_Mask));
 	end Get_Pointer_Type;
 
@@ -239,14 +239,14 @@ package body H2.Scheme is
 	function Is_Special_Pointer (Pointer: in Object_Pointer) return Standard.Boolean is
 	begin
 		-- though sepcial, these 3 pointers gets true for Is_Pointer.
-		return Pointer = Nil_Pointer or else 
+		return Pointer = Nil_Pointer or else
 		       Pointer = True_Pointer or else
 		       Pointer = False_Pointer;
 	end Is_Special_Pointer;
 
 	function Is_Normal_Pointer (Pointer: in Object_Pointer) return Standard.Boolean is
 	begin
-		return Is_Pointer(Pointer) and then 
+		return Is_Pointer(Pointer) and then
 	            not Is_Special_Pointer(Pointer);
 	end Is_Normal_Pointer;
 
@@ -353,7 +353,7 @@ package body H2.Scheme is
 		return Object_Byte(Word / (2 ** Object_Pointer_Type_Bits));
 	end Pointer_To_Byte;
 
-	-- TODO: delete this procedure 
+	-- TODO: delete this procedure
 	procedure Print_Object_Pointer (Msg: in Standard.String; Source: in Object_Pointer) is
 		W: Object_Word;
 		for W'Address use Source'Address;
@@ -368,8 +368,8 @@ package body H2.Scheme is
 		elsif Is_Special_Pointer(Source) then
 			Ada.Text_IO.Put_Line (Msg & " at " & Object_Word'Image(W));
 		elsif Source.Kind = Character_Object then
-			Ada.Text_IO.Put (Msg & " at " & Object_Word'Image(W) & 
-			                   " at " & Object_Kind'Image(Source.Kind) & 
+			Ada.Text_IO.Put (Msg & " at " & Object_Word'Image(W) &
+			                   " at " & Object_Kind'Image(Source.Kind) &
 			                   " size " & Object_Size'Image(Source.Size) & " - ");
 			if Source.Kind = Moved_Object then
 				Output_Character_Array (Get_New_Location(Source).Character_Slot);
@@ -377,7 +377,7 @@ package body H2.Scheme is
 				Output_Character_Array (Source.Character_Slot);
 			end if;
 		else
-			Ada.Text_IO.Put_Line (Msg & " at " & Object_Word'Image(W) & 
+			Ada.Text_IO.Put_Line (Msg & " at " & Object_Word'Image(W) &
 			                            " kind: " & Object_Kind'Image(Source.Kind) &
 			                            " size: " & Object_Size'Image(Source.Size) &
 			                            " tag: " & Object_Tag'Image(Source.Tag));
@@ -401,7 +401,7 @@ package body H2.Scheme is
 		end if;
 		for I in First .. Source'Last loop
 			V := V * 10 + Object_Character'Pos(Source(I)) - Object_Character'Pos(Ch.Zero);
-		end loop;	
+		end loop;
 
 		if Negative then
 			V := -V;
@@ -419,13 +419,13 @@ package body H2.Scheme is
 		end loop;
 		return Result;
 	end;
-	
+
 	-----------------------------------------------------------------------------
 	-- MORE CONVERSIONS
 	-----------------------------------------------------------------------------
 	--function Pointer_To_Opcode (Pointer: in Object_Pointer) return Opcode_Type renames Pointer_To_Integer;
 	--function Opcode_To_Pointer (Opcode: in Opcode_Type) return Object_Pointer renames Integer_To_Pointer;
-		
+
 	function Pointer_To_Opcode (Pointer: in Object_Pointer) return Opcode_Type is
 		pragma Inline (Pointer_To_Opcode);
 	begin
@@ -451,7 +451,7 @@ package body H2.Scheme is
 	end Procedure_Code_To_Pointer;
 
 
-	function Token_To_Pointer (Interp: access Interpreter_Record; 
+	function Token_To_Pointer (Interp: access Interpreter_Record;
 	                           Token:  in     Token_Record) return Object_Pointer is
 	begin
 		case Token.Kind is
@@ -463,11 +463,11 @@ package body H2.Scheme is
 			when Character_Token =>
 				pragma Assert (Token.Value.Last = 1);
 				return Character_To_Pointer(Token.Value.Ptr.all(1));
-		
+
 			when String_Token =>
 				return Make_String(Interp, Token.Value.Ptr.all(1..Token.Value.Last));
 
-			when Identifier_Token =>	
+			when Identifier_Token =>
 				return Make_Symbol(Interp, Token.Value.Ptr.all(1..Token.Value.Last));
 
 			when True_Token =>
@@ -491,13 +491,13 @@ package body H2.Scheme is
 		if X = Y then
 			return Standard.True;
 		end if;
-		
+
 		Ptr_Type := Get_Pointer_Type(X);
 		case Ptr_Type is
 			when Object_Pointer_Type_Integer |
 			     Object_Pointer_Type_Character |
 			     Object_Pointer_Type_Byte =>
-			     
+
 				-- This part of the code won't be reached if two special
 				-- pointers are the same. So False can be returned safely
 				-- without further check. See the lines commented out.
@@ -562,7 +562,7 @@ package body H2.Scheme is
 -- (define x ())
 -- (define x #())
 -- (define x $())
--- (define x #( 
+-- (define x #(
 --              (#a . 10)  ; a is a symbol
 --              (b . 20)   ; b is a variable. resolve b at the eval-time and use it.
 --              ("c" . 30) ; "c" is a string
@@ -582,20 +582,20 @@ package body H2.Scheme is
 	--procedure Set_New_Location (Object: in Object_Pointer; Ptr: in Heap_Element_Pointer) is
 		--New_Addr: Heap_Element_Pointer;
 		--for New_Addr'Address use Object.Size'Address;
-		--pragma Import (Ada, New_Addr); 
+		--pragma Import (Ada, New_Addr);
 	--begin
 		--New_Addr := Ptr;
 	--end Set_New_Location;
 	--function Get_New_Location (Object: in Object_Pointer) return Object_Pointer is
 		--New_Ptr: Object_Pointer;
 		--for New_Ptr'Address use Object.Size'Address;
-		--pragma Import (Ada, New_Ptr); 
+		--pragma Import (Ada, New_Ptr);
 	--begin
 		--return New_Ptr;
 	--end;
 
-	-- Instead, I created a new object kind that indicates a moved object.	
-	-- The original object is replaced by this special object. this special 
+	-- Instead, I created a new object kind that indicates a moved object.
+	-- The original object is replaced by this special object. this special
 	-- object takes up the smallest space that a valid object can take. So
 	-- it is safe to overlay it on any normal objects.
 	procedure Set_New_Location (Object: in Object_Pointer; Ptr: in Heap_Element_Pointer) is
@@ -634,19 +634,19 @@ package body H2.Scheme is
 		end if;
 	end Verify_Pointer;
 
-	function Allocate_Bytes_In_Heap (Heap:       access Heap_Record; 
+	function Allocate_Bytes_In_Heap (Heap:       access Heap_Record;
 	                                 Heap_Bytes: in     Heap_Size) return Heap_Element_Pointer is
 		Avail: Heap_Size;
 		Result: Heap_Element_Pointer;
 		Real_Bytes: Heap_Size := Heap_Bytes;
 	begin
 		if Real_Bytes < Moved_Object_Record'Max_Size_In_Storage_Elements then
-			-- Guarantee the minimum object size to be greater than or 
+			-- Guarantee the minimum object size to be greater than or
 			-- equal to the size of a moved object for GC to work.
-			Real_Bytes := Moved_Object_Record'Max_Size_In_Storage_Elements;	
+			Real_Bytes := Moved_Object_Record'Max_Size_In_Storage_Elements;
 
-			-- Note: Extra attention must be paid when calculating the 
-			-- actual bytes allocated for an object. Scan_New_Heap() also 
+			-- Note: Extra attention must be paid when calculating the
+			-- actual bytes allocated for an object. Scan_New_Heap() also
 			-- makes similar adjustment to skip actual allocated bytes.
 		end if;
 
@@ -654,7 +654,7 @@ package body H2.Scheme is
 		if Real_Bytes > Avail then
 			return null;
 		end if;
-		
+
 		Result := Heap.Space(Heap.Bound + 1)'Unchecked_Access;
 		Heap.Bound := Heap.Bound + Real_Bytes;
 		return Result;
@@ -676,10 +676,10 @@ package body H2.Scheme is
 		for HW2'Address use H2'Address;
 	begin
 		if SW >= HW1 and then SW < HW1 + Object_Word(Interp.Heap(0).Size) then
-			return 0;	
+			return 0;
 		end if;
 		if SW >= HW2 and then SW < HW2 + Object_Word(Interp.Heap(1).Size) then
-			return 1;	
+			return 1;
 		end if;
 
 		if Source = Nil_Pointer then
@@ -699,7 +699,7 @@ ada.text_io.put_line ("HEAP SOURCE IS NIL");
 
 		Target_Object: Target_Object_Pointer;
 		for Target_Object'Address use Target'Address;
-		pragma Import (Ada, Target_Object); 
+		pragma Import (Ada, Target_Object);
 	begin
 		-- This procedure should work. but gnat 4.3.2 on whiite(ppc32,wii)
 		-- produced erroneous code when it was called from Move_One_Object().
@@ -768,10 +768,10 @@ ada.text_io.put_line ("HEAP SOURCE IS NIL");
 					-- Create an overlay for type conversion
 					New_Object: Object_Pointer;
 					for New_Object'Address use Ptr'Address;
-					pragma Import (Ada, New_Object); 
+					pragma Import (Ada, New_Object);
 				begin
-					-- Target_Object_Record'Max_Size_In_Storage_Elements gave 
-					-- some erroneous values when compiled with GNAT 4.3.2 on 
+					-- Target_Object_Record'Max_Size_In_Storage_Elements gave
+					-- some erroneous values when compiled with GNAT 4.3.2 on
 					-- WII(ppc) Debian.
 					--Bytes := Target_Object_Record'Max_Size_In_Storage_Elements;
 					Bytes := Source.all'Size / System.Storage_Unit;
@@ -791,7 +791,7 @@ ada.text_io.put_line ("HEAP SOURCE IS NIL");
 					-- an object as it's ok to have garbage in the trailing space.
 					-- See Allocate_Bytes_In_Heap() and Scan_New_Heap() for more info.
 					--if Bytes < Moved_Object_Record'Max_Size_In_Storage_Elements then
-					--	Bytes := Moved_Object_Record'Max_Size_In_Storage_Elements;	
+					--	Bytes := Moved_Object_Record'Max_Size_In_Storage_Elements;
 					--end  if;
 
 					-- Copy the payload to the new object
@@ -824,11 +824,11 @@ ada.text_io.put_line ("HEAP SOURCE IS NIL");
 				Ptr := Interp.Heap(New_Heap).Space(Position)'Unchecked_Access;
 
 				declare
-					-- There is a overlaid pointer initialization problem despite 
+					-- There is a overlaid pointer initialization problem despite
 					-- "pragma Import()" in gnat-3.15p.
 					--Object: Object_Pointer;
 					--for Object'Address use Ptr'Address;
-					--pragma Import (Ada, Object); 
+					--pragma Import (Ada, Object);
 
 					-- So let me turn to unchecked conversion.
 					function Conv1 is new Ada.Unchecked_Conversion (Heap_Element_Pointer, Object_Pointer);
@@ -842,7 +842,7 @@ ada.text_io.put_line ("HEAP SOURCE IS NIL");
 					if Bytes < Moved_Object_Record'Max_Size_In_Storage_Elements then
 						-- Allocate_Bytes_In_Heap() guarantee the minimum object size.
 						-- The size must be guaranteed here when scanning a heap.
-						Bytes := Moved_Object_Record'Max_Size_In_Storage_Elements;	
+						Bytes := Moved_Object_Record'Max_Size_In_Storage_Elements;
 					end if;
 
 					if Object.Kind = Pointer_Object then
@@ -874,7 +874,7 @@ ada.text_io.put_line ("HEAP SOURCE IS NIL");
 			Pred := Nil_Pointer;
 			Cons := Interp.Symbol_Table;
 			while Cons /= Nil_Pointer loop
-				pragma Assert (Cons.Tag = Cons_Object);	
+				pragma Assert (Cons.Tag = Cons_Object);
 
 				Car := Cons.Pointer_Slot(Cons_Car_Index);
 				Cdr := Cons.Pointer_Slot(Cons_Cdr_Index);
@@ -882,7 +882,7 @@ ada.text_io.put_line ("HEAP SOURCE IS NIL");
 
 				if Car.Kind /= Moved_Object and then
 				   (Car.Flags and Syntax_Object) = 0 then
-					-- A non-syntax symbol has not been moved. 
+					-- A non-syntax symbol has not been moved.
 					-- Unlink the cons cell from the symbol table.
 					if Pred = Nil_Pointer then
 						Interp.Symbol_Table := Cdr;
@@ -892,8 +892,8 @@ ada.text_io.put_line ("HEAP SOURCE IS NIL");
 				else
 					Pred := Cons;
 				end if;
-				
-				Cons := Cdr;	
+
+				Cons := Cdr;
 			end loop;
 		end Compact_Symbol_Table;
 
@@ -907,7 +907,7 @@ ada.text_io.put_line ("[GC BEGIN]");
 --Ada.Text_IO.Put_Line (">>> [GC BEGIN] BOUND: " & Heap_Size'Image(Interp.Heap(Interp.Current_Heap).Bound) & " AVAIL: " & Heap_Size'Image(Avail));
 --end;
 
-		-- As the Heap_Number type is a modular type that can 
+		-- As the Heap_Number type is a modular type that can
 		-- represent 0 and 1, incrementing it gives the next value.
 		New_Heap := Interp.Current_Heap + 1;
 
@@ -922,12 +922,12 @@ ada.text_io.put_line ("[GC BEGIN]");
 
 		-- Migrate temporary object pointers
 		for I in Interp.Top.Data'First .. Interp.Top.Last loop
-			if Interp.Top.Data(I).all = Interp.Symbol_Table then 
+			if Interp.Top.Data(I).all = Interp.Symbol_Table then
 				-- The symbol table must stay before compaction.
-				-- Skip migrating a temporary object pointer if it 
+				-- Skip migrating a temporary object pointer if it
 				-- is pointing to the symbol table. Remember that
 				-- such skipping has happened.
-				Original_Symbol_Table := Interp.Symbol_Table;	
+				Original_Symbol_Table := Interp.Symbol_Table;
 			elsif Interp.Top.Data(I).all /= null and then
 			      Is_Normal_Pointer(Interp.Top.Data(I).all) then
 				Interp.Top.Data(I).all := Move_One_Object(Interp.Top.Data(I).all);
@@ -946,8 +946,8 @@ ada.text_io.put_line ("[GC BEGIN]");
 
 		-- Traverse the symbol table for unreferenced symbols.
 		-- If the symbol has not moved to the new heap, the symbol
-		-- is not referenced by any other objects than the symbol 
-		-- table itself 
+		-- is not referenced by any other objects than the symbol
+		-- table itself
 --Ada.Text_IO.Put_Line (">>> [GC COMPACTING SYMBOL TABLE]");
 		Compact_Symbol_Table;
 
@@ -958,17 +958,17 @@ ada.text_io.put_line ("[GC BEGIN]");
 		-- Update temporary object pointers that were pointing to the symbol table
 		if Original_Symbol_Table /= null then
 			for I in Interp.Top.Data'First .. Interp.Top.Last loop
-				if Interp.Top.Data(I).all = Original_Symbol_Table then 
+				if Interp.Top.Data(I).all = Original_Symbol_Table then
 					-- update to the new symbol table
-					Interp.Top.Data(I).all := Interp.Symbol_Table; 
+					Interp.Top.Data(I).all := Interp.Symbol_Table;
 				end if;
 			end loop;
 		end if;
 
 --Ada.Text_IO.Put_Line (">>> [GC SCANNING HEAP AGAIN AFTER SYMBOL TABLE MIGRATION]");
 		-- Scan the new heap again from the end position of
-		-- the previous scan to move referenced objects by 
-		-- the symbol table. 
+		-- the previous scan to move referenced objects by
+		-- the symbol table.
 		Last_Pos := Scan_New_Heap(Last_Pos);
 
 		-- Swap the current heap and the new heap
@@ -1086,7 +1086,7 @@ end if;
 		if Source'Length > Character_Object_Size'Last then
 			raise Size_Error;
 		end if;
-		
+
 		Result := Allocate_Character_Object (Interp, Size => Character_Object_Size'(Source'Length));
 		if Invert then
 			for I in Source'Range loop
@@ -1097,8 +1097,8 @@ end if;
 		end if;
 		return Result;
 	end Allocate_Character_Object;
-	
-	
+
+
 
 	function Allocate_Byte_Object (Interp: access Interpreter_Record;
 	                               Size:   in     Byte_Object_Size) return Object_Pointer is
@@ -1190,13 +1190,13 @@ end if;
 		if Top.Last >= Top.Data'Last then
 			-- Something is wrong. Too many temporary object pointers
 			raise Internal_Error; -- TODO: change the exception to something else.
-		end if; 
+		end if;
 
 		Top.Last := Top.Last + 1;
 		Top.Data(Top.Last) := Top_Datum(Source);
 	end Push_Top;
 
-	procedure Pop_Tops (Interp: in out Interpreter_Record; 
+	procedure Pop_Tops (Interp: in out Interpreter_Record;
 	                    Count:  in     Object_Size) is
 		Top: Top_Record renames Interp.Top;
 	begin
@@ -1237,7 +1237,7 @@ end if;
 
 	function Is_Cons (Source: in Object_Pointer) return Standard.Boolean is
 	begin
-		return Is_Normal_Pointer(Source) and then 
+		return Is_Normal_Pointer(Source) and then
 		       Source.Tag = Cons_Object;
 	end Is_Cons;
 
@@ -1282,7 +1282,7 @@ end if;
 		return Ptr;
 	end Get_Last_Cdr;
 
-	function Reverse_Cons (Source:   in Object_Pointer; 
+	function Reverse_Cons (Source:   in Object_Pointer;
 	                       Last_Cdr: in Object_Pointer := Nil_Pointer) return Object_Pointer is
 		pragma Assert (Is_Cons(Source));
 
@@ -1308,7 +1308,7 @@ end if;
 	function Is_String (Source: in Object_Pointer) return Standard.Boolean is
 		pragma Inline (Is_String);
 	begin
-		return Is_Normal_Pointer(Source) and then 
+		return Is_Normal_Pointer(Source) and then
 		       Source.Tag = String_Object;
 	end Is_String;
 
@@ -1321,12 +1321,12 @@ end if;
 		Result.Tag := String_Object;
 		return Result;
 	end Make_String;
-	
+
 
 	function Is_Symbol (Source: in Object_Pointer) return Standard.Boolean is
 		pragma Inline (Is_Symbol);
 	begin
-		return Is_Normal_Pointer(Source) and then 
+		return Is_Normal_Pointer(Source) and then
 		       Source.Tag = Symbol_Object;
 	end Is_Symbol;
 
@@ -1338,7 +1338,7 @@ end if;
 		-- TODO: the current linked list implementation isn't efficient.
 		--       change the symbol table to a hashable table.
 
-		-- Find an existing symbol in the symbol table.	
+		-- Find an existing symbol in the symbol table.
 		Ptr := Interp.Symbol_Table;
 		while Ptr /= Nil_Pointer loop
 			pragma Assert (Is_Cons(Ptr));
@@ -1354,7 +1354,7 @@ end if;
 					return Car;
 				end if;
 
-				Ptr := Cdr;	
+				Ptr := Cdr;
 			end;
 		end loop;
 
@@ -1365,7 +1365,7 @@ end if;
 		-- Make Ptr safe from GC
 		Push_Top (Interp.all, Ptr'Unchecked_Access);
 
-		-- Link the symbol to the symbol table. 
+		-- Link the symbol to the symbol table.
 		Interp.Symbol_Table := Make_Cons(Interp.Self, Ptr, Interp.Symbol_Table);
 
 		Pop_Tops (Interp.all, 1);
@@ -1387,7 +1387,7 @@ end if;
 	function Is_Array (Source: in Object_Pointer) return Standard.Boolean is
 		pragma Inline (Is_Array);
 	begin
-		return Is_Normal_Pointer(Source) and then 
+		return Is_Normal_Pointer(Source) and then
 		       Source.Tag = Array_Object;
 	end Is_Array;
 
@@ -1411,10 +1411,10 @@ end if;
 	begin
 		if Value < 0 then
 			W := Object_Word(-(Object_Signed_Word(Value)));
-		else 
+		else
 			W := Object_Word(Value);
 		end if;
-		
+
 		H := Bigint.Get_High(W);
 		if H > 0 then
 			Size := 2;
@@ -1439,7 +1439,7 @@ end if;
 
 	function Is_Bigint (Source: in Object_Pointer) return Standard.Boolean is
 	begin
-		return Is_Normal_Pointer(Source) and then 
+		return Is_Normal_Pointer(Source) and then
 		       Source.Tag = Bigint_Object;
 	end Is_Bigint;
 
@@ -1482,7 +1482,7 @@ end if;
 	function Is_Frame (Source: in Object_Pointer) return Standard.Boolean is
 		pragma Inline (Is_Frame);
 	begin
-		return Is_Normal_Pointer(Source) and then 
+		return Is_Normal_Pointer(Source) and then
 		       Source.Tag = Frame_Object;
 	end Is_Frame;
 
@@ -1517,12 +1517,12 @@ end if;
 		-- Add a new cons cell to the front
 
 		--Push_Top (Interp, Frame'Unchecked_Access);
-		--Frame.Pointer_Slot(Frame_Intermediate_Index) :=  
+		--Frame.Pointer_Slot(Frame_Intermediate_Index) :=
 		--	Make_Cons(Interp.Self, Value, Frame.Pointer_Slot(Frame_Intermediate_Index));
 		--Pop_Tops (Interp, 1);
 
 		-- This seems to cause a problem if Interp.Stack changes in Make_Cons().
-		--Interp.Stack.Pointer_Slot(Frame_Intermediate_Index) :=  
+		--Interp.Stack.Pointer_Slot(Frame_Intermediate_Index) :=
 		--	Make_Cons(Interp.Self, Value, Interp.Stack.Pointer_Slot(Frame_Intermediate_Index));
 
 		-- So, let's separate the evaluation and the assignment.
@@ -1572,7 +1572,7 @@ end if;
 		return Pointer_To_Opcode(Frame.Pointer_Slot(Frame_Opcode_Index));
 	end Get_Frame_Opcode;
 
-	procedure Set_Frame_Opcode (Frame:  in Object_Pointer; 
+	procedure Set_Frame_Opcode (Frame:  in Object_Pointer;
 	                            Opcode: in Opcode_Type) is
 		pragma Inline (Set_Frame_Opcode);
 		pragma Assert (Is_Frame(Frame));
@@ -1615,8 +1615,8 @@ end if;
 	                        Operand: in Object_Pointer;
 	                        Interm:  in Object_Pointer) is
 	begin
-		Set_Frame_Opcode (Frame, Opcode);	
-		Set_Frame_Operand (Frame, Operand);	
+		Set_Frame_Opcode (Frame, Opcode);
+		Set_Frame_Operand (Frame, Operand);
 		Set_Frame_Intermediate (Frame, Interm);
 		Set_Frame_Result (Frame, Nil_Pointer);
 	end Switch_Frame;
@@ -1627,7 +1627,7 @@ end if;
 	-- Environment is a cons cell whose slots represents:
 	--   Car: Point to the first key/value pair.
 	--   Cdr: Point to Parent environment
-	-- 
+	--
 	-- A key/value pair is held in an array object consisting of 3 slots.
 	--   #1: Key
 	--   #2: Value
@@ -1670,14 +1670,14 @@ end if;
 		while Arr /= Nil_Pointer loop
 			pragma Assert (Is_Array(Arr));
 			pragma Assert (Arr.Size = 3);
-			
+
 			if Arr.Pointer_Slot(1) = Key then
 				return Arr;
 			end if;
 
 			Arr := Arr.Pointer_Slot(3);
-		end loop;	
-		return null; -- not found. 
+		end loop;
+		return null; -- not found.
 	end Find_In_Environment_List;
 
 	function Get_Environment (Interp: access Interpreter_Record;
@@ -1736,7 +1736,7 @@ end if;
 	                           Value:  in     Object_Pointer) is
 		Arr: Object_Pointer;
 	begin
-		-- Search the current environment only. It doesn't search the 
+		-- Search the current environment only. It doesn't search the
 		-- environment. If no key is found, add a new pair
 		-- This is mainly for define.
 		pragma Assert (Is_Symbol(Key));
@@ -1749,7 +1749,7 @@ end if;
 		else
 			-- Add a new key/value pair in the current environment
 			-- if no existing pair has been found.
-			declare 
+			declare
 				Aliased_Envir: aliased Object_Pointer := Envir;
 				Aliased_Key: aliased Object_Pointer := Key;
 				Aliased_Value: aliased Object_Pointer := Value;
@@ -1763,9 +1763,9 @@ end if;
 				Arr.Pointer_Slot(2) := Aliased_Value;
 
 				-- Chain the pair to the head of the list
-				Arr.Pointer_Slot(3) := Get_Car(Aliased_Envir);	
+				Arr.Pointer_Slot(3) := Get_Car(Aliased_Envir);
 				Set_Car (Aliased_Envir, Arr);
-	
+
 				Pop_Tops (Interp, 3);
 			end;
 		end if;
@@ -1827,7 +1827,7 @@ end if;
 		Proc.Pointer_Slot(Procedure_Opcode_Index) := Procedure_Code_To_Pointer(Code);
 
 		-- Link it to the top environement
-		pragma Assert (Get_Frame_Environment(Interp.Stack) = Interp.Root_Environment); 
+		pragma Assert (Get_Frame_Environment(Interp.Stack) = Interp.Root_Environment);
 		pragma Assert (Get_Environment(Interp.Self, Symbol) = null);
 		Set_Current_Environment (Interp.all, Symbol, Proc);
 
@@ -1838,7 +1838,7 @@ end if;
 	function Is_Procedure (Source: in Object_Pointer) return Standard.Boolean is
 		pragma Inline (Is_Procedure);
 	begin
-		return Is_Normal_Pointer(Source) and then 
+		return Is_Normal_Pointer(Source) and then
 		       Source.Tag = Procedure_Object;
 	end Is_Procedure;
 
@@ -1849,7 +1849,7 @@ end if;
 	begin
 		return Pointer_To_Procedure_Code(Proc.Pointer_Slot(Procedure_Opcode_Index));
 	end Get_Procedure_Opcode;
-	
+
 	-----------------------------------------------------------------------------
 
 	function Make_Closure (Interp: access Interpreter_Record;
@@ -1874,7 +1874,7 @@ end if;
 	function Is_Closure (Source: in Object_Pointer) return Standard.Boolean is
 		pragma Inline (Is_Closure);
 	begin
-		return Is_Normal_Pointer(Source) and then 
+		return Is_Normal_Pointer(Source) and then
 		       Source.Tag = Closure_Object;
 	end Is_Closure;
 
@@ -1909,7 +1909,7 @@ end if;
 	function Is_Continuation (Source: in Object_Pointer) return Standard.Boolean is
 		pragma Inline (Is_Continuation);
 	begin
-		return Is_Normal_Pointer(Source) and then 
+		return Is_Normal_Pointer(Source) and then
 		       Source.Tag = Continuation_Object;
 	end Is_Continuation;
 
@@ -1932,7 +1932,7 @@ end if;
 
 					Heap: Target_Heap_Pointer;
 					for Heap'Address use Interp.Heap(I)'Address;
-					pragma Import (Ada, Heap); 
+					pragma Import (Ada, Heap);
 				begin
 					Pool.Deallocate (Heap);
 				end;
@@ -1960,7 +1960,7 @@ end if;
 			IO := IO_Pool.Allocate;
 			Interp.Stream.Allocate (Interp, Name, Stream);
 		exception
-			when others =>	
+			when others =>
 				if IO /= null then
 					if Stream /= null then
 						Interp.Stream.Deallocate (Interp, Stream);
@@ -2021,7 +2021,7 @@ end if;
 				declare
 					Heap: Target_Heap_Pointer;
 					for Heap'Address use Interp.Heap(I)'Address;
-					pragma Import (Ada, Heap); 
+					pragma Import (Ada, Heap);
 				begin
 					Heap := Pool.Allocate;
 				end;
@@ -2093,14 +2093,14 @@ end if;
 
 		procedure Make_Common_Symbol_Objects is
 		begin
-			Interp.Arrow_Symbol := Make_Symbol(Interp.Self, Label_Arrow);	
-			Interp.Else_Symbol := Make_Symbol(Interp.Self, Label_Else);	
+			Interp.Arrow_Symbol := Make_Symbol(Interp.Self, Label_Arrow);
+			Interp.Else_Symbol := Make_Symbol(Interp.Self, Label_Else);
 		end Make_Common_Symbol_Objects;
 	begin
 		-- Initialize child packages in case library-level initialization
 		-- has been skipped for various reasons.
 		Bigint.Initialize;
-		
+
 		declare
 			Aliased_Interp: aliased Interpreter_Record;
 			for Aliased_Interp'Address use Interp'Address;
@@ -2109,10 +2109,10 @@ end if;
 			-- Store a pointer to the interpreter record itself.
 			-- I use this pointer to call functions that accept the "access"
 			-- type to work around the ada95 limitation of no "in out" as
-			-- a function parameter. Accoring to Ada95 RM (6.2), both a 
+			-- a function parameter. Accoring to Ada95 RM (6.2), both a
 			-- non-private limited record type and a private type whose
 			-- full type is a by-reference type are by-rereference types.
-			-- So i assume that it's safe to create this aliased overlay 
+			-- So i assume that it's safe to create this aliased overlay
 			-- to deceive the compiler. If Interpreter_Record is a tagged
 			-- limited record type, this overlay is not needed since the
 			-- type is considered aliased. Having this overlay, however,
@@ -2151,7 +2151,7 @@ end if;
 
 	procedure Close (Interp: in out Interpreter_Record) is
 	begin
-		-- Destroy all unstacked named input streams 
+		-- Destroy all unstacked named input streams
 		while Interp.Input /= Interp.Base_Input'Unchecked_Access loop
 			Stop_Named_Input_Stream (Interp);
 		end loop;
@@ -2167,7 +2167,7 @@ end if;
 
 	function Get_Storage_Pool (Interp: in Interpreter_Record) return Storage_Pool_Pointer is
 	begin
-		return Interp.Storage_Pool;	
+		return Interp.Storage_Pool;
 	end Get_Storage_Pool;
 
 	procedure Set_Option (Interp: in out Interpreter_Record;
@@ -2195,7 +2195,7 @@ end if;
 	procedure Set_Input_Stream  (Interp: in out Interpreter_Record;
 	                             Stream: in out Stream_Record'Class) is
 	begin
-		--Open (Stream, Interp);		
+		--Open (Stream, Interp);
 		Open (Stream);
 
 		-- if Open raised an exception, it wouldn't reach here.
@@ -2217,10 +2217,10 @@ end if;
 	--procedure Set_Output_Stream (Interp: in out Interpreter_Record;
 	--                             Stream: in out Stream_Record'Class) is
 	--begin
-	--	
+	--
 	--end Set_Output_Stream;
 
-	procedure Print (Interp: in out Interpreter_Record; 
+	procedure Print (Interp: in out Interpreter_Record;
 	                 Source: in     Object_Pointer) is
 
 		procedure Print_Atom (Atom: in Object_Pointer) is
@@ -2240,7 +2240,7 @@ end if;
 				when False_Word =>
 					Ada.Text_IO.Put ("#f");
 
-				when others => 
+				when others =>
 					case Atom.Tag is
 						when Cons_Object =>
 							-- Cons_Object must not reach here.
@@ -2250,13 +2250,13 @@ end if;
 							Output_Character_Array (Atom.Character_Slot);
 
 						when String_Object =>
-							Ada.Text_IO.Put ("""");	
+							Ada.Text_IO.Put ("""");
 							Output_Character_Array (Atom.Character_Slot);
-							Ada.Text_IO.Put ("""");	
-	
+							Ada.Text_IO.Put ("""");
+
 						when Closure_Object =>
 							Ada.Text_IO.Put ("#Closure");
-	
+
 						when Continuation_Object =>
 							declare
 								w: object_word;
@@ -2264,15 +2264,15 @@ end if;
 							begin
 								Ada.Text_IO.Put ("#Continuation[" & object_word'image(w) & "]");
 							end;
-	
+
 						when Procedure_Object =>
 							Ada.Text_IO.Put ("#Procedure");
-	
+
 						when Array_Object =>
 							Ada.Text_IO.Put ("#Array");
-				
 
-						when Bigint_Object => 
+
+						when Bigint_Object =>
 							Ada.Text_IO.Put ("#Bigint(");
 declare
 package Int_IO is new ada.text_io.modular_IO(object_half_word);
@@ -2393,7 +2393,7 @@ end;
 	begin
 
 if DEBUG_GC then
-Print_Object (Source); -- use a recursive version 
+Print_Object (Source); -- use a recursive version
 Ada.Text_IO.New_Line;
 return;
 end if;
@@ -2419,7 +2419,7 @@ end if;
 						Opcode := 1;
 					else
 						Print_Atom (Operand);
-						if Stack = Nil_Pointer then 
+						if Stack = Nil_Pointer then
 							Opcode := 0; -- stack empty. arrange to exit
 							Operand := True_Pointer; -- return value
 						else
@@ -2428,9 +2428,9 @@ end if;
 							Stack := Stack.Pointer_Slot(Frame_Parent_Index); -- pop
 						end if;
 					end if;
-	
+
 				when 2 =>
-	
+
 					if Is_Cons(Operand) then
 						-- push cdr
 						Stack := Make_Frame (Interp.Self, Stack, Integer_To_Pointer(2), Get_Cdr(Operand), Nil_Pointer, Nil_Pointer); -- push
@@ -2444,16 +2444,16 @@ end if;
 							Print_Atom (Operand);
 						end if;
 						Ada.Text_IO.Put (")");
-	
+
 						if Stack = Nil_Pointer then
 							Opcode := 0; -- stack empty. arrange to exit
 						else
 							Opcode := Pointer_To_Integer(Stack.Pointer_Slot(Frame_Opcode_Index));
 							Operand := Stack.Pointer_Slot(Frame_Operand_Index);
-							Stack := Stack.Pointer_Slot(Frame_Parent_Index); -- pop 
+							Stack := Stack.Pointer_Slot(Frame_Parent_Index); -- pop
 						end if;
 					end if;
-	
+
 				when others =>
 					exit;
 			end case;
@@ -2464,7 +2464,7 @@ end if;
 
 	function Insert_Frame (Interp:  access Interpreter_Record;
 	                       Parent:  in     Object_Pointer;
-	                       Opcode:  in     Opcode_Type; 
+	                       Opcode:  in     Opcode_Type;
 	                       Operand: in     Object_Pointer;
 	                       Envir:   in     Object_Pointer;
 	                       Interm:  in     Object_Pointer) return Object_Pointer is
@@ -2475,7 +2475,7 @@ end if;
 	end Insert_Frame;
 
 	procedure Push_Frame (Interp:  in out Interpreter_Record;
-	                      Opcode:  in     Opcode_Type; 
+	                      Opcode:  in     Opcode_Type;
 	                      Operand: in     Object_Pointer) is
 		pragma Inline (Push_Frame);
 	begin
@@ -2483,7 +2483,7 @@ end if;
 	end Push_Frame;
 
 	procedure Push_Frame_With_Environment (Interp:  in out Interpreter_Record;
-	                                       Opcode:  in     Opcode_Type; 
+	                                       Opcode:  in     Opcode_Type;
 	                                       Operand: in     Object_Pointer;
 	                                       Envir:   in     Object_Pointer) is
 		pragma Inline (Push_Frame_With_Environment);
@@ -2492,7 +2492,7 @@ end if;
 	end Push_Frame_With_Environment;
 
 	procedure Push_Frame_With_Environment_And_Intermediate (Interp:  in out Interpreter_Record;
-	                                                        Opcode:  in     Opcode_Type; 
+	                                                        Opcode:  in     Opcode_Type;
 	                                                        Operand: in     Object_Pointer;
 	                                                        Envir:   in     Object_Pointer;
 	                                                        Interm:  in     Object_Pointer) is
@@ -2502,7 +2502,7 @@ end if;
 	end Push_Frame_With_Environment_And_Intermediate;
 
 	procedure Push_Frame_With_Intermediate (Interp:  in out Interpreter_Record;
-	                                        Opcode:  in     Opcode_Type; 
+	                                        Opcode:  in     Opcode_Type;
 	                                        Operand: in     Object_Pointer;
 	                                        Interm:  in     Object_Pointer) is
 		pragma Inline (Push_Frame_With_Intermediate);
@@ -2512,7 +2512,7 @@ end if;
 	end Push_Frame_With_Intermediate;
 
 	procedure Push_Subframe (Interp:  in out Interpreter_Record;
-	                         Opcode:  in     Opcode_Type; 
+	                         Opcode:  in     Opcode_Type;
 	                         Operand: in     Object_Pointer) is
 		pragma Inline (Push_Subframe);
 	begin
@@ -2521,7 +2521,7 @@ end if;
 	end Push_Subframe;
 
 	procedure Push_Subframe_With_Environment (Interp:  in out Interpreter_Record;
-	                                          Opcode:  in     Opcode_Type; 
+	                                          Opcode:  in     Opcode_Type;
 	                                          Operand: in     Object_Pointer;
 	                                          Envir:   in     Object_Pointer) is
 		pragma Inline (Push_Subframe_With_Environment);
@@ -2531,7 +2531,7 @@ end if;
 	end Push_Subframe_With_Environment;
 
 	procedure Push_Subframe_With_Intermediate (Interp:  in out Interpreter_Record;
-	                                           Opcode:  in     Opcode_Type; 
+	                                           Opcode:  in     Opcode_Type;
 	                                           Operand: in     Object_Pointer;
 	                                           Interm:  in     Object_Pointer) is
 		pragma Inline (Push_Subframe_With_Intermediate);
@@ -2541,7 +2541,7 @@ end if;
 	end Push_Subframe_With_Intermediate;
 
 	procedure Push_Subframe_With_Environment_And_Intermediate (Interp:  in out Interpreter_Record;
-	                                                           Opcode:  in     Opcode_Type; 
+	                                                           Opcode:  in     Opcode_Type;
 	                                                           Operand: in     Object_Pointer;
 	                                                           Envir:   in     Object_Pointer;
 	                                                           Interm:  in     Object_Pointer) is
@@ -2556,21 +2556,21 @@ end if;
 	begin
 		pragma Assert (Interp.Stack /= Interp.Root_Frame);
 		pragma Assert (Interp.Stack /= Nil_Pointer);
-		Interp.Stack := Interp.Stack.Pointer_Slot(Frame_Parent_Index); -- pop 
+		Interp.Stack := Interp.Stack.Pointer_Slot(Frame_Parent_Index); -- pop
 	end Pop_Frame;
 
 	procedure Return_Frame (Interp: in out Interpreter_Record;
 	                        Value:  in     Object_Pointer) is
 		pragma Inline (Return_Frame);
 	begin
-		-- Remove the current frame and return a value 
+		-- Remove the current frame and return a value
 		-- to a new active(top) frame.
 		Pop_Frame (Interp);
 		Set_Frame_Result (Interp.Stack, Value);
 	end Return_Frame;
 
 	procedure Reload_Frame (Interp:  in out Interpreter_Record;
-	                        Opcode:  in     Opcode_Type; 
+	                        Opcode:  in     Opcode_Type;
 	                        Operand: in     Object_Pointer) is
 		pragma Inline (Reload_Frame);
 		Envir: Object_Pointer;
@@ -2582,7 +2582,7 @@ end if;
 	end Reload_Frame;
 
 	procedure Reload_Frame_With_Environment (Interp:  in out Interpreter_Record;
-	                                         Opcode:  in     Opcode_Type; 
+	                                         Opcode:  in     Opcode_Type;
 	                                         Operand: in     Object_Pointer;
 	                                         Envir:   in     Object_Pointer) is
 		pragma Inline (Reload_Frame_With_Environment);
@@ -2593,7 +2593,7 @@ end if;
 	end Reload_Frame_With_Environment;
 
 	procedure Reload_Frame_With_Intermediate (Interp:  in out Interpreter_Record;
-	                                          Opcode:  in     Opcode_Type; 
+	                                          Opcode:  in     Opcode_Type;
 	                                          Operand: in     Object_Pointer;
 	                                          Interm:  in     Object_Pointer) is
 		pragma Inline (Reload_Frame_With_Intermediate);
@@ -2628,7 +2628,7 @@ end if;
 		pragma Assert (Get_Frame_Opcode(Interp.Stack) = Opcode_Exit);
 
 		Result := Get_Frame_Result(Interp.Stack);
-		Clear_Frame_Result (Interp.Stack); 
+		Clear_Frame_Result (Interp.Stack);
 	end Evaluate;
 
 	procedure Run_Loop (Interp: in out Interpreter_Record;
@@ -2661,12 +2661,12 @@ DEBUG_GC := Standard.True;
 			pragma Assert (Interp.Stack = Interp.Root_Frame);
 			pragma Assert (Get_Frame_Opcode(Interp.Stack) = Opcode_Exit);
 
-			Aliased_Result := Get_Frame_Result(Interp.Stack); 
+			Aliased_Result := Get_Frame_Result(Interp.Stack);
 			Clear_Frame_Result (Interp.Stack);
 
 Ada.Text_IO.Put ("RESULT: ");
 Print (Interp, Aliased_Result);
-Ada.Text_IO.Put_Line (">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> LOOP ITERATION XXXXXX CHECKPOINT"); 
+Ada.Text_IO.Put_Line (">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> LOOP ITERATION XXXXXX CHECKPOINT");
 		end loop;
 
 
@@ -2687,6 +2687,7 @@ q := bigint.to_string (interp.self, q, 10);
 print (interp, q);
 end;
 			goto SKIP;
+
 declare
 A: aliased Object_Pointer;
 B: aliased Object_Pointer;
@@ -2703,7 +2704,7 @@ A := Make_Bigint(Interp.Self, Value => Object_Integer'Last - 16#FFFF#);
 B := Make_Bigint(Interp.Self, Value => Object_Integer'Last);
 B.sign := Negative_Sign;
 
-A := Make_Bigint(Interp.Self, Size => 30); 
+A := Make_Bigint(Interp.Self, Size => 30);
 A.Half_Word_Slot(30) := Object_Half_Word'Last;
 Bigint.Multiply(Interp, A, integer_to_pointer(2), A);
 Bigint.Add(Interp, A, A, A);
@@ -2719,7 +2720,7 @@ declare
 q, r: object_Pointer;
 begin
 	--Bigint.Divide (Interp, integer_to_pointer(-10), integer_to_pointer(6), Q, R);
-	
+
 	Bigint.Divide (Interp, A, B, Q, R);
 ada.text_io.put ("Q => "); print (interp, Q);
 ada.text_io.put ("R => "); print (interp, R);
@@ -2765,7 +2766,7 @@ end;
 			Ada.TEXT_IO.PUT_LINE ("ERROR ERROR ERROR -> " & Ada.Exceptions.Exception_Name(X));
 			raise;
 	end Run_Loop;
-	
+
 	-----------------------------------------------------------------------------
 --
 --	function h2scm_open return Interpreter_Pointer;
@@ -2778,11 +2779,11 @@ end;
 --	                         Source: in     Object_Pointer) return Interfaces.C.int;
 --	pragma Export (C, h2scm_evaluate, "h2scm_evaluate");
 --
---	procedure h2scm_dealloc is new 
+--	procedure h2scm_dealloc is new
 --		Ada.Unchecked_Deallocation (Interpreter_Record, Interpreter_Pointer);
 --
 --	function h2scm_open return Interpreter_Pointer is
---		Interp: Interpreter_Pointer;	
+--		Interp: Interpreter_Pointer;
 --	begin
 --		begin
 --			Interp := new Interpreter_Record;
@@ -2805,7 +2806,7 @@ end;
 --	procedure h2scm_close (Interp: in out Interpreter_Pointer) is
 --	begin
 --Text_IO.Put_Line ("h2scm_close");
---		Close (Interp.all);	
+--		Close (Interp.all);
 --		h2scm_dealloc (Interp);
 --	end h2scm_close;
 --
@@ -2814,5 +2815,5 @@ end;
 --	begin
 --		return Interfaces.C.int(Interp.Heap(Interp.Current_Heap).Size);
 --	end h2scm_evaluate;
-	
+
 end H2.Scheme;
