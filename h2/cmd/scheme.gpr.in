@@ -27,7 +27,8 @@ project Scheme is
 		for Default_Switches ("Ada") use (
 			"-gnata", "-gnato", "-gnatN",  "-gnatwl", "-gnat95", "-gnatW8", "-g",
 			"-I@abs_srcdir@/../lib",
-			"-I@abs_srcdir@/../lib/posix"
+			"-I@abs_srcdir@/../lib/posix",
+			"-I@abs_builddir@/../lib/posix"
 		);
 	end Compiler;
 

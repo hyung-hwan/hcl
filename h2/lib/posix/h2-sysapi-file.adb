@@ -1,45 +1,89 @@
-with Interfaces.C;
+
 with H2.Pool;
+with H2.Sysdef;
 
 separate (H2.Sysapi)
 
 package body File is
 
-	package C renames Interfaces.C;
-	use type C.int;
+	-- External functions and procedures
+	function Sys_Open (path: Slim_String; flags: Sysdef.int_t; mode: Sysdef.int_t) return Sysdef.int_t;
+	pragma Import (C, Sys_Open, "open");
 
-	--function sys_open (path: ; flags: C.int; mode: C.int) return C.int;
-	function sys_open (path: Slim_String; flags: C.int; mode: C.int) return C.int;
-	pragma Import (C, sys_open, "open");
-
-	procedure sys_close (fd: C.int);
+	procedure Sys_Close (fd: Sysdef.int_t);
 	pragma Import (C, sys_close, "close");
 
-	INVALID_HANDLE: constant C.int := -1;
+	function Sys_Read (fd: Sysdef.int_t; buf: in System.Address; count: in Sysdef.size_t) return Sysdef.ssize_t;
+	pragma Import (C, Sys_Read, "read");
 
+	function Sys_Write (fd: Sysdef.int_t; buf: in System.Address; count: in Sysdef.size_t) return Sysdef.ssize_t;
+	pragma Import (C, Sys_Write, "write");
+
+	-- Common constants
+	INVALID_HANDLE: constant := -1;
+	ERROR_RETURN: constant := -1;
+
+	-- File record
 	type Posix_File_Record is new File_Record with record
 		Pool: Storage_Pool_Pointer := null;
-		Handle: C.int := INVALID_HANDLE;
+		Handle: Sysdef.int_t := INVALID_HANDLE;
 	end record;
 	type Posix_File_Pointer is access all Posix_File_Record;
 
-	function Flag_To_System (Bits: in File_Flag_Bits) return C.int is
-		V: C.int := 0;
+	-- Standard Files
+	Stdin: aliased Posix_File_Record := (null, 0);
+	Stdout: aliased Posix_File_Record := (null, 1);
+	Stderr: aliased Posix_File_Record := (null, 2);
+
+	function Flag_To_System (Bits: in Flag_Bits) return System_Word is
+		V: System_Word := 0;
 	begin
---  		if Bits and File_Flag_Read /= 0 then
---  			V := V or 0;
---  		end if;
---  		if Bits and File_Flag_Write /= 0 then
---  			V := V or 1;
---  		end if;
+		if ((Bits and FLAG_READ) /= 0) and then 
+		   ((Bits and FLAG_WRITE) /= 0) then
+			V := V or Sysdef.O_RDWR;
+		elsif ((Bits and FLAG_WRITE) /= 0) then
+			V := V or Sysdef.O_WRONLY;
+		else
+			V := V or Sysdef.O_RDONLY;
+		end if;
+
+		if ((Bits and FLAG_CREATE) /= 0) then
+			V := V or Sysdef.O_CREAT;
+		end if;
+
+		if ((Bits and FLAG_TRUNCATE) /= 0) then
+			V := V or Sysdef.O_TRUNC;
+		end if;
+
+		if ((Bits and FLAG_SYNC) /= 0) then
+			V := V or Sysdef.O_SYNC;
+		end if;
 
 		return V;
 	end Flag_To_System;
 
+	function Get_Stdin return File_Pointer is
+	begin
+		--return File_Pointer'(Stdin'Access);
+		return File_Record(Stdin)'Access;
+	end Get_Stdin;
+
+	function Get_Stdout return File_Pointer is
+	begin
+		--return File_Pointer'(Stdout'Access);
+		return File_Record(Stdout)'Access;
+	end Get_Stdout;
+
+	function Get_Stderr return File_Pointer is
+	begin
+		--return File_Pointer'(Stderr'Access);
+		return File_Record(Stdout)'Access;
+	end Get_Stderr;
+
 	procedure Open (File: out File_Pointer;
 	                Name: in  Slim_String;
-	                Flag: in  File_Flag;
-	                Mode: in  File_Mode := DEFAULT_FILE_MODE;
+	                Flag: in  Flag_Record;
+	                Mode: in  Mode_Record := DEFAULT_MODE;
 	                Pool: in  Storage_Pool_Pointer := null) is
 
 		package P is new H2.Pool (Posix_File_Record, Posix_File_Pointer, Pool);
@@ -49,9 +93,10 @@ package body File is
 		F := P.Allocate;
 		F.Pool := Pool;
 
-		--F.Handle := sys_open (Interfaces.C.char_array(Name & Slim.Character'Val(0)), 0, 0);
-		F.Handle := sys_open (Name, Flag_To_System(Flag.Bits), C.int(Mode.Bits));
-		if F.Handle <= -1 then
+		F.Handle := Sys_Open (Name & Slim_Character'Val(0), 
+		                      Sysdef.int_t(Flag_To_System(Flag.Bits)),
+		                      Sysdef.int_t(Mode.Bits));
+		if Sysdef."<=" (F.Handle, INVALID_HANDLE) then
 			raise Constraint_Error; -- TODO: raise a proper exception.
 		end if;
 
@@ -60,27 +105,58 @@ package body File is
 
 	procedure Open (File: out File_Pointer;
 	                Name: in  Wide_String;
-	                Flag: in  File_Flag;
-	                Mode: in  File_Mode := DEFAULT_FILE_MODE;
+	                Flag: in  Flag_Record;
+	                Mode: in  Mode_Record := DEFAULT_MODE;
 	                Pool: in  Storage_Pool_Pointer := null) is
 	begin
 		Open (File, Wide_To_Slim(Name), Flag, Mode, Pool);
 	end Open;
 
 	procedure Close (File: in out File_Pointer) is
-		F: Posix_File_Pointer;
+		F: Posix_File_Pointer := Posix_File_Pointer(File);
 	begin
-		F := Posix_File_Pointer(File);
-		sys_close (F.Handle);
-		F.Handle := Interfaces.C."-"(1);
+		if F /= Stdin'Access and then F /= Stdout'Access and then F /= Stderr'Access then
+			-- Don't close standard files.
 
-		declare
-			package P is new H2.Pool (Posix_File_Record, Posix_File_Pointer, F.Pool);
-		begin
-			P.Deallocate (F);
-		end;
+			Sys_Close (F.Handle);
+			F.Handle := INVALID_HANDLE;
 
-		File := null;
+			declare
+				package P is new H2.Pool (Posix_File_Record, Posix_File_Pointer, F.Pool);
+			begin
+				P.Deallocate (F);
+			end;
+
+			File := null;
+		end if;
 	end Close;
+
+	procedure Read (File: in File_Pointer; Buffer: in out System_Byte_Array; Last: out System_Length) is
+		F: Posix_File_Pointer := Posix_File_Pointer(File);
+		N: Sysdef.ssize_t;
+	begin
+		N := Sys_Read (F.Handle, Buffer'Address, Buffer'Length);
+		if Sysdef."<=" (N, ERROR_RETURN) then
+			raise Constraint_Error; -- TODO rename exception
+		elsif Sysdef."=" (N, 0) then
+			Last := Buffer'First - 1;
+		else
+			Last := Buffer'First + System_Length(N) - 1;
+		end if;
+	end Read;
+
+	procedure Write (File: in File_Pointer; Buffer: in System_Byte_Array; Last: out System_Length) is
+		F: Posix_File_Pointer := Posix_File_Pointer(File);
+		N: Sysdef.ssize_t;
+	begin
+		N := Sys_Write (F.Handle, Buffer'Address, Buffer'Length);
+		if Sysdef."<=" (N, ERROR_RETURN) then
+			raise Constraint_Error; -- TODO rename exception
+		elsif Sysdef."=" (N, 0) then
+			Last := Buffer'First - 1;
+		else
+			Last := Buffer'First + System_Length(N) - 1;
+		end if;
+	end Write;
 
 end File;

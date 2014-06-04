@@ -7,7 +7,10 @@ with Slim_Stream;
 with Wide_Stream;
 with Ada.Text_IO;
 with Ada.Unchecked_Deallocation;
+
+
 with H2.Sysapi;
+with H2.IO;
 
 with Interfaces.C;
 
@@ -48,16 +51,39 @@ declare
 		H2.Wide.String,
 		H2.Wide.Utf8.To_Unicode_String,
 		H2.Wide.Utf8.From_Unicode_String);
+	package File renames Sysapi.File;
 
-	F: Sysapi.File_Pointer;
-	FL: Sysapi.File_Flag;
+	F: File.File_Pointer;
+	FL: File.Flag_Record;
+	Last: H2.System_Length;
+	Buffer: H2.System_Byte_Array (50 .. 100);
 begin
-	Sysapi.Set_File_Flag_Bits (FL, Sysapi.FILE_FLAG_WRITE);
-	Sysapi.Set_File_Flag_Bits (FL, Sysapi.FILE_FLAG_READ);
-	Sysapi.File.Open (F, H2.Slim.String'("/etc/passwd"), FL);
-	Sysapi.File.Close (F);
+	--Sysapi.File.Set_Flag_Bits (FL, Sysapi.File.FLAG_WRITE); 
+	File.Set_Flag_Bits (FL, File.FLAG_READ);
+	File.Open (F, H2.Wide.String'("/etc/passwd"), FL);
+	File.Read (F, Buffer, Last);
+	File.Close (F);
+
+	File.Write (Sysapi.File.Get_Stdout, Buffer(Buffer'First .. Last), Last);
 end;
 
+declare
+	package IO is new H2.IO (
+		H2.Slim.Character,
+		H2.Wide.Character,
+		H2.Slim.String,
+		H2.Wide.String,
+		H2.Wide.Utf8.To_Unicode_String,
+		H2.Wide.Utf8.From_Unicode_String);
+
+	package File renames IO.File;
+
+	F: File.File_Record;
+	FL: File.Flag_Record;
+begin
+	File.Open (F, H2.Slim.String'("/tmp/qq"), FL);
+	File.Close (F);
+end;
 
 declare
 
