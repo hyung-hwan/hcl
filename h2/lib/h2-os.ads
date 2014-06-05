@@ -7,7 +7,7 @@ generic
 	with function Slim_To_Wide (Slim: in Slim_String) return Wide_String;
 	with function Wide_To_Slim (Wide: in Wide_String) return Slim_String;
 
-package H2.Sysapi is
+package H2.OS is
 
 
 
@@ -21,17 +21,20 @@ package H2.Sysapi is
 		Bits: File_Mode_Bits := 0;
 	end record;
 
-	procedure Set_File_Flag_Bits (Flag: in out File_Flag_Record; Bits: in File_Flag_Bits);
-	procedure Clear_File_Flag_Bits (Flag: in out File_Flag_Record; Bits: in File_Flag_Bits);
+	procedure Set_File_Flag_Bits (Flag: in out File_Flag_Record; 
+	                              Bits: in     File_Flag_Bits);
+
+	procedure Clear_File_Flag_Bits (Flag: in out File_Flag_Record;
+	                                Bits: in     File_Flag_Bits);
 
 	package File is
 		type File_Record is tagged null record;
 		type File_Pointer is access all File_Record'Class;
 
-		subtype Flag_Bits is Sysapi.File_Flag_Bits;
-		subtype Mode_Bits is Sysapi.File_Mode_Bits;
-		subtype Flag_Record is Sysapi.File_Flag_Record;
-		subtype Mode_Record is Sysapi.File_Mode_Record;
+		subtype Flag_Bits is OS.File_Flag_Bits;
+		subtype Mode_Bits is OS.File_Mode_Bits;
+		subtype Flag_Record is OS.File_Flag_Record;
+		subtype Mode_Record is OS.File_Mode_Record;
 
 		FLAG_READ:       constant Flag_Bits := 2#0000_0000_0000_0001#;
 		FLAG_WRITE:      constant Flag_Bits := 2#0000_0000_0000_0010#;
@@ -59,10 +62,10 @@ package H2.Sysapi is
 		DEFAULT_MODE: constant Mode_Record := ( Bits => 2#110_100_100# );
 
 		procedure Set_Flag_Bits (Flag: in out Flag_Record;
-		                         Bits: in     Flag_Bits) renames Sysapi.Set_File_Flag_Bits;
+		                         Bits: in     Flag_Bits) renames OS.Set_File_Flag_Bits;
 
 		procedure Clear_Flag_Bits (Flag: in out Flag_Record;
-		                           Bits: in     Flag_Bits) renames Sysapi.Clear_File_Flag_Bits;
+		                           Bits: in     Flag_Bits) renames OS.Clear_File_Flag_Bits;
 
 		function Get_Stdin return File_Pointer;
 		function Get_Stdout return File_Pointer;
@@ -84,11 +87,11 @@ package H2.Sysapi is
 
 		procedure Read (File:   in     File_Pointer; 
 		                Buffer: in out System_Byte_Array; 
-		                Last:   out    System_Length);
+		                Length: out    System_Length);
 
 		procedure Write (File:   in  File_Pointer; 
 		                 Buffer: in  System_Byte_Array; 
-		                 Last:   out System_Length);
+		                 Length: out System_Length);
 
 		pragma Inline (Get_Stdin);
 		pragma Inline (Get_Stdout);
@@ -100,4 +103,4 @@ package H2.Sysapi is
 	--                Mode: in  Mode_Record) renames File.Open;
 	--procedure Close_File (File: in out File_Pointer) renames File.Close;
 
-end H2.Sysapi;
+end H2.OS;

@@ -1,10 +1,14 @@
 project Lib is
 
+	type Platform_Type is ("posix", "win32");
+	Platform: Platform_Type := external ("platform", "posix");
+
 	for Source_Dirs use (
 		"@abs_srcdir@",
-		"@abs_srcdir@/posix",
-		"@abs_builddir@/posix"
+		"@abs_srcdir@/" & Platform,
+		"@abs_builddir@/" & Platform
 	);
+
 	for Library_Name use "h2";
 	for Library_Kind use "dynamic";
 	for Library_Dir use ".";
@@ -13,10 +17,13 @@ project Lib is
 
 	for Source_Files use (
 		"h2.ads",
-		"h2-sysdef.ads",
 		"h2-ascii.ads",
 		"h2-pool.adb",
 		"h2-pool.ads",
+		"h2-os.adb",
+		"h2-os.ads",
+		"h2-os-file.adb",
+		"h2-sysdef.ads",
 		"h2-io.ads",
 		"h2-io.adb",
 		"h2-io-file.adb",
@@ -28,9 +35,6 @@ project Lib is
 		"h2-scheme-execute-evaluate.adb",
 		"h2-scheme-token.adb",
 		"h2-slim.ads",
-		"h2-sysapi.adb",
-		"h2-sysapi.ads",
-		"h2-sysapi-file.adb",
 		"h2-utf8.adb",
 		"h2-utf8.ads",
 		"h2-wide.ads",
@@ -43,8 +47,8 @@ project Lib is
 		"h2.pool",
 		"h2.scheme",
 		"h2.slim",
-		"h2.sysapi",
 		"h2.sysdef",
+		"h2.os",
 		"h2.utf8",
 		"h2.wide",
 		"h2.wide_wide"
@@ -55,6 +59,15 @@ project Lib is
 			"-gnata", "-gnato", "-gnatN",  "-gnatwl", "-gnat95", "-gnatW8", "-g"
 		);
 	end Compiler;
+
+	--package Naming is
+	--	case Platform is
+	--		when "posix" =>
+	--			for Body ("H2.OS.File") use "h2-os-file-posix.adb";
+	--		when "win32" =>
+	--			for Body ("H2.OS.File") use "h2-os-file-win32.adb";
+	--	end case;
+	--end Naming;
 
 	--package Install is
 	--	for Prefix use "@prefix@";

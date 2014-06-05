@@ -9,8 +9,9 @@ with Ada.Text_IO;
 with Ada.Unchecked_Deallocation;
 
 
-with H2.Sysapi;
+with H2.OS;
 with H2.IO;
+use type H2.System_Length;
 
 with Interfaces.C;
 
@@ -44,27 +45,27 @@ begin
 	--h2init;
 
 declare
-	package Sysapi is new H2.Sysapi (
+	package OS is new H2.OS (
 		H2.Slim.Character,
 		H2.Wide.Character,
 		H2.Slim.String,
 		H2.Wide.String,
 		H2.Wide.Utf8.To_Unicode_String,
 		H2.Wide.Utf8.From_Unicode_String);
-	package File renames Sysapi.File;
+	package File renames OS.File;
 
 	F: File.File_Pointer;
 	FL: File.Flag_Record;
-	Last: H2.System_Length;
+	Length: H2.System_Length;
 	Buffer: H2.System_Byte_Array (50 .. 100);
 begin
-	--Sysapi.File.Set_Flag_Bits (FL, Sysapi.File.FLAG_WRITE); 
+	--OS.File.Set_Flag_Bits (FL, OS.File.FLAG_WRITE); 
 	File.Set_Flag_Bits (FL, File.FLAG_READ);
 	File.Open (F, H2.Wide.String'("/etc/passwd"), FL);
-	File.Read (F, Buffer, Last);
+	File.Read (F, Buffer, Length);
 	File.Close (F);
 
-	File.Write (Sysapi.File.Get_Stdout, Buffer(Buffer'First .. Last), Last);
+	File.Write (OS.File.Get_Stdout, Buffer(Buffer'First .. Buffer'First + Length - 1), Length);
 end;
 
 declare
@@ -74,14 +75,35 @@ declare
 		H2.Slim.String,
 		H2.Wide.String,
 		H2.Wide.Utf8.To_Unicode_String,
-		H2.Wide.Utf8.From_Unicode_String);
+		H2.Wide.Utf8.From_Unicode_String,
+		H2.Wide.Utf8.Sequence_Length);
 
 	package File renames IO.File;
 
 	F: File.File_Record;
 	FL: File.Flag_Record;
+	Buffer: H2.Slim.String (1 .. 10);
+	Length: H2.System_Length;
 begin
-	File.Open (F, H2.Slim.String'("/tmp/qq"), FL);
+	--File.Open (F, H2.Slim.String'("/etc/passwd"), FL);
+	--File.Read (F, Buffer, Length);
+	--Ada.Text_IO.PUt_Line (Standard.String(Buffer(Buffer'First .. Buffer'First + Length - 1)));
+
+	--File.Read (F, Buffer, Length);
+	--Ada.Text_IO.PUt_Line (Standard.String(Buffer(Buffer'First .. Buffer'First + Length - 1)));
+	--File.Close (F);
+
+ada.text_io.put_line ("------------------");
+
+	File.Open (F, H2.Slim.String'("/etc/passwd"), FL);
+	loop
+		File.Read_Line (F, Buffer, Length);
+		if Length <= 0 then
+			exit;
+		end if;
+		Ada.Text_IO.PUt_Line (Standard.String(Buffer(Buffer'First .. Buffer'First + Length - 1)));
+	end loop;
+
 	File.Close (F);
 end;
 

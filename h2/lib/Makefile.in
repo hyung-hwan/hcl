@@ -178,9 +178,9 @@ EXTRA_DIST = \
 	h2-ascii.ads  \
 	h2-utf8.ads \
 	h2-utf8.adb  \
-	h2-sysapi.ads \
-	h2-sysapi.adb \
-	posix/h2-sysapi-file.adb \
+	h2-os.ads \
+	h2-os.adb \
+	posix/h2-os-file.adb \
 	h2-io.ads \
 	h2-io.adb \
 	h2-io-file.adb \

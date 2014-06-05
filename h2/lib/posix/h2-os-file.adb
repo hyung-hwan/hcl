@@ -2,7 +2,7 @@
 with H2.Pool;
 with H2.Sysdef;
 
-separate (H2.Sysapi)
+separate (H2.OS)
 
 package body File is
 
@@ -131,32 +131,35 @@ package body File is
 		end if;
 	end Close;
 
-	procedure Read (File: in File_Pointer; Buffer: in out System_Byte_Array; Last: out System_Length) is
+	procedure Read (File:   in     File_Pointer; 
+	                Buffer: in out System_Byte_Array;
+	                Length: out    System_Length) is
+		pragma Assert (Buffer'Length > 0);
 		F: Posix_File_Pointer := Posix_File_Pointer(File);
 		N: Sysdef.ssize_t;
 	begin
 		N := Sys_Read (F.Handle, Buffer'Address, Buffer'Length);
 		if Sysdef."<=" (N, ERROR_RETURN) then
 			raise Constraint_Error; -- TODO rename exception
-		elsif Sysdef."=" (N, 0) then
-			Last := Buffer'First - 1;
 		else
-			Last := Buffer'First + System_Length(N) - 1;
+			Length := System_Length(N);
 		end if;
 	end Read;
 
-	procedure Write (File: in File_Pointer; Buffer: in System_Byte_Array; Last: out System_Length) is
+	procedure Write (File:   in  File_Pointer; 
+	                 Buffer: in  System_Byte_Array;
+	                 Length: out System_Length) is
+		pragma Assert (Buffer'Length > 0);
 		F: Posix_File_Pointer := Posix_File_Pointer(File);
 		N: Sysdef.ssize_t;
 	begin
 		N := Sys_Write (F.Handle, Buffer'Address, Buffer'Length);
 		if Sysdef."<=" (N, ERROR_RETURN) then
 			raise Constraint_Error; -- TODO rename exception
-		elsif Sysdef."=" (N, 0) then
-			Last := Buffer'First - 1;
 		else
-			Last := Buffer'First + System_Length(N) - 1;
+			Length := System_Length(N);
 		end if;
+
 	end Write;
 
 end File;

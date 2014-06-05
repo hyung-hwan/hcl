@@ -6,6 +6,9 @@ generic
 package H2.Utf8 is
 	pragma Preelaborate (Utf8);
 
+	--Invalid_Unicode_Character: exception renames Invalid_Wide_Character;
+	--Invalid_Utf8_Sequence: exception renames Invalid_Slim_Sequence;
+	--Insufficient_Utf8_Sequence: exception renames Insifficient_Slim_Sequence;
 	Invalid_Unicode_Character: exception;
 	Invalid_Utf8_Sequence: exception;
 	Insufficient_Utf8_Sequence: exception;

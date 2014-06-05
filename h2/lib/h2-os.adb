@@ -1,4 +1,4 @@
-package body H2.Sysapi is
+package body H2.OS is
 
 	package body File is separate;
 
@@ -12,4 +12,4 @@ package body H2.Sysapi is
 		Flag.Bits := Flag.Bits and not Bits;
 	end Clear_File_Flag_Bits;
 
-end H2.Sysapi;
+end H2.OS;
