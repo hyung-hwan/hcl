@@ -6,6 +6,7 @@ with Storage;
 with Slim_Stream;
 with Wide_Stream;
 with Ada.Text_IO;
+with Ada.Wide_Text_IO;
 with Ada.Unchecked_Deallocation;
 
 
@@ -80,30 +81,45 @@ declare
 
 	package File renames IO.File;
 
-	F: File.File_Record;
+	F, F2: File.File_Record;
 	FL: File.Flag_Record;
-	Buffer: H2.Slim.String (1 .. 10);
-	Length: H2.System_Length;
+	Buffer: H2.Slim.String (1 .. 200);
+	BufferW: H2.Wide.String (1 .. 50);
+	IL, OL: H2.System_Length;
 begin
 	--File.Open (F, H2.Slim.String'("/etc/passwd"), FL);
 	--File.Read (F, Buffer, Length);
 	--Ada.Text_IO.PUt_Line (Standard.String(Buffer(Buffer'First .. Buffer'First + Length - 1)));
 
 	--File.Read (F, Buffer, Length);
-	--Ada.Text_IO.PUt_Line (Standard.String(Buffer(Buffer'First .. Buffer'First + Length - 1)));
+	--Ada.Text_IO.PUt (Standard.String(Buffer(Buffer'First .. Buffer'First + Length - 1)));
 	--File.Close (F);
 
 ada.text_io.put_line ("------------------");
+	File.Set_Flag_Bits (FL, File.FLAG_READ);
+	File.Set_Flag_Bits (FL, File.FLAG_NONBLOCK);
+	File.Open (F, H2.Slim.String'("/tmp/xxx"), FL);
 
-	File.Open (F, H2.Slim.String'("/etc/passwd"), FL);
+	File.Clear_Flag_Bits (FL, FL.Bits);
+	File.Set_Flag_Bits (FL, File.FLAG_WRITE);
+	File.Set_Flag_Bits (FL, File.FLAG_CREATE);
+	File.Set_Flag_Bits (FL, File.FLAG_TRUNCATE);
+	File.Open (F2, H2.Wide.String'("/tmp/yyy"), FL);
 	loop
-		File.Read_Line (F, Buffer, Length);
-		if Length <= 0 then
-			exit;
-		end if;
-		Ada.Text_IO.PUt_Line (Standard.String(Buffer(Buffer'First .. Buffer'First + Length - 1)));
+		File.Read (F, Buffer, IL);
+		--File.Read (F, BufferW, IL);
+		exit when IL <= 0;
+
+		File.Write_Line (F2, Buffer(Buffer'First .. Buffer'First + IL - 1), OL);
+		pragma Assert (IL = OL);
+
+		--Ada.Text_IO.PUt (Standard.String(Buffer(Buffer'First .. Buffer'First + IL - 1)));
+		--Ada.Wide_Text_IO.Put_Line (Standard.Wide_String(BufferW(BufferW'First .. BufferW'First + IL - 1)));
 	end loop;
 
+	File.Write (F2, H2.Wide.String'("나는 피리부는 사나이 정말로 멋있는 사나이"), OL);
+	File.Write_Line (F2, H2.Wide.String'("이세상에 문디없어면 무슨재미로 너도 나도 만세."), OL);
+	File.Close (F2);
 	File.Close (F);
 end;
 

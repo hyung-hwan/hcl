@@ -9,8 +9,6 @@ generic
 
 package H2.OS is
 
-
-
 	type File_Flag_Bits is new System_Word;
 	type File_Flag_Record is record
 		Bits: File_Flag_Bits := 0;
@@ -97,6 +95,11 @@ package H2.OS is
 		pragma Inline (Get_Stdout);
 		pragma Inline (Get_Stderr);
 	end File;
+
+	--package Socket
+	--	type Socket_Record is tagged null record;
+	--	type Socket_Pointer is access all Socket_Record'Class;
+	--end Socket;
 
 	--procedure Open_File (File: out File_Pointer;
 	--                Flag: in  Flag_Record;

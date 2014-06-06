@@ -39,46 +39,66 @@ package H2.IO is
 		                           Bits: in     Flag_Bits) renames OS.File.Clear_Flag_Bits;
 
 		procedure Open (File: in out File_Record; 
-					 Name: in     Slim_String;
+		                Name: in     Slim_String;
 		                Flag: in     Flag_Record;
-					 Pool: in     Storage_Pool_Pointer := null);
+		                Pool: in     Storage_Pool_Pointer := null);
 
 		procedure Open (File: in out File_Record;
-					 Name: in     Wide_String;
+		                Name: in     Wide_String;
 		                Flag: in     Flag_Record;
-					 Pool: in     Storage_Pool_Pointer := null);
+		                Pool: in     Storage_Pool_Pointer := null);
 
 		procedure Close (File: in out File_Record);
 
 		procedure Read (File:   in out File_Record; 
-					 Buffer: in out Slim_String;
-					 Length: out    System_Length);
-
-		procedure Read (File:   in out File_Record;
-					 Buffer: in out Wide_String;
-					 Length: out    System_Length);
+		                Buffer: in out Slim_String;
+		                Length: out    System_Length);
 
 		procedure Read_Line (File:   in out File_Record; 
-					      Buffer: in out Slim_String;
-					      Length: out    System_Length);
+		                     Buffer: in out Slim_String;
+		                     Length: out    System_Length);
+
+		procedure Read (File:   in out File_Record;
+		                Buffer: in out Wide_String;
+		                Length: out    System_Length);
 
 		procedure Read_Line (File:   in out File_Record;
-					      Buffer: in out Wide_String;
-					      Length: out    System_Length);
+		                     Buffer: in out Wide_String;
+		                     Length: out    System_Length);
 
 		procedure Write (File:   in out File_Record; 
-					  Buffer: in     Slim_String;
-					  Length: out    System_Length);
+		                 Buffer: in     Slim_String;
+		                 Length: out    System_Length);
+
+		-- The Write_Line procedure doesn't add a line terminator.
+		-- It writes to the underlying file if the internal buffer
+		-- is full or writes up to the last line terminator found.
+		procedure Write_Line (File:   in out File_Record;
+		                      Buffer: in     Slim_String;
+		                      Length: out    System_Length);
 
 		procedure Write (File:   in out File_Record;
-					  Buffer: in     Wide_String;
-					  Length: out    System_Length);
+		                 Buffer: in     Wide_String;
+		                 Length: out    System_Length);
 
+		procedure Write_Line (File:   in out File_Record;
+		                      Buffer: in     Wide_String;
+		                      Length: out    System_Length);
+
+		
 		procedure Flush (File: in out File_Record);
+		procedure Drain (File: in out File_Record);
+
+		--procedure Rewind (File: in out File_Record);
+		--procedure Set_Position (File: in out File_Record; Position: Position_Record);
+		--procedure Get_Position (File: in out File_Record; Position: Position_Record);
 
 	private
 		type File_Buffer is record
-			Data: System_Byte_Array (1 .. 2048); -- TODO: determine the best size
+			-- TODO: determine the best buffer size.
+			-- The Data array size must be as large as the longest 
+			-- multi-byte sequence for a single wide character.
+			Data: System_Byte_Array (1 .. 2048); 
 			Length: System_Length := 0;
 		end record;
 

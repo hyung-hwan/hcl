@@ -32,6 +32,12 @@ int main (int argc, char* argv[])
 	printf ("\tO_CREAT:  constant := %d;\n", O_CREAT);
 	printf ("\tO_EXCL:   constant := %d;\n", O_EXCL);
 	printf ("\tO_TRUNC:  constant := %d;\n", O_TRUNC);
+	printf ("\tO_APPEND:  constant := %d;\n", O_APPEND);
+
+#if !defined(O_NONBLOCK)
+#	define O_NONBLOCK 0
+#endif
+	printf ("\tO_NONBLOCK:  constant := %d;\n", O_NONBLOCK);
 
 #if !defined(O_SYNC)
 #	define O_SYNC 0

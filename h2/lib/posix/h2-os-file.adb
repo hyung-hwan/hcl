@@ -47,15 +47,23 @@ package body File is
 			V := V or Sysdef.O_RDONLY;
 		end if;
 
-		if ((Bits and FLAG_CREATE) /= 0) then
+		if (Bits and FLAG_CREATE) /= 0 then
 			V := V or Sysdef.O_CREAT;
 		end if;
 
-		if ((Bits and FLAG_TRUNCATE) /= 0) then
+		if (Bits and FLAG_TRUNCATE) /= 0 then
 			V := V or Sysdef.O_TRUNC;
 		end if;
 
-		if ((Bits and FLAG_SYNC) /= 0) then
+		if (Bits and FLAG_APPEND) /= 0 then
+			V := V or Sysdef.O_APPEND;
+		end if;
+
+		if (Bits and FLAG_NONBLOCK) /= 0 then
+			V := V or Sysdef.O_NONBLOCK;
+		end if;
+
+		if (Bits and FLAG_SYNC) /= 0 then
 			V := V or Sysdef.O_SYNC;
 		end if;
 
