@@ -5,7 +5,7 @@ generic
 	type Character_Type is (<>);
 package H2.Ascii is
 
-	pragma Preelaborate (Ascii);
+	--pragma Preelaborate (Ascii);
 
 	package Pos is
 		NUL                 : constant := 0;

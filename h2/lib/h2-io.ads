@@ -1,4 +1,5 @@
 with H2.OS;
+with H2.Ascii;
 
 generic
 	type Slim_Character is (<>);
@@ -12,6 +13,11 @@ generic
 package H2.IO is
 
 	package OS is new H2.OS (Slim_Character, Wide_Character, Slim_String, Wide_String, Slim_To_Wide, Wide_To_Slim);
+	package Slim_Ascii is new H2.Ascii (Slim_Character);
+	package Wide_Ascii is new H2.Ascii (Wide_Character);
+
+	function Get_Line_Terminator return Slim_String;
+	--function Get_Line_Terminator return Wide_String;
 
 	package File is
 
@@ -31,12 +37,14 @@ package H2.IO is
 		type File_Buffer is private;
 		type File_Record is limited private;
 			
-
 		procedure Set_Flag_Bits (Flag: in out Flag_Record; 
 		                         Bits: in     Flag_Bits) renames OS.File.Set_Flag_Bits;
 
 		procedure Clear_Flag_Bits (Flag: in out Flag_Record;
 		                           Bits: in     Flag_Bits) renames OS.File.Clear_Flag_Bits;
+
+		function Is_Open (File: in File_Record) return Standard.Boolean;
+		pragma Inline (Is_Open);
 
 		procedure Open (File: in out File_Record; 
 		                Name: in     Slim_String;
@@ -48,23 +56,40 @@ package H2.IO is
 		                Flag: in     Flag_Record;
 		                Pool: in     Storage_Pool_Pointer := null);
 
+
 		procedure Close (File: in out File_Record);
 
+		-- The Read procedure reads as many characters as the buffer 
+		-- can hold with a single system call at most.
 		procedure Read (File:   in out File_Record; 
-		                Buffer: in out Slim_String;
+		                Buffer: out    Slim_String;
 		                Length: out    System_Length);
 
+		-- The Read_Line procedure reads a single line into the bufer.
+		-- If the buffer is not large enough, it may not contain a full line. 
+		-- The remaining part can be returned in the next call.
 		procedure Read_Line (File:   in out File_Record; 
-		                     Buffer: in out Slim_String;
+		                     Buffer: out    Slim_String;
 		                     Length: out    System_Length);
 
+
+		-- The Get_Line procedure acts like Read_Line but the line terminator
+		-- is translated to LF.
+		procedure Get_Line (File:   in out File_Record;
+		                    Buffer: out    Slim_String;
+		                    Length: out    System_Length);
+
 		procedure Read (File:   in out File_Record;
-		                Buffer: in out Wide_String;
+		                Buffer: out    Wide_String;
 		                Length: out    System_Length);
 
 		procedure Read_Line (File:   in out File_Record;
-		                     Buffer: in out Wide_String;
+		                     Buffer: out    Wide_String;
 		                     Length: out    System_Length);
+
+		procedure Get_Line (File:   in out File_Record;
+		                    Buffer: out    Wide_String;
+		                    Length: out    System_Length);
 
 		procedure Write (File:   in out File_Record; 
 		                 Buffer: in     Slim_String;
@@ -85,7 +110,6 @@ package H2.IO is
 		                      Buffer: in     Wide_String;
 		                      Length: out    System_Length);
 
-		
 		procedure Flush (File: in out File_Record);
 		procedure Drain (File: in out File_Record);
 
@@ -100,6 +124,8 @@ package H2.IO is
 			-- multi-byte sequence for a single wide character.
 			Data: System_Byte_Array (1 .. 2048); 
 			Length: System_Length := 0;
+			First: System_Length := 0;
+			Last: System_Length := 0;
 		end record;
 
 		type File_Record is limited record

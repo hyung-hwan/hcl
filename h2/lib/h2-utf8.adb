@@ -168,10 +168,10 @@ package body H2.Utf8 is
 		return Chr;
 	end To_Unicode_Character;
 
-	procedure To_Unicode_String (Seq:     in     Utf8_String; 
-	                             Seq_Len: out    System_Length;
-	                             Str:     in out Unicode_String;
-	                             Str_Len: out    System_Length) is
+	procedure To_Unicode_String (Seq:     in  Utf8_String; 
+	                             Seq_Len: out System_Length;
+	                             Str:     out Unicode_String;
+	                             Str_Len: out System_Length) is
 		Seq_Pos: System_Index := Seq'First;
 		Str_Pos: System_Index := Str'First;
 		Len: System_Length;

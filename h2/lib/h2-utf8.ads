@@ -4,7 +4,7 @@ generic
 	type Slim_String is array(System_Index range<>) of Slim_Character;
 	type Wide_String is array(System_Index range<>) of Wide_Character;
 package H2.Utf8 is
-	pragma Preelaborate (Utf8);
+	--pragma Preelaborate (Utf8);
 
 	--Invalid_Unicode_Character: exception renames Invalid_Wide_Character;
 	--Invalid_Utf8_Sequence: exception renames Invalid_Slim_Sequence;
@@ -41,10 +41,10 @@ package H2.Utf8 is
 	                                Seq_Len: out System_Length;
 	                                Chr:     out Unicode_Character);
 
-	procedure To_Unicode_String (Seq:     in     Utf8_String; 
-	                             Seq_Len: out    System_Length;
-	                             Str:     in out Unicode_String;
-	                             Str_Len: out    System_Length);
+	procedure To_Unicode_String (Seq:     in  Utf8_String; 
+	                             Seq_Len: out System_Length;
+	                             Str:     out Unicode_String;
+	                             Str_Len: out System_Length);
 
 	function To_Unicode_Character (Seq: in Utf8_String) return Unicode_Character;
 	function To_Unicode_String (Seq: in Utf8_String) return Unicode_String;

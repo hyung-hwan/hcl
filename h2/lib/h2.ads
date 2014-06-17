@@ -2,7 +2,7 @@ with System;
 with System.Storage_Pools;
 
 package H2 is
-	pragma Preelaborate (H2);
+	--pragma Preelaborate (H2);
 
 	System_Word_Bits: constant := System.Word_Size;
 	System_Word_Bytes: constant := System_Word_Bits / System.Storage_Unit;
@@ -24,8 +24,12 @@ package H2 is
 	type Storage_Pool_Pointer is
 		access all System.Storage_Pools.Root_Storage_Pool'Class;
 
+	type System_Byte_Array is array(System_Index range<>) of System_Byte;
+	
+	
 	
 
-	type System_Byte_Array is array(System_Index range<>) of System_Byte;
+	
+	
 	
 end H2;

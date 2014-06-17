@@ -8,7 +8,7 @@ with Wide_Stream;
 with Ada.Text_IO;
 with Ada.Wide_Text_IO;
 with Ada.Unchecked_Deallocation;
-
+with Ada.Exceptions;
 
 with H2.OS;
 with H2.IO;
@@ -84,7 +84,7 @@ declare
 	F, F2: File.File_Record;
 	FL: File.Flag_Record;
 	Buffer: H2.Slim.String (1 .. 200);
-	BufferW: H2.Wide.String (1 .. 50);
+	BufferW: H2.Wide.String (1 .. 27);
 	IL, OL: H2.System_Length;
 begin
 	--File.Open (F, H2.Slim.String'("/etc/passwd"), FL);
@@ -96,6 +96,12 @@ begin
 	--File.Close (F);
 
 ada.text_io.put_line ("------------------");
+
+
+	--Stdout.Get_Line (..
+	--Stdout.Print ("-----------------");
+	--Stdout.Print_Line ("-------------------");
+
 	File.Set_Flag_Bits (FL, File.FLAG_READ);
 	File.Set_Flag_Bits (FL, File.FLAG_NONBLOCK);
 	File.Open (F, H2.Slim.String'("/tmp/xxx"), FL);
@@ -105,12 +111,16 @@ ada.text_io.put_line ("------------------");
 	File.Set_Flag_Bits (FL, File.FLAG_CREATE);
 	File.Set_Flag_Bits (FL, File.FLAG_TRUNCATE);
 	File.Open (F2, H2.Wide.String'("/tmp/yyy"), FL);
+
 	loop
-		File.Read (F, Buffer, IL);
+
+		File.Get_Line (F, BufferW, IL);
+
+ada.wide_text_io.put_line (standard.wide_string(bufferw(1..il)));
 		--File.Read (F, BufferW, IL);
 		exit when IL <= 0;
 
-		File.Write_Line (F2, Buffer(Buffer'First .. Buffer'First + IL - 1), OL);
+		File.Write_Line (F2, BufferW(BufferW'First .. BufferW'First + IL - 1), OL);
 		pragma Assert (IL = OL);
 
 		--Ada.Text_IO.PUt (Standard.String(Buffer(Buffer'First .. Buffer'First + IL - 1)));
@@ -119,8 +129,21 @@ ada.text_io.put_line ("------------------");
 
 	File.Write (F2, H2.Wide.String'("나는 피리부는 사나이 정말로 멋있는 사나이"), OL);
 	File.Write_Line (F2, H2.Wide.String'("이세상에 문디없어면 무슨재미로 너도 나도 만세."), OL);
+	File.Write_Line (F2, H2.Wide.String'("이세상에 for the first time 우하."), OL);
+	File.Write_Line (F2, H2.Wide.String'(""), OL);
 	File.Close (F2);
 	File.Close (F);
+
+exception
+	when Error: others =>
+		Ada.Text_IO.Put_Line ("~~~~~~~~~~ EXCEPTION ~~~~~~~~~~" & Ada.Exceptions.Exception_Information(Error));
+
+		if File.Is_Open(F2) then
+			File.Close (F2);
+		end if;
+		if File.Is_Open(F) then
+			File.Close (F);
+		end if;
 end;
 
 declare

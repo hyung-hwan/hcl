@@ -4,8 +4,8 @@ separate (H2.IO)
 
 package body File is
 
-	package Slim_Ascii is new H2.Ascii (Slim_Character);
-	package Wide_Ascii is new H2.Ascii (Wide_Character);
+	package Slim_Ascii renames IO.Slim_Ascii;
+	package Wide_Ascii renames IO.Wide_Ascii;
 
 	--|-----------------------------------------------------------------------
 	--| PRIVATE ROUTINES
@@ -34,237 +34,310 @@ package body File is
 		Dst(Dst'First .. Dst'First + Length - 1) := Src(Src'First .. Src'First + Length - 1);
 	end Copy_Array;
 
+
+	Slim_Line_Terminator: Slim_String := Get_Line_Terminator;
+	--Wide_Line_Terminator: Wide_String := Get_Line_Terminator;
+
 	--|-----------------------------------------------------------------------
 	--| OPEN AND CLOSE
 	--|-----------------------------------------------------------------------
+	function Is_Open (File: in File_Record) return Standard.Boolean is
+	begin
+		return OS.File."/="(File.File, null);
+	end Is_Open;
 
 	procedure Open (File: in out File_Record;
 	                Name: in     Slim_String;
 	                Flag: in     Flag_Record;
 	                Pool: in     Storage_Pool_Pointer := null) is
+		pragma Assert (not Is_Open(File));
 	begin
 		OS.File.Open (File.File, Name, Flag, Pool => Pool);
+		File.Rbuf.First := 0;
+		File.Rbuf.Last := 0;
 		File.Rbuf.Length := 0;
+
 		File.Wbuf.Length := 0;
 		File.EOF := Standard.False;
+		--File.Slim_Line_Break := Get_Line_Terminator;
+		--File.Wide_Line_Break := Get_Line_Terminator;
 	end Open;
 
 	procedure Open (File: in out File_Record;
 	                Name: in     Wide_String;
 	                Flag: in     Flag_Record;
 	                Pool: in     Storage_Pool_Pointer := null) is
+		pragma Assert (not Is_Open(File));
 	begin
 		OS.File.Open (File.File, Name, Flag, Pool => Pool);
 		File.Rbuf.Length := 0;
 		File.Wbuf.Length := 0;
 		File.EOF := Standard.False;
+		--File.Slim_Line_Break := Get_Line_Terminator;
+		--File.Wide_Line_Break := Get_Line_Terminator;
 	end Open;
 
 	procedure Close (File: in out File_Record) is
+		pragma Assert (Is_Open(File));
 	begin
 		Flush (File);
 		OS.File.Close (File.File);
 		File.File := null;
 	end Close;
 
+	function Is_Empty (Buf: in File_Buffer) return Standard.Boolean is
+		pragma Inline (Is_Empty);
+	begin
+		return Buf.First >= Buf.Last;
+	end Is_Empty;
+
+	procedure Set_Length (Buf: in out File_Buffer; Length: in System_Length) is
+		pragma Inline (Set_Length);
+	begin
+		Buf.First := Buf.Data'First - 1; -- this should be 0
+		Buf.Last := Buf.First + Length;
+	end Set_Length;
+
+	procedure Load_Bytes (File: in out File_Record) is
+		pragma Assert (Is_Open(File));
+		pragma Assert (Is_Empty(File.Rbuf));
+		L1: System_Length;
+	begin
+		if File.EOF then
+			-- raise EOF EXCEPTION. ???
+			null;
+		else
+			-- Read bytes into the buffer
+			OS_Read_File (File, File.Rbuf.Data, L1);
+			Set_Length  (File.Rbuf, L1);
+		end if;
+	end Load_Bytes;
+
+	procedure Fetch_Byte (File:      in out File_Record; 
+	                      Item:      out    System_Byte;
+	                      Available: out    Standard.Boolean) is
+	begin
+		-- NOTE: If no data is available, Item is not initialized in this procedure
+		if Is_Empty(File.Rbuf) then
+			Load_Bytes (File);
+		end if;
+			
+		if Is_Empty(File.Rbuf) then
+			Available := Standard.False;
+		else
+			-- Consume 1 byte
+			Available := Standard.True;
+			File.Rbuf.First := File.Rbuf.First + 1;
+			Item := File.Rbuf.Data(File.Rbuf.First);
+		end if;
+	end Fetch_Byte;
+
+	procedure Fetch_Bytes (File:   in out File_Record;
+	                       Item:   out    System_Byte_Array;
+	                       Length: out    System_Length) is
+		pragma Assert (Is_Open(File));
+		L1, L2: System_Length;
+	begin
+		if Is_Empty(File.Rbuf) and then File.EOF then
+			-- raise EOF EXCEPTION. ???
+			Length := 0;
+		else
+			L1 := File.Rbuf.Last - File.Rbuf.First;
+			if L1 > 0 then
+				-- Copy the residue over to the output buffer
+				if Item'Length <= L1 then
+					L2 := Item'Length;
+				else
+					L2 := L1;
+				end if;
+			
+				Copy_Array (Item, File.Rbuf.Data(File.Rbuf.First + 1 .. File.Rbuf.Last), L2);
+				File.Rbuf.First := File.Rbuf.First + L2;
+
+				Length := L2;
+			else
+				Length := 0;
+			end if;
+
+			if Item'Length > L1 then
+				-- Item is not full. the internal read buffer must be empty.
+				pragma Assert (File.Rbuf.First >= File.Rbuf.Last); 
+
+				L2 := Item'Length - Length; -- Remaining capacity
+				If L2 >= File.Rbuf.Data'Length then
+					-- The remaining capacity of the output buffer is
+					-- higher than that of the internal buffer. So read
+					-- directly into the output buffer.
+					OS_Read_File (File, Item(Item'First + Length .. Item'Last), L2);
+					Length := Length + L2;
+				else
+					-- Read into the internal buffer.
+					OS_Read_File (File, File.Rbuf.Data, L1);
+					Set_Length (File.Rbuf, L1);
+
+					if L1 < L2 then
+						-- the actual bytes read may be less than the remaining capacity
+						L2 := L1; 
+					end if;
+
+					-- Copy as many bytes as needed into the output buffer.
+					Copy_Array (Item(Item'First + Length .. Item'Last), File.Rbuf.Data, L2);
+					Length := Length + L2;
+					File.Rbuf.First := File.Rbuf.First + L2;
+				end if;
+			end if;
+		end if;
+	end Fetch_Bytes;
+
 	--|-----------------------------------------------------------------------
 	--| READ SLIM STRING
 	--|-----------------------------------------------------------------------
 	procedure Read (File:   in out File_Record; 
-	                Buffer: in out Slim_String;
+	                Buffer: out    Slim_String;
 	                Length: out    System_Length) is
+		pragma Assert (Is_Open(File));
 		pragma Assert (Buffer'Length > 0);
 
 		Outbuf: System_Byte_Array (Buffer'Range);
 		for Outbuf'Address use Buffer'Address;
-
-		Rbuf: File_Buffer renames File.Rbuf;
-		L1, L2: System_Length;
 	begin
-		if Rbuf.Length <= 0 and then File.EOF then
-			-- raise EOF EXCEPTION. ???
-			Length := 0;
-			return;
-		end if;
-
-		if Outbuf'Length >= Rbuf.Data'Length then
-			-- The output buffer size if greater than the internal buffer size.
-
-			L1 := Rbuf.Length;
-			if L1 < Outbuf'Length then
-				-- Read into the tail of the output buffer if insufficient
-				-- data is available in the internal buffer.
-				OS_Read_File (File, Outbuf(Outbuf'First + L1 .. Outbuf'Last), L2);
-			end if;
-
-			-- Fill the head of the output buffer with the internal buffer contents
-			Copy_Array (Outbuf, Rbuf.Data, L1);
-
-			-- Empty the internal buffer.
-			Rbuf.Length := 0;
-
-			-- Set the output length
-			Length := L1 + L2;
-		else
-			if Rbuf.Length < Rbuf.Data'Length then
-				-- Attempt to fill the internal buffer. It may not get full with a single read.
-				OS_Read_File (File, Rbuf.Data(Rbuf.Data'First + Rbuf.Length .. Rbuf.Data'Last), L1);
-				Rbuf.Length := RBuf.Length + L1;
-			end if;
-
-			-- Determine how much need to be copied to the output buffer.
-			If Outbuf'Length < Rbuf.Length then
-				L2 := Outbuf'Length;
-			else
-				L2 := Rbuf.Length;
-			end if;
-
-			-- Copy the head of the internal buffer to the output buffer
-			Copy_Array (Outbuf, Rbuf.Data, L2);
-
-			-- Move the residue of the internal buffer to the head
-			Shift_Buffer (Rbuf, L2);
-			
-			-- Set the output length
-			Length := L2;
-		end if;
+		Fetch_Bytes (File, Outbuf, Length);
 	end Read;
 
 	procedure Read_Line (File:   in out File_Record;
-	                     Buffer: in out Slim_String;
-	                     Length: out   System_Length) is
-
+	                     Buffer: out    Slim_String;
+	                     Length: out    System_Length) is
+		pragma Assert (Is_Open(File));
 		pragma Assert (Buffer'Length > 0);
 
 		Outbuf: System_Byte_Array (Buffer'Range);
 		for Outbuf'Address use Buffer'Address;
 
-		Rbuf: File_Buffer renames File.Rbuf;
-		L1, L2, K: System_Length;
-
+		K: System_Length;
 	begin
-		-- Unlike Read, this procedure should use the internal buffer
-		-- regardless of the output buffer size as the position of
-		-- the line terminator is unknown. 
-		--
-		-- If the buffer is not large enough to hold a line, the output
-		-- is just truncated truncated to the buffer size.
-
-		if Rbuf.Length <= 0 and then File.EOF then
-			-- raise EOF EXCEPTION. ???
-			Length := 0;
-			return;
-		end if;
-
 		K := Outbuf'First - 1;
 
 		outer: loop
-			if Rbuf.Length < Rbuf.Data'Length then
-				-- Attempt to fill the internal buffer. It may not get full with a single read.
-				OS_Read_File (File, Rbuf.Data(Rbuf.Data'First + Rbuf.Length .. Rbuf.Data'Last), L1);
-				Rbuf.Length := Rbuf.Length + L1;
+			if Is_Empty(File.Rbuf) then
+				Load_Bytes (File);
+				exit when Is_Empty(File.Rbuf);
 			end if;
 
-			exit when Rbuf.Length <= 0;
-
-			L2 := Rbuf.Data'First + Rbuf.Length - 1; -- Last index of the internal buffer
-			for I in Rbuf.Data'First .. L2 loop
+			while File.Rbuf.First < File.Rbuf.Last loop
 				K := K + 1;
-				Outbuf(K) := Rbuf.Data(I);
+				File.Rbuf.First := File.Rbuf.First + 1;
+				Outbuf(K) := File.Rbuf.Data(File.Rbuf.First);
 				if K >= Outbuf'Last or else Outbuf(K) = Slim_Ascii.Pos.LF then -- TODO: different line terminator
-					L1 := I - Rbuf.Data'First + 1; -- Length of data copied to the output buffer.
-					Shift_Buffer (Rbuf, L1); -- Shift the residue
 					exit outer; -- Done
 				end if;
 			end loop;
-
-			-- Empty the internal buffer;
-			Rbuf.Length := 0;
 		end loop outer;
 
 		Length := K + 1 - Outbuf'First;
 	end Read_Line;
 
+	procedure Get_Line (File:   in out File_Record;
+	                    Buffer: out    Slim_String;
+	                    Length: out    System_Length) is
+		pragma Assert (Is_Open(File));
+		pragma Assert (Buffer'Length > 0);
+
+		Last: System_Length;
+	begin
+		Read_Line (File, Buffer, Length);
+
+		if Length >= 1 then
+			Last := Buffer'First + Length - 1;
+			if Buffer(Last) = Slim_Ascii.LF then
+				if Last > Buffer'First and then Buffer(Last - 1) = Slim_Ascii.CR then
+					-- Switch CR/LF to LF
+					Length := Length - 1;
+					Buffer(Last - 1) := Slim_Ascii.LF;
+				end if;
+			elsif Buffer(Last) = Slim_Ascii.CR then
+				if Is_Empty(File.Rbuf) then
+					Load_Bytes (File);
+				end if;
+
+				if not Is_Empty(File.Rbuf) then
+					if File.Rbuf.Data(File.Rbuf.First + 1) = Slim_Ascii.Pos.LF then
+						-- Consume LF held in the internal read buffer.
+						File.Rbuf.First := File.Rbuf.First + 1;
+						-- Switch CR to LF (End-result: CR/LF to LF)
+						Buffer(Last) := Slim_Ascii.LF;
+					end if;
+				end if;
+			end if;
+		end if;
+	end Get_Line;
+
 	--|-----------------------------------------------------------------------
 	--| READ WIDE STRING
 	--|-----------------------------------------------------------------------
+
 	procedure Read_Wide (File:       in out File_Record; 
-	                     Buffer:     in out Wide_String;
+	                     Buffer:     out    Wide_String;
 	                     Length:     out    System_Length;
 	                     Terminator: in     Wide_String) is
+
+		pragma Assert (Is_Open(File));
 		pragma Assert (Buffer'Length > 0);
+
 		Outbuf: Wide_String renames Buffer;
-
-		Rbuf: File_Buffer renames File.Rbuf;
-		Inbuf: Slim_String (Rbuf.Data'Range);
-		for Inbuf'Address use Rbuf.Data'Address;
+		Inbuf: Slim_String (File.Rbuf.Data'Range);
+		for Inbuf'Address use File.Rbuf.Data'Address;
 		
-		L1, L2, L3, L4, I, J, K: System_Length;
+		L3, L4, I, J, K: System_Length;
 	begin
-		if Rbuf.Length <= 0 and then File.EOF then
-			-- raise EOF EXCEPTION. ???
-			Length := 0;
-			return;
-		end if;
-
 		K := Outbuf'First - 1;
 
 		outer: while K < Outbuf'Last loop
-
-			if Rbuf.Length < Rbuf.Data'Length then
-				-- Attempt to fill the internal buffer. It may not get full with a single read.
-				OS_Read_File (File, Rbuf.Data(Rbuf.Data'First + Rbuf.Length .. Rbuf.Data'Last), L1);
-				Rbuf.Length := Rbuf.Length + L1;
+			if Is_Empty(File.Rbuf) then
+				Load_Bytes (File);
+				exit when Is_Empty(File.Rbuf);
 			end if;
 
-			exit when Rbuf.Length <= 0;
-
-			L2 := Rbuf.Data'First + Rbuf.Length - 1; -- Last index of the internal buffer
-			I := Rbuf.Data'First;
-			while I <= L2 and K < Outbuf'Last loop
+			while File.Rbuf.First < File.Rbuf.Last and K < Outbuf'Last loop
+				I := File.Rbuf.First + 1;
 				L3 := Sequence_Length(Inbuf(I)); -- Required number of bytes to compose a wide character
 
 				if L3 <= 0 then
 					-- Potentially illegal sequence 
 					K := K + 1;
 					Outbuf(K) := Wide_Ascii.Question;
-					I := I + 1;
+					File.Rbuf.First := I;
 				else
-					L4 := L2 - I + 1;  -- Avaliable number of bytes available in the internal buffer
+					L4 := File.Rbuf.Last - File.Rbuf.First;  -- Avaliable number of bytes available in the internal buffer
 					if L4 < L3 then
 						-- Insufficient data available. Exit the inner loop to read more.
 						exit;
 					end if;
 
 					K := K + 1;
-					J := I + L3;
 					begin
-						Outbuf(K..K) := Slim_To_Wide(Inbuf(I .. J - 1));
+						J := File.Rbuf.First + L3;
+						Outbuf(K..K) := Slim_To_Wide(Inbuf(I .. J));
 					exception
 						when others => 
 							Outbuf(K) := Wide_Ascii.Question;
-							J := I + 1; -- Override J to skip 1 byte only
+							J := I; -- Override J to skip 1 byte only.
 					end;
-					I := J;
+					File.Rbuf.First := J;
 				end if;
 
 				if Terminator'Length > 0 and then
 				   Outbuf(K) = Terminator(Terminator'First) then 
 					-- TODO: compare more characters in terminator, not just the first charactrer
-					Shift_Buffer (Rbuf, I - Rbuf.Data'First);
 					exit outer;
 				end if;
 			end loop;
-
-			-- Move the residue to the front.
-			Shift_Buffer (Rbuf, I - Rbuf.Data'First);
 		end loop outer;
 
 		Length := K + 1 - Outbuf'First;
 	end Read_Wide;
 
 	procedure Read (File:   in out File_Record; 
-	                Buffer: in out Wide_String;
+	                Buffer: out    Wide_String;
 	                Length: out    System_Length) is
 		Terminator: Wide_String(1..0);
 	begin
@@ -272,12 +345,68 @@ package body File is
 	end Read;
 
 	procedure Read_Line (File:   in out File_Record; 
-	                     Buffer: in out Wide_String;
+	                     Buffer: out    Wide_String;
 	                     Length: out    System_Length) is
 		Terminator: constant Wide_String(1..1) := (1 => Wide_Ascii.LF);
 	begin
 		Read_Wide (File, Buffer, Length, Terminator);
 	end Read_Line;
+
+	procedure Get_Line (File:   in out File_Record;
+	                    Buffer: out    Wide_String;
+	                    Length: out    System_Length) is
+		pragma Assert (Is_Open(File));
+		pragma Assert (Buffer'Length > 0);
+
+		Last: System_Length;
+	begin
+		Read_Line (File, Buffer, Length);
+
+		if Length >= 1 then
+			Last := Buffer'First + Length - 1;
+			if Buffer(Last) = Wide_Ascii.LF then
+				if Last > Buffer'First and then Buffer(Last - 1) = Wide_Ascii.CR then
+					-- Switch CR/LF to LF
+					Length := Length - 1;
+					Buffer(Last - 1) := Wide_Ascii.LF;
+				end if;
+			elsif Buffer(Last) = Wide_Ascii.CR then
+				-- if the last character in the output buffer is CR,
+				-- i need to inspect the first character in the internal 
+				-- read buffer to determine if it's CR/LF.
+				if Is_Empty(File.Rbuf) then
+					Load_Bytes (File);
+				end if;
+
+				if not Is_Empty(File.Rbuf) then
+					declare
+						Inbuf: Slim_String (File.Rbuf.Data'Range);
+						for Inbuf'Address use File.Rbuf.Data'Address;
+						L3, I, J: System_Length;
+						W: Wide_String(1..1);
+					begin
+						I := File.Rbuf.First + 1;
+						L3 := Sequence_Length(Inbuf(I)); -- Required number of bytes to compose a wide character
+						if L3 in  1 .. File.Rbuf.Last - File.Rbuf.First then
+							J := File.Rbuf.First + L3;
+							begin
+								W := Slim_To_Wide(Inbuf(I .. J));
+							exception
+								when others =>
+									W(1) := Wide_Ascii.NUL;
+							end;
+							if W(1) = Wide_Ascii.LF then
+								-- Consume LF held in the internal read buffer.
+								File.Rbuf.First := J;
+								-- Switch CR to LF (End-result: CR/LF to LF)
+								Buffer(Last) := Wide_Ascii.LF;
+							end if;
+						end if;
+					end;
+				end if;
+			end if;
+		end if;
+	end Get_Line;
 
 	--|-----------------------------------------------------------------------
 	--| WRITE SLIM STRING
@@ -285,6 +414,8 @@ package body File is
 	procedure Write (File:   in out File_Record; 
 	                 Buffer: in     Slim_String;
 	                 Length: out    System_Length) is
+		pragma Assert (Is_Open(File));
+
 		Wbuf: File_Buffer renames File.Wbuf;
 
 		Inbuf: System_Byte_Array (Buffer'Range);
@@ -336,6 +467,8 @@ package body File is
 	procedure Write_Line (File:   in out File_Record; 
 	                      Buffer: in     Slim_String;
 	                      Length: out    System_Length) is
+		pragma Assert (Is_Open(File));
+
 		Wbuf: File_Buffer renames File.Wbuf;
 
 		Inbuf: System_Byte_Array (Buffer'Range);
@@ -384,6 +517,8 @@ package body File is
 	procedure Write (File:   in out File_Record; 
 	                 Buffer: in     Wide_String;
 	                 Length: out    System_Length) is
+		pragma Assert (Is_Open(File));
+
 		Wbuf: File_Buffer renames File.Wbuf;
 		F, L, I: System_Length;
 	begin
@@ -419,6 +554,7 @@ package body File is
 	procedure Write_Line (File:   in out File_Record; 
 	                      Buffer: in     Wide_String;
 	                      Length: out    System_Length) is
+		pragma Assert (Is_Open(File));
 
 		Wbuf: File_Buffer renames File.Wbuf;
 		F, L, I, LF: System_Length;
@@ -427,6 +563,11 @@ package body File is
 		I := Buffer'First - 1;
 		while I < Buffer'Last loop
 			I := I + 1;
+
+			--if Buffer(I) = Wide_Ascii.LF then
+			--else
+			--end if;
+
 			declare
 				Tmp: Slim_String := Wide_To_Slim(Buffer(I..I));
 				Tmp2: System_Byte_Array(Tmp'Range);
@@ -465,10 +606,13 @@ package body File is
 		Length := I - Buffer'First + 1;
 	end Write_Line;
 
+
 	--|-----------------------------------------------------------------------
 	--| FLUSH AND DRAIN
 	--|-----------------------------------------------------------------------
 	procedure Flush (File: in out File_Record) is
+		pragma Assert (Is_Open(File));
+
 		Wbuf: File_Buffer renames File.Wbuf;
 		Length: System_Length;
 	begin
@@ -487,7 +631,9 @@ package body File is
 	end Flush;
 	                 
 	procedure Drain (File: in out File_Record) is
+		pragma Assert (Is_Open(File));
 	begin
 		File.Wbuf.Length := 0;
 	end Drain;
+
 end File;

@@ -2,6 +2,8 @@ with H2.Scheme;
 with H2.Utf8;
 with H2.Slim;
 
+-- TODO: rename H2.Wide to H2.Wide_Utf8 or soemthing...
+
 package H2.Wide is
 
 	subtype Character is Standard.Wide_Character;

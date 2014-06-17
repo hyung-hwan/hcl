@@ -84,7 +84,7 @@ package H2.OS is
 		procedure Close (File: in out File_Pointer);
 
 		procedure Read (File:   in     File_Pointer; 
-		                Buffer: in out System_Byte_Array; 
+		                Buffer: out    System_Byte_Array; 
 		                Length: out    System_Length);
 
 		procedure Write (File:   in  File_Pointer; 

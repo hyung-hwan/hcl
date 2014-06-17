@@ -140,7 +140,7 @@ package body File is
 	end Close;
 
 	procedure Read (File:   in     File_Pointer; 
-	                Buffer: in out System_Byte_Array;
+	                Buffer: out    System_Byte_Array;
 	                Length: out    System_Length) is
 		pragma Assert (Buffer'Length > 0);
 		F: Posix_File_Pointer := Posix_File_Pointer(File);
