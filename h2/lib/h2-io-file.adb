@@ -18,13 +18,26 @@ package body File is
 		File.EOF := (Length <= 0);
 	end OS_Read_File;
 
-	procedure Shift_Buffer (Buffer: in out File_Buffer;
-	                        Length: in     System_Length) is
-		pragma Inline (Shift_Buffer);
+	--procedure Shift_Buffer (Buffer: in out File_Buffer;
+	--                        Length: in     System_Length) is
+	--	pragma Inline (Shift_Buffer);
+	--begin
+	--	Buffer.Length := Buffer.Length - Length;
+	--	Buffer.Data(Buffer.Data'First .. Buffer.Data'First + Buffer.Length - 1) := Buffer.Data(Buffer.Data'First + Length .. Buffer.Data'First + Length + Buffer.Length - 1);
+	--end Shift_Buffer;
+
+	procedure Compact_Buffer (Buffer: in out File_Buffer) is
+		A, B, L: System_Length;
 	begin
-		Buffer.Length := Buffer.Length - Length;
-		Buffer.Data(Buffer.Data'First .. Buffer.Data'First + Buffer.Length - 1) := Buffer.Data(Buffer.Data'First + Length .. Buffer.Data'First + Length + Buffer.Length - 1);
-	end Shift_Buffer;
+		A := Buffer.Pos;
+		B := Buffer.Last;
+		L := Buffer.Pos - Buffer.Data'First + 1;
+
+		Buffer.Pos := Buffer.Pos - L; -- should be same as Buffer.Data'First - 1
+		Buffer.Last := Buffer.Last - L;
+
+		Buffer.Data(Buffer.Pos + 1 .. Buffer.Last) := Buffer.Data(A + 1 .. B);
+	end Compact_Buffer;
 
 	procedure Copy_Array (Dst:    in out System_Byte_Array;
 	                      Src:    in     System_Byte_Array;
@@ -34,9 +47,35 @@ package body File is
 		Dst(Dst'First .. Dst'First + Length - 1) := Src(Src'First .. Src'First + Length - 1);
 	end Copy_Array;
 
+	function Is_Empty (Buf: in File_Buffer) return Standard.Boolean is
+		pragma Inline (Is_Empty);
+	begin
+		return Buf.Pos >= Buf.Last;
+	end Is_Empty;
+
+	procedure Set_Length (Buf: in out File_Buffer; Length: in System_Length) is
+		pragma Inline (Set_Length);
+	begin
+		Buf.Pos := Buf.Data'First - 1; -- this should be 0
+		Buf.Last := Buf.Pos + Length;
+	end Set_Length;
+
 
 	Slim_Line_Terminator: Slim_String := Get_Line_Terminator;
 	--Wide_Line_Terminator: Wide_String := Get_Line_Terminator;
+
+
+	procedure Set_Option_Bits (Option: in out Option_Record;
+	                            Bits:   in     Option_Bits) is
+	begin
+		Option.Bits := Option.Bits or Bits;
+	end Set_Option_Bits;
+
+	procedure Clear_Option_Bits (Option: in out Option_Record;
+	                             Bits:   in     Option_Bits) is
+	begin
+		Option.Bits := Option.Bits and not Bits;
+	end Clear_Option_Bits;
 
 	--|-----------------------------------------------------------------------
 	--| OPEN AND CLOSE
@@ -53,11 +92,10 @@ package body File is
 		pragma Assert (not Is_Open(File));
 	begin
 		OS.File.Open (File.File, Name, Flag, Pool => Pool);
-		File.Rbuf.First := 0;
-		File.Rbuf.Last := 0;
-		File.Rbuf.Length := 0;
+	
+		Set_Length (File.Rbuf, 0);
+		Set_Length (File.Wbuf, 0);
 
-		File.Wbuf.Length := 0;
 		File.EOF := Standard.False;
 		--File.Slim_Line_Break := Get_Line_Terminator;
 		--File.Wide_Line_Break := Get_Line_Terminator;
@@ -70,8 +108,10 @@ package body File is
 		pragma Assert (not Is_Open(File));
 	begin
 		OS.File.Open (File.File, Name, Flag, Pool => Pool);
-		File.Rbuf.Length := 0;
-		File.Wbuf.Length := 0;
+
+		Set_Length (File.Rbuf, 0);
+		Set_Length (File.Wbuf, 0);
+
 		File.EOF := Standard.False;
 		--File.Slim_Line_Break := Get_Line_Terminator;
 		--File.Wide_Line_Break := Get_Line_Terminator;
@@ -85,18 +125,15 @@ package body File is
 		File.File := null;
 	end Close;
 
-	function Is_Empty (Buf: in File_Buffer) return Standard.Boolean is
-		pragma Inline (Is_Empty);
+	procedure Set_Option (File: in out File_Record; Option: in Option_Record) is
 	begin
-		return Buf.First >= Buf.Last;
-	end Is_Empty;
+		File.Option := Option;
+	end Set_Option;
 
-	procedure Set_Length (Buf: in out File_Buffer; Length: in System_Length) is
-		pragma Inline (Set_Length);
+	function Get_Option (File: in File_Record) return Option_Record is
 	begin
-		Buf.First := Buf.Data'First - 1; -- this should be 0
-		Buf.Last := Buf.First + Length;
-	end Set_Length;
+		return File.Option;
+	end Get_Option;
 
 	procedure Load_Bytes (File: in out File_Record) is
 		pragma Assert (Is_Open(File));
@@ -127,8 +164,8 @@ package body File is
 		else
 			-- Consume 1 byte
 			Available := Standard.True;
-			File.Rbuf.First := File.Rbuf.First + 1;
-			Item := File.Rbuf.Data(File.Rbuf.First);
+			File.Rbuf.Pos := File.Rbuf.Pos + 1;
+			Item := File.Rbuf.Data(File.Rbuf.Pos);
 		end if;
 	end Fetch_Byte;
 
@@ -142,7 +179,7 @@ package body File is
 			-- raise EOF EXCEPTION. ???
 			Length := 0;
 		else
-			L1 := File.Rbuf.Last - File.Rbuf.First;
+			L1 := File.Rbuf.Last - File.Rbuf.Pos;
 			if L1 > 0 then
 				-- Copy the residue over to the output buffer
 				if Item'Length <= L1 then
@@ -151,8 +188,8 @@ package body File is
 					L2 := L1;
 				end if;
 			
-				Copy_Array (Item, File.Rbuf.Data(File.Rbuf.First + 1 .. File.Rbuf.Last), L2);
-				File.Rbuf.First := File.Rbuf.First + L2;
+				Copy_Array (Item, File.Rbuf.Data(File.Rbuf.Pos + 1 .. File.Rbuf.Last), L2);
+				File.Rbuf.Pos := File.Rbuf.Pos + L2;
 
 				Length := L2;
 			else
@@ -161,7 +198,7 @@ package body File is
 
 			if Item'Length > L1 then
 				-- Item is not full. the internal read buffer must be empty.
-				pragma Assert (File.Rbuf.First >= File.Rbuf.Last); 
+				pragma Assert (File.Rbuf.Pos >= File.Rbuf.Last); 
 
 				L2 := Item'Length - Length; -- Remaining capacity
 				If L2 >= File.Rbuf.Data'Length then
@@ -183,7 +220,7 @@ package body File is
 					-- Copy as many bytes as needed into the output buffer.
 					Copy_Array (Item(Item'First + Length .. Item'Last), File.Rbuf.Data, L2);
 					Length := Length + L2;
-					File.Rbuf.First := File.Rbuf.First + L2;
+					File.Rbuf.Pos := File.Rbuf.Pos + L2;
 				end if;
 			end if;
 		end if;
@@ -223,10 +260,10 @@ package body File is
 				exit when Is_Empty(File.Rbuf);
 			end if;
 
-			while File.Rbuf.First < File.Rbuf.Last loop
+			while File.Rbuf.Pos < File.Rbuf.Last loop
 				K := K + 1;
-				File.Rbuf.First := File.Rbuf.First + 1;
-				Outbuf(K) := File.Rbuf.Data(File.Rbuf.First);
+				File.Rbuf.Pos := File.Rbuf.Pos + 1;
+				Outbuf(K) := File.Rbuf.Data(File.Rbuf.Pos);
 				if K >= Outbuf'Last or else Outbuf(K) = Slim_Ascii.Pos.LF then -- TODO: different line terminator
 					exit outer; -- Done
 				end if;
@@ -260,9 +297,9 @@ package body File is
 				end if;
 
 				if not Is_Empty(File.Rbuf) then
-					if File.Rbuf.Data(File.Rbuf.First + 1) = Slim_Ascii.Pos.LF then
+					if File.Rbuf.Data(File.Rbuf.Pos + 1) = Slim_Ascii.Pos.LF then
 						-- Consume LF held in the internal read buffer.
-						File.Rbuf.First := File.Rbuf.First + 1;
+						File.Rbuf.Pos := File.Rbuf.Pos + 1;
 						-- Switch CR to LF (End-result: CR/LF to LF)
 						Buffer(Last) := Slim_Ascii.LF;
 					end if;
@@ -274,7 +311,6 @@ package body File is
 	--|-----------------------------------------------------------------------
 	--| READ WIDE STRING
 	--|-----------------------------------------------------------------------
-
 	procedure Read_Wide (File:       in out File_Record; 
 	                     Buffer:     out    Wide_String;
 	                     Length:     out    System_Length;
@@ -297,17 +333,17 @@ package body File is
 				exit when Is_Empty(File.Rbuf);
 			end if;
 
-			while File.Rbuf.First < File.Rbuf.Last and K < Outbuf'Last loop
-				I := File.Rbuf.First + 1;
+			while File.Rbuf.Pos < File.Rbuf.Last and K < Outbuf'Last loop
+				I := File.Rbuf.Pos + 1;
 				L3 := Sequence_Length(Inbuf(I)); -- Required number of bytes to compose a wide character
 
 				if L3 <= 0 then
 					-- Potentially illegal sequence 
 					K := K + 1;
 					Outbuf(K) := Wide_Ascii.Question;
-					File.Rbuf.First := I;
+					File.Rbuf.Pos := I;
 				else
-					L4 := File.Rbuf.Last - File.Rbuf.First;  -- Avaliable number of bytes available in the internal buffer
+					L4 := File.Rbuf.Last - File.Rbuf.Pos;  -- Avaliable number of bytes available in the internal buffer
 					if L4 < L3 then
 						-- Insufficient data available. Exit the inner loop to read more.
 						exit;
@@ -315,14 +351,14 @@ package body File is
 
 					K := K + 1;
 					begin
-						J := File.Rbuf.First + L3;
+						J := File.Rbuf.Pos + L3;
 						Outbuf(K..K) := Slim_To_Wide(Inbuf(I .. J));
 					exception
 						when others => 
 							Outbuf(K) := Wide_Ascii.Question;
 							J := I; -- Override J to skip 1 byte only.
 					end;
-					File.Rbuf.First := J;
+					File.Rbuf.Pos := J;
 				end if;
 
 				if Terminator'Length > 0 and then
@@ -385,10 +421,10 @@ package body File is
 						L3, I, J: System_Length;
 						W: Wide_String(1..1);
 					begin
-						I := File.Rbuf.First + 1;
+						I := File.Rbuf.Pos + 1;
 						L3 := Sequence_Length(Inbuf(I)); -- Required number of bytes to compose a wide character
-						if L3 in  1 .. File.Rbuf.Last - File.Rbuf.First then
-							J := File.Rbuf.First + L3;
+						if L3 in  1 .. File.Rbuf.Last - File.Rbuf.Pos then
+							J := File.Rbuf.Pos + L3;
 							begin
 								W := Slim_To_Wide(Inbuf(I .. J));
 							exception
@@ -397,7 +433,7 @@ package body File is
 							end;
 							if W(1) = Wide_Ascii.LF then
 								-- Consume LF held in the internal read buffer.
-								File.Rbuf.First := J;
+								File.Rbuf.Pos := J;
 								-- Switch CR to LF (End-result: CR/LF to LF)
 								Buffer(Last) := Wide_Ascii.LF;
 							end if;
@@ -416,8 +452,6 @@ package body File is
 	                 Length: out    System_Length) is
 		pragma Assert (Is_Open(File));
 
-		Wbuf: File_Buffer renames File.Wbuf;
-
 		Inbuf: System_Byte_Array (Buffer'Range);
 		for Inbuf'Address use Buffer'Address;
 
@@ -427,16 +461,20 @@ package body File is
 		-- However, under a certain condition, it may not be able to 
 		-- process the input buffer in full.
 
-		if Wbuf.Length > 0 then
+		if not Is_Empty(File.Wbuf) then
 			-- Some residue data in the internal buffer.
 
-			if Inbuf'Length <= Wbuf.Data'Length - Wbuf.Length then
+			if Inbuf'Length <= File.Wbuf.Data'Last - File.Wbuf.Last then
 				-- Copy the input to the internal buffer to reduce OS calls
-				F := Wbuf.Data'First + Wbuf.Length - 1;
+
+				F := File.Wbuf.Last + 1;
 				L := F + Inbuf'Length - 1;
-				Wbuf.Data(F .. L) := Inbuf;
+				File.Wbuf.Data(F .. L) := Inbuf;
+				File.Wbuf.Last := L;
 				Flush (File);
 
+				-- The resulting length is the length  of input buffer given.
+				-- The residue in the internal write buffer is not counted.
 				Length := Inbuf'Length;
 				return;
 			end if;
@@ -448,7 +486,7 @@ package body File is
 		L := 0;
 		while L < Inbuf'Length loop
 			--begin
-				OS.File.Write (File.File, Inbuf, F);
+				OS.File.Write (File.File, Inbuf(Inbuf'First + L .. Inbuf'Last), F);
 			--exception
 			--	when OS.Would_Block_Exception =>
 			--		-- Cannot write the input in full.
@@ -469,47 +507,106 @@ package body File is
 	                      Length: out    System_Length) is
 		pragma Assert (Is_Open(File));
 
-		Wbuf: File_Buffer renames File.Wbuf;
-
 		Inbuf: System_Byte_Array (Buffer'Range);
 		for Inbuf'Address use Buffer'Address;
 
-		I, J, LF: System_Length;
-
+		L, I, LF: System_Length;
 	begin
 		-- This procedure attempts to write the input up to the last line
 		-- terminator. It buffers the remaining input after the terminator.
 		-- The input may not include any line terminators. 
 
-		LF := Wbuf.Data'First - 1;
+		LF := File.Wbuf.Data'First - 1;
 		I := Inbuf'First - 1;
+
 		while I < Inbuf'Last loop
-			I := I + 1;
-			J := Wbuf.Data'First + Wbuf.Length;
-			Wbuf.Data(J) := Inbuf(I);
-			Wbuf.Length := Wbuf.Length + 1;
-			if Wbuf.Data(J) = Slim_Ascii.Pos.LF then -- TODO: different line terminator
-				-- Remeber the index of the line terminator
-				LF := J;
-			end if;
-			
-			if Wbuf.Length >= Wbuf.Data'Length then
+			if File.Wbuf.Last >= File.Wbuf.Data'Last then
 				-- The internal write buffer is full.
 				Flush (File);
-				LF := Wbuf.Data'First - 1;
+				LF := File.Wbuf.Data'First - 1;
+			end if;
+
+			I := I + 1;
+			File.Wbuf.Last := File.Wbuf.Last + 1;
+			File.Wbuf.Data(File.Wbuf.Last) := Inbuf(I);
+			if File.Wbuf.Data(File.Wbuf.Last) = Slim_Ascii.Pos.LF then -- TODO: different line terminator
+				-- Remeber the index of the line terminator
+				LF := File.Wbuf.Last;
 			end if;
 		end loop;
 
 		-- The line terminator was found. Write up to the terminator.
 		-- Keep the rest in the internal buffer.
-		while LF in Wbuf.Data'First .. Wbuf.Length loop
-			OS.File.Write (File.File, Wbuf.Data(Wbuf.Data'First .. LF), J);
-			Shift_Buffer (Wbuf, J);
-			LF := LF - J;
-		end loop;
+		if LF in File.Wbuf.Data'Range then
+			while File.Wbuf.Pos < LF loop
+				OS.File.Write (File.File, File.Wbuf.Data(File.Wbuf.Pos + 1 .. LF), L);
+				File.Wbuf.Pos := File.Wbuf.Pos + L;
+			end loop;
+		end if;
+
+		if File.Wbuf.Pos >= File.Wbuf.Data'First then
+			Compact_Buffer (File.Wbuf);
+		end if;
 
 		Length := I - Inbuf'First + 1;
 	end Write_Line;
+
+	procedure Put_Line (File:   in out File_Record; 
+	                    Buffer: in     Slim_String;
+	                    Length: out    System_Length) is
+		pragma Assert (Is_Open(File));
+
+		Inbuf: System_Byte_Array (Buffer'Range);
+		for Inbuf'Address use Buffer'Address;
+
+		L, I, LF: System_Length;
+		X: System_Byte;
+		Injected: Standard.Boolean := Standard.False;
+
+	begin
+		LF := File.Wbuf.Data'First - 1;
+		I := Inbuf'First - 1;
+
+		while I < Inbuf'Last loop
+			if (File.Option.Bits and OPTION_CRLF) /= 0 and then 
+			   not Injected and then Inbuf(I + 1) = Slim_Ascii.Pos.LF then
+				X := Slim_Ascii.Pos.CR;
+				Injected := Standard.True;
+			else
+				I := I + 1;
+				X := Inbuf(I);
+				Injected := Standard.False;
+			end if;
+
+			if File.Wbuf.Last >= File.Wbuf.Data'Last then
+				-- The internal write buffer is full.
+				Flush (File);
+				LF := File.Wbuf.Data'First - 1;
+			end if;
+
+			File.Wbuf.Last := File.Wbuf.Last + 1;
+			File.Wbuf.Data(File.Wbuf.Last) := X;
+			if File.Wbuf.Data(File.Wbuf.Last) = Slim_Ascii.Pos.LF then -- TODO: different line terminator
+				-- Remeber the index of the line terminator
+				LF := File.Wbuf.Last;
+			end if;
+		end loop;
+
+		-- The line terminator was found. Write up to the terminator.
+		-- Keep the rest in the internal buffer.
+		if LF in File.Wbuf.Data'Range then
+			while File.Wbuf.Pos < LF loop
+				OS.File.Write (File.File, File.Wbuf.Data(File.Wbuf.Pos + 1 .. LF), L);
+				File.Wbuf.Pos := File.Wbuf.Pos + L;
+			end loop;
+		end if;
+
+		if File.Wbuf.Pos >= File.Wbuf.Data'First then
+			Compact_Buffer (File.Wbuf);
+		end if;
+
+		Length := I - Inbuf'First + 1;
+	end Put_Line;
 
 	--|-----------------------------------------------------------------------
 	--| WRITE WIDE STRING
@@ -519,8 +616,7 @@ package body File is
 	                 Length: out    System_Length) is
 		pragma Assert (Is_Open(File));
 
-		Wbuf: File_Buffer renames File.Wbuf;
-		F, L, I: System_Length;
+		L, I: System_Length;
 	begin
 		I := Buffer'First - 1;
 		while I < Buffer'Last loop
@@ -530,20 +626,18 @@ package body File is
 				Tmp2: System_Byte_Array(Tmp'Range);
 				for Tmp2'Address use Tmp'Address;
 			begin
-				F := Wbuf.Data'First + Wbuf.Length;
-				L := F + Tmp2'Length - 1;
+				L := File.Wbuf.Last + Tmp2'Length;
 
-				if L > Wbuf.Data'Last then
+				if L > File.Wbuf.Data'Last then
 					-- The multi-byte sequence for the current character
 					-- can't fit into the internal buffer. Flush the
 					-- buffer and attempt to fit it in.
 					Flush (File);
-					F := Wbuf.Data'First;
-					L := F + Tmp2'Length - 1;
+					L := File.Wbuf.Pos + Tmp2'Length;
 				end if;
 
-				Wbuf.Data(F..L) := Tmp2;
-				Wbuf.Length := Wbuf.Length + Tmp2'Length;
+				File.Wbuf.Data(File.Wbuf.Last + 1 .. L) := Tmp2;
+				File.Wbuf.Last := L;
 			end;
 		end loop;
 
@@ -556,56 +650,115 @@ package body File is
 	                      Length: out    System_Length) is
 		pragma Assert (Is_Open(File));
 
-		Wbuf: File_Buffer renames File.Wbuf;
-		F, L, I, LF: System_Length;
+		L, I, LF: System_Length;
 	begin
-		LF := Wbuf.Data'First - 1;
+
+		LF := File.Wbuf.Data'First - 1;
 		I := Buffer'First - 1;
 		while I < Buffer'Last loop
 			I := I + 1;
-
-			--if Buffer(I) = Wide_Ascii.LF then
-			--else
-			--end if;
 
 			declare
 				Tmp: Slim_String := Wide_To_Slim(Buffer(I..I));
 				Tmp2: System_Byte_Array(Tmp'Range);
 				for Tmp2'Address use Tmp'Address;
 			begin
-				F := Wbuf.Data'First + Wbuf.Length;
-				L := F + Tmp2'Length - 1;
+				L := File.Wbuf.Last + Tmp2'Length;
 
-				if L > Wbuf.Data'Last then
+				if L > File.Wbuf.Data'Last then
 					-- The multi-byte sequence for the current character
 					-- can't fit into the internal buffer. Flush the
 					-- buffer and attempt to fit it in.
 					Flush (File);
-					F := Wbuf.Data'First;
-					L := F + Tmp2'Length - 1;
-					LF := Wbuf.Data'First - 1;
-				end if;
 
-				Wbuf.Data(F..L) := Tmp2;
-				Wbuf.Length := Wbuf.Length + Tmp2'Length;
+					L := File.Wbuf.Pos + Tmp2'Length;
+					LF := File.Wbuf.Data'First - 1;
+				end if;
 
 				if Buffer(I) = Wide_Ascii.LF then -- TODO: different line terminator
 					LF := L;
 				end if;
+
+				File.Wbuf.Data(File.Wbuf.Last + 1 .. L) := Tmp2;
+				File.Wbuf.Last := L;
 			end;
 		end loop;
 
-		-- The line terminator was found. Write up to the terminator.
-		-- Keep the rest in the internal buffer.
-		while LF in Wbuf.Data'First .. Wbuf.Length loop
-			OS.File.Write (File.File, Wbuf.Data(Wbuf.Data'First .. LF), L);
-			Shift_Buffer (Wbuf, L);
-			LF := LF - L;
-		end loop;
+		if LF in File.Wbuf.Data'Range then
+			while File.Wbuf.Pos < LF loop
+				OS.File.Write (File.File, File.Wbuf.Data(File.Wbuf.Pos + 1 .. LF), L);
+				File.Wbuf.Pos := File.Wbuf.Pos + L;
+			end loop;
+		end if;
+
+		if File.Wbuf.Pos >= File.Wbuf.Data'First then
+			Compact_Buffer (File.Wbuf);
+		end if;
 
 		Length := I - Buffer'First + 1;
 	end Write_Line;
 
+	procedure Put_Line (File:   in out File_Record; 
+	                    Buffer: in     Wide_String;
+	                    Length: out    System_Length) is
+		pragma Assert (Is_Open(File));
+
+		F, L, I, LF: System_Length;
+		X: Wide_String(1..2) := (Wide_Ascii.CR, Wide_Ascii.LF);
+	begin
+
+		LF := File.Wbuf.Data'First - 1;
+		I := Buffer'First - 1;
+		while I < Buffer'Last loop
+			I := I + 1;
+
+			X(2) := Buffer(I);
+			if (File.Option.Bits and OPTION_CRLF) /= 0 and then
+			   Buffer(I) = Wide_Ascii.LF then
+				F := 1;
+			else
+				F := 2;
+			end if;
+
+			declare
+				Tmp: Slim_String := Wide_To_Slim(X(F..2));
+				Tmp2: System_Byte_Array(Tmp'Range);
+				for Tmp2'Address use Tmp'Address;
+			begin
+				L := File.Wbuf.Last + Tmp2'Length;
+
+				if L > File.Wbuf.Data'Last then
+					-- The multi-byte sequence for the current character
+					-- can't fit into the internal buffer. Flush the
+					-- buffer and attempt to fit it in.
+					Flush (File);
+
+					L := File.Wbuf.Pos + Tmp2'Length;
+					LF := File.Wbuf.Data'First - 1;
+				end if;
+
+				if Buffer(I) = Wide_Ascii.LF then 
+					LF := L;
+				end if;
+
+				File.Wbuf.Data(File.Wbuf.Last + 1 .. L) := Tmp2;
+				File.Wbuf.Last := L;
+			end;
+		end loop;
+
+		if LF in File.Wbuf.Data'Range then
+			while File.Wbuf.Pos < LF loop
+				OS.File.Write (File.File, File.Wbuf.Data(File.Wbuf.Pos + 1 .. LF), L);
+				File.Wbuf.Pos := File.Wbuf.Pos + L;
+			end loop;
+		end if;
+
+		if File.Wbuf.Pos >= File.Wbuf.Data'First then
+			Compact_Buffer (File.Wbuf);
+		end if;
+
+		Length := I - Buffer'First + 1;
+	end Put_Line;
 
 	--|-----------------------------------------------------------------------
 	--| FLUSH AND DRAIN
@@ -613,12 +766,11 @@ package body File is
 	procedure Flush (File: in out File_Record) is
 		pragma Assert (Is_Open(File));
 
-		Wbuf: File_Buffer renames File.Wbuf;
-		Length: System_Length;
+		L: System_Length;
 	begin
-		while Wbuf.Length > 0 loop
+		while not Is_Empty(File.Wbuf)  loop
 			--begin
-				OS.File.Write (File.File, Wbuf.Data(Wbuf.Data'First .. Wbuf.Length), Length);
+				OS.File.Write (File.File, File.Wbuf.Data(File.Wbuf.Pos + 1 .. File.Wbuf.Last), L);
 			--exception
 			--	when Would_Block_Exception =>
 			--		-- Flush must write all it can.
@@ -626,14 +778,16 @@ package body File is
 			--	when others => 
 			--		raise;
 			--end;
-			Shift_Buffer (Wbuf, Length);
+			File.Wbuf.Pos := File.Wbuf.Pos + L;
 		end loop;
+
+		Set_Length (File.Wbuf, 0);
 	end Flush;
 	                 
 	procedure Drain (File: in out File_Record) is
 		pragma Assert (Is_Open(File));
 	begin
-		File.Wbuf.Length := 0;
+		Set_Length (File.Wbuf, 0);
 	end Drain;
 
 end File;

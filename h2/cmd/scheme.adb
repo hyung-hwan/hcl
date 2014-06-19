@@ -86,6 +86,7 @@ declare
 	Buffer: H2.Slim.String (1 .. 200);
 	BufferW: H2.Wide.String (1 .. 27);
 	IL, OL: H2.System_Length;
+	Option: File.Option_Record;
 begin
 	--File.Open (F, H2.Slim.String'("/etc/passwd"), FL);
 	--File.Read (F, Buffer, Length);
@@ -111,16 +112,18 @@ ada.text_io.put_line ("------------------");
 	File.Set_Flag_Bits (FL, File.FLAG_CREATE);
 	File.Set_Flag_Bits (FL, File.FLAG_TRUNCATE);
 	File.Open (F2, H2.Wide.String'("/tmp/yyy"), FL);
+	File.Set_Option_Bits (Option, File.Option_CRLF);
+	File.Set_Option (F2, Option);
 
 	loop
 
-		File.Get_Line (F, BufferW, IL);
+		File.Get_Line (F, Buffer, IL);
 
-ada.wide_text_io.put_line (standard.wide_string(bufferw(1..il)));
+--ada.wide_text_io.put_line (standard.wide_string(bufferw(1..il)));
 		--File.Read (F, BufferW, IL);
 		exit when IL <= 0;
 
-		File.Write_Line (F2, BufferW(BufferW'First .. BufferW'First + IL - 1), OL);
+		File.Put_Line (F2, Buffer(Buffer'First .. Buffer'First + IL - 1), OL);
 		pragma Assert (IL = OL);
 
 		--Ada.Text_IO.PUt (Standard.String(Buffer(Buffer'First .. Buffer'First + IL - 1)));

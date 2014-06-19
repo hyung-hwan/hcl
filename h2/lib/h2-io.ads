@@ -34,6 +34,14 @@ package H2.IO is
 		FLAG_SYNC:       constant Flag_Bits := OS.File.FLAG_SYNC;
 		FLAG_NOFOLLOW:   constant Flag_Bits := OS.File.FLAG_NOFOLLOW;
 
+		type Option_Bits is new System_Word;
+		type Option_Record is record
+			Bits: Option_Bits := 0;
+		end record;
+
+		-- Convert LF to CR/LF in Put_Line
+		OPTION_CRLF: constant Option_Bits := 2#0000_0000_0000_0001#;
+
 		type File_Buffer is private;
 		type File_Record is limited private;
 			
@@ -43,6 +51,12 @@ package H2.IO is
 		procedure Clear_Flag_Bits (Flag: in out Flag_Record;
 		                           Bits: in     Flag_Bits) renames OS.File.Clear_Flag_Bits;
 
+		procedure Set_Option_Bits (Option: in out Option_Record;
+		                            Bits:   in     Option_Bits);
+
+		procedure Clear_Option_Bits (Option: in out Option_Record;
+		                             Bits:   in     Option_Bits);
+	
 		function Is_Open (File: in File_Record) return Standard.Boolean;
 		pragma Inline (Is_Open);
 
@@ -56,8 +70,11 @@ package H2.IO is
 		                Flag: in     Flag_Record;
 		                Pool: in     Storage_Pool_Pointer := null);
 
-
 		procedure Close (File: in out File_Record);
+
+		procedure Set_Option (File: in out File_Record; Option: in Option_Record);
+
+		function Get_Option (File: in File_Record) return Option_Record;
 
 		-- The Read procedure reads as many characters as the buffer 
 		-- can hold with a single system call at most.
@@ -102,6 +119,11 @@ package H2.IO is
 		                      Buffer: in     Slim_String;
 		                      Length: out    System_Length);
 
+		procedure Put_Line (File:   in out File_Record;
+		                    Buffer: in     Slim_String;
+		                    Length: out    System_Length);
+
+
 		procedure Write (File:   in out File_Record;
 		                 Buffer: in     Wide_String;
 		                 Length: out    System_Length);
@@ -109,6 +131,10 @@ package H2.IO is
 		procedure Write_Line (File:   in out File_Record;
 		                      Buffer: in     Wide_String;
 		                      Length: out    System_Length);
+
+		procedure Put_Line (File:   in out File_Record;
+		                    Buffer: in     Wide_String;
+		                    Length: out    System_Length);
 
 		procedure Flush (File: in out File_Record);
 		procedure Drain (File: in out File_Record);
@@ -123,8 +149,7 @@ package H2.IO is
 			-- The Data array size must be as large as the longest 
 			-- multi-byte sequence for a single wide character.
 			Data: System_Byte_Array (1 .. 2048); 
-			Length: System_Length := 0;
-			First: System_Length := 0;
+			Pos: System_Length := 0;
 			Last: System_Length := 0;
 		end record;
 
@@ -133,6 +158,7 @@ package H2.IO is
 			Rbuf: File_Buffer;
 			Wbuf: File_Buffer;
 			EOF: Standard.Boolean := false;
+			Option: Option_Record;
 		end record;
 
 	end File;
