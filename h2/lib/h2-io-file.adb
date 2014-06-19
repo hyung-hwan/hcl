@@ -18,14 +18,6 @@ package body File is
 		File.EOF := (Length <= 0);
 	end OS_Read_File;
 
-	--procedure Shift_Buffer (Buffer: in out File_Buffer;
-	--                        Length: in     System_Length) is
-	--	pragma Inline (Shift_Buffer);
-	--begin
-	--	Buffer.Length := Buffer.Length - Length;
-	--	Buffer.Data(Buffer.Data'First .. Buffer.Data'First + Buffer.Length - 1) := Buffer.Data(Buffer.Data'First + Length .. Buffer.Data'First + Length + Buffer.Length - 1);
-	--end Shift_Buffer;
-
 	procedure Compact_Buffer (Buffer: in out File_Buffer) is
 		A, B, L: System_Length;
 	begin
