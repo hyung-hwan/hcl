@@ -121,9 +121,9 @@ package body Bigint is
 			V := W rem Object_Word(Radix);
 			
 			if V in 0 .. 9 then
-				Buffer(Buffer'First + Len) := Object_Character'Val(Object_Character'Pos(Ch.Zero) + V);
+				Buffer(Buffer'First + Len) := Object_Character'Val(Object_Character'Pos(Ch_Val.Zero) + V);
 			else
-				Buffer(Buffer'First + Len) := Object_Character'Val(Object_Character'Pos(Ch.UC_A) + V - 10);
+				Buffer(Buffer'First + Len) := Object_Character'Val(Object_Character'Pos(Ch_Val.UC_A) + V - 10);
 			end if;
 			Len := Len + 1;
 			
@@ -1009,7 +1009,7 @@ package body Bigint is
 				Convert_Word_To_Text (W, Radix, Buf, Len);
 				if Sign = Negative_Sign then
 					Len := Len + 1;
-					Buf(Len) := Ch.Minus_Sign;
+					Buf(Len) := Ch_Val.Minus_Sign;
 				end if;
 				return Make_String(Interp, Source => Buf(1 .. Len), Invert => Standard.True);
 			end;
@@ -1102,7 +1102,7 @@ package body Bigint is
 				--for I in Seglen + 1 .. Block_Divisors(Radix).Length loop
 				for I in Seglen + 1 .. BD.Length loop
 					Totlen := Totlen + 1;
-					Buf(Totlen) := Object_Character'Val(Object_Character'Pos(Ch.Zero));
+					Buf(Totlen) := Object_Character'Val(Object_Character'Pos(Ch_Val.Zero));
 				end loop;
 			end loop;
 
@@ -1110,7 +1110,7 @@ package body Bigint is
 			
 			if Sign = Negative_Sign then
 				Totlen := Totlen + 1;
-				Buf(Totlen) := Ch.Minus_Sign;
+				Buf(Totlen) := Ch_Val.Minus_Sign;
 			end if;
 			
 			Z := Make_String(Interp.Self, Source => Buf(1 .. Totlen), Invert => Standard.True);
@@ -1142,14 +1142,14 @@ package body Bigint is
 		begin
 			Pos := Object_Character'Pos(C);
 			case Pos is
-				when Ch.Pos.Zero .. Ch.Pos.Nine =>
-					Pos := Pos - Ch.Pos.Zero;
+				when Ch_Code.Zero .. Ch_Code.Nine =>
+					Pos := Pos - Ch_Code.Zero;
 
-				when Ch.Pos.LC_A .. Ch.Pos.LC_Z =>
-					Pos := Pos - Ch.Pos.LC_A + 10;
+				when Ch_Code.LC_A .. Ch_Code.LC_Z =>
+					Pos := Pos - Ch_Code.LC_A + 10;
 
-				when Ch.Pos.UC_A .. Ch.Pos.UC_Z =>
-					Pos := Pos - Ch.Pos.UC_A + 10;
+				when Ch_Code.UC_A .. Ch_Code.UC_Z =>
+					Pos := Pos - Ch_Code.UC_A + 10;
 
 				when others =>
 					Pos := -1;
@@ -1173,9 +1173,9 @@ package body Bigint is
 		Sign := Positive_Sign;
 		Idx := X'First;
 		if Idx <= X'Last then
-			if X(Idx) = Ch.Plus_Sign then
+			if X(Idx) = Ch_Val.Plus_Sign then
 				Idx := Idx + 1;
-			elsif X(Idx) = Ch.Minus_Sign then
+			elsif X(Idx) = Ch_Val.Minus_Sign then
 				Idx := Idx + 1;
 				Sign := Negative_Sign;
 			end if;
@@ -1190,7 +1190,7 @@ package body Bigint is
 		
 		-- Find the first non-zero digit
 		while Idx <= X'Last loop
-			exit when X(Idx) /= Ch.Zero;
+			exit when X(Idx) /= Ch_Val.Zero;
 			Idx := Idx + 1;
 		end loop;
 		if Idx > X'Last then

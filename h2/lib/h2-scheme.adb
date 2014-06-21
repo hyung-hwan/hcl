@@ -60,64 +60,64 @@ package body H2.Scheme is
 	-- Why doesn't ada include a formal type support for different character
 	-- and string types? This limitation is caused because the generic
 	-- type I chosed to use to represent a character type is a discrete type.
-	Label_And:        constant Object_Character_Array := (Ch.LC_A, Ch.LC_N, Ch.LC_D); -- "and"
-	Label_Begin:      constant Object_Character_Array := (Ch.LC_B, Ch.LC_E, Ch.LC_G, Ch.LC_I, Ch.LC_N); -- "begin"
-	Label_Case:       constant Object_Character_Array := (Ch.LC_C, Ch.LC_A, Ch.LC_S, Ch.LC_E); -- "case"
-	Label_Cond:       constant Object_Character_Array := (Ch.LC_C, Ch.LC_O, Ch.LC_N, Ch.LC_D); -- "cond"
-	Label_Define:     constant Object_Character_Array := (Ch.LC_D, Ch.LC_E, Ch.LC_F, Ch.LC_I, Ch.LC_N, Ch.LC_E); -- "define"
-	Label_Do:         constant Object_Character_Array := (Ch.LC_D, Ch.LC_O); -- "do"
-	Label_If:         constant Object_Character_Array := (Ch.LC_I, Ch.LC_F); -- "if"
-	Label_Lambda:     constant Object_Character_Array := (Ch.LC_L, Ch.LC_A, Ch.LC_M, Ch.LC_B, Ch.LC_D, Ch.LC_A); -- "lambda"
-	Label_Let:        constant Object_Character_Array := (Ch.LC_L, Ch.LC_E, Ch.LC_T); -- "let"
-	Label_Letast:     constant Object_Character_Array := (Ch.LC_L, Ch.LC_E, Ch.LC_T, Ch.Asterisk); -- "let*"
-	Label_Letrec:     constant Object_Character_Array := (Ch.LC_L, Ch.LC_E, Ch.LC_T, Ch.LC_R, Ch.LC_E, Ch.LC_C); -- "letrec"
-	Label_Or:         constant Object_Character_Array := (Ch.LC_O, Ch.LC_R); -- "or"
-	Label_Quasiquote: constant Object_Character_Array := (Ch.LC_Q, Ch.LC_U, Ch.LC_A, Ch.LC_S, Ch.LC_I,
-	                                                      Ch.LC_Q, Ch.LC_U, Ch.LC_O, Ch.LC_T, Ch.LC_E); -- "quasiquote"
-	Label_Quote:      constant Object_Character_Array := (Ch.LC_Q, Ch.LC_U, Ch.LC_O, Ch.LC_T, Ch.LC_E); -- "quote"
-	Label_Set:        constant Object_Character_Array := (Ch.LC_S, Ch.LC_E, Ch.LC_T, Ch.Exclamation); -- "set!"
+	Label_And:        constant Object_Character_Array := (Ch_Val.LC_A, Ch_Val.LC_N, Ch_Val.LC_D); -- "and"
+	Label_Begin:      constant Object_Character_Array := (Ch_Val.LC_B, Ch_Val.LC_E, Ch_Val.LC_G, Ch_Val.LC_I, Ch_Val.LC_N); -- "begin"
+	Label_Case:       constant Object_Character_Array := (Ch_Val.LC_C, Ch_Val.LC_A, Ch_Val.LC_S, Ch_Val.LC_E); -- "case"
+	Label_Cond:       constant Object_Character_Array := (Ch_Val.LC_C, Ch_Val.LC_O, Ch_Val.LC_N, Ch_Val.LC_D); -- "cond"
+	Label_Define:     constant Object_Character_Array := (Ch_Val.LC_D, Ch_Val.LC_E, Ch_Val.LC_F, Ch_Val.LC_I, Ch_Val.LC_N, Ch_Val.LC_E); -- "define"
+	Label_Do:         constant Object_Character_Array := (Ch_Val.LC_D, Ch_Val.LC_O); -- "do"
+	Label_If:         constant Object_Character_Array := (Ch_Val.LC_I, Ch_Val.LC_F); -- "if"
+	Label_Lambda:     constant Object_Character_Array := (Ch_Val.LC_L, Ch_Val.LC_A, Ch_Val.LC_M, Ch_Val.LC_B, Ch_Val.LC_D, Ch_Val.LC_A); -- "lambda"
+	Label_Let:        constant Object_Character_Array := (Ch_Val.LC_L, Ch_Val.LC_E, Ch_Val.LC_T); -- "let"
+	Label_Letast:     constant Object_Character_Array := (Ch_Val.LC_L, Ch_Val.LC_E, Ch_Val.LC_T, Ch_Val.Asterisk); -- "let*"
+	Label_Letrec:     constant Object_Character_Array := (Ch_Val.LC_L, Ch_Val.LC_E, Ch_Val.LC_T, Ch_Val.LC_R, Ch_Val.LC_E, Ch_Val.LC_C); -- "letrec"
+	Label_Or:         constant Object_Character_Array := (Ch_Val.LC_O, Ch_Val.LC_R); -- "or"
+	Label_Quasiquote: constant Object_Character_Array := (Ch_Val.LC_Q, Ch_Val.LC_U, Ch_Val.LC_A, Ch_Val.LC_S, Ch_Val.LC_I,
+	                                                      Ch_Val.LC_Q, Ch_Val.LC_U, Ch_Val.LC_O, Ch_Val.LC_T, Ch_Val.LC_E); -- "quasiquote"
+	Label_Quote:      constant Object_Character_Array := (Ch_Val.LC_Q, Ch_Val.LC_U, Ch_Val.LC_O, Ch_Val.LC_T, Ch_Val.LC_E); -- "quote"
+	Label_Set:        constant Object_Character_Array := (Ch_Val.LC_S, Ch_Val.LC_E, Ch_Val.LC_T, Ch_Val.Exclamation); -- "set!"
 
 
-	Label_Callcc:     constant Object_Character_Array := (Ch.LC_C, Ch.LC_A, Ch.LC_L, Ch.LC_L, Ch.Minus_Sign,
-	                                                      Ch.LC_W, Ch.LC_I, Ch.LC_T, Ch.LC_H, Ch.Minus_Sign,
-	                                                      Ch.LC_C, Ch.LC_U, Ch.LC_R, Ch.LC_R, Ch.LC_E, Ch.LC_N, Ch.LC_T, Ch.Minus_Sign,
-	                                                      Ch.LC_C, Ch.LC_O, Ch.LC_N, Ch.LC_T, Ch.LC_I, Ch.LC_N, Ch.LC_U, Ch.LC_A,
-	                                                      Ch.LC_T, Ch.LC_I, Ch.LC_O, Ch.LC_N);  -- "call-with-current-continuation"
-	Label_Car:        constant Object_Character_Array := (Ch.LC_C, Ch.LC_A, Ch.LC_R); -- "car"
-	Label_Cdr:        constant Object_Character_Array := (Ch.LC_C, Ch.LC_D, Ch.LC_R); -- "cdr"
-	Label_Cons:       constant Object_Character_Array := (Ch.LC_C, Ch.LC_O, Ch.LC_N, Ch.LC_S); -- "cons"
-	Label_Not:        constant Object_Character_Array := (Ch.LC_N, Ch.LC_O, Ch.LC_T); -- "not"
+	Label_Callcc:     constant Object_Character_Array := (Ch_Val.LC_C, Ch_Val.LC_A, Ch_Val.LC_L, Ch_Val.LC_L, Ch_Val.Minus_Sign,
+	                                                      Ch_Val.LC_W, Ch_Val.LC_I, Ch_Val.LC_T, Ch_Val.LC_H, Ch_Val.Minus_Sign,
+	                                                      Ch_Val.LC_C, Ch_Val.LC_U, Ch_Val.LC_R, Ch_Val.LC_R, Ch_Val.LC_E, Ch_Val.LC_N, Ch_Val.LC_T, Ch_Val.Minus_Sign,
+	                                                      Ch_Val.LC_C, Ch_Val.LC_O, Ch_Val.LC_N, Ch_Val.LC_T, Ch_Val.LC_I, Ch_Val.LC_N, Ch_Val.LC_U, Ch_Val.LC_A,
+	                                                      Ch_Val.LC_T, Ch_Val.LC_I, Ch_Val.LC_O, Ch_Val.LC_N);  -- "call-with-current-continuation"
+	Label_Car:        constant Object_Character_Array := (Ch_Val.LC_C, Ch_Val.LC_A, Ch_Val.LC_R); -- "car"
+	Label_Cdr:        constant Object_Character_Array := (Ch_Val.LC_C, Ch_Val.LC_D, Ch_Val.LC_R); -- "cdr"
+	Label_Cons:       constant Object_Character_Array := (Ch_Val.LC_C, Ch_Val.LC_O, Ch_Val.LC_N, Ch_Val.LC_S); -- "cons"
+	Label_Not:        constant Object_Character_Array := (Ch_Val.LC_N, Ch_Val.LC_O, Ch_Val.LC_T); -- "not"
 
-	Label_N_Add:       constant Object_Character_Array := (1 => Ch.Plus_Sign); -- "+"
-	Label_N_EQ:        constant Object_Character_Array := (1 => Ch.Equal_Sign); -- "="
-	Label_N_GE:        constant Object_Character_Array := (Ch.Greater_Than_Sign, Ch.Equal_Sign); -- ">="
-	Label_N_GT:        constant Object_Character_Array := (1 => Ch.Greater_Than_Sign); -- ">"
-	Label_N_LE:        constant Object_Character_Array := (Ch.Less_Than_Sign, Ch.Equal_Sign); -- "<="
-	Label_N_LT:        constant Object_Character_Array := (1 => Ch.Less_Than_Sign); -- "<"
-	Label_N_Multiply:  constant Object_Character_Array := (1 => Ch.Asterisk); -- "*"
-	Label_N_Quotient:  constant Object_Character_Array := (Ch.LC_Q, Ch.LC_U, Ch.LC_O, Ch.LC_T, Ch.LC_I, Ch.LC_E, Ch.LC_N, Ch.LC_T); -- "quotient"
-	Label_N_Remainder: constant Object_Character_Array := (Ch.LC_R, Ch.LC_E, Ch.LC_M, Ch.LC_A, Ch.LC_I, Ch.LC_N, Ch.LC_D, Ch.LC_E, Ch.LC_R); -- "remainder"
-	Label_N_Subtract:  constant Object_Character_Array := (1 => Ch.Minus_Sign); -- "-"
+	Label_N_Add:       constant Object_Character_Array := (1 => Ch_Val.Plus_Sign); -- "+"
+	Label_N_EQ:        constant Object_Character_Array := (1 => Ch_Val.Equal_Sign); -- "="
+	Label_N_GE:        constant Object_Character_Array := (Ch_Val.Greater_Than_Sign, Ch_Val.Equal_Sign); -- ">="
+	Label_N_GT:        constant Object_Character_Array := (1 => Ch_Val.Greater_Than_Sign); -- ">"
+	Label_N_LE:        constant Object_Character_Array := (Ch_Val.Less_Than_Sign, Ch_Val.Equal_Sign); -- "<="
+	Label_N_LT:        constant Object_Character_Array := (1 => Ch_Val.Less_Than_Sign); -- "<"
+	Label_N_Multiply:  constant Object_Character_Array := (1 => Ch_Val.Asterisk); -- "*"
+	Label_N_Quotient:  constant Object_Character_Array := (Ch_Val.LC_Q, Ch_Val.LC_U, Ch_Val.LC_O, Ch_Val.LC_T, Ch_Val.LC_I, Ch_Val.LC_E, Ch_Val.LC_N, Ch_Val.LC_T); -- "quotient"
+	Label_N_Remainder: constant Object_Character_Array := (Ch_Val.LC_R, Ch_Val.LC_E, Ch_Val.LC_M, Ch_Val.LC_A, Ch_Val.LC_I, Ch_Val.LC_N, Ch_Val.LC_D, Ch_Val.LC_E, Ch_Val.LC_R); -- "remainder"
+	Label_N_Subtract:  constant Object_Character_Array := (1 => Ch_Val.Minus_Sign); -- "-"
 
-	Label_Q_Boolean:   constant Object_Character_Array := (Ch.LC_B, Ch.LC_O, Ch.LC_O, Ch.LC_L, Ch.LC_E, Ch.LC_A, Ch.LC_N, Ch.Question); -- "boolean?"
-	Label_Q_Eq:        constant Object_Character_Array := (Ch.LC_E, Ch.LC_Q, Ch.Question); -- "eq?"
-	Label_Q_Eqv:       constant Object_Character_Array := (Ch.LC_E, Ch.LC_Q, Ch.LC_V, Ch.Question); -- "eqv?"
-	Label_Q_Null:      constant Object_Character_Array := (Ch.LC_N, Ch.LC_U, Ch.LC_L, Ch.LC_L, Ch.Question); -- "null?"
-	Label_Q_Number:    constant Object_Character_Array := (Ch.LC_N, Ch.LC_U, Ch.LC_M, Ch.LC_B, Ch.LC_E, Ch.LC_R, Ch.Question); -- "number?"
-	Label_Q_Pair:      constant Object_Character_Array := (Ch.LC_P, Ch.LC_A, Ch.LC_I, Ch.LC_R, Ch.Question); -- "pair?"
-	Label_Q_Procedure: constant Object_Character_Array := (Ch.LC_P, Ch.LC_R, Ch.LC_O, Ch.LC_C, Ch.LC_E, Ch.LC_D, Ch.LC_U, Ch.LC_R, Ch.LC_E, Ch.Question); -- "procedure?"
-	Label_Q_String:    constant Object_Character_Array := (Ch.LC_S, Ch.LC_T, Ch.LC_R, Ch.LC_I, Ch.LC_N, Ch.LC_G, Ch.Question); -- "string?"
-	Label_Q_String_EQ: constant Object_Character_Array := (Ch.LC_S, Ch.LC_T, Ch.LC_R, Ch.LC_I, Ch.LC_N, Ch.LC_G, Ch.Equal_Sign, Ch.Question); -- "string=?"
-	Label_Q_Symbol:    constant Object_Character_Array := (Ch.LC_S, Ch.LC_Y, Ch.LC_M, Ch.LC_B, Ch.LC_O, Ch.LC_L, Ch.Question); -- "symbol?"
+	Label_Q_Boolean:   constant Object_Character_Array := (Ch_Val.LC_B, Ch_Val.LC_O, Ch_Val.LC_O, Ch_Val.LC_L, Ch_Val.LC_E, Ch_Val.LC_A, Ch_Val.LC_N, Ch_Val.Question); -- "boolean?"
+	Label_Q_Eq:        constant Object_Character_Array := (Ch_Val.LC_E, Ch_Val.LC_Q, Ch_Val.Question); -- "eq?"
+	Label_Q_Eqv:       constant Object_Character_Array := (Ch_Val.LC_E, Ch_Val.LC_Q, Ch_Val.LC_V, Ch_Val.Question); -- "eqv?"
+	Label_Q_Null:      constant Object_Character_Array := (Ch_Val.LC_N, Ch_Val.LC_U, Ch_Val.LC_L, Ch_Val.LC_L, Ch_Val.Question); -- "null?"
+	Label_Q_Number:    constant Object_Character_Array := (Ch_Val.LC_N, Ch_Val.LC_U, Ch_Val.LC_M, Ch_Val.LC_B, Ch_Val.LC_E, Ch_Val.LC_R, Ch_Val.Question); -- "number?"
+	Label_Q_Pair:      constant Object_Character_Array := (Ch_Val.LC_P, Ch_Val.LC_A, Ch_Val.LC_I, Ch_Val.LC_R, Ch_Val.Question); -- "pair?"
+	Label_Q_Procedure: constant Object_Character_Array := (Ch_Val.LC_P, Ch_Val.LC_R, Ch_Val.LC_O, Ch_Val.LC_C, Ch_Val.LC_E, Ch_Val.LC_D, Ch_Val.LC_U, Ch_Val.LC_R, Ch_Val.LC_E, Ch_Val.Question); -- "procedure?"
+	Label_Q_String:    constant Object_Character_Array := (Ch_Val.LC_S, Ch_Val.LC_T, Ch_Val.LC_R, Ch_Val.LC_I, Ch_Val.LC_N, Ch_Val.LC_G, Ch_Val.Question); -- "string?"
+	Label_Q_String_EQ: constant Object_Character_Array := (Ch_Val.LC_S, Ch_Val.LC_T, Ch_Val.LC_R, Ch_Val.LC_I, Ch_Val.LC_N, Ch_Val.LC_G, Ch_Val.Equal_Sign, Ch_Val.Question); -- "string=?"
+	Label_Q_Symbol:    constant Object_Character_Array := (Ch_Val.LC_S, Ch_Val.LC_Y, Ch_Val.LC_M, Ch_Val.LC_B, Ch_Val.LC_O, Ch_Val.LC_L, Ch_Val.Question); -- "symbol?"
 
-	Label_Setcar:      constant Object_Character_Array := (Ch.LC_S, Ch.LC_E, Ch.LC_T, Ch.Minus_Sign, Ch.LC_C, Ch.LC_A, Ch.LC_R, Ch.Exclamation); -- "set-car!"
-	Label_Setcdr:      constant Object_Character_Array := (Ch.LC_S, Ch.LC_E, Ch.LC_T, Ch.Minus_Sign, Ch.LC_C, Ch.LC_D, Ch.LC_R, Ch.Exclamation); -- "set-cdr!"
+	Label_Setcar:      constant Object_Character_Array := (Ch_Val.LC_S, Ch_Val.LC_E, Ch_Val.LC_T, Ch_Val.Minus_Sign, Ch_Val.LC_C, Ch_Val.LC_A, Ch_Val.LC_R, Ch_Val.Exclamation); -- "set-car!"
+	Label_Setcdr:      constant Object_Character_Array := (Ch_Val.LC_S, Ch_Val.LC_E, Ch_Val.LC_T, Ch_Val.Minus_Sign, Ch_Val.LC_C, Ch_Val.LC_D, Ch_Val.LC_R, Ch_Val.Exclamation); -- "set-cdr!"
 
-	Label_Newline:    constant Object_Character_Array := (Ch.LC_N, Ch.LC_E, Ch.LC_W, Ch.LC_L, Ch.LC_I, Ch.LC_N, Ch.LC_E); -- "newline"
-	Label_Space:      constant Object_Character_Array := (Ch.LC_S, Ch.LC_P, Ch.LC_A, Ch.LC_C, Ch.LC_E); -- "space"
+	Label_Newline:    constant Object_Character_Array := (Ch_Val.LC_N, Ch_Val.LC_E, Ch_Val.LC_W, Ch_Val.LC_L, Ch_Val.LC_I, Ch_Val.LC_N, Ch_Val.LC_E); -- "newline"
+	Label_Space:      constant Object_Character_Array := (Ch_Val.LC_S, Ch_Val.LC_P, Ch_Val.LC_A, Ch_Val.LC_C, Ch_Val.LC_E); -- "space"
 
-	Label_Arrow:      constant Object_Character_Array := (Ch.Equal_Sign, Ch.Greater_Than_Sign); -- "=>"
-	Label_Else:       constant Object_Character_Array := (Ch.LC_E, Ch.LC_L, Ch.LC_S, Ch.LC_E); -- "else"
+	Label_Arrow:      constant Object_Character_Array := (Ch_Val.Equal_Sign, Ch_Val.Greater_Than_Sign); -- "=>"
+	Label_Else:       constant Object_Character_Array := (Ch_Val.LC_E, Ch_Val.LC_L, Ch_Val.LC_S, Ch_Val.LC_E); -- "else"
 
 	-----------------------------------------------------------------------------
 	-- INTERNAL EXCEPTIONS
@@ -393,14 +393,14 @@ package body H2.Scheme is
 		pragma Assert (Source'Length > 0);
 
 		First := Source'First;
-		if Source(First) = Ch.Minus_Sign then
+		if Source(First) = Ch_Val.Minus_Sign then
 			First := First + 1;
 			Negative := Standard.True;
-		elsif Source(First) = Ch.Plus_Sign then
+		elsif Source(First) = Ch_Val.Plus_Sign then
 			First := First + 1;
 		end if;
 		for I in First .. Source'Last loop
-			V := V * 10 + Object_Character'Pos(Source(I)) - Object_Character'Pos(Ch.Zero);
+			V := V * 10 + Object_Character'Pos(Source(I)) - Object_Character'Pos(Ch_Val.Zero);
 		end loop;
 
 		if Negative then
@@ -1071,8 +1071,8 @@ end if;
 			Tag => Unknown_Object,
 			Scode => Syntax_Code'Val(0),
 			Sign => Positive_Sign,
-			Character_Slot => (others => Ch.NUL),
-			Character_Terminator => Ch.NUL
+			Character_Slot => (others => Ch_Val.NUL),
+			Character_Terminator => Ch_Val.NUL
 		);
 
 		return Result;

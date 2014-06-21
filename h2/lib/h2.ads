@@ -25,11 +25,7 @@ package H2 is
 		access all System.Storage_Pools.Root_Storage_Pool'Class;
 
 	type System_Byte_Array is array(System_Index range<>) of System_Byte;
-	
-	
-	
 
-	
-	
-	
+
+	--package Chpos renames H2.Ascii.Code;
 end H2;

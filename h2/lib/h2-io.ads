@@ -13,11 +13,7 @@ generic
 package H2.IO is
 
 	package OS is new H2.OS (Slim_Character, Wide_Character, Slim_String, Wide_String, Slim_To_Wide, Wide_To_Slim);
-	package Slim_Ascii is new H2.Ascii (Slim_Character);
-	package Wide_Ascii is new H2.Ascii (Wide_Character);
-
-	function Get_Line_Terminator return Slim_String;
-	--function Get_Line_Terminator return Wide_String;
+	package Ascii is new H2.Ascii (Slim_Character, Wide_Character);
 
 	package File is
 
@@ -37,10 +33,13 @@ package H2.IO is
 		type Option_Bits is new System_Word;
 		type Option_Record is record
 			Bits: Option_Bits := 0;
+			LF: System_Byte := Ascii.Code.LF;
+			CR: System_Byte := Ascii.Code.CR;
 		end record;
 
 		-- Convert LF to CR/LF in Put_Line
-		OPTION_CRLF: constant Option_Bits := 2#0000_0000_0000_0001#;
+		OPTION_CRLF_IN:  constant Option_Bits := 2#0000_0000_0000_0001#;
+		OPTION_CRLF_OUT: constant Option_Bits := 2#0000_0000_0000_0010#;
 
 		type File_Buffer is private;
 		type File_Record is limited private;
@@ -52,7 +51,7 @@ package H2.IO is
 		                           Bits: in     Flag_Bits) renames OS.File.Clear_Flag_Bits;
 
 		procedure Set_Option_Bits (Option: in out Option_Record;
-		                            Bits:   in     Option_Bits);
+		                           Bits:   in     Option_Bits);
 
 		procedure Clear_Option_Bits (Option: in out Option_Record;
 		                             Bits:   in     Option_Bits);
@@ -155,10 +154,10 @@ package H2.IO is
 
 		type File_Record is limited record
 			File: OS.File.File_Pointer := null;
+			Option: Option_Record;
 			Rbuf: File_Buffer;
 			Wbuf: File_Buffer;
 			EOF: Standard.Boolean := false;
-			Option: Option_Record;
 		end record;
 
 	end File;

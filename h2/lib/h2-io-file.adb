@@ -4,9 +4,6 @@ separate (H2.IO)
 
 package body File is
 
-	package Slim_Ascii renames IO.Slim_Ascii;
-	package Wide_Ascii renames IO.Wide_Ascii;
-
 	--|-----------------------------------------------------------------------
 	--| PRIVATE ROUTINES
 	--|-----------------------------------------------------------------------
@@ -52,13 +49,8 @@ package body File is
 		Buf.Last := Buf.Pos + Length;
 	end Set_Length;
 
-
-	Slim_Line_Terminator: Slim_String := Get_Line_Terminator;
-	--Wide_Line_Terminator: Wide_String := Get_Line_Terminator;
-
-
 	procedure Set_Option_Bits (Option: in out Option_Record;
-	                            Bits:   in     Option_Bits) is
+                                Bits:   in     Option_Bits) is
 	begin
 		Option.Bits := Option.Bits or Bits;
 	end Set_Option_Bits;
@@ -69,6 +61,11 @@ package body File is
 		Option.Bits := Option.Bits and not Bits;
 	end Clear_Option_Bits;
 
+	
+	-- This function is platform dependent. It is placed separately in a 
+	-- platform specific directory.
+	function Get_Default_Option return Option_Record is separate;
+	
 	--|-----------------------------------------------------------------------
 	--| OPEN AND CLOSE
 	--|-----------------------------------------------------------------------
@@ -88,9 +85,8 @@ package body File is
 		Set_Length (File.Rbuf, 0);
 		Set_Length (File.Wbuf, 0);
 
+		File.Option := Get_Default_Option;
 		File.EOF := Standard.False;
-		--File.Slim_Line_Break := Get_Line_Terminator;
-		--File.Wide_Line_Break := Get_Line_Terminator;
 	end Open;
 
 	procedure Open (File: in out File_Record;
@@ -104,9 +100,8 @@ package body File is
 		Set_Length (File.Rbuf, 0);
 		Set_Length (File.Wbuf, 0);
 
+		File.Option := Get_Default_Option;
 		File.EOF := Standard.False;
-		--File.Slim_Line_Break := Get_Line_Terminator;
-		--File.Wide_Line_Break := Get_Line_Terminator;
 	end Open;
 
 	procedure Close (File: in out File_Record) is
@@ -119,6 +114,11 @@ package body File is
 
 	procedure Set_Option (File: in out File_Record; Option: in Option_Record) is
 	begin
+		if Slim_Character'Val(Option.LF) = Slim_Character'First or else
+		   Wide_Character'Val(Option.LF) = Wide_Character'First then
+			raise Constraint_Error; -- TODO: different exception name
+		end if;
+
 		File.Option := Option;
 	end Set_Option;
 
@@ -256,7 +256,7 @@ package body File is
 				K := K + 1;
 				File.Rbuf.Pos := File.Rbuf.Pos + 1;
 				Outbuf(K) := File.Rbuf.Data(File.Rbuf.Pos);
-				if K >= Outbuf'Last or else Outbuf(K) = Slim_Ascii.Pos.LF then -- TODO: different line terminator
+				if K >= Outbuf'Last or else Outbuf(K) = File.Option.LF then
 					exit outer; -- Done
 				end if;
 			end loop;
@@ -275,29 +275,39 @@ package body File is
 	begin
 		Read_Line (File, Buffer, Length);
 
-		if Length >= 1 then
-			Last := Buffer'First + Length - 1;
-			if Buffer(Last) = Slim_Ascii.LF then
-				if Last > Buffer'First and then Buffer(Last - 1) = Slim_Ascii.CR then
-					-- Switch CR/LF to LF
-					Length := Length - 1;
-					Buffer(Last - 1) := Slim_Ascii.LF;
-				end if;
-			elsif Buffer(Last) = Slim_Ascii.CR then
-				if Is_Empty(File.Rbuf) then
-					Load_Bytes (File);
-				end if;
+		if Length <= 0 or else (File.Option.Bits and OPTION_CRLF_IN) = 0 then
+			return;
+		end if;
 
-				if not Is_Empty(File.Rbuf) then
-					if File.Rbuf.Data(File.Rbuf.Pos + 1) = Slim_Ascii.Pos.LF then
-						-- Consume LF held in the internal read buffer.
-						File.Rbuf.Pos := File.Rbuf.Pos + 1;
-						-- Switch CR to LF (End-result: CR/LF to LF)
-						Buffer(Last) := Slim_Ascii.LF;
-					end if;
+		Last := Buffer'First + Length - 1;
+		if Buffer(Last) = Slim_Character'Val(File.Option.LF) then
+			if Last > Buffer'First and then 
+			   Buffer(Last - 1) = Slim_Character'Val(File.Option.CR) then
+
+
+				-- Switch CR/LF to LF
+				Length := Length - 1;
+				Buffer(Last - 1) := Slim_Character'Val(File.Option.LF);
+			end if;
+
+		elsif Buffer(Last) = Slim_Character'Val(File.Option.CR) then
+
+			if Is_Empty(File.Rbuf) then
+				Load_Bytes (File);
+
+				if Is_Empty(File.Rbuf) then
+					return;
 				end if;
 			end if;
+
+			if File.Rbuf.Data(File.Rbuf.Pos + 1) = File.Option.LF then
+				-- Consume LF held in the internal read buffer.
+				File.Rbuf.Pos := File.Rbuf.Pos + 1;
+				-- Switch CR to LF (End-result: CR/LF to LF)
+				Buffer(Last) := Slim_Character'Val(File.Option.LF);
+			end if;
 		end if;
+		
 	end Get_Line;
 
 	--|-----------------------------------------------------------------------
@@ -306,7 +316,7 @@ package body File is
 	procedure Read_Wide (File:       in out File_Record; 
 	                     Buffer:     out    Wide_String;
 	                     Length:     out    System_Length;
-	                     Terminator: in     Wide_String) is
+	                     Terminator: in     Wide_Character) is
 
 		pragma Assert (Is_Open(File));
 		pragma Assert (Buffer'Length > 0);
@@ -332,7 +342,7 @@ package body File is
 				if L3 <= 0 then
 					-- Potentially illegal sequence 
 					K := K + 1;
-					Outbuf(K) := Wide_Ascii.Question;
+					Outbuf(K) := Ascii.Wide.Question;
 					File.Rbuf.Pos := I;
 				else
 					L4 := File.Rbuf.Last - File.Rbuf.Pos;  -- Avaliable number of bytes available in the internal buffer
@@ -347,15 +357,13 @@ package body File is
 						Outbuf(K..K) := Slim_To_Wide(Inbuf(I .. J));
 					exception
 						when others => 
-							Outbuf(K) := Wide_Ascii.Question;
+							Outbuf(K) := Ascii.Wide.Question;
 							J := I; -- Override J to skip 1 byte only.
 					end;
 					File.Rbuf.Pos := J;
 				end if;
 
-				if Terminator'Length > 0 and then
-				   Outbuf(K) = Terminator(Terminator'First) then 
-					-- TODO: compare more characters in terminator, not just the first charactrer
+				if Terminator /= Wide_Character'First and then Outbuf(K) = Terminator then 
 					exit outer;
 				end if;
 			end loop;
@@ -367,17 +375,15 @@ package body File is
 	procedure Read (File:   in out File_Record; 
 	                Buffer: out    Wide_String;
 	                Length: out    System_Length) is
-		Terminator: Wide_String(1..0);
 	begin
-		Read_Wide (File, Buffer, Length, Terminator);
+		Read_Wide (File, Buffer, Length, Wide_Character'First);
 	end Read;
 
 	procedure Read_Line (File:   in out File_Record; 
 	                     Buffer: out    Wide_String;
 	                     Length: out    System_Length) is
-		Terminator: constant Wide_String(1..1) := (1 => Wide_Ascii.LF);
 	begin
-		Read_Wide (File, Buffer, Length, Terminator);
+		Read_Wide (File, Buffer, Length, Wide_Character'Val(File.Option.LF));
 	end Read_Line;
 
 	procedure Get_Line (File:   in out File_Record;
@@ -390,50 +396,70 @@ package body File is
 	begin
 		Read_Line (File, Buffer, Length);
 
-		if Length >= 1 then
-			Last := Buffer'First + Length - 1;
-			if Buffer(Last) = Wide_Ascii.LF then
-				if Last > Buffer'First and then Buffer(Last - 1) = Wide_Ascii.CR then
-					-- Switch CR/LF to LF
-					Length := Length - 1;
-					Buffer(Last - 1) := Wide_Ascii.LF;
-				end if;
-			elsif Buffer(Last) = Wide_Ascii.CR then
-				-- if the last character in the output buffer is CR,
-				-- i need to inspect the first character in the internal 
-				-- read buffer to determine if it's CR/LF.
-				if Is_Empty(File.Rbuf) then
-					Load_Bytes (File);
-				end if;
+		if Length <= 0 or else (File.Option.Bits and OPTION_CRLF_IN) = 0 then
+			return;
+		end if;
+	
+		Last := Buffer'First + Length - 1;
 
-				if not Is_Empty(File.Rbuf) then
-					declare
-						Inbuf: Slim_String (File.Rbuf.Data'Range);
-						for Inbuf'Address use File.Rbuf.Data'Address;
-						L3, I, J: System_Length;
-						W: Wide_String(1..1);
-					begin
-						I := File.Rbuf.Pos + 1;
-						L3 := Sequence_Length(Inbuf(I)); -- Required number of bytes to compose a wide character
-						if L3 in  1 .. File.Rbuf.Last - File.Rbuf.Pos then
-							J := File.Rbuf.Pos + L3;
-							begin
-								W := Slim_To_Wide(Inbuf(I .. J));
-							exception
-								when others =>
-									W(1) := Wide_Ascii.NUL;
-							end;
-							if W(1) = Wide_Ascii.LF then
-								-- Consume LF held in the internal read buffer.
-								File.Rbuf.Pos := J;
-								-- Switch CR to LF (End-result: CR/LF to LF)
-								Buffer(Last) := Wide_Ascii.LF;
-							end if;
-						end if;
-					end;
+		if Buffer(Last) = Wide_Character'Val(File.Option.LF) then
+			-- if the last character in the output bufer is LF.
+			-- inspect the previous character to check if it's CR.
+
+			if Last > Buffer'First and then 
+			   Buffer(Last - 1) = Wide_Character'Val(File.Option.CR) then
+				-- Switch CR/LF to LF
+				Length := Length - 1;
+				Buffer(Last - 1) := Wide_Character'Val(File.Option.LF);
+			end if;
+
+		elsif Buffer(Last) = Wide_Character'Val(File.Option.CR) then
+
+			-- if the last character in the output buffer is CR,
+			-- i need to inspect the first character in the internal 
+			-- read buffer to determine if it's CR/LF.
+			if Is_Empty(File.Rbuf) then
+
+				Load_Bytes (File);
+
+				if Is_Empty(File.Rbuf) then
+					-- no more data available.
+					return;
 				end if;
 			end if;
+
+			-- At least the first byte is available.
+			declare
+				Inbuf: Slim_String (File.Rbuf.Data'Range);
+				for Inbuf'Address use File.Rbuf.Data'Address;
+				L3, I, J: System_Length;
+				W: Wide_String(1..1);
+			begin
+				I := File.Rbuf.Pos + 1;
+				L3 := Sequence_Length(Inbuf(I)); -- Required number of bytes to compose a wide character
+				if L3 in  1 .. File.Rbuf.Last - File.Rbuf.Pos then
+					-- The next byte in the internal read buffer is a valid sequence leader and
+					-- the internal buffer has enough bytes to build a wide character.
+					J := File.Rbuf.Pos + L3;
+					begin
+						W := Slim_To_Wide(Inbuf(I .. J));
+					exception
+						when others =>
+							-- Don't do anything special despite the conversion error. 
+							-- The next call should encounter the error again.
+							J := File.Rbuf.Pos;
+					end;
+					
+					if J > File.Rbuf.Pos and then W(1) = Wide_Character'Val(File.Option.LF) then
+						-- Consume LF held in the internal read buffer.
+						File.Rbuf.Pos := J;
+						-- Switch CR to LF (End-result: CR/LF to LF)
+						Buffer(Last) := Wide_Character'Val(File.Option.LF);
+					end if;
+				end if;
+			end;
 		end if;
+
 	end Get_Line;
 
 	--|-----------------------------------------------------------------------
@@ -521,7 +547,7 @@ package body File is
 			I := I + 1;
 			File.Wbuf.Last := File.Wbuf.Last + 1;
 			File.Wbuf.Data(File.Wbuf.Last) := Inbuf(I);
-			if File.Wbuf.Data(File.Wbuf.Last) = Slim_Ascii.Pos.LF then -- TODO: different line terminator
+			if File.Wbuf.Data(File.Wbuf.Last) = File.Option.LF then
 				-- Remeber the index of the line terminator
 				LF := File.Wbuf.Last;
 			end if;
@@ -560,9 +586,9 @@ package body File is
 		I := Inbuf'First - 1;
 
 		while I < Inbuf'Last loop
-			if (File.Option.Bits and OPTION_CRLF) /= 0 and then 
-			   not Injected and then Inbuf(I + 1) = Slim_Ascii.Pos.LF then
-				X := Slim_Ascii.Pos.CR;
+			if (File.Option.Bits and OPTION_CRLF_OUT) /= 0 and then 
+			   not Injected and then Inbuf(I + 1) = File.Option.LF then
+				X := File.Option.CR;
 				Injected := Standard.True;
 			else
 				I := I + 1;
@@ -578,7 +604,7 @@ package body File is
 
 			File.Wbuf.Last := File.Wbuf.Last + 1;
 			File.Wbuf.Data(File.Wbuf.Last) := X;
-			if File.Wbuf.Data(File.Wbuf.Last) = Slim_Ascii.Pos.LF then -- TODO: different line terminator
+			if File.Wbuf.Data(File.Wbuf.Last) = File.Option.LF then 
 				-- Remeber the index of the line terminator
 				LF := File.Wbuf.Last;
 			end if;
@@ -667,7 +693,7 @@ package body File is
 					LF := File.Wbuf.Data'First - 1;
 				end if;
 
-				if Buffer(I) = Wide_Ascii.LF then -- TODO: different line terminator
+				if Buffer(I) = Wide_Character'Val(File.Option.LF) then
 					LF := L;
 				end if;
 
@@ -696,7 +722,7 @@ package body File is
 		pragma Assert (Is_Open(File));
 
 		F, L, I, LF: System_Length;
-		X: Wide_String(1..2) := (Wide_Ascii.CR, Wide_Ascii.LF);
+		X: Wide_String(1..2) := (Wide_Character'Val(File.Option.CR), Wide_Character'Val(File.Option.LF));
 	begin
 
 		LF := File.Wbuf.Data'First - 1;
@@ -705,8 +731,8 @@ package body File is
 			I := I + 1;
 
 			X(2) := Buffer(I);
-			if (File.Option.Bits and OPTION_CRLF) /= 0 and then
-			   Buffer(I) = Wide_Ascii.LF then
+			if (File.Option.Bits and OPTION_CRLF_OUT) /= 0 and then
+			   Buffer(I) = Wide_Character'Val(File.Option.LF) then
 				F := 1;
 			else
 				F := 2;
@@ -729,7 +755,7 @@ package body File is
 					LF := File.Wbuf.Data'First - 1;
 				end if;
 
-				if Buffer(I) = Wide_Ascii.LF then 
+				if Buffer(I) = Wide_Character'Val(File.Option.LF) then 
 					LF := L;
 				end if;
 

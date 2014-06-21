@@ -7,17 +7,32 @@ separate (H2.OS)
 package body File is
 
 	-- External functions and procedures
-	function Sys_Open (path: Slim_String; flags: Sysdef.int_t; mode: Sysdef.int_t) return Sysdef.int_t;
-	pragma Import (C, Sys_Open, "open");
+	function CreateFileA (lpFileName           : Slim_String;
+					  dwDesiredAccess      : Sysdef.DWORD;
+					  dwShareMode          : Sysdef.DWORD;
+					  lpSecurityAttributes : Sysdef.PVOID; -- LPSECURITY_ATTRIBUTES;
+					  dwCreationDisposition: Sysdef.DWORD;
+					  dwFlagsAndAttributes : Sysdef.DWORD;
+					  hTemplateFile        : Sysdef.HANDLE) return Sysdef.HANDLE;
+	pragma Import (Stdcall, CreateFileA, "CreateFileA");
 
-	procedure Sys_Close (fd: Sysdef.int_t);
-	pragma Import (C, sys_close, "close");
+	function CreateFileW (lpFileName           : Wide_String;
+					  dwDesiredAccess      : Sysdef.DWORD;
+					  dwShareMode          : Sysdef.DWORD;
+					  lpSecurityAttributes : Sysdef.PVOID; -- LPSECURITY_ATTRIBUTES;
+					  dwCreationDisposition: Sysdef.DWORD;
+					  dwFlagsAndAttributes : Sysdef.DWORD;
+					  hTemplateFile        : Sysdef.HANDLE) return Sysdef.HANDLE;
+	pragma Import (Stdcall, CreateFileW, "CreateFileW");
 
-	function Sys_Read (fd: Sysdef.int_t; buf: in System.Address; count: in Sysdef.size_t) return Sysdef.ssize_t;
-	pragma Import (C, Sys_Read, "read");
+	procedure CloseFile (fd: Sysdef.HANDLE);
+	pragma Import (Stdcall, CloseFile, "CloseFile");
 
-	function Sys_Write (fd: Sysdef.int_t; buf: in System.Address; count: in Sysdef.size_t) return Sysdef.ssize_t;
-	pragma Import (C, Sys_Write, "write");
+	function ReadFile (fd: Sysdef.HANDLE; buf: in System.Address; count: in Sysdef.size_t) return Sysdef.ssize_t;
+	pragma Import (Stdcall, ReadFile, "ReadFile");
+
+	function Sys_Write (fd: Sysdef.HANDLE; buf: in System.Address; count: in Sysdef.size_t) return Sysdef.ssize_t;
+	pragma Import (Stdcall, WriteFile, "WriteFile");
 
 	-- Common constants
 	INVALID_HANDLE: constant := -1;

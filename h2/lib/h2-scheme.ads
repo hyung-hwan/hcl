@@ -54,7 +54,6 @@ package H2.Scheme is
 	Divide_By_Zero_Error: exception;
 	Numeric_String_Error: exception;
 
-
 	type Interpreter_Record is limited private;
 	type Interpreter_Pointer is access all Interpreter_Record;
 
@@ -494,8 +493,10 @@ package H2.Scheme is
 	-- -----------------------------------------------------------------------------
 
 private
-	package Ch is new Ascii(Object_Character);
-	
+	package Ch is new H2.Ascii(Object_Character, Object_Character);
+	package Ch_Code renames Ch.Code;
+	package Ch_Val renames Ch.Slim; -- Ch.Slim and Ch.Wide are the same as both are Object_Charater above.
+
 	type Heap_Element_Array is array(Heap_Size range <>) of aliased Heap_Element;
 
 	type Heap_Record(Size: Heap_Size) is record

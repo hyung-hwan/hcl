@@ -583,14 +583,14 @@ procedure Execute (Interp: in out Interpreter_Record) is
 
 	function Is_White_Space (X: in Object_Character) return Standard.Boolean is
 	begin
-		return X = Ch.Space or else X = Ch.HT or else X = Ch.VT or else 
-		       X = Ch.CR or else X = Ch.LF or else X = Ch.FF;
+		return X = Ch_Val.Space or else X = Ch_Val.HT or else X = Ch_Val.VT or else 
+		       X = Ch_Val.CR or else X = Ch_Val.LF or else X = Ch_Val.FF;
 	end Is_White_Space;
 
 	function Is_Delimiter (X: in Object_Character) return  Standard.Boolean is
 	begin
-		return X = Ch.Left_Parenthesis or else X = Ch.Right_Parenthesis or else
-		       X = Ch.Quotation or else X = Ch.Semicolon or else 
+		return X = Ch_Val.Left_Parenthesis or else X = Ch_Val.Right_Parenthesis or else
+		       X = Ch_Val.Quotation or else X = Ch_Val.Semicolon or else 
 	            Is_White_Space(X);
 	end Is_Delimiter;
 
@@ -602,13 +602,13 @@ procedure Execute (Interp: in out Interpreter_Record) is
 			-- Normal character
 			if Is_White_Space(LC.Value) then
 				Fetch_Character;
-			elsif LC.Value = Ch.Semicolon then
+			elsif LC.Value = Ch_Val.Semicolon then
 				-- Comment.
 				loop
 					Fetch_Character;
 					exit when LC.Kind = End_Character; -- EOF before LF
 
-					if LC.Kind = Normal_Character and then LC.Value = Ch.LF then -- TODO: handle different line ending convention
+					if LC.Kind = Normal_Character and then LC.Value = Ch_Val.LF then -- TODO: handle different line ending convention
 						Fetch_Character; -- Read the next character after LF
 						exit;
 					end if;
@@ -636,24 +636,24 @@ procedure Execute (Interp: in out Interpreter_Record) is
 
 		-- TODO: Pass Token Location when calling Token.Set
 
-		-- Use Ch.Pos.XXX values instead of Ch.XXX values as gnat complained that 
-		-- Ch.XXX values are not static. For this reason, "case LC.Value is ..."
+		-- Use Ch_Code.XXX values instead of Ch_Val.XXX values as gnat complained that 
+		-- Ch_Val.XXX values are not static. For this reason, "case LC.Value is ..."
 		-- changed to use Object_Character'Pos(LC.Value).
 		case Object_Character'Pos(LC.Value) is
 
-			when Ch.Pos.Left_Parenthesis =>
+			when Ch_Code.Left_Parenthesis =>
 				Token.Set (Interp, Left_Parenthesis_Token, LC.Value);
 
-			when Ch.Pos.Right_Parenthesis =>
+			when Ch_Code.Right_Parenthesis =>
 				Token.Set (Interp, Right_Parenthesis_Token, LC.Value);
 
-			when Ch.Pos.Period =>
+			when Ch_Code.Period =>
 				Token.Set (Interp, Period_Token, LC.Value);
 
-			when Ch.Pos.Apostrophe =>
+			when Ch_Code.Apostrophe =>
 				Token.Set (Interp, Single_Quote_Token, LC.Value);
 
-			when Ch.Pos.Number_Sign => 
+			when Ch_Code.Number_Sign => 
 				Fetch_Character;
 				if LC.Kind /= Normal_Character then
 					-- ended prematurely.
@@ -672,15 +672,15 @@ procedure Execute (Interp: in out Interpreter_Record) is
 				-- #< > -- xxx
 
 				case Object_Character'Pos(LC.Value) is
-					when Ch.Pos.LC_T => -- #t
-						Token.Set (Interp, True_Token, Ch.Number_Sign);
+					when Ch_Code.LC_T => -- #t
+						Token.Set (Interp, True_Token, Ch_Val.Number_Sign);
 						Token.Append_Character (Interp, LC.Value);
 
-					when Ch.Pos.LC_F => -- #f
-						Token.Set (Interp, False_Token, Ch.Number_Sign);
+					when Ch_Code.LC_F => -- #f
+						Token.Set (Interp, False_Token, Ch_Val.Number_Sign);
 						Token.Append_Character (Interp, LC.Value);
 
-					when Ch.Pos.Backslash => -- #\C, #\space, #\newline
+					when Ch_Code.Backslash => -- #\C, #\space, #\newline
 						Fetch_Character;
 						if LC.Kind /= Normal_Character then
 							ada.text_io.put_line ("ERROR: NO CHARACTER AFTER #\");
@@ -702,9 +702,9 @@ procedure Execute (Interp: in out Interpreter_Record) is
 							-- TODO: case insensitive match. binary search for more diverse words
 							-- TODO: #\xHHHH....
 							if Interp.Token.Value.Ptr.all(1..Interp.Token.Value.Last) = Label_Newline then
-								Token.Set (Interp, Character_Token, Ch.LF);  -- reset the token to LF
+								Token.Set (Interp, Character_Token, Ch_Val.LF);  -- reset the token to LF
 							elsif Interp.Token.Value.Ptr.all(1..Interp.Token.Value.Last) = Label_Space then
-								Token.Set (Interp, Character_Token, Ch.Space); -- reset the token to Space
+								Token.Set (Interp, Character_Token, Ch_Val.Space); -- reset the token to Space
 							else
 								-- unknown character name.
 								ada.text_io.put ("ERROR: UNKNOWN CHARACTER NAME ");
@@ -717,16 +717,16 @@ procedure Execute (Interp: in out Interpreter_Record) is
 							end if;
 						end if;
 
-					--when Ch.Pos.Left_Parenthesis => -- #(
-					--	Token.Set (Interp, Vector_Token, Ch.Number_Sign);
+					--when Ch_Code.Left_Parenthesis => -- #(
+					--	Token.Set (Interp, Vector_Token, Ch_Val.Number_Sign);
 					--	Token.Append_Character (Interp, LC.Value);
 
-					--when Ch.Pos.Left_Bracket => -- $[
-					--	Token.Set (Interp, List_Token, Ch.Number_Sign);
+					--when Ch_Code.Left_Bracket => -- $[
+					--	Token.Set (Interp, List_Token, Ch_Val.Number_Sign);
 					--	Token.Append_Character (Interp, LC.Value);
 
-					--when Ch.Pos.Left_Bracket => -- ${
-					--	Token.Set (Interp, Table_Token, Ch.Number_Sign);
+					--when Ch_Code.Left_Bracket => -- ${
+					--	Token.Set (Interp, Table_Token, Ch_Val.Number_Sign);
 					--	Token.Append_Character (Interp, LC.Value);
 
 					when others =>
@@ -736,7 +736,7 @@ procedure Execute (Interp: in out Interpreter_Record) is
 					
 				end case;
 
-			when Ch.Pos.Quotation =>
+			when Ch_Code.Quotation =>
 				Fetch_Character;
 				Token.Set (Interp, String_Token);
 				loop
@@ -746,7 +746,7 @@ procedure Execute (Interp: in out Interpreter_Record) is
 						raise Syntax_Error;		
 					end if;
 
-					if LC.Value = Ch.Backslash then
+					if LC.Value = Ch_Val.Backslash then
 						Fetch_Character;
 						if LC.Kind /= Normal_Character then
 							-- String ended prematurely.
@@ -755,7 +755,7 @@ procedure Execute (Interp: in out Interpreter_Record) is
 						end if;
 						-- TODO: escape letters??? \n \r \\ etc....
 						Token.Append_Character (Interp, LC.Value);
-					elsif LC.Value = Ch.Quotation then
+					elsif LC.Value = Ch_Val.Quotation then
 						exit;
 					else
 						Token.Append_Character (Interp, LC.Value);
@@ -764,33 +764,33 @@ procedure Execute (Interp: in out Interpreter_Record) is
 				end loop;
 
 
-			when Ch.Pos.Zero .. Ch.Pos.Nine =>
+			when Ch_Code.Zero .. Ch_Code.Nine =>
 				-- TODO; negative number, floating-point number, bignum, hexdecimal, etc
 				Token.Set (Interp, Integer_Token);
 				loop
 					Token.Append_Character (Interp, LC.Value);
 					Fetch_Character;
 					if LC.Kind /= Normal_Character or else
-					   LC.Value not in Ch.Zero .. Ch.Nine  then
+					   LC.Value not in Ch_Val.Zero .. Ch_Val.Nine  then
 						-- Unfetch the last character
 						Unfetch_Character;
 						exit;
 					end if;
 				end loop;
 
-			when Ch.Pos.Plus_Sign | Ch.Pos.Minus_Sign =>
+			when Ch_Code.Plus_Sign | Ch_Code.Minus_Sign =>
 
 				Tmp(1) := LC.Value;
 
 				Fetch_Character;
 				if LC.Kind = Normal_Character and then
-				   LC.Value in Ch.Zero .. Ch.Nine then
+				   LC.Value in Ch_Val.Zero .. Ch_Val.Nine then
 					Token.Set (Interp, Integer_Token, Tmp(1..1));
 					loop
 						Token.Append_Character (Interp, LC.Value);
 						Fetch_Character;
 						if LC.Kind /= Normal_Character or else
-						   LC.Value not in Ch.Zero .. Ch.Nine  then
+						   LC.Value not in Ch_Val.Zero .. Ch_Val.Nine  then
 							Unfetch_Character;
 							exit;
 						end if;

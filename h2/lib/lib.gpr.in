@@ -27,7 +27,7 @@ project Lib is
 		"h2-io.ads",
 		"h2-io.adb",
 		"h2-io-file.adb",
-		"h2-io-get_line_terminator.adb",
+		"h2-io-file-get_default_option.adb",
 		"h2-scheme.adb",
 		"h2-scheme.ads",
 		"h2-scheme-bigint.adb",

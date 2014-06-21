@@ -33,8 +33,8 @@ procedure scheme is
 	String_Stream: Stream.String_Input_Stream_Record (String'Unchecked_Access);
 	--String_Stream: Stream.String_Input_Stream_Record := (Len => String'Length, Str => String, Pos => 0);
 
-	--File_Name: aliased S.Object_Character_Array := "test.adb";
-	File_Name: aliased constant Scheme.Object_Character_Array := "시험.scm";
+	File_Name: aliased Scheme.Object_Character_Array := "test.adb";
+	--File_Name: aliased constant Scheme.Object_Character_Array := "시험.scm";
 	--File_Stream: Stream.File_Stream_Record (File_Name'Unchecked_Access);
 	--File_Stream: Stream.File_Stream_Record := (Name => File_Name'Unchecked_Access);
 	File_Stream: Stream.File_Stream_Record;
@@ -107,33 +107,41 @@ ada.text_io.put_line ("------------------");
 	File.Set_Flag_Bits (FL, File.FLAG_NONBLOCK);
 	File.Open (F, H2.Slim.String'("/tmp/xxx"), FL);
 
+	--Option := File.Get_Option(F2);
 	File.Clear_Flag_Bits (FL, FL.Bits);
 	File.Set_Flag_Bits (FL, File.FLAG_WRITE);
 	File.Set_Flag_Bits (FL, File.FLAG_CREATE);
 	File.Set_Flag_Bits (FL, File.FLAG_TRUNCATE);
 	File.Open (F2, H2.Wide.String'("/tmp/yyy"), FL);
-	File.Set_Option_Bits (Option, File.Option_CRLF);
+
+	File.Set_Option_Bits (Option, File.Option_CRLF_IN);
+	--File.Set_Option_Bits (Option, File.Option_CRLF_OUT);
+	--Option.LF := IO.Ascii.Code.Colon;
 	File.Set_Option (F2, Option);
+	File.Set_Option (F, Option);
 
 	loop
 
-		File.Get_Line (F, Buffer, IL);
+		--File.Get_Line (F, Buffer, IL);
+		File.Get_Line (F, BufferW, IL);
 
+--ada.text_io.put_line (standard.string(buffer(1..il)));
 --ada.wide_text_io.put_line (standard.wide_string(bufferw(1..il)));
 		--File.Read (F, BufferW, IL);
 		exit when IL <= 0;
 
-		File.Put_Line (F2, Buffer(Buffer'First .. Buffer'First + IL - 1), OL);
+		--File.Put_Line (F2, Buffer(Buffer'First .. Buffer'First + IL - 1), OL);
+		File.Put_Line (F2, BufferW(Buffer'First .. Buffer'First + IL - 1), OL);
 		pragma Assert (IL = OL);
 
 		--Ada.Text_IO.PUt (Standard.String(Buffer(Buffer'First .. Buffer'First + IL - 1)));
 		--Ada.Wide_Text_IO.Put_Line (Standard.Wide_String(BufferW(BufferW'First .. BufferW'First + IL - 1)));
 	end loop;
 
-	File.Write (F2, H2.Wide.String'("나는 피리부는 사나이 정말로 멋있는 사나이"), OL);
-	File.Write_Line (F2, H2.Wide.String'("이세상에 문디없어면 무슨재미로 너도 나도 만세."), OL);
-	File.Write_Line (F2, H2.Wide.String'("이세상에 for the first time 우하."), OL);
-	File.Write_Line (F2, H2.Wide.String'(""), OL);
+	--File.Write (F2, H2.Wide.String'("나는 피리부는 사나이 정말로 멋있는 사나이"), OL);
+	--File.Write_Line (F2, H2.Wide.String'("이세상에 문디없어면 무슨재미로 너도 나도 만세."), OL);
+	--File.Write_Line (F2, H2.Wide.String'("이세상에 for the first time 우하."), OL);
+	--File.Write_Line (F2, H2.Wide.String'(""), OL);
 	File.Close (F2);
 	File.Close (F);
 
