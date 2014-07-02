@@ -1,5 +1,6 @@
 AUTOMAKE_OPTIONS = nostdinc
 
+SUBDIRS = cmn
 
 EXTRA_DIST =  \
 	h2.ads \

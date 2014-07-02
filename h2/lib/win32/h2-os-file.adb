@@ -7,31 +7,39 @@ separate (H2.OS)
 package body File is
 
 	-- External functions and procedures
-	function CreateFileA (lpFileName           : Slim_String;
-					  dwDesiredAccess      : Sysdef.DWORD;
-					  dwShareMode          : Sysdef.DWORD;
-					  lpSecurityAttributes : Sysdef.PVOID; -- LPSECURITY_ATTRIBUTES;
-					  dwCreationDisposition: Sysdef.DWORD;
-					  dwFlagsAndAttributes : Sysdef.DWORD;
-					  hTemplateFile        : Sysdef.HANDLE) return Sysdef.HANDLE;
+	function CreateFileA (lpFileName           : Standard.String;
+	                      dwDesiredAccess      : Sysdef.DWORD;
+	                      dwShareMode          : Sysdef.DWORD;
+	                      lpSecurityAttributes : Sysdef.LPVOID; -- LPSECURITY_ATTRIBUTES;
+	                      dwCreationDisposition: Sysdef.DWORD;
+	                      dwFlagsAndAttributes : Sysdef.DWORD;
+	                      hTemplateFile        : Sysdef.HANDLE) return Sysdef.HANDLE;
 	pragma Import (Stdcall, CreateFileA, "CreateFileA");
 
-	function CreateFileW (lpFileName           : Wide_String;
-					  dwDesiredAccess      : Sysdef.DWORD;
-					  dwShareMode          : Sysdef.DWORD;
-					  lpSecurityAttributes : Sysdef.PVOID; -- LPSECURITY_ATTRIBUTES;
-					  dwCreationDisposition: Sysdef.DWORD;
-					  dwFlagsAndAttributes : Sysdef.DWORD;
-					  hTemplateFile        : Sysdef.HANDLE) return Sysdef.HANDLE;
+	function CreateFileW (lpFileName           : Standard.Wide_String;
+	                      dwDesiredAccess      : Sysdef.DWORD;
+	                      dwShareMode          : Sysdef.DWORD;
+	                      lpSecurityAttributes : Sysdef.LPVOID; -- LPSECURITY_ATTRIBUTES;
+	                      dwCreationDisposition: Sysdef.DWORD;
+	                      dwFlagsAndAttributes : Sysdef.DWORD;
+	                      hTemplateFile        : Sysdef.HANDLE) return Sysdef.HANDLE;
 	pragma Import (Stdcall, CreateFileW, "CreateFileW");
 
-	procedure CloseFile (fd: Sysdef.HANDLE);
+	procedure CloseFile (hFile: in Sysdef.HANDLE);
 	pragma Import (Stdcall, CloseFile, "CloseFile");
 
-	function ReadFile (fd: Sysdef.HANDLE; buf: in System.Address; count: in Sysdef.size_t) return Sysdef.ssize_t;
+	function ReadFile (hFile:                in  Sysdef.HANDLE;
+	                   lpBuffer:             in  Sysdef.LPVOID;
+	                   nNumberOfBytesToRead: in  Sysdef.DWORD;
+	                   lpNumberOfBytesRead:  in  Sysdef.LPDWORD;
+	                   lpOverlapped:         in  Sysdef.LPVOID) return Sysdef.BOOL;
 	pragma Import (Stdcall, ReadFile, "ReadFile");
 
-	function Sys_Write (fd: Sysdef.HANDLE; buf: in System.Address; count: in Sysdef.size_t) return Sysdef.ssize_t;
+	function WriteFile (hFile:                  in  Sysdef.HANDLE;
+	                    lpBuffer:               in  Sysdef.LPVOID;
+	                    nNumberOfBytesToWrite:  in  Sysdef.DWORD;
+	                    lpNumberOfBytesWritten: in  Sysdef.LPDWORD;
+	                    lpOverlapped:           in  Sysdef.LPVOID) return Sysdef.BOOL;
 	pragma Import (Stdcall, WriteFile, "WriteFile");
 
 	-- Common constants
