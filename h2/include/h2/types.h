@@ -476,15 +476,56 @@ typedef h2_uint32_t h2_wwcint_t;
 #define H2_SIZEOF_WWCHAR_T H2_SIZEOF_UINT32_T
 #define H2_SIZEOF_WWCINT_T H2_SIZEOF_UINT32_T
 
+/** typedef h2_mcstr_t
+ * The h2_mcstr_t type defines a structure containing a pointer to
+ * a h2_mchar_t array and its length
+ */
+struct h2_mcstr_t
+{
+	h2_mchar_t* ptr;
+	h2_size_t len;
+};
+
+/** typedef h2_wcstr_t
+ * The h2_wcstr_t type defines a structure containing a pointer to
+ * a h2_wchar_t array and its length
+ */
+struct h2_wcstr_t
+{
+	h2_wchar_t* ptr;
+	h2_size_t len;
+};
+
+
+/** typedef h2_wwcstr_t
+ * The h2_wwcstr_t type defines a structure containing a pointer to
+ * a h2_wwchar_t array and its length
+ */
+struct h2_wwcstr_t
+{
+	h2_wwchar_t* ptr;
+	h2_size_t len;
+};
+
+typedef struct h2_mcstr_t h2_mcstr_t;
+typedef struct h2_wcstr_t h2_wcstr_t;
+typedef struct h2_wwcstr_t h2_wwcstr_t;
+
+/** typedef h2_char_t
+ * The h2_char_t type defines the primary character type.
+ */
 #if defined(H2_CHAR_IS_MCHAR)
 	typedef h2_mchar_t h2_char_t;
 	typedef h2_mcint_t h2_cint_t;
+	typedef h2_mcstr_t h2_cstr_t;
 #elif defined(H2_CHAR_IS_WCHAR)
 	typedef h2_wchar_t h2_char_t;
 	typedef h2_wcint_t h2_cint_t;
+	typedef h2_wcstr_t h2_cstr_t;
 #elif defined(H2_CHAR_IS_WWCHAR)
 	typedef h2_wwchar_t h2_char_t;
 	typedef h2_wwcint_t h2_cint_t;
+	typedef h2_wwcstr_t h2_cstr_t;
 #else
 #	error Unknown default character type
 #endif  
@@ -508,20 +549,24 @@ typedef h2_wwcint_t h2_wxcint_t;
 
 /** typedef h2_oschar_t
  * The h2_oschar_t type defines the character type the operating system
- * calls use. */
+ * calls use. 
+ */
 #if defined(H2_OSCHAR_IS_MCHAR)
 	typedef h2_mchar_t h2_oschar_t;
 	typedef h2_mcint_t h2_oscint_t;
+	typedef h2_mcstr_t h2_oscstr_t;
 #	define H2_SIZEOF_OSCHAR_T H2_SIZEOF_MCHAR_T
 #	define H2_SIZEOF_OSCINT_T H2_SIZEOF_MCINT_T
 #elif defined(H2_OSCHAR_IS_WCHAR)
 	typedef h2_wchar_t h2_oschar_t;
 	typedef h2_wcint_t h2_oscint_t;
+	typedef h2_wcstr_t h2_oscstr_t;
 #	define H2_SIZEOF_OSCHAR_T H2_SIZEOF_WCHAR_T
 #	define H2_SIZEOF_OSCINT_T H2_SIZEOF_WCINT_T
 #elif defined(H2_OSCHAR_IS_WWCHAR)
 	typedef h2_wwchar_t h2_oschar_t;
 	typedef h2_wwcint_t h2_oscint_t;
+	typedef h2_wwcstr_t h2_oscstr_t;
 #	define H2_SIZEOF_OSCHAR_T H2_SIZEOF_WWCHAR_T
 #	define H2_SIZEOF_OSCINT_T H2_SIZEOF_WWCINT_T
 #else
@@ -556,6 +601,33 @@ enum h2_char_type_t
 };
 
 
+
+typedef h2_size_t (*h2_cmgr_mbtowc_t) (
+	const h2_mchar_t* mb,
+	h2_size_t         size,
+	h2_wxchar_t*      wc
+);
+
+typedef h2_size_t (*h2_cmgr_wctomb_t) (
+	h2_wxchar_t  wc,
+	h2_mchar_t*  mb,
+	h2_size_t    size
+);
+
+/**
+ * The h2_cmgr_t type defines the character-level interface to
+ * multibyte/wide-character conversion. This interface doesn't
+ * provide any facility to store conversion state in a context
+ * independent manner. This leads to the limitation that it can
+ * handle a stateless multibyte encoding only.
+ */
+struct h2_cmgr_t
+{
+	h2_cmgr_mbtowc_t mbtowc;
+	h2_cmgr_wctomb_t wctomb;
+};
+
+typedef struct h2_cmgr_t h2_cmgr_t;
 
 /* Special definiton to use Unicode APIs on Windows */
 #if defined(_WIN32)
