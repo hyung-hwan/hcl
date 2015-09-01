@@ -100,7 +100,7 @@ am__installdirs = "$(DESTDIR)$(libdir)"
 LTLIBRARIES = $(lib_LTLIBRARIES)
 am__DEPENDENCIES_1 =
 libh2cmn_la_DEPENDENCIES = $(am__DEPENDENCIES_1) $(am__DEPENDENCIES_1)
-am_libh2cmn_la_OBJECTS = str.lo utf8.lo
+am_libh2cmn_la_OBJECTS = str.lo utf16.lo utf8.lo
 libh2cmn_la_OBJECTS = $(am_libh2cmn_la_OBJECTS)
 AM_V_lt = $(am__v_lt_@AM_V@)
 am__v_lt_ = $(am__v_lt_@AM_DEFAULT_V@)
@@ -445,6 +445,7 @@ noinst_HEADERS = \
 
 libh2cmn_la_SOURCES = \
 	str.c \
+	utf16.c \
 	utf8.c
 
 
@@ -533,6 +534,7 @@ distclean-compile:
 	-rm -f *.tab.c
 
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/str.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/utf16.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/utf8.Plo@am__quote@
 
 .c.o:

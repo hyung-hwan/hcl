@@ -125,6 +125,7 @@ noinst_HEADERS =  \
 
 libh2cmn_la_SOURCES = \
 	str.c \
+	utf16.c \
 	utf8.c
 
 
