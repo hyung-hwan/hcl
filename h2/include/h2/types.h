@@ -600,19 +600,43 @@ enum h2_char_type_t
 #endif  
 };
 
+typedef enum h2_char_type_t h2_char_type_t;
 
+
+typedef struct h2_cmgr_t h2_cmgr_t;
 
 typedef h2_size_t (*h2_cmgr_mbtowc_t) (
+	h2_cmgr_t*        cmgr,
 	const h2_mchar_t* mb,
 	h2_size_t         size,
 	h2_wxchar_t*      wc
 );
 
 typedef h2_size_t (*h2_cmgr_wctomb_t) (
+	h2_cmgr_t*   cmgr,
 	h2_wxchar_t  wc,
 	h2_mchar_t*  mb,
 	h2_size_t    size
 );
+
+/*
+typedef h2_size_t (*h2_cmgr_mtowx_t) (
+	h2_cmgr_t*        cmgr,
+	const h2_mchar_t* mb,
+	h2_size_t         size,
+	h2_wxchar_t*      wc
+);
+
+typedef h2_size_t (*h2_cmgr_wxtom_t) (
+	h2_cmgr_t*   cmgr,
+	h2_wxchar_t  wc,
+	h2_mchar_t*  mb,
+	h2_size_t    size
+);
+*/
+
+
+
 
 /**
  * The h2_cmgr_t type defines the character-level interface to
@@ -625,11 +649,56 @@ struct h2_cmgr_t
 {
 	h2_cmgr_mbtowc_t mbtowc;
 	h2_cmgr_wctomb_t wctomb;
+
+/*
+	h2_cmgr_mtowx_t mtowx;
+	h2_cmgr_wxtom_t wxtom;
+*/
+
+	
+	void* ctx;
 };
 
-typedef struct h2_cmgr_t h2_cmgr_t;
 
-/* Special definiton to use Unicode APIs on Windows */
+
+
+typedef struct h2_mmgr_t h2_mmgr_t;
+
+/**
+ * allocate a memory chunk of the size @a n.
+ * @return pointer to a memory chunk on success, QSE_NULL on failure.
+ */
+typedef void* (*h2_mmgr_alloc_t)   (h2_mmgr_t* mmgr, h2_size_t n);
+/**
+ * resize a memory chunk pointed to by @a ptr to the size @a n.
+ * @return pointer to a memory chunk on success, QSE_NULL on failure.
+ */
+typedef void* (*h2_mmgr_realloc_t) (h2_mmgr_t* mmgr, void* ptr, h2_size_t n);
+/**
+ * free a memory chunk pointed to by @a ptr.
+ */
+typedef void  (*h2_mmgr_free_t)    (h2_mmgr_t* mmgr, void* ptr);
+
+/**
+ * The h2_mmgr_t type defines the memory management interface.
+ * As the type is merely a structure, it is just used as a single container
+ * for memory management functions with a pointer to user-defined data.
+ * The user-defined data pointer @a ctx is passed to each memory management
+ * function whenever it is called. You can allocate, reallocate, and free
+ * a memory chunk.
+ *
+ * For example, a h2_xxx_open() function accepts a pointer of the h2_mmgr_t
+ * type and the xxx object uses it to manage dynamic data within the object.
+ */
+struct h2_mmgr_t
+{
+	h2_mmgr_alloc_t   alloc;   /**< allocation function */
+	h2_mmgr_realloc_t realloc; /**< resizing function */
+	h2_mmgr_free_t    free;    /**< disposal function */
+	void*             ctx;     /**< user-defined data pointer */
+};
+
+/* Special definition to use Unicode APIs on Windows */
 #if defined(_WIN32)
 #	if !defined(UNICODE)
 #		define UNICODE
