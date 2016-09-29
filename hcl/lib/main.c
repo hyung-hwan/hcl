@@ -447,8 +447,10 @@ static char* syntax_error_msg[] =
 	"argument name list expected",
 	"argument name expected",
 	"lambda block too big",
+	"lambda block too deep",
 	"variable name expected",
-	"wrong number of arguments"
+	"wrong number of arguments",
+	"too many arguments defined"
 };
 
 static void print_synerr (hcl_t* hcl)

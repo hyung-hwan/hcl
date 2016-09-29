@@ -1,5 +1,4 @@
 /*
-/*
  * $Id$
  *
     Copyright (c) 2014-2016 Chung, Hyung-Hwan. All rights reserved.
@@ -120,7 +119,7 @@ int hcl_decode (hcl_t* hcl, hcl_oow_t start, hcl_oow_t end)
 
 			/* ------------------------------------------------- */
 			case HCL_CODE_PUSH_TEMPVAR_X:
-			case BCODE_STORE_INTO_TEMPVAR_X:
+			case HCL_CODE_STORE_INTO_TEMPVAR_X:
 			case BCODE_POP_INTO_TEMPVAR_X:
 				FETCH_PARAM_CODE_TO (hcl, b1);
 				goto handle_tempvar;
@@ -133,14 +132,14 @@ int hcl_decode (hcl_t* hcl, hcl_oow_t start, hcl_oow_t end)
 			case HCL_CODE_PUSH_TEMPVAR_5:
 			case HCL_CODE_PUSH_TEMPVAR_6:
 			case HCL_CODE_PUSH_TEMPVAR_7:
-			case BCODE_STORE_INTO_TEMPVAR_0:
-			case BCODE_STORE_INTO_TEMPVAR_1:
-			case BCODE_STORE_INTO_TEMPVAR_2:
-			case BCODE_STORE_INTO_TEMPVAR_3:
-			case BCODE_STORE_INTO_TEMPVAR_4:
-			case BCODE_STORE_INTO_TEMPVAR_5:
-			case BCODE_STORE_INTO_TEMPVAR_6:
-			case BCODE_STORE_INTO_TEMPVAR_7:
+			case HCL_CODE_STORE_INTO_TEMPVAR_0:
+			case HCL_CODE_STORE_INTO_TEMPVAR_1:
+			case HCL_CODE_STORE_INTO_TEMPVAR_2:
+			case HCL_CODE_STORE_INTO_TEMPVAR_3:
+			case HCL_CODE_STORE_INTO_TEMPVAR_4:
+			case HCL_CODE_STORE_INTO_TEMPVAR_5:
+			case HCL_CODE_STORE_INTO_TEMPVAR_6:
+			case HCL_CODE_STORE_INTO_TEMPVAR_7:
 			case BCODE_POP_INTO_TEMPVAR_0:
 			case BCODE_POP_INTO_TEMPVAR_1:
 			case BCODE_POP_INTO_TEMPVAR_2:
@@ -203,7 +202,7 @@ int hcl_decode (hcl_t* hcl, hcl_oow_t start, hcl_oow_t end)
 			/* ------------------------------------------------- */
 			case HCL_CODE_PUSH_OBJECT_X:
 			case HCL_CODE_STORE_INTO_OBJECT_X:
-			case HCL_CODE_POP_INTO_OBJECT_X:
+			case BCODE_POP_INTO_OBJECT_X:
 				FETCH_PARAM_CODE_TO (hcl, b1);
 				goto handle_object;
 
@@ -215,10 +214,10 @@ int hcl_decode (hcl_t* hcl, hcl_oow_t start, hcl_oow_t end)
 			case HCL_CODE_STORE_INTO_OBJECT_1:
 			case HCL_CODE_STORE_INTO_OBJECT_2:
 			case HCL_CODE_STORE_INTO_OBJECT_3:
-			case HCL_CODE_POP_INTO_OBJECT_0:
-			case HCL_CODE_POP_INTO_OBJECT_1:
-			case HCL_CODE_POP_INTO_OBJECT_2:
-			case HCL_CODE_POP_INTO_OBJECT_3:
+			case BCODE_POP_INTO_OBJECT_0:
+			case BCODE_POP_INTO_OBJECT_1:
+			case BCODE_POP_INTO_OBJECT_2:
+			case BCODE_POP_INTO_OBJECT_3:
 				b1 = bcode & 0x3; /* low 2 bits */
 			handle_object:
 				if ((bcode >> 3) & 1)
@@ -306,20 +305,20 @@ return -1;
 			
 			/* -------------------------------------------------------- */
 
-			case BCODE_PUSH_CTXTEMPVAR_X:
-			case BCODE_STORE_INTO_CTXTEMPVAR_X:
+			case HCL_CODE_PUSH_CTXTEMPVAR_X:
+			case HCL_CODE_STORE_INTO_CTXTEMPVAR_X:
 			case BCODE_POP_INTO_CTXTEMPVAR_X:
 				FETCH_PARAM_CODE_TO (hcl, b1);
 				FETCH_PARAM_CODE_TO (hcl, b2);
 				goto handle_ctxtempvar;
-			case BCODE_PUSH_CTXTEMPVAR_0:
-			case BCODE_PUSH_CTXTEMPVAR_1:
-			case BCODE_PUSH_CTXTEMPVAR_2:
-			case BCODE_PUSH_CTXTEMPVAR_3:
-			case BCODE_STORE_INTO_CTXTEMPVAR_0:
-			case BCODE_STORE_INTO_CTXTEMPVAR_1:
-			case BCODE_STORE_INTO_CTXTEMPVAR_2:
-			case BCODE_STORE_INTO_CTXTEMPVAR_3:
+			case HCL_CODE_PUSH_CTXTEMPVAR_0:
+			case HCL_CODE_PUSH_CTXTEMPVAR_1:
+			case HCL_CODE_PUSH_CTXTEMPVAR_2:
+			case HCL_CODE_PUSH_CTXTEMPVAR_3:
+			case HCL_CODE_STORE_INTO_CTXTEMPVAR_0:
+			case HCL_CODE_STORE_INTO_CTXTEMPVAR_1:
+			case HCL_CODE_STORE_INTO_CTXTEMPVAR_2:
+			case HCL_CODE_STORE_INTO_CTXTEMPVAR_3:
 			case BCODE_POP_INTO_CTXTEMPVAR_0:
 			case BCODE_POP_INTO_CTXTEMPVAR_1:
 			case BCODE_POP_INTO_CTXTEMPVAR_2:

@@ -52,6 +52,7 @@ enum hcl_errnum_t
 	HCL_EPERM,   /**< operation not permitted */
 	HCL_ERANGE,  /**< range error. overflow and underflow */
 	HCL_ENOENT,  /**< no matching entry */
+	HCL_EEXIST,  /**< duplicate entry */
 	HCL_EDFULL,  /**< dictionary full */
 	HCL_EPFULL,  /**< processor full */
 	HCL_ESHFULL, /**< semaphore heap full */
@@ -90,8 +91,10 @@ enum hcl_synerrnum_t
 	HCL_SYNERR_ARGNAMELIST,   /* argument name list expected */
 	HCL_SYNERR_ARGNAME,       /* argument name expected */
 	HCL_SYNERR_BLKFLOOD,      /* lambda block too big */
+	HCL_SYNERR_BLKDEPTH,      /* lambda block too deep */
 	HCL_SYNERR_VARNAME,       /* variable name expected */
-	HCL_SYNERR_ARGCOUNT       /* wrong number of arguments */
+	HCL_SYNERR_ARGCOUNT,      /* wrong number of arguments */
+	HCL_SYNERR_ARGFLOOD       /* too many arguments defined */
 };
 typedef enum hcl_synerrnum_t hcl_synerrnum_t;
 

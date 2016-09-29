@@ -32,6 +32,9 @@ enum
 	VAR_ARGUMENT
 };
 
+#define TV_BUFFER_ALIGN 256
+#define BLK_TMPRCNT_BUFFER_ALIGN 128
+
 #define EMIT_BYTE_INSTRUCTION(hcl,code) \
 	do { if (emit_byte_instruction(hcl,code) <= -1) return -1; } while(0)
 
@@ -71,6 +74,82 @@ static int add_literal (hcl_t* hcl, hcl_oop_t obj, hcl_oow_t* index)
 	((hcl_oop_oop_t)hcl->code.lit.arr)->slot[hcl->code.lit.len++] = obj;
 	return 0;
 }
+
+static int add_temporary_variable (hcl_t* hcl, hcl_oop_t name, hcl_oow_t dup_check_start)
+{
+	hcl_oow_t i;
+
+	HCL_ASSERT (HCL_IS_SYMBOL (hcl, name));
+
+	for (i = dup_check_start; i < hcl->c->tv.size; i++)
+	{
+		HCL_ASSERT (HCL_IS_SYMBOL (hcl, hcl->c->tv.ptr[i]));
+		if (hcl->c->tv.ptr[i] == name)
+		{
+			hcl->errnum = HCL_EEXIST;
+			return -1;
+		}
+	}
+
+	if (hcl->c->tv.size >= hcl->c->tv.capa)
+	{
+		hcl_oop_t* tmp;
+		hcl_oow_t newcapa;
+
+		newcapa = HCL_ALIGN (hcl->c->tv.capa + 1, TV_BUFFER_ALIGN); /* TODO: set a better resizing policy */
+		tmp = hcl_reallocmem (hcl, hcl->c->tv.ptr, newcapa);
+		if (!tmp) return -1;
+
+		hcl->c->tv.capa = newcapa;
+		hcl->c->tv.ptr = tmp;
+	}
+
+	hcl->c->tv.ptr[hcl->c->tv.size++] = name;
+	return 0;
+}
+
+static int find_temporary_variable_backward (hcl_t* hcl, hcl_oop_t name, hcl_oow_t* index)
+{
+	hcl_oow_t i;
+
+	HCL_ASSERT (HCL_IS_SYMBOL (hcl, name));
+	for (i = hcl->c->tv.size; i > 0; )
+	{
+		--i;
+		HCL_ASSERT (HCL_IS_SYMBOL (hcl, hcl->c->tv.ptr[i]));
+		if (hcl->c->tv.ptr[i] == name)
+		{
+			*index = i;
+			return 0;
+		}
+	}
+
+	hcl->errnum = HCL_ENOENT;
+	return -1;
+}
+
+static int store_temporary_variable_count_for_block (hcl_t* hcl, hcl_oow_t tmpr_count)
+{
+	HCL_ASSERT (hcl->c->blk.depth >= 0);
+
+	if (hcl->c->blk.depth >= hcl->c->blk.tmprcnt_capa)
+	{
+		hcl_oow_t* tmp;
+		hcl_oow_t newcapa;
+
+		newcapa = HCL_ALIGN (hcl->c->blk.depth + 1, BLK_TMPRCNT_BUFFER_ALIGN);
+		tmp = (hcl_oow_t*)hcl_reallocmem (hcl, hcl->c->blk.tmprcnt, newcapa * HCL_SIZEOF(*tmp));
+		if (!tmp) return -1;
+
+		hcl->c->blk.tmprcnt_capa = newcapa;
+		hcl->c->blk.tmprcnt = tmp;
+	}
+
+	hcl->c->blk.tmprcnt[hcl->c->blk.depth] = tmpr_count;
+	return 0;
+}
+
+/* ========================================================================= */
 
 static HCL_INLINE void patch_instruction (hcl_t* hcl, hcl_oow_t index, hcl_oob_t bc)
 {
@@ -150,7 +229,7 @@ static int emit_single_param_instruction (hcl_t* hcl, int cmd, hcl_oow_t param_1
 
 		case HCL_CODE_PUSH_OBJECT_0:
 		case HCL_CODE_STORE_INTO_OBJECT_0:
-		case HCL_CODE_POP_INTO_OBJECT_0:
+		case BCODE_POP_INTO_OBJECT_0:
 		case HCL_CODE_JUMP_FORWARD_0:
 		case HCL_CODE_JUMP_BACKWARD_0:
 #if 0
@@ -229,15 +308,17 @@ static int emit_double_param_instruction (hcl_t* hcl, int cmd, hcl_oow_t param_1
 
 	switch (cmd)
 	{
-#if 0
+
 		case HCL_CODE_STORE_INTO_CTXTEMPVAR_0:
-		case HCL_CODE_POP_INTO_CTXTEMPVAR_0:
+		/*case BCODE_POP_INTO_CTXTEMPVAR_0:*/
 		case HCL_CODE_PUSH_CTXTEMPVAR_0:
+#if 0
 		case HCL_CODE_PUSH_OBJVAR_0:
 		case HCL_CODE_STORE_INTO_OBJVAR_0:
-		case HCL_CODE_POP_INTO_OBJVAR_0:
+		case BCODE_POP_INTO_OBJVAR_0:
 		case HCL_CODE_SEND_MESSAGE_0:
 		case HCL_CODE_SEND_MESSAGE_TO_SUPER_0:
+#endif
 			if (param_1 < 4 && param_2 < 0xFF)
 			{
 				/* low 2 bits of the instruction code is the first parameter */
@@ -247,10 +328,10 @@ static int emit_double_param_instruction (hcl_t* hcl, int cmd, hcl_oow_t param_1
 			else
 			{
 				/* convert the code to a long version */
-				bc = cmd | 0x80;
+				bc = cmd | 0x80; 
 				goto write_long;
 			}
-#endif
+
 
 		case HCL_CODE_MAKE_BLOCK:
 			bc = cmd;
@@ -469,10 +550,12 @@ static int compile_lambda (hcl_t* hcl, hcl_oop_t src)
 	hcl_oop_t obj, args, arg, ptr;
 	hcl_oow_t nargs, ntmprs;
 	hcl_oow_t jump_inst_pos;
+	hcl_oow_t saved_tv_count;
 
 	HCL_ASSERT (HCL_BRANDOF(hcl,src) == HCL_BRAND_CONS);
 	HCL_ASSERT (HCL_CONS_CAR(src) == hcl->_lambda);
 
+	saved_tv_count = hcl->c->tv.size;
 	obj = HCL_CONS_CDR(src);
 
 	if (HCL_IS_NIL(hcl, obj))
@@ -496,6 +579,7 @@ static int compile_lambda (hcl_t* hcl, hcl_oop_t src)
 	}
 	else
 	{
+		hcl_oow_t tv_dup_start;
 		if (HCL_BRANDOF(hcl, args) != HCL_BRAND_CONS)
 		{
 			HCL_DEBUG1 (hcl, "Syntax error - not a lambda argument list - %O\n", args);
@@ -503,6 +587,7 @@ static int compile_lambda (hcl_t* hcl, hcl_oop_t src)
 			return -1;
 		}
 
+		tv_dup_start = hcl->c->tv.size;
 		nargs = 0;
 		ptr = args;
 		do
@@ -510,12 +595,23 @@ static int compile_lambda (hcl_t* hcl, hcl_oop_t src)
 			arg = HCL_CONS_CAR(ptr);
 			if (HCL_BRANDOF(hcl, arg) != HCL_BRAND_SYMBOL)
 			{
-				HCL_DEBUG1 (hcl, "Syntax error - ldamba argument not a symbol - %O\n", arg);
+				HCL_DEBUG1 (hcl, "Syntax error - lambda argument not a symbol - %O\n", arg);
 				hcl_setsynerr (hcl, HCL_SYNERR_ARGNAME, HCL_NULL, HCL_NULL); /* TODO: error location */
 				return -1;
 			}
 	/* TODO: check duplicates within only the argument list. duplicates against outer-scope are ok.
 	 * is this check necessary? */
+
+			if (add_temporary_variable (hcl, arg, tv_dup_start) <= -1) 
+			{
+				if (hcl->errnum == HCL_EEXIST)
+				{
+					HCL_DEBUG1 (hcl, "Syntax error - lambda argument duplicate - %O\n", arg);
+					hcl_setsynerr (hcl, HCL_SYNERR_ARGNAME, HCL_NULL, HCL_NULL); /* TODO: error location */
+					return -1;
+				}
+				return -1;
+			}
 			nargs++;
 
 			ptr = HCL_CONS_CDR(ptr);
@@ -533,8 +629,41 @@ static int compile_lambda (hcl_t* hcl, hcl_oop_t src)
 		while (1);
 	}
 
-	ntmprs = nargs;
+	ntmprs = nargs;  
 /* TODO: handle local temporary variables */
+
+	HCL_ASSERT (nargs == hcl->c->tv.size - saved_tv_count);
+	if (nargs > MAX_CODE_NBLKARGS) /*TODO: change this limit to max call argument count */
+	{
+		/* while an integer object is pused to indicate the number of
+		 * block arguments, evaluation which is done by message passing
+		 * limits the number of arguments that can be passed. so the
+		 * check is implemented */
+		HCL_DEBUG1 (hcl, "Syntax error - too many arguments - %O\n", args);
+		hcl_setsynerr (hcl, HCL_SYNERR_ARGFLOOD, HCL_NULL, HCL_NULL); 
+		return -1;
+	}
+
+#if 0
+/* TODO: block local temporary variables... */
+	/* ntmprs: number of temporary variables including arguments */
+	HCL_ASSERT (ntmprs == hcl->c->tv.size - saved_tv_count);
+	if (ntmprs > MAX_CODE_NBLKTMPRS)
+	{
+		HCL_DEBUG1 (hcl, "Syntax error - too many local temporary variables - %O\n", args);
+		hcl_setsynerr (hcl, HCL_SYNERR_BLKTMPRFLOOD, HCL_NULL, HCL_NULL); 
+		return -1;
+	}
+#endif
+
+	if (hcl->c->blk.depth == HCL_TYPE_MAX(hcl_ooi_t))
+	{
+		HCL_DEBUG1 (hcl, "Syntax error - lambda block depth too deep - %O\n", src);
+		hcl_setsynerr (hcl, HCL_SYNERR_BLKDEPTH, HCL_NULL, HCL_NULL); 
+		return -1;
+	}
+	hcl->c->blk.depth++;
+	if (store_temporary_variable_count_for_block (hcl, hcl->c->tv.size) <= -1) return -1;
 
 	if (emit_double_param_instruction (hcl, HCL_CODE_MAKE_BLOCK, nargs, ntmprs) <= -1) return -1;
 
@@ -544,8 +673,9 @@ static int compile_lambda (hcl_t* hcl, hcl_oop_t src)
 	if (emit_single_param_instruction (hcl, HCL_CODE_JUMP_FORWARD_0, MAX_CODE_JUMP) <= -1) return -1;
 
 	SWITCH_TOP_CFRAME (hcl, COP_COMPILE_OBJECT_LIST, HCL_CONS_CDR(obj));
+
 	PUSH_SUBCFRAME (hcl, COP_EMIT_LAMBDA, hcl->_nil); /* operand field is not used for COP_EMIT_LAMBDA */
-	cf = GET_SUBCFRAME (hcl);
+	cf = GET_SUBCFRAME (hcl); /* modify the EMIT_LAMBDA frame */
 	cf->u.lambda.jip = jump_inst_pos;
 	cf->u.lambda.nargs = nargs;
 	cf->u.lambda.ntmprs = ntmprs;
@@ -610,7 +740,7 @@ static int compile_set (hcl_t* hcl, hcl_oop_t src)
 	}
 
 	SWITCH_TOP_CFRAME (hcl, COP_COMPILE_OBJECT, val);
-	PUSH_SUBCFRAME (hcl, COP_EMIT_SET, var);
+	PUSH_SUBCFRAME (hcl, COP_EMIT_SET, var); /* set doesn't evaluate the variable name */
 	cf = GET_SUBCFRAME (hcl);
 	cf->u.set.var_type = VAR_NAMED;
 
@@ -719,11 +849,44 @@ static HCL_INLINE int compile_symbol (hcl_t* hcl, hcl_oop_t obj)
 	HCL_ASSERT (HCL_BRANDOF(hcl,obj) == HCL_BRAND_SYMBOL);
 
 	/* check if a symbol is a local variable */
-	/*if (emit_single_param_instruction (hcl, HCL_CODE_PUSH_TEMPVAR_0, xxx) <= -1) return -1;*/
+	if (find_temporary_variable_backward (hcl, obj, &index) <= -1)
+	{
+		/* global variable */
+		if (add_literal(hcl, obj, &index) <= -1 ||
+		    emit_single_param_instruction (hcl, HCL_CODE_PUSH_OBJECT_0, index) <= -1) return -1;
+	}
+	else
+	{
+	#if defined(HCL_USE_CTXTEMPVAR)
+		if (hcl->c->blk.depth >= 0)
+		{
+			hcl_oow_t i;
 
-	/* global variable */
-	if (add_literal(hcl, obj,&index) <= -1 ||
-	    emit_single_param_instruction (hcl, HCL_CODE_PUSH_OBJECT_0, index) <= -1) return -1;
+			/* if a temporary variable is accessed inside a block,
+			 * use a special instruction to indicate it */
+			HCL_ASSERT (index < hcl->c->blk.tmprcnt[hcl->c->blk.depth]);
+			for (i = hcl->c->blk.depth; i > 0; i--) /* excluded the top level -- TODO: change this code depending on global variable handling */
+			{
+				if (index >= hcl->c->blk.tmprcnt[i - 1])
+				{
+					hcl_oow_t ctx_offset, index_in_ctx;
+					ctx_offset = hcl->c->blk.depth - i;
+					index_in_ctx = index - hcl->c->blk.tmprcnt[i - 1];
+					/* ctx_offset 0 means the current context.
+					 *            1 means current->home.
+					 *            2 means current->home->home. 
+					 * index_in_ctx is a relative index within the context found.
+					 */
+					if (emit_double_param_instruction(hcl, HCL_CODE_PUSH_CTXTEMPVAR_0, ctx_offset, index_in_ctx) <= -1) return -1;
+					return 0;
+				}
+			}
+		}
+	#endif
+
+		/* TODO: top-level... verify this. this will vary depending on how i implement the top-level and global variables... */
+		if (emit_single_param_instruction (hcl, HCL_CODE_PUSH_TEMPVAR_0, index) <= -1) return -1;
+	}
 
 	return 0;
 }
@@ -831,6 +994,9 @@ static HCL_INLINE int emit_lambda (hcl_t* hcl)
 	cf = GET_TOP_CFRAME(hcl);
 	HCL_ASSERT (cf->opcode == COP_EMIT_LAMBDA);
 	HCL_ASSERT (HCL_IS_NIL(hcl, cf->operand));
+
+	hcl->c->blk.depth--;
+	hcl->c->tv.size = hcl->c->blk.tmprcnt[hcl->c->blk.depth];
 
 	/* HCL_CODE_LONG_PARAM_SIZE + 1 => size of the long JUMP_FORWARD instruction */
 	block_code_size = hcl->code.bc.len - cf->u.lambda.jip - (HCL_BCODE_LONG_PARAM_SIZE + 1);
@@ -944,6 +1110,13 @@ int hcl_compile (hcl_t* hcl, hcl_oop_t obj)
 	saved_bc_len = hcl->code.bc.len;
 	saved_lit_len = hcl->code.lit.len;
 
+	HCL_ASSERT (hcl->c->tv.size == 0);
+	HCL_ASSERT (hcl->c->blk.depth == -1);
+
+/* TODO: in case i implement all global variables as block arguments at the top level... */
+	hcl->c->blk.depth++;
+	if (store_temporary_variable_count_for_block(hcl, hcl->c->tv.size) <= -1) return -1;
+
 	PUSH_CFRAME (hcl, COP_COMPILE_OBJECT, obj);
 
 	while (GET_TOP_CFRAME_INDEX(hcl) >= 0)
@@ -990,6 +1163,9 @@ int hcl_compile (hcl_t* hcl, hcl_oop_t obj)
 
 done:
 	HCL_ASSERT (GET_TOP_CFRAME_INDEX(hcl) < 0);
+	HCL_ASSERT (hcl->c->tv.size == 0);
+	HCL_ASSERT (hcl->c->blk.depth == 0);
+	hcl->c->blk.depth--;
 	return 0;
 
 oops:
@@ -999,5 +1175,7 @@ oops:
 	hcl->code.bc.len = saved_bc_len;
 	hcl->code.lit.len = saved_lit_len;
 
+	hcl->c->tv.size = 0;
+	hcl->c->blk.depth = 0;
 	return -1;
 }

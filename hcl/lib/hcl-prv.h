@@ -351,6 +351,20 @@ struct hcl_compiler_t
 		hcl_oow_t     capa;
 	} cfs;
 	/* == END COMPILER STACK == */
+
+	struct
+	{
+		hcl_oop_t* ptr;
+		hcl_oow_t size;
+		hcl_oow_t capa;
+	} tv; /* temporary variables including arguments */
+
+	struct
+	{
+		hcl_ooi_t depth;
+		hcl_oow_t* tmprcnt;
+		hcl_oow_t  tmprcnt_capa;
+	} blk; /* lambda block */
 };
 
 #endif
@@ -489,15 +503,15 @@ enum hcl_bcode_t
 	HCL_CODE_PUSH_TEMPVAR_6        = 0x1E,
 	HCL_CODE_PUSH_TEMPVAR_7        = 0x1F,
 
-	BCODE_STORE_INTO_TEMPVAR_0     = 0x20,
-	BCODE_STORE_INTO_TEMPVAR_1     = 0x21,
-	BCODE_STORE_INTO_TEMPVAR_2     = 0x22,
-	BCODE_STORE_INTO_TEMPVAR_3     = 0x23,
+	HCL_CODE_STORE_INTO_TEMPVAR_0  = 0x20,
+	HCL_CODE_STORE_INTO_TEMPVAR_1  = 0x21,
+	HCL_CODE_STORE_INTO_TEMPVAR_2  = 0x22,
+	HCL_CODE_STORE_INTO_TEMPVAR_3  = 0x23,
 
-	BCODE_STORE_INTO_TEMPVAR_4     = 0x24,
-	BCODE_STORE_INTO_TEMPVAR_5     = 0x25,
-	BCODE_STORE_INTO_TEMPVAR_6     = 0x26,
-	BCODE_STORE_INTO_TEMPVAR_7     = 0x27,
+	HCL_CODE_STORE_INTO_TEMPVAR_4  = 0x24,
+	HCL_CODE_STORE_INTO_TEMPVAR_5  = 0x25,
+	HCL_CODE_STORE_INTO_TEMPVAR_6  = 0x26,
+	HCL_CODE_STORE_INTO_TEMPVAR_7  = 0x27,
 
 	BCODE_POP_INTO_TEMPVAR_0       = 0x28,
 	BCODE_POP_INTO_TEMPVAR_1       = 0x29,
@@ -526,10 +540,10 @@ enum hcl_bcode_t
 	HCL_CODE_STORE_INTO_OBJECT_2      = 0x3A,
 	HCL_CODE_STORE_INTO_OBJECT_3      = 0x3B,
 
-	HCL_CODE_POP_INTO_OBJECT_0        = 0x3C,
-	HCL_CODE_POP_INTO_OBJECT_1        = 0x3D,
-	HCL_CODE_POP_INTO_OBJECT_2        = 0x3E,
-	HCL_CODE_POP_INTO_OBJECT_3        = 0x3F,
+	BCODE_POP_INTO_OBJECT_0        = 0x3C,
+	BCODE_POP_INTO_OBJECT_1        = 0x3D,
+	BCODE_POP_INTO_OBJECT_2        = 0x3E,
+	BCODE_POP_INTO_OBJECT_3        = 0x3F,
 
 	HCL_CODE_PUSH_OBJECT_0         = 0x40,
 	HCL_CODE_PUSH_OBJECT_1         = 0x41,
@@ -561,20 +575,20 @@ enum hcl_bcode_t
 	HCL_CODE_CALL_2                = 0x56, /* 86 */
 	HCL_CODE_CALL_3                = 0x57, /* 87 */
 
-	BCODE_STORE_INTO_CTXTEMPVAR_0  = 0x58, /* 88 */
-	BCODE_STORE_INTO_CTXTEMPVAR_1  = 0x59, /* 89 */
-	BCODE_STORE_INTO_CTXTEMPVAR_2  = 0x5A, /* 90 */
-	BCODE_STORE_INTO_CTXTEMPVAR_3  = 0x5B, /* 91 */
+	HCL_CODE_STORE_INTO_CTXTEMPVAR_0  = 0x58, /* 88 */
+	HCL_CODE_STORE_INTO_CTXTEMPVAR_1  = 0x59, /* 89 */
+	HCL_CODE_STORE_INTO_CTXTEMPVAR_2  = 0x5A, /* 90 */
+	HCL_CODE_STORE_INTO_CTXTEMPVAR_3  = 0x5B, /* 91 */
 
 	BCODE_POP_INTO_CTXTEMPVAR_0    = 0x5C, /* 92 */
 	BCODE_POP_INTO_CTXTEMPVAR_1    = 0x5D, /* 93 */
 	BCODE_POP_INTO_CTXTEMPVAR_2    = 0x5E, /* 94 */
 	BCODE_POP_INTO_CTXTEMPVAR_3    = 0x5F, /* 95 */
 
-	BCODE_PUSH_CTXTEMPVAR_0        = 0x60, /* 96 */
-	BCODE_PUSH_CTXTEMPVAR_1        = 0x61, /* 97 */
-	BCODE_PUSH_CTXTEMPVAR_2        = 0x62, /* 98 */
-	BCODE_PUSH_CTXTEMPVAR_3        = 0x63, /* 99 */
+	HCL_CODE_PUSH_CTXTEMPVAR_0     = 0x60, /* 96 */
+	HCL_CODE_PUSH_CTXTEMPVAR_1     = 0x61, /* 97 */
+	HCL_CODE_PUSH_CTXTEMPVAR_2     = 0x62, /* 98 */
+	HCL_CODE_PUSH_CTXTEMPVAR_3     = 0x63, /* 99 */
 
 	BCODE_PUSH_OBJVAR_0            = 0x64,
 	BCODE_PUSH_OBJVAR_1            = 0x65,
@@ -608,7 +622,7 @@ enum hcl_bcode_t
 	BCODE_PUSH_INSTVAR_X           = 0x90, /* 144 */
 
 	HCL_CODE_PUSH_TEMPVAR_X        = 0x98, /* 152 */
-	BCODE_STORE_INTO_TEMPVAR_X     = 0xA0, /* 160 */
+	HCL_CODE_STORE_INTO_TEMPVAR_X  = 0xA0, /* 160 */
 	BCODE_POP_INTO_TEMPVAR_X       = 0xA8, /* 168 */
 
 	HCL_CODE_PUSH_LITERAL_X        = 0xB0, /* 176 */
@@ -616,8 +630,8 @@ enum hcl_bcode_t
 
 	/* SEE FURTHER DOWN FOR SPECIAL CODES - 0xB2 - 0xB7  */
 
-	HCL_CODE_STORE_INTO_OBJECT_X      = 0xB8, /* 184 */
-	HCL_CODE_POP_INTO_OBJECT_X        = 0xBC, /* 188 */
+	HCL_CODE_STORE_INTO_OBJECT_X   = 0xB8, /* 184 */
+	BCODE_POP_INTO_OBJECT_X        = 0xBC, /* 188 */
 	HCL_CODE_PUSH_OBJECT_X         = 0xC0, /* 192 */
 
 	HCL_CODE_JUMP_FORWARD_X        = 0xC4, /* 196 */
@@ -627,9 +641,9 @@ enum hcl_bcode_t
 
 	HCL_CODE_CALL_X                = 0xD4, /* 212 */
 
-	BCODE_STORE_INTO_CTXTEMPVAR_X  = 0xD8, /* 216 */
+	HCL_CODE_STORE_INTO_CTXTEMPVAR_X  = 0xD8, /* 216 */
 	BCODE_POP_INTO_CTXTEMPVAR_X    = 0xDC, /* 220 */
-	BCODE_PUSH_CTXTEMPVAR_X        = 0xE0, /* 224 */
+	HCL_CODE_PUSH_CTXTEMPVAR_X        = 0xE0, /* 224 */
 
 	BCODE_PUSH_OBJVAR_X            = 0xE4, /* 228 */
 	BCODE_STORE_INTO_OBJVAR_X      = 0xE8, /* 232 */
