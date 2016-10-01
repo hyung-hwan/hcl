@@ -80,21 +80,27 @@ enum hcl_synerrnum_t
 	HCL_SYNERR_LPAREN,        /* ( expected */
 	HCL_SYNERR_RPAREN,        /* ) expected */
 	HCL_SYNERR_RBRACK,        /* ] expected */
+	HCL_SYNERR_VBAR,          /* | expected */
 
 	HCL_SYNERR_STRING,        /* string expected */
 	HCL_SYNERR_BYTERANGE,     /* byte too small or too large */
 	HCL_SYNERR_NESTING,       /* nesting level too deep */
 
+	HCL_SYNERR_VBARBANNED,    /* | disallowed */
 	HCL_SYNERR_DOTBANNED,     /* . disallowed */
 	HCL_SYNERR_INCLUDE,       /* #include error */
 
-	HCL_SYNERR_ARGNAMELIST,   /* argument name list expected */
-	HCL_SYNERR_ARGNAME,       /* argument name expected */
 	HCL_SYNERR_BLKFLOOD,      /* lambda block too big */
 	HCL_SYNERR_BLKDEPTH,      /* lambda block too deep */
+	HCL_SYNERR_ARGNAMELIST,   /* argument name list expected */
+	HCL_SYNERR_ARGNAME,       /* argument name expected */
+	HCL_SYNERR_ARGNAMEDUP,    /* duplicate argument name  */
 	HCL_SYNERR_VARNAME,       /* variable name expected */
 	HCL_SYNERR_ARGCOUNT,      /* wrong number of arguments */
-	HCL_SYNERR_ARGFLOOD       /* too many arguments defined */
+	HCL_SYNERR_ARGFLOOD,      /* too many arguments defined */
+	HCL_SYNERR_VARFLOOD,      /* too many variables defined */
+	HCL_SYNERR_VARDCLBANNED,  /* variable declaration disallowed */
+	HCL_SYNERR_VARNAMEDUP     /* duplicate variable name */
 };
 typedef enum hcl_synerrnum_t hcl_synerrnum_t;
 
@@ -1038,6 +1044,7 @@ enum
 	HCL_BRAND_CONS,
 	HCL_BRAND_ARRAY,
 	HCL_BRAND_BYTE_ARRAY,
+	HCL_BRAND_SYMBOL_ARRAY, /* special. internal use only */
 	HCL_BRAND_SYMBOL,
 	HCL_BRAND_STRING,
 	HCL_BRAND_SET,
@@ -1056,7 +1063,7 @@ enum
 	HCL_SYNCODE_IF,
 	HCL_SYNCODE_LAMBDA,
 	HCL_SYNCODE_QUOTE,
-	HCL_SYNCODE_SET,
+	HCL_SYNCODE_SET
 };
 
 struct hcl_cons_t
@@ -1070,6 +1077,8 @@ typedef struct hcl_cons_t* hcl_oop_cons_t;
 
 #define HCL_IS_NIL(hcl,v) (v == (hcl)->_nil)
 #define HCL_IS_SYMBOL(hcl,v) (HCL_OOP_IS_POINTER(v) && HCL_OBJ_GET_FLAGS_BRAND(v) == HCL_BRAND_SYMBOL)
+#define HCL_IS_SYMBOL_ARRAY(hcl,v) (HCL_OOP_IS_POINTER(v) && HCL_OBJ_GET_FLAGS_BRAND(v) == HCL_BRAND_SYMBOL_ARRAY)
+#define HCL_IS_CONS(hcl,v) (HCL_OOP_IS_POINTER(v) && HCL_OBJ_GET_FLAGS_BRAND(v) == HCL_BRAND_CONS)
 
 #define HCL_CONS_CAR(v)  (((hcl_cons_t*)(v))->car)
 #define HCL_CONS_CDR(v)  (((hcl_cons_t*)(v))->cdr)
@@ -1274,9 +1283,7 @@ HCL_EXPORT void hcl_setsynerr (
 	const hcl_oocs_t*  tgt
 );
 
-
 /* Memory allocation/deallocation functions using hcl's MMGR */
-
 HCL_EXPORT void* hcl_allocmem (
 	hcl_t*     hcl,
 	hcl_oow_t size

@@ -255,6 +255,7 @@ struct hcl_iotok_t
 		HCL_IOTOK_BAPAREN,
 		HCL_IOTOK_LBRACK,
 		HCL_IOTOK_RBRACK,
+		HCL_IOTOK_VBAR,
 
 		HCL_IOTOK_INCLUDE
 	} type;
@@ -337,9 +338,19 @@ struct hcl_compiler_t
 		hcl_oop_t s;  /* stack for reading */
 		hcl_oop_t e;  /* last object read */
 
-		hcl_oow_t balit_capa;
-		hcl_oow_t balit_count;
-		hcl_oob_t* balit;
+		struct
+		{
+			hcl_oob_t* ptr;
+			hcl_oow_t size;
+			hcl_oow_t capa;
+		} balit;
+
+		struct
+		{
+			hcl_oop_t* ptr;
+			hcl_oow_t size;
+			hcl_oow_t capa;
+		} salit;
 	} r; /* reading */
 	/* == END READER == */
 

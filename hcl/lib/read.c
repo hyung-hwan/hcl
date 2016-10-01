@@ -33,6 +33,7 @@ static int end_include (hcl_t* hcl);
 
 #define BUFFER_ALIGN 128
 #define BALIT_BUFFER_ALIGN 128
+#define SALIT_BUFFER_ALIGN 128
 #define ARLIT_BUFFER_ALIGN 128
 
 #define CHAR_TO_NUM(c,base) \
@@ -218,7 +219,7 @@ static HCL_INLINE int is_alnumchar (hcl_ooci_t c)
 
 static HCL_INLINE int is_delimiter (hcl_ooci_t c)
 {
-	return c == '(' || c == ')' || c == '[' || c == ']' || c == '\"' || c == '#' || c == ';' || is_spacechar(c) || c == HCL_UCI_EOF;
+	return c == '(' || c == ')' || c == '[' || c == ']' || c == '\"' || c == '#' || c == ';' || c == '|' || is_spacechar(c) || c == HCL_UCI_EOF;
 }
 
 
@@ -908,13 +909,13 @@ retry:
 		}
 
 		case '(':
-			SET_TOKEN_TYPE (hcl, HCL_IOTOK_LPAREN);
 			ADD_TOKEN_CHAR(hcl, c);
+			SET_TOKEN_TYPE (hcl, HCL_IOTOK_LPAREN);
 			break;
 
 		case ')':
-			SET_TOKEN_TYPE (hcl, HCL_IOTOK_RPAREN);
 			ADD_TOKEN_CHAR(hcl, c);
+			SET_TOKEN_TYPE (hcl, HCL_IOTOK_RPAREN);
 			break;
 
 		case '[':
@@ -925,6 +926,11 @@ retry:
 		case ']':
 			ADD_TOKEN_CHAR(hcl, c);
 			SET_TOKEN_TYPE (hcl, HCL_IOTOK_RBRACK);
+			break;
+
+		case '|': 
+			ADD_TOKEN_CHAR (hcl, c);
+			SET_TOKEN_TYPE(hcl, HCL_IOTOK_VBAR);
 			break;
 
 		case '.':
@@ -1204,12 +1210,14 @@ static HCL_INLINE hcl_oop_t enter_list (hcl_t* hcl, int flagv)
 	 * nil#2 to store the last element in the list.
 	 * both to be updated in chain_to_list() as items are added.
 	 */
+
+/* TODO: change to push array of  3 cells instead? or don't use the object memory for stack. use compiler's own memory... */
 	return (push (hcl, HCL_SMOOI_TO_OOP(flagv)) == HCL_NULL ||
 	        push (hcl, hcl->_nil) == HCL_NULL ||
 	        push (hcl, hcl->_nil) == HCL_NULL)? HCL_NULL: hcl->c->r.s;
 }
 
-static HCL_INLINE hcl_oop_t leave_list (hcl_t* hcl, int* flagv)
+static HCL_INLINE hcl_oop_t leave_list (hcl_t* hcl, int* flagv, int* oldflagv)
 {
 	hcl_oop_t head;
 	int fv;
@@ -1260,6 +1268,7 @@ static HCL_INLINE hcl_oop_t leave_list (hcl_t* hcl, int* flagv)
 		head = (hcl_oop_t)arr;
 	}
 
+	*oldflagv = fv;
 	if (HCL_IS_NIL(hcl,hcl->c->r.s))
 	{
 		/* the stack is empty after popping. 
@@ -1380,21 +1389,21 @@ static HCL_INLINE int is_list_empty (hcl_t* hcl)
 
 static int add_to_byte_array_literal_buffer (hcl_t* hcl, hcl_oob_t b)
 {
-	if (hcl->c->r.balit_count >= hcl->c->r.balit_capa)
+	if (hcl->c->r.balit.size >= hcl->c->r.balit.capa)
 	{
 		hcl_oob_t* tmp;
 		hcl_oow_t new_capa;
 
-		new_capa = HCL_ALIGN (hcl->c->r.balit_count + 1, BALIT_BUFFER_ALIGN);
-		tmp = (hcl_oob_t*)hcl_reallocmem (hcl, hcl->c->r.balit, new_capa * HCL_SIZEOF(*tmp));
+		new_capa = HCL_ALIGN (hcl->c->r.balit.size + 1, BALIT_BUFFER_ALIGN);
+		tmp = (hcl_oob_t*)hcl_reallocmem (hcl, hcl->c->r.balit.ptr, new_capa * HCL_SIZEOF(*tmp));
 		if (!tmp) return -1;
 
-		hcl->c->r.balit_capa = new_capa;
-		hcl->c->r.balit = tmp;
+		hcl->c->r.balit.capa = new_capa;
+		hcl->c->r.balit.ptr = tmp;
 	}
 
-/* TODO: overflow check of hcl->c->r.balit_count itself */
-	hcl->c->r.balit[hcl->c->r.balit_count++] = b;
+/* TODO: overflow check of hcl->c->r.balit.size itself */
+	hcl->c->r.balit.ptr[hcl->c->r.balit.size++] = b;
 	return 0;
 }
 
@@ -1403,7 +1412,7 @@ static int get_byte_array_literal (hcl_t* hcl, hcl_oop_t* xlit)
 	hcl_ooi_t tmp;
 	hcl_oop_t ba;
 
-	hcl->c->r.balit_count = 0;
+	HCL_ASSERT (hcl->c->r.balit.size == 0);
 
 	HCL_ASSERT (TOKEN_TYPE(hcl) == HCL_IOTOK_BAPAREN);
 	GET_TOKEN(hcl); /* skip #[ */
@@ -1439,14 +1448,81 @@ static int get_byte_array_literal (hcl_t* hcl, hcl_oop_t* xlit)
 		return -1;
 	}
 
-	ba = hcl_makebytearray (hcl, hcl->c->r.balit, hcl->c->r.balit_count);
+	ba = hcl_makebytearray (hcl, hcl->c->r.balit.ptr, hcl->c->r.balit.size);
 	if (!ba) 
 	{
-		hcl->c->r.balit_count = 0; /* reset literal count... */
+		hcl->c->r.balit.size = 0; /* reset literal count... */
 		return -1;
 	}
 
 	*xlit = ba;
+
+	hcl->c->r.balit.size = 0; /* reset literal count... */
+	return 0;
+}
+
+
+static int add_to_symbol_array_literal_buffer (hcl_t* hcl, hcl_oop_t b)
+{
+	if (hcl->c->r.salit.size >= hcl->c->r.salit.capa)
+	{
+		hcl_oop_t* tmp;
+		hcl_oow_t new_capa;
+
+		new_capa = HCL_ALIGN (hcl->c->r.salit.size + 1, SALIT_BUFFER_ALIGN);
+		tmp = (hcl_oop_t*)hcl_reallocmem (hcl, hcl->c->r.salit.ptr, new_capa * HCL_SIZEOF(*tmp));
+		if (!tmp) return -1;
+
+		hcl->c->r.salit.capa = new_capa;
+		hcl->c->r.salit.ptr = tmp;
+	}
+
+/* TODO: overflow check of hcl->c->r.tvlit_count itself */
+	hcl->c->r.salit.ptr[hcl->c->r.salit.size++] = b;
+	return 0;
+}
+
+static int get_symbol_array_literal (hcl_t* hcl, hcl_oop_t* xlit)
+{
+	hcl_oop_t sa, sym;
+	hcl_oow_t i;
+
+	HCL_ASSERT (hcl->c->r.salit.size == 0);
+
+	HCL_ASSERT (TOKEN_TYPE(hcl) == HCL_IOTOK_VBAR);
+	GET_TOKEN(hcl); /* skip #[ */
+
+	while (TOKEN_TYPE(hcl) == HCL_IOTOK_IDENT)
+	{
+		sym = hcl_makesymbol (hcl, TOKEN_NAME_PTR(hcl), TOKEN_NAME_LEN(hcl));
+		if (!sym) return -1;
+
+		if (add_to_symbol_array_literal_buffer(hcl, sym) <= -1) return -1;
+		GET_TOKEN (hcl);
+	}
+
+	if (TOKEN_TYPE(hcl) != HCL_IOTOK_VBAR)
+	{
+		hcl_setsynerr (hcl, HCL_SYNERR_VBAR, TOKEN_LOC(hcl), TOKEN_NAME(hcl));
+		return -1;
+	}
+
+	sa = hcl_makearray (hcl, hcl->c->r.salit.size);
+	if (!sa) 
+	{
+		hcl->c->r.salit.size = 0; /* reset literal count... */
+		return -1;
+	}
+
+	for (i = 0; i < hcl->c->r.salit.size; i++)
+		((hcl_oop_oop_t)sa)->slot[i] = hcl->c->r.salit.ptr[i];
+
+	/* switch array to symbol array. this is special-purpose. */
+	HCL_OBJ_SET_FLAGS_BRAND (sa, HCL_BRAND_SYMBOL_ARRAY);
+
+	*xlit = sa;
+
+	hcl->c->r.salit.size = 0; /* reset literal count... */
 	return 0;
 }
 
@@ -1455,7 +1531,7 @@ static int read_object (hcl_t* hcl)
 	/* this function read an s-expression non-recursively
 	 * by manipulating its own stack. */
 
-	int level = 0, flagv = 0; 
+	int level = 0, array_level = 0, flagv = 0; 
 	hcl_oop_t obj;
 
 	while (1)
@@ -1521,6 +1597,7 @@ static int read_object (hcl_t* hcl)
 				 * a list literal or an array literal */
 				if (enter_list (hcl, flagv) == HCL_NULL) return -1;
 				level++;
+				if (flagv & ARRAY) array_level++;
 
 				/* read the next token */
 				GET_TOKEN (hcl);
@@ -1541,6 +1618,8 @@ static int read_object (hcl_t* hcl)
 				goto redo;
 
 			case HCL_IOTOK_RPAREN:
+			{
+				int oldflagv;
 				if ((flagv & QUOTED) || level <= 0)
 				{
 					/* the right parenthesis can never appear while 
@@ -1564,13 +1643,25 @@ static int read_object (hcl_t* hcl)
 					return -1;
 				}
 
-				obj = leave_list (hcl, &flagv);
+				obj = leave_list (hcl, &flagv, &oldflagv);
 
 				level--;
+				if (oldflagv & ARRAY) array_level--;
 				break;
+			}
 
 			case HCL_IOTOK_BAPAREN:
 				if (get_byte_array_literal(hcl, &obj) <= -1) return -1;
+				break;
+
+			case HCL_IOTOK_VBAR:
+/* TODO: think wheter to allow | | inside a quoted list... */
+				if (array_level > 0)
+				{
+					hcl_setsynerr (hcl, HCL_SYNERR_VBARBANNED, TOKEN_LOC(hcl), TOKEN_NAME(hcl));
+					return -1;
+				}
+				if (get_symbol_array_literal (hcl, &obj) <= -1) return -1;
 				break;
 
 			case HCL_IOTOK_NIL:
@@ -1622,6 +1713,8 @@ static int read_object (hcl_t* hcl)
 		/* check if the element is read for a quoted list */
 		while (flagv & QUOTED)
 		{
+			int oldflagv;
+
 			HCL_ASSERT (level > 0);
 
 			/* if so, append the element read into the quote list */
@@ -1629,10 +1722,11 @@ static int read_object (hcl_t* hcl)
 
 			/* exit out of the quoted list. the quoted list can have 
 			 * one element only. */
-			obj = leave_list (hcl, &flagv);
+			obj = leave_list (hcl, &flagv, &oldflagv);
 
 			/* one level up toward the top */
 			level--;
+			if (oldflagv & ARRAY) array_level--;
 		}
 
 		/* check if we are at the top level */
@@ -1648,6 +1742,7 @@ static int read_object (hcl_t* hcl)
 
 	/* upon exit, we must be at the top level */
 	HCL_ASSERT (level == 0);
+	HCL_ASSERT (array_level == 0);
 
 	hcl->c->r.e = obj; 
 	return 0;
@@ -1683,6 +1778,7 @@ static void gc_compiler (hcl_t* hcl)
 	hcl->c->r.s = hcl_moveoop (hcl, hcl->c->r.s);
 	hcl->c->r.e = hcl_moveoop (hcl, hcl->c->r.e);
 
+
 	for (i = 0; i <= hcl->c->cfs.top; i++)
 	{
 		hcl->c->cfs.ptr[i].operand = hcl_moveoop(hcl, hcl->c->cfs.ptr[i].operand);
@@ -1692,6 +1788,12 @@ static void gc_compiler (hcl_t* hcl)
 	{
 		hcl->c->tv.ptr[i] = hcl_moveoop (hcl, hcl->c->tv.ptr[i]);
 	}
+
+	for (i = 0; i < hcl->c->r.salit.size; i++)
+	{
+		hcl->c->r.salit.ptr[i] = hcl_moveoop (hcl, hcl->c->r.salit.ptr[i]);
+	}
+
 }
 
 static void fini_compiler (hcl_t* hcl)
@@ -1699,12 +1801,20 @@ static void fini_compiler (hcl_t* hcl)
 	/* called before the hcl object is closed */
 	if (hcl->c)
 	{
-		if (hcl->c->r.balit)
+		if (hcl->c->r.balit.ptr)
 		{
-			hcl_freemem (hcl, hcl->c->r.balit);
-			hcl->c->r.balit = HCL_NULL;
-			hcl->c->r.balit_count = 0;
-			hcl->c->r.balit_capa = 0;
+			hcl_freemem (hcl, hcl->c->r.balit.ptr);
+			hcl->c->r.balit.ptr = HCL_NULL;
+			hcl->c->r.balit.size = 0;
+			hcl->c->r.balit.capa = 0;
+		}
+
+		if (hcl->c->r.salit.ptr)
+		{
+			hcl_freemem (hcl, hcl->c->r.salit.ptr);
+			hcl->c->r.salit.ptr = HCL_NULL;
+			hcl->c->r.salit.size = 0;
+			hcl->c->r.salit.capa = 0;
 		}
 
 		if (hcl->c->cfs.ptr)

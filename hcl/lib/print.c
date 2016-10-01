@@ -52,11 +52,11 @@ do { \
 #define OUTPUT_CHAR(pr,ch) do { \
 	hcl_ooch_t tmp = ch; \
 	OUTPUT_STRX (pr, &tmp, 1); \
-} while(0);
+} while(0)
 
-#define PRINT_STACK_ARRAY_END  0
-#define PRINT_STACK_CONS  1
-#define PRINT_STACK_ARRAY 2
+#define PRINT_STACK_ARRAY_END    0
+#define PRINT_STACK_CONS         1
+#define PRINT_STACK_ARRAY        2
 
 typedef struct print_stack_t print_stack_t;
 struct print_stack_t
@@ -193,6 +193,7 @@ static int print_object (printer_t* pr, hcl_oop_t obj)
 	hcl_t* hcl;
 	hcl_oop_t cur;
 	print_stack_t ps;
+	int brand;
 
 	static struct 
 	{
@@ -219,7 +220,7 @@ next:
 		goto done;
 	}
 
-	switch (HCL_OBJ_GET_FLAGS_BRAND(obj)) 
+	switch ((brand = HCL_OBJ_GET_FLAGS_BRAND(obj))) 
 	{
 		case HCL_BRAND_NIL:
 			OUTPUT_STRX (pr, word[0].ptr, word[0].len);
@@ -337,18 +338,32 @@ next:
 		{
 			hcl_oow_t arridx;
 
-			OUTPUT_CHAR (pr, '#');
-			OUTPUT_CHAR (pr, '(');
+			if (brand == HCL_BRAND_ARRAY)
+			{
+				OUTPUT_CHAR (pr, '#');
+				OUTPUT_CHAR (pr, '(');
+			}
+			else
+			{
+				OUTPUT_CHAR (pr, '|');
+			}
 
-			if (HCL_OBJ_GET_SIZE(obj) <= 0) goto done_array;
+			if (HCL_OBJ_GET_SIZE(obj) <= 0) 
+			{
+				if (brand == HCL_BRAND_ARRAY)
+					OUTPUT_CHAR (pr, ')');
+				else
+					OUTPUT_CHAR (pr, '|');
+				break;
+			}
 			arridx = 0;
+			ps.type = PRINT_STACK_ARRAY;
 
 			do
 			{
 				int x;
 
-				/* Push what to print next on to the stack 
-				 * the variable p is */
+				/* Push what to print next on to the stack */
 				ps.idx = arridx + 1;
 				if (ps.idx >= HCL_OBJ_GET_SIZE(obj)) 
 				{
@@ -356,7 +371,7 @@ next:
 				}
 				else
 				{
-					ps.type = PRINT_STACK_ARRAY;
+					HCL_ASSERT (ps.type == PRINT_STACK_ARRAY);
 					ps.obj = obj;
 				}
 				
@@ -368,7 +383,7 @@ next:
 				/* Jump to the 'next' label so that the object 
 				 * pointed to by 'obj' is printed. Once it 
 				 * ends, a jump back to the 'resume' label
-				 * is made at the at of this function. */
+				 * is made at the end of this function. */
 				goto next; 
 
 			resume_array:
@@ -377,9 +392,6 @@ next:
 				obj = ps.obj;
 			} 
 			while (1);
-
-		done_array:
-			OUTPUT_CHAR (pr, ')');
 			break;
 		}
 
@@ -399,6 +411,23 @@ next:
 			break;
 		}
 
+		case HCL_BRAND_SYMBOL_ARRAY:
+		{
+			hcl_oow_t i;
+
+			OUTPUT_CHAR (pr, '|');
+
+			for (i = 0; i < HCL_OBJ_GET_SIZE(obj); i++)
+			{
+				hcl_oop_t s;
+				s = ((hcl_oop_oop_t)obj)->slot[i];
+				OUTPUT_CHAR (pr, ' ');
+				OUTPUT_STRX (pr, ((hcl_oop_char_t)s)->slot, HCL_OBJ_GET_SIZE(s));
+			}
+			OUTPUT_CHAR (pr, ' ');
+			OUTPUT_CHAR (pr, '|');
+			break;
+		}
 #if 0
 		case HCL_BRAND_PROCEDURE:
 			OUTPUT_STR (pr, "#<PROCEDURE>");
@@ -411,7 +440,7 @@ next:
 
 		default:
 			HCL_ASSERT ("Unknown object type" == HCL_NULL);
-			HCL_DEBUG2 (hcl, "Internal error - unknown object type at %s:%d\n", __FILE__, __LINE__);
+			HCL_DEBUG3 (hcl, "Internal error - unknown object type %d at %s:%d\n", (int)brand, __FILE__, __LINE__);
 			hcl->errnum = HCL_EINTERN;
 			return -1;
 	}
@@ -421,12 +450,22 @@ done:
 	while (hcl->p.s.size > 0)
 	{
 		pop (hcl, &ps);
-		if (ps.type == PRINT_STACK_CONS) goto resume_cons;
-		else if (ps.type == PRINT_STACK_ARRAY) goto resume_array;
-		else 
+		switch (ps.type)
 		{
-			HCL_ASSERT (ps.type == PRINT_STACK_ARRAY_END);
-			OUTPUT_CHAR (pr, ')');
+			case PRINT_STACK_CONS:
+				goto resume_cons;
+
+			case PRINT_STACK_ARRAY:
+				goto resume_array;
+
+			case PRINT_STACK_ARRAY_END:
+				OUTPUT_CHAR (pr, ')');
+				break;
+
+			default:
+				HCL_DEBUG3 (hcl, "Internal error - unknown print stack type %d at %s:%d\n", (int)ps.type, __FILE__, __LINE__);
+				hcl->errnum = HCL_EINTERN;
+				return -1;
 		}
 	}
 

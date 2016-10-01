@@ -435,7 +435,16 @@ struct hcl_ntime_t
 #define HCL_GETBITS(type,value,offset,length) \
 	((((type)(value)) >> (offset)) & HCL_LBMASK(type,length))
 
+#define HCL_CLEARBITS(type,value,offset,length) \
+	(((type)(value)) & ~(HCL_LBMASK(type,length) << (offset)))
+
 #define HCL_SETBITS(type,value,offset,length,bits) \
+	(value = (HCL_CLEARBITS(type,value,offset,length) | (((bits) & HCL_LBMASK(type,length)) << (offset))))
+
+#define HCL_FLIPBITS(type,value,offset,length) \
+	(((type)(value)) ^ (HCL_LBMASK(type,length) << (offset)))
+
+#define HCL_ORBITS(type,value,offset,length,bits) \
 	(value = (((type)(value)) | (((bits) & HCL_LBMASK(type,length)) << (offset))))
 
 

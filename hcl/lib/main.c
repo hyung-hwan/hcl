@@ -436,21 +436,27 @@ static char* syntax_error_msg[] =
 	"( expected",
 	") expected",
 	"] expected",
+	"| expected",
 
 	"string expected",
 	"byte too small or too large",
 	"nesting level too deep",
 
+	"| disallowed",
 	". disallowed",
 	"#include error",
 
-	"argument name list expected",
-	"argument name expected",
 	"lambda block too big",
 	"lambda block too deep",
+	"argument name list expected",
+	"argument name expected",
+	"duplicate argument name",
 	"variable name expected",
 	"wrong number of arguments",
-	"too many arguments defined"
+	"too many arguments defined",
+	"too many variables defined",
+	"variable declaration disallowed",
+	"duplicate variable name"
 };
 
 static void print_synerr (hcl_t* hcl)
@@ -499,7 +505,6 @@ hcl_ooch_t str_hcl[] = { 'S', 't', 'i', 'x' };
 hcl_ooch_t str_my_object[] = { 'M', 'y', 'O', 'b','j','e','c','t' };
 hcl_ooch_t str_main[] = { 'm', 'a', 'i', 'n' };
 
-
 int main (int argc, char* argv[])
 {
 	hcl_t* hcl;
@@ -513,7 +518,6 @@ int main (int argc, char* argv[])
 		return -1;
 	}
 #endif
-
 
 	memset (&vmprim, 0, HCL_SIZEOF(vmprim));
 	vmprim.log_write = log_write;
@@ -601,7 +605,19 @@ int main (int argc, char* argv[])
 		else
 		{
 			hcl_print (hcl, HCL_CHAR_TO_OOP('\n'));
-			hcl_compile (hcl, obj); /* TODO: error handling */
+			if (hcl_compile (hcl, obj) <= -1)
+			{
+				if (hcl->errnum == HCL_ESYNERR)
+				{
+					print_synerr (hcl);
+				}
+				else
+				{
+					printf ("ERROR: cannot compile object - %d\n", hcl_geterrnum(hcl));
+				}
+
+				/* carry on? */
+			}
 		}
 	}
 
