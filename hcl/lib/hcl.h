@@ -53,6 +53,7 @@ enum hcl_errnum_t
 	HCL_ERANGE,  /**< range error. overflow and underflow */
 	HCL_ENOENT,  /**< no matching entry */
 	HCL_EEXIST,  /**< duplicate entry */
+	HCL_EBCFULL, /**< byte-code full */
 	HCL_EDFULL,  /**< dictionary full */
 	HCL_EPFULL,  /**< processor full */
 	HCL_ESHFULL, /**< semaphore heap full */
@@ -597,11 +598,11 @@ struct hcl_context_t
 };
 
 
-#define HCL_PROCESS_NAMED_INSTVARS 7
+#define HCL_PROCESS_NAMED_INSTVARS 7 /* TODO: RENAME THIS TO SOMETHING ELSE */
 typedef struct hcl_process_t hcl_process_t;
 typedef struct hcl_process_t* hcl_oop_process_t;
 
-#define HCL_SEMAPHORE_NAMED_INSTVARS 6
+#define HCL_SEMAPHORE_NAMED_INSTVARS 6 /* TODO: RENAME THIS TO SOMETHIGN ELSE */
 typedef struct hcl_semaphore_t hcl_semaphore_t;
 typedef struct hcl_semaphore_t* hcl_oop_semaphore_t;
 
@@ -938,12 +939,13 @@ struct hcl_t
 	hcl_oow_t tmp_count;
 
 	/* == EXECUTION REGISTERS == */
+	hcl_oop_context_t initial_context; /* fake initial context */
 	hcl_oop_context_t active_context;
-	hcl_oop_method_t active_method;
-	hcl_oob_t* active_code;
 	hcl_ooi_t sp;
 	hcl_ooi_t ip;
 	int proc_switched; /* TODO: this is temporary. implement something else to skip immediate context switching */
+	int switch_proc;
+	hcl_ntime_t vm_time_offset;
 	/* == END EXECUTION REGISTERS == */
 
 	/* == BIGINT CONVERSION == */
@@ -958,13 +960,13 @@ struct hcl_t
 	{
 		struct
 		{
-			hcl_oop_t arr; /* byte code array - not part of object memory */
+			hcl_oop_byte_t arr; /* byte code array - not part of object memory */
 			hcl_oow_t len;
 		} bc;
 
 		struct
 		{
-			hcl_oop_t arr; /* literal array - not part of object memory */
+			hcl_oop_oop_t arr; /* literal array - not part of object memory */
 			hcl_oow_t len;
 		} lit;
 	} code;
@@ -986,6 +988,33 @@ struct hcl_t
 	hcl_compiler_t* c;
 #endif
 };
+
+
+/* TODO: stack bound check when pushing */
+#define HCL_STACK_PUSH(hcl,v) \
+	do { \
+		(hcl)->sp = (hcl)->sp + 1; \
+		(hcl)->processor->active->slot[(hcl)->sp] = v; \
+	} while (0)
+
+#define HCL_STACK_GET(hcl,v_sp) ((hcl)->processor->active->slot[v_sp])
+#define HCL_STACK_SET(hcl,v_sp,v_obj) ((hcl)->processor->active->slot[v_sp] = v_obj)
+
+#define HCL_STACK_GETTOP(hcl) HCL_STACK_GET(hcl, (hcl)->sp)
+#define HCL_STACK_SETTOP(hcl,v_obj) HCL_STACK_SET(hcl, (hcl)->sp, v_obj)
+
+#define HCL_STACK_POP(hcl) ((hcl)->sp = (hcl)->sp - 1)
+#define HCL_STACK_POPS(hcl,count) ((hcl)->sp = (hcl)->sp - (count))
+#define HCL_STACK_ISEMPTY(hcl) ((hcl)->sp <= -1)
+
+#define HCL_STACK_GETARG(hcl,nargs,idx) HCL_STACK_GET(hcl, (hcl)->sp - ((nargs) - (idx) - 1))
+#define HCL_STACK_GETRCV(hcl,nargs) HCL_STACK_GET(hcl, (hcl)->sp - nargs);
+
+/* you can't access arguments and receiver after this macro. 
+ * also you must not call this macro more than once */
+#define HCL_STACK_SETRET(hcl,nargs,retv) (HCL_STACK_POPS(hcl, nargs), HCL_STACK_SETTOP(hcl, retv))
+#define HCL_STACK_SETRETTORCV(hcl,nargs) (HCL_STACK_POPS(hcl, nargs))
+
 
 /* =========================================================================
  * HCL VM LOGGING
@@ -1036,7 +1065,7 @@ typedef enum hcl_log_mask_t hcl_log_mask_t;
  * ========================================================================= */
 enum 
 {
-	HCL_BRAND_NIL,
+	HCL_BRAND_NIL = 1,
 	HCL_BRAND_TRUE,
 	HCL_BRAND_FALSE,
 	HCL_BRAND_CHARACTER,
@@ -1049,10 +1078,12 @@ enum
 	HCL_BRAND_STRING,
 	HCL_BRAND_SET,
 
-	HCL_BRAND_ENVIRONMENT, 
 	HCL_BRAND_CFRAME,/* compiler frame */
 
-	HCL_BRAND_PROCESS
+	HCL_BRAND_CONTEXT,
+	HCL_BRAND_PROCESS,
+	HCL_BRAND_PROCESS_SCHEDULER,
+	HCL_BRAND_SEMAPHORE
 };
 
 enum
@@ -1078,7 +1109,10 @@ typedef struct hcl_cons_t* hcl_oop_cons_t;
 #define HCL_IS_NIL(hcl,v) (v == (hcl)->_nil)
 #define HCL_IS_SYMBOL(hcl,v) (HCL_OOP_IS_POINTER(v) && HCL_OBJ_GET_FLAGS_BRAND(v) == HCL_BRAND_SYMBOL)
 #define HCL_IS_SYMBOL_ARRAY(hcl,v) (HCL_OOP_IS_POINTER(v) && HCL_OBJ_GET_FLAGS_BRAND(v) == HCL_BRAND_SYMBOL_ARRAY)
+#define HCL_IS_CONTEXT(hcl,v) (HCL_OOP_IS_POINTER(v) && HCL_OBJ_GET_FLAGS_BRAND(v) == HCL_BRAND_CONTEXT)
+#define HCL_IS_PROCESS(hcl,v) (HCL_OOP_IS_POINTER(v) && HCL_OBJ_GET_FLAGS_BRAND(v) == HCL_BRAND_PROCESS)
 #define HCL_IS_CONS(hcl,v) (HCL_OOP_IS_POINTER(v) && HCL_OBJ_GET_FLAGS_BRAND(v) == HCL_BRAND_CONS)
+#define HCL_IS_ARRAY(hcl,v) (HCL_OOP_IS_POINTER(v) && HCL_OBJ_GET_FLAGS_BRAND(v) == HCL_BRAND_ARRAY)
 
 #define HCL_CONS_CAR(v)  (((hcl_cons_t*)(v))->car)
 #define HCL_CONS_CDR(v)  (((hcl_cons_t*)(v))->cdr)
@@ -1266,8 +1300,8 @@ HCL_EXPORT void hcl_poptmps (
 
 HCL_EXPORT int hcl_decode (
 	hcl_t*            hcl,
-	hcl_oow_t         start,
-	hcl_oow_t         end
+	hcl_ooi_t         start,
+	hcl_ooi_t         end
 );
 
 /* Syntax error handling */
@@ -1363,6 +1397,16 @@ HCL_EXPORT hcl_oop_t hcl_makestring (
 HCL_EXPORT hcl_oop_t hcl_makeset (
 	hcl_t*            hcl, 
 	hcl_oow_t         inisize /* initial bucket size */
+);
+
+HCL_EXPORT hcl_oop_t hcl_makeprocess (
+	hcl_t*            hcl, 
+	hcl_oow_t         stksize
+);
+
+HCL_EXPORT hcl_oop_t hcl_makecontext (
+	hcl_t*            hcl,
+	hcl_ooi_t         ntmprs
 );
 
 

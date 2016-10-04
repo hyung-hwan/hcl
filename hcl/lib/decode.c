@@ -47,15 +47,18 @@
 #endif
 
 /* TODO: check if ip shoots beyond the maximum length in fetching code and parameters */
-int hcl_decode (hcl_t* hcl, hcl_oow_t start, hcl_oow_t end)
+int hcl_decode (hcl_t* hcl, hcl_ooi_t start, hcl_ooi_t end)
 {
 	hcl_oob_t bcode, * cdptr;
-	hcl_oow_t ip = start;
-	hcl_ooi_t b1, b2;
+	hcl_ooi_t ip = start;
+	hcl_oow_t b1, b2;
 
 	/* the instruction at the offset 'end' is not decoded.
 	 * decoding offset range is from start to end - 1. */
-	HCL_ASSERT (end <= hcl->code.bc.len);
+
+	HCL_ASSERT (start >= 0 && end >= 0);
+	HCL_ASSERT (hcl->code.bc.len < HCL_SMOOI_MAX); /* asserted by the compiler */
+	HCL_ASSERT (end <= hcl->code.bc.len); /* not harmful though this fails */
 
 	ip = start;
 	cdptr = ((hcl_oop_byte_t)hcl->code.bc.arr)->slot;
@@ -80,7 +83,7 @@ int hcl_decode (hcl_t* hcl, hcl_oow_t start, hcl_oow_t end)
 			case BCODE_PUSH_INSTVAR_7:
 				b1 = bcode & 0x7; /* low 3 bits */
 			push_instvar:
-				LOG_INST_1 (hcl, "push_instvar %zd", b1);
+				LOG_INST_1 (hcl, "push_instvar %zu", b1);
 				break;
 
 			/* ------------------------------------------------- */
@@ -98,7 +101,7 @@ int hcl_decode (hcl_t* hcl, hcl_oow_t start, hcl_oow_t end)
 			case BCODE_STORE_INTO_INSTVAR_7:
 				b1 = bcode & 0x7; /* low 3 bits */
 			store_instvar:
-				LOG_INST_1 (hcl, "store_into_instvar %zd", b1);
+				LOG_INST_1 (hcl, "store_into_instvar %zu", b1);
 				break;
 
 			case BCODE_POP_INTO_INSTVAR_X:
@@ -114,7 +117,7 @@ int hcl_decode (hcl_t* hcl, hcl_oow_t start, hcl_oow_t end)
 			case BCODE_POP_INTO_INSTVAR_7:
 				b1 = bcode & 0x7; /* low 3 bits */
 			pop_into_instvar:
-				LOG_INST_1 (hcl, "pop_into_instvar %zd", b1);
+				LOG_INST_1 (hcl, "pop_into_instvar %zu", b1);
 				break;
 
 			/* ------------------------------------------------- */
@@ -154,7 +157,7 @@ int hcl_decode (hcl_t* hcl, hcl_oow_t start, hcl_oow_t end)
 				if ((bcode >> 4) & 1)
 				{
 					/* push - bit 4 on */
-					LOG_INST_1 (hcl, "push_tempvar %zd", b1);
+					LOG_INST_1 (hcl, "push_tempvar %zu", b1);
 				}
 				else
 				{
@@ -162,11 +165,11 @@ int hcl_decode (hcl_t* hcl, hcl_oow_t start, hcl_oow_t end)
 					if ((bcode >> 3) & 1)
 					{
 						/* pop - bit 3 on */
-						LOG_INST_1 (hcl, "pop_into_tempvar %zd", b1);
+						LOG_INST_1 (hcl, "pop_into_tempvar %zu", b1);
 					}
 					else
 					{
-						LOG_INST_1 (hcl, "store_into_tempvar %zd", b1);
+						LOG_INST_1 (hcl, "store_into_tempvar %zu", b1);
 					}
 				}
 				break;
@@ -196,7 +199,7 @@ int hcl_decode (hcl_t* hcl, hcl_oow_t start, hcl_oow_t end)
 			case HCL_CODE_PUSH_LITERAL_7:
 				b1 = bcode & 0x7; /* low 3 bits */
 			push_literal:
-				LOG_INST_1 (hcl, "push_literal @%zd", b1);
+				LOG_INST_1 (hcl, "push_literal @%zu", b1);
 				break;
 
 			/* ------------------------------------------------- */
@@ -224,16 +227,16 @@ int hcl_decode (hcl_t* hcl, hcl_oow_t start, hcl_oow_t end)
 				{
 					if ((bcode >> 2) & 1)
 					{
-						LOG_INST_1 (hcl, "pop_into_object @%zd", b1);
+						LOG_INST_1 (hcl, "pop_into_object @%zu", b1);
 					}
 					else
 					{
-						LOG_INST_1 (hcl, "store_into_object @%zd", b1);
+						LOG_INST_1 (hcl, "store_into_object @%zu", b1);
 					}
 				}
 				else
 				{
-					LOG_INST_1 (hcl, "push_object @%zd", b1);
+					LOG_INST_1 (hcl, "push_object @%zu", b1);
 				}
 				break;
 
@@ -241,19 +244,19 @@ int hcl_decode (hcl_t* hcl, hcl_oow_t start, hcl_oow_t end)
 
 			case HCL_CODE_JUMP_FORWARD_X:
 				FETCH_PARAM_CODE_TO (hcl, b1);
-				LOG_INST_1 (hcl, "jump_forward %zd", b1);
+				LOG_INST_1 (hcl, "jump_forward %zu", b1);
 				break;
 
 			case HCL_CODE_JUMP_FORWARD_0:
 			case HCL_CODE_JUMP_FORWARD_1:
 			case HCL_CODE_JUMP_FORWARD_2:
 			case HCL_CODE_JUMP_FORWARD_3:
-				LOG_INST_1 (hcl, "jump_forward %zd", (bcode & 0x3)); /* low 2 bits */
+				LOG_INST_1 (hcl, "jump_forward %zu", (hcl_oow_t)(bcode & 0x3)); /* low 2 bits */
 				break;
 
 			case HCL_CODE_JUMP_BACKWARD_X:
 				FETCH_PARAM_CODE_TO (hcl, b1);
-				LOG_INST_1 (hcl, "jump_backward %zd", b1);
+				LOG_INST_1 (hcl, "jump_backward %zu", b1);
 				hcl->ip += b1;
 				break;
 
@@ -261,7 +264,7 @@ int hcl_decode (hcl_t* hcl, hcl_oow_t start, hcl_oow_t end)
 			case HCL_CODE_JUMP_BACKWARD_1:
 			case HCL_CODE_JUMP_BACKWARD_2:
 			case HCL_CODE_JUMP_BACKWARD_3:
-				LOG_INST_1 (hcl, "jump_backward %zd", (bcode & 0x3)); /* low 2 bits */
+				LOG_INST_1 (hcl, "jump_backward %zu", (hcl_oow_t)(bcode & 0x3)); /* low 2 bits */
 				break;
 
 			case BCODE_JUMP_IF_TRUE_X:
@@ -280,12 +283,12 @@ return -1;
 
 			case HCL_CODE_JUMP2_FORWARD:
 				FETCH_PARAM_CODE_TO (hcl, b1);
-				LOG_INST_1 (hcl, "jump2_forward %zd", b1);
+				LOG_INST_1 (hcl, "jump2_forward %zu", b1);
 				break;
 
 			case HCL_CODE_JUMP2_BACKWARD:
 				FETCH_PARAM_CODE_TO (hcl, b1);
-				LOG_INST_1 (hcl, "jump2_backward %zd", b1);
+				LOG_INST_1 (hcl, "jump2_backward %zu", b1);
 				break;
 
 			/* -------------------------------------------------------- */
@@ -300,7 +303,7 @@ return -1;
 			case HCL_CODE_CALL_3:
 				b1 = bcode & 0x3; /* low 2 bits */
 			handle_call:
-				LOG_INST_1 (hcl, "call %zd", b1);
+				LOG_INST_1 (hcl, "call %zu", b1);
 				break;
 			
 			/* -------------------------------------------------------- */
@@ -333,17 +336,17 @@ return -1;
 
 					if ((bcode >> 2) & 1)
 					{
-						LOG_INST_2 (hcl, "pop_into_ctxtempvar %zd %zd", b1, b2);
+						LOG_INST_2 (hcl, "pop_into_ctxtempvar %zu %zu", b1, b2);
 					}
 					else
 					{
-						LOG_INST_2 (hcl, "store_into_ctxtempvar %zd %zd", b1, b2);
+						LOG_INST_2 (hcl, "store_into_ctxtempvar %zu %zu", b1, b2);
 					}
 				}
 				else
 				{
 					/* push */
-					LOG_INST_2 (hcl, "push_ctxtempvar %zd %zd", b1, b2);
+					LOG_INST_2 (hcl, "push_ctxtempvar %zu %zu", b1, b2);
 				}
 
 				break;
@@ -379,16 +382,16 @@ return -1;
 					/* store or pop */
 					if ((bcode >> 2) & 1)
 					{
-						LOG_INST_2 (hcl, "pop_into_objvar %zd %zd", b1, b2);
+						LOG_INST_2 (hcl, "pop_into_objvar %zu %zu", b1, b2);
 					}
 					else
 					{
-						LOG_INST_2 (hcl, "store_into_objvar %zd %zd", b1, b2);
+						LOG_INST_2 (hcl, "store_into_objvar %zu %zu", b1, b2);
 					}
 				}
 				else
 				{
-					LOG_INST_2 (hcl, "push_objvar %zd %zd", b1, b2);
+					LOG_INST_2 (hcl, "push_objvar %zu %zu", b1, b2);
 				}
 
 				break;
@@ -414,7 +417,7 @@ return -1;
 				FETCH_BYTE_CODE_TO (hcl, b2);
 
 			handle_send_message:
-				LOG_INST_3 (hcl, "send_message%hs %zd @%zd", (((bcode >> 2) & 1)? "_to_super": ""), b1, b2);
+				LOG_INST_3 (hcl, "send_message%hs %zu @%zu", (((bcode >> 2) & 1)? "_to_super": ""), b1, b2);
 				break; 
 
 			/* -------------------------------------------------------- */
@@ -461,17 +464,17 @@ return -1;
 
 			case HCL_CODE_PUSH_INTLIT:
 				FETCH_PARAM_CODE_TO (hcl, b1);
-				LOG_INST_1 (hcl, "push_intlit %zd", b1);
+				LOG_INST_1 (hcl, "push_intlit %zu", b1);
 				break;
 
 			case HCL_CODE_PUSH_NEGINTLIT:
 				FETCH_PARAM_CODE_TO (hcl, b1);
-				LOG_INST_1 (hcl, "push_negintlit %zd", -b1);
+				LOG_INST_1 (hcl, "push_negintlit %zu", b1);
 				break;
 
 			case HCL_CODE_PUSH_CHARLIT:
 				FETCH_PARAM_CODE_TO (hcl, b1);
-				LOG_INST_1 (hcl, "push_charlit %zd", b1);
+				LOG_INST_1 (hcl, "push_charlit %zu", b1);
 				break;
 			/* -------------------------------------------------------- */
 
@@ -501,7 +504,7 @@ return -1;
 				FETCH_PARAM_CODE_TO (hcl, b1);
 				FETCH_PARAM_CODE_TO (hcl, b2);
 
-				LOG_INST_2 (hcl, "make_block %zd %zd", b1, b2);
+				LOG_INST_2 (hcl, "make_block %zu %zu", b1, b2);
 
 				HCL_ASSERT (b1 >= 0);
 				HCL_ASSERT (b2 >= b1);
@@ -520,14 +523,13 @@ return -1;
 				LOG_INST_1 (hcl, "UNKNOWN BYTE CODE ENCOUNTERED %x", (int)bcode);
 				hcl->errnum = HCL_EINTERN;
 				break;
-
 		}
 	}
 
 	/* print literal frame contents */
 	for (ip = 0; ip < hcl->code.lit.len; ip++)
 	{
-		LOG_INST_2 (hcl, " @%-3lu %O", (unsigned long int)ip, ((hcl_oop_oop_t)hcl->code.lit.arr)->slot[ip]);
+		LOG_INST_2 (hcl, " @%-3zd %O", ip, ((hcl_oop_oop_t)hcl->code.lit.arr)->slot[ip]);
 	}
 
 	return 0;

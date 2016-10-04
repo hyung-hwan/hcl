@@ -160,11 +160,9 @@ static hcl_oop_t find_or_make_symbol (hcl_t* hcl, const hcl_ooch_t* ptr, hcl_oow
 	}
 
 	/* create a new symbol since it isn't found in the symbol table */
-	symbol = (hcl_oop_char_t)hcl_alloccharobj (hcl, ptr, len);
+	symbol = (hcl_oop_char_t)hcl_alloccharobj (hcl, HCL_BRAND_SYMBOL, ptr, len);
 	if (symbol)
 	{
-		HCL_OBJ_SET_FLAGS_BRAND (symbol, HCL_BRAND_SYMBOL);
-
 		HCL_ASSERT (tally < HCL_SMOOI_MAX);
 		hcl->symtab->tally = HCL_SMOOI_TO_OOP(tally + 1);
 		hcl->symtab->bucket->slot[index] = (hcl_oop_t)symbol;

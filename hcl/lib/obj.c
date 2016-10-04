@@ -46,7 +46,7 @@ void* hcl_allocbytes (hcl_t* hcl, hcl_oow_t size)
 	return ptr;
 }
 
-hcl_oop_t hcl_allocoopobj (hcl_t* hcl, hcl_oow_t size)
+hcl_oop_t hcl_allocoopobj (hcl_t* hcl, int brand, hcl_oow_t size)
 {
 	hcl_oop_oop_t hdr;
 	hcl_oow_t nbytes, nbytes_aligned;
@@ -67,6 +67,7 @@ hcl_oop_t hcl_allocoopobj (hcl_t* hcl, hcl_oow_t size)
 	hdr->_flags = HCL_OBJ_MAKE_FLAGS(HCL_OBJ_TYPE_OOP, HCL_SIZEOF(hcl_oop_t), 0, 0, 0, 0, 0, 0);
 	HCL_OBJ_SET_SIZE (hdr, size);
 	HCL_OBJ_SET_CLASS (hdr, hcl->_nil);
+	HCL_OBJ_SET_FLAGS_BRAND (hdr, brand);
 
 	while (size > 0) hdr->slot[--size] = hcl->_nil;
 
@@ -109,7 +110,7 @@ hcl_oop_t hcl_allocoopobjwithtrailer (hcl_t* hcl, hcl_oow_t size, const hcl_oob_
 }
 #endif
 
-static HCL_INLINE hcl_oop_t alloc_numeric_array (hcl_t* hcl, const void* ptr, hcl_oow_t len, hcl_obj_type_t type, hcl_oow_t unit, int extra, int ngc)
+static HCL_INLINE hcl_oop_t alloc_numeric_array (hcl_t* hcl, int  brand, const void* ptr, hcl_oow_t len, hcl_obj_type_t type, hcl_oow_t unit, int extra, int ngc)
 {
 	/* allocate a variable object */
 
@@ -137,6 +138,7 @@ static HCL_INLINE hcl_oop_t alloc_numeric_array (hcl_t* hcl, const void* ptr, hc
 	hdr->_size = len;
 	HCL_OBJ_SET_SIZE (hdr, len);
 	HCL_OBJ_SET_CLASS (hdr, hcl->_nil);
+	HCL_OBJ_SET_FLAGS_BRAND (hdr, brand);
 
 	if (ptr)
 	{
@@ -153,24 +155,24 @@ static HCL_INLINE hcl_oop_t alloc_numeric_array (hcl_t* hcl, const void* ptr, hc
 	return hdr;
 }
 
-hcl_oop_t hcl_alloccharobj (hcl_t* hcl, const hcl_ooch_t* ptr, hcl_oow_t len)
+hcl_oop_t hcl_alloccharobj (hcl_t* hcl, int brand, const hcl_ooch_t* ptr, hcl_oow_t len)
 {
-	return alloc_numeric_array (hcl, ptr, len, HCL_OBJ_TYPE_CHAR, HCL_SIZEOF(hcl_ooch_t), 1, 0);
+	return alloc_numeric_array (hcl, brand, ptr, len, HCL_OBJ_TYPE_CHAR, HCL_SIZEOF(hcl_ooch_t), 1, 0);
 }
 
-hcl_oop_t hcl_allocbyteobj (hcl_t* hcl, const hcl_oob_t* ptr, hcl_oow_t len)
+hcl_oop_t hcl_allocbyteobj (hcl_t* hcl, int brand, const hcl_oob_t* ptr, hcl_oow_t len)
 {
-	return alloc_numeric_array (hcl, ptr, len, HCL_OBJ_TYPE_BYTE, HCL_SIZEOF(hcl_oob_t), 0, 0);
+	return alloc_numeric_array (hcl, brand, ptr, len, HCL_OBJ_TYPE_BYTE, HCL_SIZEOF(hcl_oob_t), 0, 0);
 }
 
-hcl_oop_t hcl_allochalfwordobj (hcl_t* hcl, const hcl_oohw_t* ptr, hcl_oow_t len)
+hcl_oop_t hcl_allochalfwordobj (hcl_t* hcl, int brand, const hcl_oohw_t* ptr, hcl_oow_t len)
 {
-	return alloc_numeric_array (hcl, ptr, len, HCL_OBJ_TYPE_HALFWORD, HCL_SIZEOF(hcl_oohw_t), 0, 0);
+	return alloc_numeric_array (hcl, brand, ptr, len, HCL_OBJ_TYPE_HALFWORD, HCL_SIZEOF(hcl_oohw_t), 0, 0);
 }
 
-hcl_oop_t hcl_allocwordobj (hcl_t* hcl, const hcl_oow_t* ptr, hcl_oow_t len)
+hcl_oop_t hcl_allocwordobj (hcl_t* hcl, int brand, const hcl_oow_t* ptr, hcl_oow_t len)
 {
-	return alloc_numeric_array (hcl, ptr, len, HCL_OBJ_TYPE_WORD, HCL_SIZEOF(hcl_oow_t), 0, 0);
+	return alloc_numeric_array (hcl, brand, ptr, len, HCL_OBJ_TYPE_WORD, HCL_SIZEOF(hcl_oow_t), 0, 0);
 }
 
 
@@ -227,6 +229,7 @@ static HCL_INLINE int decode_spec (hcl_t* hcl, hcl_oop_t _class, hcl_oow_t vlen,
 
 hcl_oop_t hcl_instantiate (hcl_t* hcl, hcl_oop_t _class, const void* vptr, hcl_oow_t vlen)
 {
+#if 0
 	hcl_oop_t oop;
 	hcl_obj_type_t type;
 	hcl_oow_t alloclen;
@@ -292,12 +295,17 @@ hcl_oop_t hcl_instantiate (hcl_t* hcl, hcl_oop_t _class, const void* vptr, hcl_o
 	if (oop) HCL_OBJ_SET_CLASS (oop, _class);
 	hcl_poptmps (hcl, tmp_count);
 	return oop;
+#endif
+
+	hcl->errnum = HCL_ENOIMPL;
+	return HCL_NULL;
 }
 
 #if defined(HCL_USE_OBJECT_TRAILER)
 
 hcl_oop_t hcl_instantiatewithtrailer (hcl_t* hcl, hcl_oop_t _class, hcl_oow_t vlen, const hcl_oob_t* tptr, hcl_oow_t tlen)
 {
+#if 0
 	hcl_oop_t oop;
 	hcl_obj_type_t type;
 	hcl_oow_t alloclen;
@@ -329,6 +337,10 @@ hcl_oop_t hcl_instantiatewithtrailer (hcl_t* hcl, hcl_oop_t _class, hcl_oow_t vl
 	if (oop) HCL_OBJ_SET_CLASS (oop, _class);
 	hcl_poptmps (hcl, tmp_count);
 	return oop;
+#endif
+
+	hcl->errnum = HCL_ENOIMPL;
+	return HCL_NULL;
 }
 #endif
 
@@ -340,56 +352,23 @@ hcl_oop_t hcl_instantiatewithtrailer (hcl_t* hcl, hcl_oop_t _class, hcl_oow_t vl
 
 hcl_oop_t hcl_makenil (hcl_t* hcl)
 {
-	hcl_oop_t obj;
-
-	obj = hcl_allocoopobj (hcl, 0);
-	if (obj)
-	{
-		HCL_OBJ_SET_FLAGS_BRAND (obj, HCL_BRAND_NIL);
-	}
-
-	return obj;
+	return hcl_allocoopobj (hcl, HCL_BRAND_NIL, 0);
 }
 
 hcl_oop_t hcl_maketrue (hcl_t* hcl)
 {
-	hcl_oop_t obj;
-
-	obj = hcl_allocoopobj (hcl, 0);
-	if (obj)
-	{
-		HCL_OBJ_SET_FLAGS_BRAND (obj, HCL_BRAND_TRUE);
-	}
-
-	return obj;
+	return hcl_allocoopobj (hcl, HCL_BRAND_TRUE, 0);
 }
 
 hcl_oop_t hcl_makefalse (hcl_t* hcl)
 {
-	hcl_oop_t obj;
-
-	obj = hcl_allocoopobj (hcl, 0);
-	if (obj)
-	{
-		HCL_OBJ_SET_FLAGS_BRAND (obj, HCL_BRAND_FALSE);
-	}
-
-	return obj;
+	return hcl_allocoopobj (hcl, HCL_BRAND_FALSE, 0);
 }
 
 hcl_oop_t hcl_makeinteger (hcl_t* hcl, hcl_ooi_t v)
 {
-	hcl_oop_t obj;
-
 	if (HCL_IN_SMOOI_RANGE(v)) return HCL_SMOOI_TO_OOP(v);
-
-	obj = hcl_allocwordobj (hcl, (hcl_oow_t*)&v, 1);
-	if (obj)
-	{
-		HCL_OBJ_SET_FLAGS_BRAND (obj, HCL_BRAND_INTEGER);
-	}
-
-	return obj;
+	return hcl_allocwordobj (hcl, HCL_BRAND_INTEGER, (hcl_oow_t*)&v, 1);
 }
 
 hcl_oop_t hcl_makecons (hcl_t* hcl, hcl_oop_t car, hcl_oop_t cdr)
@@ -399,12 +378,11 @@ hcl_oop_t hcl_makecons (hcl_t* hcl, hcl_oop_t car, hcl_oop_t cdr)
 	hcl_pushtmp (hcl, &car);
 	hcl_pushtmp (hcl, &cdr);
 
-	cons = (hcl_oop_cons_t)hcl_allocoopobj (hcl, 2);
+	cons = (hcl_oop_cons_t)hcl_allocoopobj (hcl, HCL_BRAND_CONS, 2);
 	if (cons)
 	{
 		cons->car = car;
 		cons->cdr = cdr;
-		HCL_OBJ_SET_FLAGS_BRAND (cons, HCL_BRAND_CONS);
 	}
 
 	hcl_poptmps (hcl, 2);
@@ -414,55 +392,30 @@ hcl_oop_t hcl_makecons (hcl_t* hcl, hcl_oop_t car, hcl_oop_t cdr)
 
 hcl_oop_t hcl_makearray (hcl_t* hcl, hcl_oow_t size)
 {
-	hcl_oop_t obj;
-
-	obj = hcl_allocoopobj (hcl, size);
-	if (obj)
-	{
-		HCL_OBJ_SET_FLAGS_BRAND (obj, HCL_BRAND_ARRAY);
-	}
-
-	return obj;
+	return hcl_allocoopobj (hcl, HCL_BRAND_ARRAY, size);
 }
 
 hcl_oop_t hcl_makebytearray (hcl_t* hcl, const hcl_oob_t* ptr, hcl_oow_t size)
 {
-	hcl_oop_t obj;
-
-	obj = hcl_allocbyteobj (hcl, ptr, size);
-	if (obj)
-	{
-		HCL_OBJ_SET_FLAGS_BRAND (obj, HCL_BRAND_BYTE_ARRAY);
-	}
-
-	return obj;
+	return hcl_allocbyteobj (hcl, HCL_BRAND_BYTE_ARRAY, ptr, size);
 }
 
 hcl_oop_t hcl_makestring (hcl_t* hcl, const hcl_ooch_t* ptr, hcl_oow_t len)
 {
-	hcl_oop_t obj;
-
-	obj = hcl_alloccharobj (hcl, ptr, len);
-	if (obj)
-	{
-		HCL_OBJ_SET_FLAGS_BRAND (obj, HCL_BRAND_STRING);
-	}
-
-	return obj;
+	return hcl_alloccharobj (hcl, HCL_BRAND_STRING, ptr, len);
 }
 
 hcl_oop_t hcl_makeset (hcl_t* hcl, hcl_oow_t inisize)
 {
 	hcl_oop_set_t obj;
 
-	obj = (hcl_oop_set_t)hcl_allocoopobj (hcl, 2);
+	obj = (hcl_oop_set_t)hcl_allocoopobj (hcl, HCL_BRAND_SET, 2);
 	if (obj)
 	{
 		hcl_oop_oop_t bucket;
 
-		HCL_OBJ_SET_FLAGS_BRAND (obj, HCL_BRAND_SET);
 		obj->tally = HCL_SMOOI_TO_OOP(0);
-		
+
 		hcl_pushtmp (hcl, (hcl_oop_t*)&obj);
 		bucket = (hcl_oop_oop_t)hcl_makearray (hcl, inisize);
 		hcl_poptmp (hcl);
@@ -475,6 +428,12 @@ hcl_oop_t hcl_makeset (hcl_t* hcl, hcl_oow_t inisize)
 }
 
 
+
+
+/* ------------------------------------------------------------------------ *
+ * NGC HANDLING
+ * ------------------------------------------------------------------------ */
+
 void hcl_freengcobj (hcl_t* hcl, hcl_oop_t obj)
 {
 	if (HCL_OOP_IS_POINTER(obj) && HCL_OBJ_GET_FLAGS_NGC(obj)) hcl_freemem (hcl, obj);
@@ -482,15 +441,7 @@ void hcl_freengcobj (hcl_t* hcl, hcl_oop_t obj)
 
 hcl_oop_t hcl_makengcbytearray (hcl_t* hcl, const hcl_oob_t* ptr, hcl_oow_t len)
 {
-	hcl_oop_t obj;
-
-	obj = alloc_numeric_array (hcl, ptr, len, HCL_OBJ_TYPE_BYTE, HCL_SIZEOF(hcl_oob_t), 0, 1);
-	if (obj)
-	{
-		HCL_OBJ_SET_FLAGS_BRAND (obj, HCL_BRAND_BYTE_ARRAY);
-	}
-
-	return obj;
+	return alloc_numeric_array (hcl, HCL_BRAND_BYTE_ARRAY, ptr, len, HCL_OBJ_TYPE_BYTE, HCL_SIZEOF(hcl_oob_t), 0, 1);
 }
 
 hcl_oop_t hcl_remakengcbytearray (hcl_t* hcl, hcl_oop_t obj, hcl_oow_t newsize)
@@ -518,15 +469,7 @@ hcl_oop_t hcl_remakengcbytearray (hcl_t* hcl, hcl_oop_t obj, hcl_oow_t newsize)
 
 hcl_oop_t hcl_makengcarray (hcl_t* hcl, hcl_oow_t len)
 {
-	hcl_oop_t obj;
-
-	obj = alloc_numeric_array (hcl, HCL_NULL, len, HCL_OBJ_TYPE_OOP, HCL_SIZEOF(hcl_oop_t), 0, 1);
-	if (obj)
-	{
-		HCL_OBJ_SET_FLAGS_BRAND (obj, HCL_BRAND_ARRAY);
-	}
-
-	return obj;
+	return alloc_numeric_array (hcl, HCL_BRAND_ARRAY, HCL_NULL, len, HCL_OBJ_TYPE_OOP, HCL_SIZEOF(hcl_oop_t), 0, 1);
 }
 
 hcl_oop_t hcl_remakengcarray (hcl_t* hcl, hcl_oop_t obj, hcl_oow_t newsize)

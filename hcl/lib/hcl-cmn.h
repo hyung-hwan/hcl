@@ -447,7 +447,6 @@ struct hcl_ntime_t
 #define HCL_ORBITS(type,value,offset,length,bits) \
 	(value = (((type)(value)) | (((bits) & HCL_LBMASK(type,length)) << (offset))))
 
-
 /** 
  * The HCL_BITS_MAX() macros calculates the maximum value that the 'nbits'
  * bits of an unsigned integer of the given 'type' can hold.

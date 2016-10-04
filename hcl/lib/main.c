@@ -621,6 +621,13 @@ int main (int argc, char* argv[])
 		}
 	}
 
+hcl_decode (hcl, 0, hcl->code.bc.len);
+HCL_LOG0 (hcl, HCL_LOG_MNEMONIC, "------------------------------------------\n");
+if (hcl_execute (hcl) <= -1)
+{
+	printf ("ERROR: cannot execute - %d\n", hcl_geterrnum(hcl));
+}
+
 
 {
 HCL_LOG0 (hcl, HCL_LOG_MNEMONIC, "------------------------------------------\n");

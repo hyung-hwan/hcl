@@ -52,7 +52,7 @@
 /* this is for gc debugging */
 /*#define HCL_DEBUG_PROCESSOR*/
 #define HCL_DEBUG_GC
-
+#define HCL_DEBUG_VM_EXEC
 
 /* limit the maximum object size such that:
  *   1. an index to an object field can be represented in a small integer.
@@ -377,16 +377,8 @@ struct hcl_compiler_t
 		hcl_oow_t  tmprcnt_capa;
 	} blk; /* lambda block */
 };
-
 #endif
 
-#if defined(HCL_USE_OBJECT_TRAILER)
-	/* let it point to the trailer of the method */
-#	define SET_ACTIVE_METHOD_CODE(hcl) ((hcl)->active_code = (hcl_oob_t*)&(hcl)->active_method->slot[HCL_OBJ_GET_SIZE((hcl)->active_method) + 1 - HCL_METHOD_NAMED_INSTVARS])
-#else
-	/* let it point to the payload of the code byte array */
-#	define SET_ACTIVE_METHOD_CODE(hcl) ((hcl)->active_code = (hcl)->active_method->code->slot)
-#endif
 
 #if defined(HCL_BCODE_LONG_PARAM_SIZE) && (HCL_BCODE_LONG_PARAM_SIZE == 1)
 #	define MAX_CODE_INDEX               (0xFFu)
@@ -757,6 +749,7 @@ void* hcl_allocbytes (
  */
 hcl_oop_t hcl_allocoopobj (
 	hcl_t*    hcl,
+	int       brand,
 	hcl_oow_t size
 );
 
@@ -771,24 +764,28 @@ hcl_oop_t hcl_allocoopobjwithtrailer (
 
 hcl_oop_t hcl_alloccharobj (
 	hcl_t*            hcl,
+	int               brand,
 	const hcl_ooch_t* ptr,
 	hcl_oow_t         len
 );
 
 hcl_oop_t hcl_allocbyteobj (
-	hcl_t*           hcl,
-	const hcl_oob_t* ptr,
-	hcl_oow_t        len
+	hcl_t*            hcl,
+	int               brand,
+	const hcl_oob_t*  ptr,
+	hcl_oow_t         len
 );
 
 hcl_oop_t hcl_allochalfwordobj (
 	hcl_t*            hcl,
+	int               brand,
 	const hcl_oohw_t* ptr,
 	hcl_oow_t         len
 );
 
 hcl_oop_t hcl_allocwordobj (
 	hcl_t*           hcl,
+	int               brand,
 	const hcl_oow_t* ptr,
 	hcl_oow_t        len
 );

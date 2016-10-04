@@ -94,9 +94,9 @@ static hcl_oop_cons_t find_or_upsert (hcl_t* hcl, hcl_oop_set_t dic, hcl_oop_cha
 
 	/* the system dictionary is not a generic dictionary.
 	 * it accepts only a symbol as a key. */
-	HCL_ASSERT (HCL_BRANDOF(hcl,key) == HCL_BRAND_SYMBOL);
+	HCL_ASSERT (HCL_IS_SYMBOL(hcl,key));
 	HCL_ASSERT (HCL_OOP_IS_SMOOI(dic->tally));
-	HCL_ASSERT (HCL_BRANDOF(hcl,dic->bucket) == HCL_BRAND_INTEGER);
+	HCL_ASSERT (HCL_IS_ARRAY(hcl,dic->bucket));
 
 	index = hcl_hashchars(key->slot, HCL_OBJ_GET_SIZE(key)) % HCL_OBJ_GET_SIZE(dic->bucket);
 
@@ -225,13 +225,13 @@ static hcl_oop_cons_t lookup (hcl_t* hcl, hcl_oop_set_t dic, const hcl_oocs_t* n
 
 hcl_oop_cons_t hcl_putatsysdic (hcl_t* hcl, hcl_oop_t key, hcl_oop_t value)
 {
-	HCL_ASSERT (HCL_BRANDOF(hcl,key) == HCL_BRAND_SYMBOL);
+	HCL_ASSERT (HCL_IS_SYMBOL(hcl,key));
 	return find_or_upsert (hcl, hcl->sysdic, (hcl_oop_char_t)key, value);
 }
 
 hcl_oop_cons_t hcl_getatsysdic (hcl_t* hcl, hcl_oop_t key)
 {
-	HCL_ASSERT (HCL_BRANDOF(hcl,key) == HCL_BRAND_SYMBOL);
+	HCL_ASSERT (HCL_IS_SYMBOL(hcl,key));
 	return find_or_upsert (hcl, hcl->sysdic, (hcl_oop_char_t)key, HCL_NULL);
 }
 

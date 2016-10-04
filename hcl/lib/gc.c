@@ -285,9 +285,10 @@ void hcl_gc (hcl_t* hcl)
 
 	if (hcl->active_context)
 	{
-		/*HCL_ASSERT ((hcl_oop_t)hcl->processor != hcl->_nil);
-		if ((hcl_oop_t)hcl->processor->active != hcl->_nil)*/
-			hcl->processor->active->sp = HCL_SMOOI_TO_OOP(hcl->sp);
+		HCL_ASSERT ((hcl_oop_t)hcl->processor != hcl->_nil);
+		HCL_ASSERT ((hcl_oop_t)hcl->processor->active != hcl->_nil);
+		/* store the stack pointer to the active process */
+		hcl->processor->active->sp = HCL_SMOOI_TO_OOP(hcl->sp);
 
 		/* store the instruction pointer to the active context */
 		hcl->active_context->ip = HCL_SMOOI_TO_OOP(hcl->ip);
@@ -347,10 +348,10 @@ void hcl_gc (hcl_t* hcl)
 		*hcl->tmp_stack[i] = hcl_moveoop (hcl, *hcl->tmp_stack[i]);
 	}
 
+	if (hcl->initial_context)
+		hcl->initial_context = (hcl_oop_context_t)hcl_moveoop (hcl, (hcl_oop_t)hcl->initial_context);
 	if (hcl->active_context)
 		hcl->active_context = (hcl_oop_context_t)hcl_moveoop (hcl, (hcl_oop_t)hcl->active_context);
-	if (hcl->active_method)
-		hcl->active_method = (hcl_oop_method_t)hcl_moveoop (hcl, (hcl_oop_t)hcl->active_method);
 
 	for (cb = hcl->cblist; cb; cb = cb->next)
 	{
@@ -385,26 +386,29 @@ void hcl_gc (hcl_t* hcl)
 	hcl->curheap = hcl->newheap;
 	hcl->newheap = tmp;
 
+
 /*
-{
-hcl_oow_t index;
-hcl_oop_oop_t buc;
-printf ("=== SURVIVING SYMBOLS ===\n");
-buc = (hcl_oop_oop_t) hcl->symtab->slot[HCL_SYMTAB_BUCKET];
-for (index = 0; index < buc->size; index++)
-{
-	if ((hcl_oop_t)buc->slot[index] != hcl->_nil) 
+	if (hcl->symtab && HCL_LOG_ENABLED(hcl, HCL_LOG_GC | HCL_LOG_DEBUG))
 	{
-		const hcl_oop_char_t* p = ((hcl_oop_char_t)buc->slot[index])->slot;
-		printf ("SYM [");
-		while (*p) printf ("%c", *p++);
-		printf ("]\n");
+		hcl_oow_t index;
+		hcl_oop_oop_t buc;
+		HCL_LOG0 (hcl, HCL_LOG_GC | HCL_LOG_DEBUG, "--------- SURVIVING SYMBOLS IN GC ----------\n");
+		buc = (hcl_oop_oop_t) hcl->symtab->bucket;
+		for (index = 0; index < HCL_OBJ_GET_SIZE(buc); index++)
+		{
+			if ((hcl_oop_t)buc->slot[index] != hcl->_nil) 
+			{
+				HCL_LOG1 (hcl, HCL_LOG_GC | HCL_LOG_DEBUG, "\t%O\n", buc->slot[index]);
+			}
+		}
+		HCL_LOG0 (hcl, HCL_LOG_GC | HCL_LOG_DEBUG, "--------------------------------------------\n");
 	}
-}
-printf ("===========================\n");
-}
 */
-	if (hcl->active_method) SET_ACTIVE_METHOD_CODE (hcl); /* update hcl->active_code */
+
+/* TODO: include some gc statstics like number of live objects, gc performance, etc */
+	HCL_LOG4 (hcl, HCL_LOG_GC | HCL_LOG_INFO, 
+		"Finished GC curheap base %p ptr %p newheap base %p ptr %p\n",
+		hcl->curheap->base, hcl->curheap->ptr, hcl->newheap->base, hcl->newheap->ptr); 
 }
 
 
@@ -496,6 +500,24 @@ int hcl_ignite (hcl_t* hcl)
 		*(hcl_oop_t*)((hcl_uint8_t*)hcl + syminfo[i].offset) = tmp;
 	}
 
+
+	if (!hcl->nil_process)
+	{
+		/* Create a nil process used to simplify nil check in GC.
+		 * only accessible by VM. not exported via the global dictionary. */
+		hcl->nil_process = (hcl_oop_process_t)hcl_allocoopobj (hcl, HCL_BRAND_PROCESS, HCL_PROCESS_NAMED_INSTVARS);
+		if (!hcl->nil_process) return -1;
+		hcl->nil_process->sp = HCL_SMOOI_TO_OOP(-1);
+	}
+
+	if (!hcl->processor)
+	{
+		hcl->processor = (hcl_oop_process_scheduler_t)hcl_allocoopobj (hcl, HCL_BRAND_PROCESS_SCHEDULER, HCL_PROCESS_SCHEDULER_NAMED_INSTVARS);
+		if (!hcl->processor) return -1;
+		hcl->processor->tally = HCL_SMOOI_TO_OOP(0);
+		hcl->processor->active = hcl->nil_process;
+	}
+
 	if (!hcl->code.bc.arr)
 	{
 		hcl->code.bc.arr = hcl_makengcbytearray (hcl, HCL_NULL, 20000); /* TODO: set a proper intial size */
@@ -504,7 +526,7 @@ int hcl_ignite (hcl_t* hcl)
 
 	if (!hcl->code.lit.arr)
 	{
-		hcl->code.lit.arr = hcl_makengcarray (hcl, 20000); /* TOOD: set a proper initial size */
+		hcl->code.lit.arr = (hcl_oop_oop_t)hcl_makengcarray (hcl, 20000); /* TOOD: set a proper initial size */
 		if (!hcl->code.lit.arr) return -1;
 	}
 

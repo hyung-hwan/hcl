@@ -188,23 +188,45 @@ static HCL_INLINE int print_char (printer_t* pr, hcl_ooch_t ch)
 	return 0;
 }
 
+enum
+{
+	WORD_NIL,
+	WORD_TRUE,
+	WORD_FALSE,
+
+
+	WORD_SET,
+	WORD_CFRAME,
+	WORD_CONTEXT,
+	WORD_PROCESS,
+	WORD_PROCESS_SCHEDULER,
+	WORD_SEMAPHORE
+};
+
+static struct 
+{
+	hcl_oow_t  len;
+	hcl_ooch_t ptr[20];
+} word[] =
+{
+	{  4,  { '#','n', 'i', 'l' } },
+	{  5,  { '#','t', 'r', 'u', 'e' } },
+	{  6,  { '#','f', 'a', 'l', 's', 'e' } },
+
+	{  6,  { '#','<','S','E','T','>' } },
+	{  9,  { '#','<','C','F','R','A','M','E','>' } },
+	{  10, { '#','<','C','O','N','T','E','X','T','>' } },
+	{  10, { '#','<','P','R','O','C','E','S','S','>' } },
+	{  20, { '#','<','P','R','O','C','E','S','S','-','S','C','H','E','D','U','L','E','R','>' } },
+	{  12, { '#','<','S','E','M','A','P','H','O','R','E','>' } }
+};
+
 static int print_object (printer_t* pr, hcl_oop_t obj)
 {
 	hcl_t* hcl;
 	hcl_oop_t cur;
 	print_stack_t ps;
 	int brand;
-
-	static struct 
-	{
-		hcl_oow_t  len;
-		hcl_ooch_t ptr[10];
-	} word[] =
-	{
-		{  4, { '#','n', 'i', 'l' } },
-		{  5, { '#','t', 'r', 'u', 'e' } },
-		{  6, { '#','f', 'a', 'l', 's', 'e' } }
-	};
 
 	hcl = pr->hcl;
 
@@ -223,15 +245,15 @@ next:
 	switch ((brand = HCL_OBJ_GET_FLAGS_BRAND(obj))) 
 	{
 		case HCL_BRAND_NIL:
-			OUTPUT_STRX (pr, word[0].ptr, word[0].len);
+			OUTPUT_STRX (pr, word[WORD_NIL].ptr, word[WORD_NIL].len);
 			break;
 
 		case HCL_BRAND_TRUE:
-			OUTPUT_STRX (pr, word[1].ptr, word[1].len);
+			OUTPUT_STRX (pr, word[WORD_TRUE].ptr, word[WORD_TRUE].len);
 			break;
 
 		case HCL_BRAND_FALSE:
-			OUTPUT_STRX (pr, word[2].ptr, word[2].len);
+			OUTPUT_STRX (pr, word[WORD_FALSE].ptr, word[WORD_FALSE].len);
 			break;
 
 		case HCL_BRAND_INTEGER:
@@ -428,6 +450,11 @@ next:
 			OUTPUT_CHAR (pr, '|');
 			break;
 		}
+
+		case HCL_BRAND_SET:
+			OUTPUT_STRX (pr, word[WORD_SET].ptr, word[WORD_SET].len);
+			break;
+
 #if 0
 		case HCL_BRAND_PROCEDURE:
 			OUTPUT_STR (pr, "#<PROCEDURE>");
@@ -438,9 +465,30 @@ next:
 			break;
 #endif
 
+
+		case HCL_BRAND_CFRAME:
+			OUTPUT_STRX (pr, word[WORD_CFRAME].ptr, word[WORD_CFRAME].len);
+			break;
+
+		case HCL_BRAND_CONTEXT:
+			OUTPUT_STRX (pr, word[WORD_CONTEXT].ptr, word[WORD_CONTEXT].len);
+			break;
+
+		case HCL_BRAND_PROCESS:
+			OUTPUT_STRX (pr, word[WORD_PROCESS].ptr, word[WORD_PROCESS].len);
+			break;
+
+		case HCL_BRAND_PROCESS_SCHEDULER:
+			OUTPUT_STRX (pr, word[WORD_PROCESS_SCHEDULER].ptr, word[WORD_PROCESS_SCHEDULER].len);
+			break;
+
+		case HCL_BRAND_SEMAPHORE:
+			OUTPUT_STRX (pr, word[WORD_SEMAPHORE].ptr, word[WORD_SEMAPHORE].len);
+			break;
+
 		default:
-			HCL_ASSERT ("Unknown object type" == HCL_NULL);
 			HCL_DEBUG3 (hcl, "Internal error - unknown object type %d at %s:%d\n", (int)brand, __FILE__, __LINE__);
+			HCL_ASSERT ("Unknown object type" == HCL_NULL);
 			hcl->errnum = HCL_EINTERN;
 			return -1;
 	}

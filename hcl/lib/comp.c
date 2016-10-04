@@ -32,6 +32,7 @@ enum
 	VAR_INDEXED
 };
 
+#define CODE_BUFFER_ALIGN 1024 /* TODO: set a bigger value */
 #define TV_BUFFER_ALIGN 256
 #define BLK_TMPRCNT_BUFFER_ALIGN 128
 
@@ -154,12 +155,23 @@ static int store_temporary_variable_count_for_block (hcl_t* hcl, hcl_oow_t tmpr_
 static HCL_INLINE void patch_instruction (hcl_t* hcl, hcl_oow_t index, hcl_oob_t bc)
 {
 	HCL_ASSERT (index < hcl->code.bc.len);
-	((hcl_oop_byte_t)hcl->code.bc.arr)->slot[index] = bc;
+	hcl->code.bc.arr->slot[index] = bc;
 }
 
 static int emit_byte_instruction (hcl_t* hcl, hcl_oob_t bc)
 {
 	hcl_oow_t capa;
+
+	/* the context object has the ip field. it should be representable
+	 * in a small integer. for simplicity, limit the total byte code length
+	 * to fit in a small integer. because 'ip' points to the next instruction
+	 * to execute, he upper bound should be (max - 1) so that i stays
+	 * at the max when incremented */
+	if (hcl->code.bc.len == HCL_SMOOI_MAX - 1)
+	{
+		hcl->errnum = HCL_EBCFULL; /* byte code full/too big */
+		return -1;
+	}
 
 	capa = HCL_OBJ_GET_SIZE(hcl->code.bc.arr);
 	if (hcl->code.bc.len >= capa)
@@ -167,14 +179,14 @@ static int emit_byte_instruction (hcl_t* hcl, hcl_oob_t bc)
 		hcl_oop_t tmp;
 		hcl_oow_t newcapa;
 
-		newcapa = capa + 20000; /* TODO: set a better resizing policy */
-		tmp = hcl_remakengcbytearray (hcl, hcl->code.bc.arr, newcapa);
+		newcapa = HCL_ALIGN (capa + 1, CODE_BUFFER_ALIGN);
+		tmp = hcl_remakengcbytearray (hcl, (hcl_oop_t)hcl->code.bc.arr, newcapa);
 		if (!tmp) return -1;
 
-		hcl->code.bc.arr = tmp;
+		hcl->code.bc.arr = (hcl_oop_byte_t)tmp;
 	}
 
-	((hcl_oop_byte_t)hcl->code.bc.arr)->slot[hcl->code.bc.len++] = bc;
+	hcl->code.bc.arr->slot[hcl->code.bc.len++] = bc;
 	return 0;
 }
 
@@ -920,9 +932,18 @@ static HCL_INLINE int compile_symbol (hcl_t* hcl, hcl_oop_t obj)
 	/* check if a symbol is a local variable */
 	if (find_temporary_variable_backward (hcl, obj, &index) <= -1)
 	{
+		hcl_oop_t cons;
 /* TODO: if i require all variables to be declared, this part is not needed and should handle it as an error */
+/* TODO: change the scheme... allow declaration??? */
 		/* global variable */
-		if (add_literal(hcl, obj, &index) <= -1 ||
+		cons = (hcl_oop_t)hcl_getatsysdic (hcl, obj);
+		if (!cons) 
+		{
+			cons = (hcl_oop_t)hcl_putatsysdic (hcl, obj, hcl->_nil);
+			if (!cons) return -1;
+		}
+
+		if (add_literal(hcl, cons, &index) <= -1 ||
 		    emit_single_param_instruction (hcl, HCL_CODE_PUSH_OBJECT_0, index) <= -1) return -1;
 
 		return 0;
@@ -1053,9 +1074,11 @@ static HCL_INLINE int emit_lambda (hcl_t* hcl)
 		/* no body in lambda - (lambda (a b c)) */
 /* TODO: is this correct??? */
 		if (emit_byte_instruction(hcl, HCL_CODE_PUSH_NIL) <= -1) return -1;
+		block_code_size++;
 	}
 
 	if (emit_byte_instruction (hcl, HCL_CODE_RETURN_FROM_BLOCK) <= -1) return -1;
+	block_code_size++;
 
 	if (block_code_size > MAX_CODE_JUMP * 2)
 	{
@@ -1132,10 +1155,18 @@ static HCL_INLINE int emit_set (hcl_t* hcl)
 	if (cf->u.set.var_type == VAR_NAMED)
 	{
 		hcl_oow_t index;
+		hcl_oop_t cons;
 
 		HCL_ASSERT (HCL_IS_SYMBOL(hcl, cf->operand));
 
-		if (add_literal(hcl, cf->operand, &index) <= -1 ||
+		cons = (hcl_oop_t)hcl_getatsysdic (hcl, cf->operand);
+		if (!cons) 
+		{
+			cons = (hcl_oop_t)hcl_putatsysdic (hcl, cf->operand, hcl->_nil);
+			if (!cons) return -1;
+		}
+
+		if (add_literal(hcl, cons, &index) <= -1 ||
 		    emit_single_param_instruction(hcl, HCL_CODE_STORE_INTO_OBJECT_0, index) <= -1) return -1;
 	}
 	else
