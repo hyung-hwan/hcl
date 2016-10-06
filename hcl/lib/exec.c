@@ -947,7 +947,7 @@ static int __activate_context (hcl_t* hcl, hcl_oop_context_t rcv_blkctx, hcl_ooi
 	/* copy the arguments to the stack */
 	for (i = 0; i < nargs; i++)
 	{
-		blkctx->slot[i] = HCL_STACK_GETARG(hcl, nargs, 0);
+		blkctx->slot[i] = HCL_STACK_GETARG(hcl, nargs, i);
 	}
 
 	HCL_STACK_POPS (hcl, nargs + 1); /* pop arguments and receiver */
@@ -1537,21 +1537,28 @@ return -1;
 			{
 				hcl_oop_t rcv;
 
-			handle_call:
 				b1 = bcode & 0x3; /* low 2 bits */
+			handle_call:
 				LOG_INST_1 (hcl, "call %zu", b1);
 
 				rcv = HCL_STACK_GETRCV (hcl, b1);
-				if (HCL_IS_CONTEXT(hcl, rcv))
+				if (HCL_OOP_IS_POINTER(rcv))
 				{
-					if (activate_context (hcl, b1) <= -1) return -1;
-				}
-				else if (HCL_IS_PRIM(hcl, rcv))
-				{
-					if (call_primitive (hcl, b1) <= -1) return -1;
+					switch (HCL_OBJ_GET_FLAGS_BRAND(rcv))
+					{
+						case HCL_BRAND_CONTEXT:
+							if (activate_context (hcl, b1) <= -1) return -1;
+							break;
+						case HCL_BRAND_PRIM:
+							if (call_primitive (hcl, b1) <= -1) return -1;
+							break;
+						default:
+							goto cannot_call;
+					}
 				}
 				else
 				{
+				cannot_call:
 					/* run time error */
 					HCL_LOG1 (hcl, HCL_LOG_IC | HCL_LOG_ERROR, "Error - cannot call %O\n", rcv);
 					hcl->errnum = HCL_ECALL;
