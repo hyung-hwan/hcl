@@ -272,6 +272,7 @@ static int put_oocs (hcl_t* hcl, hcl_oow_t mask, const hcl_ooch_t* ptr, hcl_oow_
 	hcl->log.len += len;
 
 	hcl->log.last_mask = mask;
+
 	return 1; /* success */
 }
 

@@ -29,10 +29,10 @@
 
 #define DECODE_LOG_MASK (HCL_LOG_MNEMONIC)
 
-#define LOG_INST_0(hcl,fmt) HCL_LOG0(hcl, DECODE_LOG_MASK, "\t" fmt "\n")
-#define LOG_INST_1(hcl,fmt,a1) HCL_LOG1(hcl, DECODE_LOG_MASK, "\t" fmt "\n",a1)
-#define LOG_INST_2(hcl,fmt,a1,a2) HCL_LOG2(hcl, DECODE_LOG_MASK, "\t" fmt "\n", a1, a2)
-#define LOG_INST_3(hcl,fmt,a1,a2,a3) HCL_LOG3(hcl, DECODE_LOG_MASK, "\t" fmt "\n", a1, a2, a3)
+#define LOG_INST_0(hcl,fmt) HCL_LOG1(hcl, DECODE_LOG_MASK, "%010zd " fmt "\n", fetched_instruction_pointer)
+#define LOG_INST_1(hcl,fmt,a1) HCL_LOG2(hcl, DECODE_LOG_MASK, "%010zd " fmt "\n", fetched_instruction_pointer, a1)
+#define LOG_INST_2(hcl,fmt,a1,a2) HCL_LOG3(hcl, DECODE_LOG_MASK, "%010zd " fmt "\n", fetched_instruction_pointer, a1, a2)
+#define LOG_INST_3(hcl,fmt,a1,a2,a3) HCL_LOG4(hcl, DECODE_LOG_MASK, "%010zd " fmt "\n", fetched_instruction_pointer, a1, a2, a3)
 
 #define FETCH_BYTE_CODE(hcl) (cdptr[ip++])
 #define FETCH_BYTE_CODE_TO(hcl,v_ooi) (v_ooi = FETCH_BYTE_CODE(hcl))
@@ -50,7 +50,7 @@
 int hcl_decode (hcl_t* hcl, hcl_ooi_t start, hcl_ooi_t end)
 {
 	hcl_oob_t bcode, * cdptr;
-	hcl_ooi_t ip = start;
+	hcl_ooi_t ip = start, fetched_instruction_pointer;
 	hcl_oow_t b1, b2;
 
 	/* the instruction at the offset 'end' is not decoded.
@@ -66,6 +66,7 @@ int hcl_decode (hcl_t* hcl, hcl_ooi_t start, hcl_ooi_t end)
 /* TODO: check if ip increases beyond bcode when fetching parameters too */
 	while (ip < end)
 	{
+		fetched_instruction_pointer = ip;
 		FETCH_BYTE_CODE_TO(hcl, bcode);
 
 		switch (bcode)
@@ -529,7 +530,7 @@ return -1;
 	/* print literal frame contents */
 	for (ip = 0; ip < hcl->code.lit.len; ip++)
 	{
-		LOG_INST_2 (hcl, " @%-3zd %O", ip, ((hcl_oop_oop_t)hcl->code.lit.arr)->slot[ip]);
+		HCL_LOG2(hcl, DECODE_LOG_MASK, "@%-9zd %O\n", ip, ((hcl_oop_oop_t)hcl->code.lit.arr)->slot[ip]);
 	}
 
 	return 0;

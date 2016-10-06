@@ -500,7 +500,6 @@ int hcl_ignite (hcl_t* hcl)
 		*(hcl_oop_t*)((hcl_uint8_t*)hcl + syminfo[i].offset) = tmp;
 	}
 
-
 	if (!hcl->nil_process)
 	{
 		/* Create a nil process used to simplify nil check in GC.
@@ -520,7 +519,7 @@ int hcl_ignite (hcl_t* hcl)
 
 	if (!hcl->code.bc.arr)
 	{
-		hcl->code.bc.arr = hcl_makengcbytearray (hcl, HCL_NULL, 20000); /* TODO: set a proper intial size */
+		hcl->code.bc.arr = (hcl_oop_byte_t)hcl_makengcbytearray (hcl, HCL_NULL, 20000); /* TODO: set a proper intial size */
 		if (!hcl->code.bc.arr) return -1;
 	}
 

@@ -40,29 +40,32 @@
  */
 enum hcl_errnum_t
 {
-	HCL_ENOERR,  /**< no error */
-	HCL_EOTHER,  /**< other error */
-	HCL_ENOIMPL, /**< not implemented */
-	HCL_ESYSERR, /**< subsystem error */
-	HCL_EINTERN, /**< internal error */
-	HCL_ESYSMEM, /**< insufficient system memory */
-	HCL_EOOMEM,  /**< insufficient object memory */
-	HCL_EINVAL,  /**< invalid parameter or data */
-	HCL_ETOOBIG, /**< data too large */
-	HCL_EPERM,   /**< operation not permitted */
-	HCL_ERANGE,  /**< range error. overflow and underflow */
-	HCL_ENOENT,  /**< no matching entry */
-	HCL_EEXIST,  /**< duplicate entry */
-	HCL_EBCFULL, /**< byte-code full */
-	HCL_EDFULL,  /**< dictionary full */
-	HCL_EPFULL,  /**< processor full */
-	HCL_ESHFULL, /**< semaphore heap full */
-	HCL_ESLFULL, /**< semaphore list full */
-	HCL_EDIVBY0, /**< divide by zero */
-	HCL_EIOERR,  /**< I/O error */
-	HCL_EECERR,  /**< encoding conversion error */
-	HCL_EFINIS,  /**< end of data/input/stream/etc */
-	HCL_ESYNERR  /** < syntax error */
+	HCL_ENOERR,   /**< no error */
+	HCL_EOTHER,   /**< other error */
+	HCL_ENOIMPL,  /**< not implemented */
+	HCL_ESYSERR,  /**< subsystem error */
+	HCL_EINTERN,  /**< internal error */
+	HCL_ESYSMEM,  /**< insufficient system memory */
+	HCL_EOOMEM,   /**< insufficient object memory */
+	HCL_EINVAL,   /**< invalid parameter or data */
+	HCL_ETOOBIG,  /**< data too large */
+	HCL_EPERM,    /**< operation not permitted */
+	HCL_ERANGE,   /**< range error. overflow and underflow */
+	HCL_ENOENT,   /**< no matching entry */
+	HCL_EEXIST,   /**< duplicate entry */
+	HCL_EBCFULL,  /**< byte-code full */
+	HCL_EDFULL,   /**< dictionary full */
+	HCL_EPFULL,   /**< processor full */
+	HCL_ESHFULL,  /**< semaphore heap full */
+	HCL_ESLFULL,  /**< semaphore list full */
+	HCL_EDIVBY0,  /**< divide by zero */
+	HCL_EIOERR,   /**< I/O error */
+	HCL_EECERR,   /**< encoding conversion error */
+	HCL_EFINIS,   /**< end of data/input/stream/etc */
+	HCL_ESYNERR,  /**< syntax error */
+	HCL_ECALL,    /**< runtime error - cannot call */
+	HCL_ERECALL,  /**< runtime error - cannot call again */
+	HCL_ECALLARG  /**< runtime error - wrong number of arguments to call */
 };
 typedef enum hcl_errnum_t hcl_errnum_t;
 
@@ -466,80 +469,6 @@ struct hcl_class_t
 #define HCL_CLASS_MTHDIC_CLASS    1
 
 
-#if defined(HCL_USE_OBJECT_TRAILER)
-#	define HCL_METHOD_NAMED_INSTVARS 8
-#else
-#	define HCL_METHOD_NAMED_INSTVARS 9
-#endif
-typedef struct hcl_method_t hcl_method_t;
-typedef struct hcl_method_t* hcl_oop_method_t;
-struct hcl_method_t
-{
-	HCL_OBJ_HEADER;
-
-	hcl_oop_class_t owner; /* Class */
-
-	hcl_oop_char_t  name; /* Symbol, method name */
-
-	/* primitive number */
-	hcl_oop_t       preamble; /* SmallInteger */
-
-	hcl_oop_t       preamble_data[2]; /* SmallInteger */
-
-	/* number of temporaries including arguments */
-	hcl_oop_t       tmpr_count; /* SmallInteger */
-
-	/* number of arguments in temporaries */
-	hcl_oop_t       tmpr_nargs; /* SmallInteger */
-
-#if defined(HCL_USE_OBJECT_TRAILER)
-	/* no code field is used */
-#else
-	hcl_oop_byte_t  code; /* ByteArray */
-#endif
-
-	hcl_oop_t       source; /* TODO: what should I put? */
-
-	/* == variable indexed part == */
-	hcl_oop_t       slot[1]; /* it stores literals */
-};
-
-/* The preamble field is composed of a 8-bit code and a 16-bit
- * index. 
- *
- * The code can be one of the following values:
- *  0 - no special action
- *  1 - return self
- *  2 - return nil
- *  3 - return true
- *  4 - return false 
- *  5 - return index.
- *  6 - return -index.
- *  7 - return instvar[index] 
- *  8 - do primitive[index]
- *  9 - do named primitive[index]
- * 10 - exception handler
- */
-#define HCL_METHOD_MAKE_PREAMBLE(code,index)  ((((hcl_ooi_t)index) << 8) | ((hcl_ooi_t)code))
-#define HCL_METHOD_GET_PREAMBLE_CODE(preamble) (((hcl_ooi_t)preamble) & 0xFF)
-#define HCL_METHOD_GET_PREAMBLE_INDEX(preamble) (((hcl_ooi_t)preamble) >> 8)
-
-#define HCL_METHOD_PREAMBLE_NONE            0
-#define HCL_METHOD_PREAMBLE_RETURN_RECEIVER 1
-#define HCL_METHOD_PREAMBLE_RETURN_NIL      2
-#define HCL_METHOD_PREAMBLE_RETURN_TRUE     3
-#define HCL_METHOD_PREAMBLE_RETURN_FALSE    4
-#define HCL_METHOD_PREAMBLE_RETURN_INDEX    5
-#define HCL_METHOD_PREAMBLE_RETURN_NEGINDEX 6
-#define HCL_METHOD_PREAMBLE_RETURN_INSTVAR  7
-#define HCL_METHOD_PREAMBLE_PRIMITIVE       8
-#define HCL_METHOD_PREAMBLE_NAMED_PRIMITIVE 9 /* index is an index to the symbol table */
-#define HCL_METHOD_PREAMBLE_EXCEPTION       10
-
-/* the index is an 16-bit unsigned integer. */
-#define HCL_METHOD_PREAMBLE_INDEX_MIN 0x0000
-#define HCL_METHOD_PREAMBLE_INDEX_MAX 0xFFFF
-#define HCL_OOI_IN_PREAMBLE_INDEX_RANGE(num) ((num) >= HCL_METHOD_PREAMBLE_INDEX_MIN && (num) <= HCL_METHOD_PREAMBLE_INDEX_MAX)
 
 #define HCL_CONTEXT_NAMED_INSTVARS 8
 typedef struct hcl_context_t hcl_context_t;
@@ -1028,11 +957,10 @@ enum hcl_log_mask_t
 	HCL_LOG_ERROR     = (1 << 3),
 	HCL_LOG_FATAL     = (1 << 4),
 
-	HCL_LOG_MNEMONIC  = (1 << 8), /* bytecode mnemonic */
+	HCL_LOG_MNEMONIC  = (1 << 8),  /* bytecode mnemonic */
 	HCL_LOG_GC        = (1 << 9),
 	HCL_LOG_IC        = (1 << 10), /* instruction cycle, fetch-decode-execute */
-	HCL_LOG_PRIMITIVE = (1 << 11),
-	HCL_LOG_APP       = (1 << 12) /* hcl applications, set by hcl logging primitive */
+	HCL_LOG_APP       = (1 << 11)  /* hcl applications, set by hcl logging primitive */
 };
 typedef enum hcl_log_mask_t hcl_log_mask_t;
 
@@ -1059,7 +987,6 @@ typedef enum hcl_log_mask_t hcl_log_mask_t;
 #define HCL_INFO4(hcl,fmt,a1,a2,a3,a4) HCL_LOG4(hcl, HCL_LOG_INFO, fmt, a1, a2, a3, a4)
 #define HCL_INFO5(hcl,fmt,a1,a2,a3,a4,a5) HCL_LOG5(hcl, HCL_LOG_INFO, fmt, a1, a2, a3, a4, a5
 
-
 /* =========================================================================
  * HCL COMMON OBJECTS
  * ========================================================================= */
@@ -1079,6 +1006,7 @@ enum
 	HCL_BRAND_SET,
 
 	HCL_BRAND_CFRAME,/* compiler frame */
+	HCL_BRAND_PRIM,
 
 	HCL_BRAND_CONTEXT,
 	HCL_BRAND_PROCESS,
@@ -1114,12 +1042,16 @@ typedef struct hcl_cons_t* hcl_oop_cons_t;
 #define HCL_IS_CONS(hcl,v) (HCL_OOP_IS_POINTER(v) && HCL_OBJ_GET_FLAGS_BRAND(v) == HCL_BRAND_CONS)
 #define HCL_IS_ARRAY(hcl,v) (HCL_OOP_IS_POINTER(v) && HCL_OBJ_GET_FLAGS_BRAND(v) == HCL_BRAND_ARRAY)
 
+#define HCL_IS_PRIM(hcl,v) (HCL_OOP_IS_POINTER(v) && HCL_OBJ_GET_FLAGS_BRAND(v) == HCL_BRAND_PRIM)
+
 #define HCL_CONS_CAR(v)  (((hcl_cons_t*)(v))->car)
 #define HCL_CONS_CDR(v)  (((hcl_cons_t*)(v))->cdr)
 
 #if defined(__cplusplus)
 extern "C" {
 #endif
+
+#define hcl_switchprocess(hcl) ((hcl)->switch_proc = 1)
 
 HCL_EXPORT hcl_t* hcl_open (
 	hcl_mmgr_t*         mmgr,
@@ -1454,6 +1386,13 @@ HCL_EXPORT hcl_oop_t hcl_getlastconscdr (
 HCL_EXPORT hcl_oop_t hcl_reversecons (
 	hcl_t*           hcl,
 	hcl_oop_t        cons
+);
+
+HCL_EXPORT hcl_oop_t hcl_makeprim (
+	hcl_t*          hcl,
+	hcl_prim_impl_t primimpl,
+	hcl_oow_t       minargs,
+	hcl_oow_t       maxargs
 );
 
 #if defined(__cplusplus)

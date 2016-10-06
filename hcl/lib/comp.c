@@ -65,10 +65,10 @@ static int add_literal (hcl_t* hcl, hcl_oop_t obj, hcl_oow_t* index)
 		hcl_oow_t newcapa;
 
 		newcapa = capa + 20000; /* TODO: set a better resizing policy */
-		tmp = hcl_remakengcarray (hcl, hcl->code.lit.arr, newcapa);
+		tmp = hcl_remakengcarray (hcl, (hcl_oop_t)hcl->code.lit.arr, newcapa);
 		if (!tmp) return -1;
 
-		hcl->code.lit.arr = tmp;
+		hcl->code.lit.arr = (hcl_oop_oop_t)tmp;
 	}
 
 	*index = hcl->code.lit.len;
@@ -536,7 +536,6 @@ static int push_subcframe (hcl_t* hcl, int opcode, hcl_oop_t operand)
 
 enum 
 {
-	COP_EXIT,
 	COP_COMPILE_OBJECT,
 	COP_COMPILE_OBJECT_LIST,
 	COP_COMPILE_ARGUMENT_LIST,
@@ -1209,9 +1208,6 @@ int hcl_compile (hcl_t* hcl, hcl_oop_t obj)
 
 		switch (cf->opcode)
 		{
-			case COP_EXIT:
-				goto done;
-
 			case COP_COMPILE_OBJECT:
 				if (compile_object (hcl) <= -1) goto oops;
 				break;
@@ -1243,7 +1239,10 @@ int hcl_compile (hcl_t* hcl, hcl_oop_t obj)
 		}
 	}
 
-done:
+	/* emit the pop instruction to clear the final result */
+/* TODO: for interactive use, this value must be accessible by the executor... how to do it? */
+	if (emit_byte_instruction (hcl, HCL_CODE_POP_STACKTOP) <= -1) goto oops;
+
 	HCL_ASSERT (GET_TOP_CFRAME_INDEX(hcl) < 0);
 	HCL_ASSERT (hcl->c->tv.size == 0);
 	HCL_ASSERT (hcl->c->blk.depth == 0);

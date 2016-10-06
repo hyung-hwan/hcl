@@ -40,6 +40,7 @@ libhcl_la_SOURCES = \
 	heap.c \
 	logfmt.c \
 	obj.c \
+	prim.c \
 	print.c \
 	rbt.c \
 	read.c \

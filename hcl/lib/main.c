@@ -35,20 +35,36 @@
 #if defined(_WIN32)
 #	include <windows.h>
 #	include <tchar.h>
+#	if defined(STIX_HAVE_CFG_H)
+#		include <ltdl.h>
+#		define USE_LTDL
+#	endif
 #elif defined(__OS2__)
 #	define INCL_DOSMODULEMGR
 #	define INCL_DOSPROCESS
 #	define INCL_DOSERRORS
 #	include <os2.h>
 #elif defined(__MSDOS__)
-	/* nothing to include */
-#	include <time.h>
+#	include <dos.h>
 #elif defined(macintosh)
-	/* nothing to include */
+#	include <Timer.h>
 #else
+#	include <errno.h>
 #	include <unistd.h>
-#	include <time.h>
+#	include <ltdl.h>
+#	define USE_LTDL
+
+#	if defined(HAVE_TIME_H)
+#		include <time.h>
+#	endif
+#	if defined(HAVE_SYS_TIME_H)
+#		include <sys/time.h>
+#	endif
+#	if defined(HAVE_SIGNAL_H)
+#		include <signal.h>
+#	endif
 #endif
+
 
 typedef struct bb_t bb_t;
 struct bb_t
@@ -337,10 +353,10 @@ static int write_all (int fd, const char* ptr, hcl_oow_t len)
 
 		if (wr <= -1)
 		{
-			/*if (errno == EAGAIN || errno == EWOULDBLOCK)
+			if (errno == EAGAIN || errno == EWOULDBLOCK)
 			{
-				push it to internal buffers? before writing data just converted, need to write buffered data first.
-			}*/
+				continue;
+			}
 			return -1;
 		}
 
@@ -360,16 +376,16 @@ static void log_write (hcl_t* hcl, hcl_oow_t mask, const hcl_ooch_t* msg, hcl_oo
 	hcl_bch_t buf[256];
 	hcl_oow_t ucslen, bcslen, msgidx;
 	int n;
+	char ts[64];
+	size_t tslen;
+	struct tm tm, *tmp;
+	time_t now;
+
 
 if (mask & HCL_LOG_GC) return; /* don't show gc logs */
 
 /* TODO: beautify the log message.
  *       do classification based on mask. */
-
-{
-	char ts[32];
-	struct tm tm, *tmp;
-	time_t now;
 
 	now = time(NULL);
 #if defined(__MSDOS__)
@@ -377,10 +393,13 @@ if (mask & HCL_LOG_GC) return; /* don't show gc logs */
 #else
 	tmp = localtime_r (&now, &tm);
 #endif
-	strftime (ts, sizeof(ts), "%Y-%m-%d %H:%M:%S %z ", tmp);
-
-	write_all (1, ts, strlen(ts));
-}
+	tslen = strftime (ts, sizeof(ts), "%Y-%m-%d %H:%M:%S %z ", tmp);
+	if (tslen == 0) 
+	{
+		strcpy (ts, "0000-00-00 00:00:00 +0000");
+		tslen = 25; 
+	}
+	if (write_all (1, ts, tslen) <= -1) write (1, "XXXX ", 5);
 
 	msgidx = 0;
 	while (len > 0)
@@ -417,6 +436,121 @@ if (mask & HCL_LOG_GC) return; /* don't show gc logs */
 	}
 #endif
 }
+
+/* ========================================================================= */
+
+static hcl_t* g_hcl = HCL_NULL;
+
+/* ========================================================================= */
+
+
+#if defined(__MSDOS__) && defined(_INTELC32_)
+static void (*prev_timer_intr_handler) (void);
+
+#pragma interrupt(timer_intr_handler)
+static void timer_intr_handler (void)
+{
+	/*
+	_XSTACK *stk;
+	int r;
+	stk = (_XSTACK *)_get_stk_frame();
+	r = (unsigned short)stk_ptr->eax;   
+	*/
+
+	/* The timer interrupt (normally) occurs 18.2 times per second. */
+	if (g_hcl) hcl_switchprocess (g_hcl);
+	_chain_intr(prev_timer_intr_handler);
+}
+
+#elif defined(macintosh)
+
+static TMTask g_tmtask;
+static ProcessSerialNumber g_psn;
+
+#define TMTASK_DELAY 50 /* milliseconds if positive, microseconds(after negation) if negative */
+
+static pascal void timer_intr_handler (TMTask* task)
+{
+	if (g_hcl) hcl_switchprocess (g_hcl);
+	WakeUpProcess (&g_psn);
+	PrimeTime ((QElem*)&g_tmtask, TMTASK_DELAY);
+}
+
+#else
+static void arrange_process_switching (int sig)
+{
+	if (g_hcl) hcl_switchprocess (g_hcl);
+}
+#endif
+
+static void setup_tick (void)
+{
+#if defined(__MSDOS__) && defined(_INTELC32_)
+
+	prev_timer_intr_handler = _dos_getvect (0x1C);
+	_dos_setvect (0x1C, timer_intr_handler);
+
+#elif defined(macintosh)
+
+	GetCurrentProcess (&g_psn);
+	memset (&g_tmtask, 0, HCL_SIZEOF(g_tmtask));
+	g_tmtask.tmAddr = NewTimerProc (timer_intr_handler);
+	InsXTime ((QElem*)&g_tmtask);
+
+	PrimeTime ((QElem*)&g_tmtask, TMTASK_DELAY);
+
+#elif defined(HAVE_SETITIMER) && defined(SIGVTALRM) && defined(ITIMER_VIRTUAL)
+	struct itimerval itv;
+	struct sigaction act;
+
+	sigemptyset (&act.sa_mask);
+	act.sa_handler = arrange_process_switching;
+	act.sa_flags = 0;
+	sigaction (SIGVTALRM, &act, HCL_NULL);
+
+	itv.it_interval.tv_sec = 0;
+	itv.it_interval.tv_usec = 100; /* 100 microseconds */
+	itv.it_value.tv_sec = 0;
+	itv.it_value.tv_usec = 100;
+	setitimer (ITIMER_VIRTUAL, &itv, HCL_NULL);
+#else
+
+#	error UNSUPPORTED
+#endif
+}
+
+static void cancel_tick (void)
+{
+#if defined(__MSDOS__) && defined(_INTELC32_)
+
+	_dos_setvect (0x1C, prev_timer_intr_handler);
+
+#elif defined(macintosh)
+	RmvTime ((QElem*)&g_tmtask);
+	/*DisposeTimerProc (g_tmtask.tmAddr);*/
+
+#elif defined(HAVE_SETITIMER) && defined(SIGVTALRM) && defined(ITIMER_VIRTUAL)
+	struct itimerval itv;
+	struct sigaction act;
+
+	itv.it_interval.tv_sec = 0;
+	itv.it_interval.tv_usec = 0;
+	itv.it_value.tv_sec = 0; /* make setitimer() one-shot only */
+	itv.it_value.tv_usec = 0;
+	setitimer (ITIMER_VIRTUAL, &itv, HCL_NULL);
+
+	sigemptyset (&act.sa_mask); 
+	act.sa_handler = SIG_IGN; /* ignore the signal potentially fired by the one-shot arrange above */
+	act.sa_flags = 0;
+	sigaction (SIGVTALRM, &act, HCL_NULL);
+
+#else
+#	error UNSUPPORTED
+#endif
+}
+
+/* ========================================================================= */
+
 
 /* ========================================================================= */
 
@@ -556,6 +690,13 @@ int main (int argc, char* argv[])
 		return -1;
 	}
 
+	if (hcl_addbuiltinprims(hcl) <= -1)
+	{
+		printf ("cannot add builtin primitives - %d\n", hcl_geterrnum(hcl));
+		hcl_close (hcl);
+		return -1;
+	}
+
 	xtn = hcl_getxtn (hcl);
 
 #if defined(macintosh)
@@ -623,10 +764,14 @@ int main (int argc, char* argv[])
 
 hcl_decode (hcl, 0, hcl->code.bc.len);
 HCL_LOG0 (hcl, HCL_LOG_MNEMONIC, "------------------------------------------\n");
+g_hcl = hcl;
+setup_tick ();
 if (hcl_execute (hcl) <= -1)
 {
 	printf ("ERROR: cannot execute - %d\n", hcl_geterrnum(hcl));
 }
+cancel_tick();
+g_hcl = HCL_NULL;
 
 
 {

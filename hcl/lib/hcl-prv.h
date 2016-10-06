@@ -54,6 +54,10 @@
 #define HCL_DEBUG_GC
 #define HCL_DEBUG_VM_EXEC
 
+/* allow the caller to drive process switching by calling
+ * stix_switchprocess(). */
+#define HCL_EXTERNAL_PROCESS_SWITCH
+
 /* limit the maximum object size such that:
  *   1. an index to an object field can be represented in a small integer.
  *   2. the maximum number of bits including bit-shifts can be represented
@@ -1077,11 +1081,10 @@ HCL_EXPORT int hcl_compile (
 );
 
 /* ========================================================================= */
-/* exec.c                                                                    */
+/* prim.c                                                                    */
 /* ========================================================================= */
-int hcl_getprimno (
-	hcl_t*            hcl,
-	const hcl_oocs_t* name
+int hcl_addbuiltinprims (
+	hcl_t*         hcl
 );
 
 /* TODO: remove debugging functions */

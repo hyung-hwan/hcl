@@ -193,10 +193,11 @@ enum
 	WORD_NIL,
 	WORD_TRUE,
 	WORD_FALSE,
-
-
 	WORD_SET,
+
 	WORD_CFRAME,
+	WORD_PRIM,
+
 	WORD_CONTEXT,
 	WORD_PROCESS,
 	WORD_PROCESS_SCHEDULER,
@@ -215,6 +216,7 @@ static struct
 
 	{  6,  { '#','<','S','E','T','>' } },
 	{  9,  { '#','<','C','F','R','A','M','E','>' } },
+	{  7,  { '#','<','P','R','I','M','>' } },
 	{  10, { '#','<','C','O','N','T','E','X','T','>' } },
 	{  10, { '#','<','P','R','O','C','E','S','S','>' } },
 	{  20, { '#','<','P','R','O','C','E','S','S','-','S','C','H','E','D','U','L','E','R','>' } },
@@ -468,6 +470,10 @@ next:
 
 		case HCL_BRAND_CFRAME:
 			OUTPUT_STRX (pr, word[WORD_CFRAME].ptr, word[WORD_CFRAME].len);
+			break;
+
+		case HCL_BRAND_PRIM:
+			OUTPUT_STRX (pr, word[WORD_PRIM].ptr, word[WORD_PRIM].len);
 			break;
 
 		case HCL_BRAND_CONTEXT:

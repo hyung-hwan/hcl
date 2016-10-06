@@ -110,10 +110,10 @@
 #if defined(HCL_DEBUG_VM_EXEC)
 #	define LOG_MASK_INST (HCL_LOG_IC | HCL_LOG_MNEMONIC)
 
-#	define LOG_INST_0(hcl,fmt) HCL_LOG0(hcl, LOG_MASK_INST, "\t" fmt "\n")
-#	define LOG_INST_1(hcl,fmt,a1) HCL_LOG1(hcl, LOG_MASK_INST, "\t" fmt "\n",a1)
-#	define LOG_INST_2(hcl,fmt,a1,a2) HCL_LOG2(hcl, LOG_MASK_INST, "\t" fmt "\n", a1, a2)
-#	define LOG_INST_3(hcl,fmt,a1,a2,a3) HCL_LOG3(hcl, LOG_MASK_INST, "\t" fmt "\n", a1, a2, a3)
+#	define LOG_INST_0(hcl,fmt) HCL_LOG1(hcl, LOG_MASK_INST, "%010zd " fmt "\n", fetched_instruction_pointer)
+#	define LOG_INST_1(hcl,fmt,a1) HCL_LOG2(hcl, LOG_MASK_INST, "%010zd " fmt "\n",fetched_instruction_pointer, a1)
+#	define LOG_INST_2(hcl,fmt,a1,a2) HCL_LOG3(hcl, LOG_MASK_INST, "%010zd " fmt "\n", fetched_instruction_pointer, a1, a2)
+#	define LOG_INST_3(hcl,fmt,a1,a2,a3) HCL_LOG4(hcl, LOG_MASK_INST, "%010zd " fmt "\n", fetched_instruction_pointer, a1, a2, a3)
 
 #else
 #	define LOG_INST_0(hcl,fmt)
@@ -266,7 +266,6 @@ static void vm_cleanup (hcl_t* hcl)
 }
 
 /* ------------------------------------------------------------------------- */
-
 
 static HCL_INLINE hcl_oop_t make_context (hcl_t* hcl, hcl_ooi_t ntmprs)
 {
@@ -867,6 +866,7 @@ static void update_sem_heap (hcl_t* hcl, hcl_ooi_t index, hcl_oop_semaphore_t ne
 	else
 		sift_down_sem_heap (hcl, index);
 }
+/* ------------------------------------------------------------------------- */
 
 static int __activate_context (hcl_t* hcl, hcl_oop_context_t rcv_blkctx, hcl_ooi_t nargs, hcl_oop_context_t* pblkctx)
 {
@@ -898,18 +898,20 @@ static int __activate_context (hcl_t* hcl, hcl_oop_context_t rcv_blkctx, hcl_ooi
 		 * you can't send 'value' again to reactivate it.
 		 * For example, [thisContext value] value. */
 		HCL_ASSERT (HCL_OBJ_GET_SIZE(rcv_blkctx) > HCL_CONTEXT_NAMED_INSTVARS);
-		HCL_LOG1 (hcl, HCL_LOG_PRIMITIVE | HCL_LOG_ERROR, 
+		HCL_LOG1 (hcl, HCL_LOG_IC | HCL_LOG_ERROR, 
 			"Error - re-valuing of a block context - %O\n", rcv_blkctx);
-		return 0;
+		hcl->errnum = HCL_ERECALL;
+		return -1;
 	}
 	HCL_ASSERT (HCL_OBJ_GET_SIZE(rcv_blkctx) == HCL_CONTEXT_NAMED_INSTVARS);
 
 	if (HCL_OOP_TO_SMOOI(rcv_blkctx->method_or_nargs) != nargs)
 	{
-		HCL_LOG3 (hcl, HCL_LOG_PRIMITIVE | HCL_LOG_ERROR, 
+		HCL_LOG3 (hcl, HCL_LOG_IC | HCL_LOG_ERROR, 
 			"Error - wrong number of arguments to a block context %O - expecting %zd, got %zd\n",
 			rcv_blkctx, HCL_OOP_TO_SMOOI(rcv_blkctx->method_or_nargs), nargs);
-		return 0;
+		hcl->errnum = HCL_ECALLARG;
+		return -1;
 	}
 
 	/* the number of temporaries stored in the block context
@@ -917,7 +919,6 @@ static int __activate_context (hcl_t* hcl, hcl_oop_context_t rcv_blkctx, hcl_ooi
 	 * simple calculation is needed to find the number of local temporaries */
 	local_ntmprs = HCL_OOP_TO_SMOOI(rcv_blkctx->ntmprs) -
 	               HCL_OOP_TO_SMOOI(((hcl_oop_context_t)rcv_blkctx->home)->ntmprs);
-printf ("%d %d\n", (int)local_ntmprs, (int)nargs);
 	HCL_ASSERT (local_ntmprs >= nargs);
 
 
@@ -956,34 +957,46 @@ printf ("%d %d\n", (int)local_ntmprs, (int)nargs);
 	blkctx->sender = hcl->active_context;
 
 	*pblkctx = blkctx;
-	return 1;
+	return 0;
 }
 
-static int activate_context (hcl_t* hcl, hcl_ooi_t nargs)
+static HCL_INLINE int activate_context (hcl_t* hcl, hcl_ooi_t nargs)
 {
 	int x;
-	hcl_oop_context_t rcv_blkctx, blkctx;
+	hcl_oop_context_t rcv, blkctx;
 
-	rcv_blkctx = (hcl_oop_context_t)HCL_STACK_GETRCV(hcl, nargs);
-	HCL_ASSERT (HCL_IS_CONTEXT (hcl, rcv_blkctx));
-#if 0
-	if (HCL_CLASSOF(hcl, rcv_blkctx) != hcl->_block_context)
-	{
-		/* the receiver must be a block context */
-		HCL_LOG1 (hcl, HCL_LOG_PRIMITIVE | HCL_LOG_ERROR, 
-			"Error - invalid receiver, not a block context - %O\n", rcv_blkctx);
-		return 0;
-	}
-#endif
+	rcv = (hcl_oop_context_t)HCL_STACK_GETRCV(hcl, nargs);
+	HCL_ASSERT (HCL_IS_CONTEXT (hcl, rcv));
 
-	x = __activate_context (hcl, rcv_blkctx, nargs, &blkctx);
-	if (x <= 0) return x; /* hard failure and soft failure */
+	x = __activate_context (hcl, rcv, nargs, &blkctx);
+	if (x <= -1) return -1;
 
 	SWITCH_ACTIVE_CONTEXT (hcl, (hcl_oop_context_t)blkctx);
-	return 1;
+	return 0;
 }
 
+/* ------------------------------------------------------------------------- */
+static HCL_INLINE int call_primitive (hcl_t* hcl, hcl_ooi_t nargs)
+{
+	hcl_oop_word_t rcv;
 
+	rcv = (hcl_oop_word_t)HCL_STACK_GETRCV(hcl, nargs);
+	HCL_ASSERT (HCL_IS_PRIM (hcl, rcv));
+
+	if (nargs < rcv->slot[1] && nargs > rcv->slot[2])
+	{
+/* TODO: include a primitive name... */
+		HCL_LOG3 (hcl, HCL_LOG_IC | HCL_LOG_ERROR, 
+			"Error - wrong number of arguments to a primitive - expecting %zd-%zd, got %zd\n",
+			rcv->slot[1], rcv->slot[2], nargs);
+		hcl->errnum = HCL_ECALLARG;
+		return -1;
+	}
+
+	return ((hcl_prim_impl_t)rcv->slot[0]) (hcl, nargs);
+}
+
+/* ------------------------------------------------------------------------- */
 static hcl_oop_process_t start_initial_process (hcl_t* hcl, hcl_oop_context_t ctx)
 {
 	hcl_oop_process_t proc;
@@ -1005,97 +1018,6 @@ static hcl_oop_process_t start_initial_process (hcl_t* hcl, hcl_oop_context_t ct
 	SWITCH_ACTIVE_CONTEXT (hcl, proc->current_context);
 
 	return proc;
-}
-
-static HCL_INLINE int activate_new_method (hcl_t* hcl, hcl_oop_method_t mth)
-{
-	hcl_oop_context_t ctx;
-	hcl_ooi_t i;
-	hcl_ooi_t ntmprs, nargs;
-
-	ntmprs = HCL_OOP_TO_SMOOI(mth->tmpr_count);
-	nargs = HCL_OOP_TO_SMOOI(mth->tmpr_nargs);
-
-	HCL_ASSERT (ntmprs >= 0);
-	HCL_ASSERT (nargs <= ntmprs);
-
-	hcl_pushtmp (hcl, (hcl_oop_t*)&mth);
-	ctx = (hcl_oop_context_t)make_context (hcl, ntmprs);
-	hcl_poptmp (hcl);
-	if (!ctx) return -1;
-
-	ctx->sender = hcl->active_context; 
-	ctx->ip = HCL_SMOOI_TO_OOP(0);
-	/* ctx->sp will be set further down */
-
-	/* A context is compose of a fixed part and a variable part.
-	 * the variable part hold temporary varibles including arguments.
-	 *
-	 * Assuming a method context with 2 arguments and 3 local temporary
-	 * variables, the context will look like this.
-	 *   +---------------------+
-	 *   | fixed part          |
-	 *   |                     |
-	 *   |                     |
-	 *   |                     |
-	 *   +---------------------+
-	 *   | tmp1 (arg1)         | slot[0]
-	 *   | tmp2 (arg2)         | slot[1]
-	 *   | tmp3                | slot[2] 
-	 *   | tmp4                | slot[3]
-	 *   | tmp5                | slot[4]
-	 *   +---------------------+
-	 */
-
-	ctx->ntmprs = HCL_SMOOI_TO_OOP(ntmprs);
-	ctx->method_or_nargs = (hcl_oop_t)mth;
-	/* the 'home' field of a method context is always hcl->_nil.
-	ctx->home = hcl->_nil;*/
-	ctx->origin = ctx; /* point to self */
-
-	/* 
-	 * Assume this message sending expression:
-	 *   obj1 do: #this with: #that with: #it
-	 * 
-	 * It would be compiled to these logical byte-code sequences shown below:
-	 *   push obj1
-	 *   push #this
-	 *   push #that
-	 *   push #it
-	 *   send #do:with:
-	 *
-	 * After three pushes, the stack looks like this.
-	 * 
-	 *  | #it   | <- sp
-	 *  | #that |    sp - 1  
-	 *  | #this |    sp - 2
-	 *  | obj1  |    sp - nargs
-	 *
-	 * Since the number of arguments is 3, stack[sp - 3] points to
-	 * the receiver. When the stack is empty, sp is -1.
-	 */
-	for (i = nargs; i > 0; )
-	{
-		/* copy argument */
-		ctx->slot[--i] = HCL_STACK_GETTOP (hcl);
-		HCL_STACK_POP (hcl);
-	}
-	/* copy receiver */
-	ctx->receiver_or_source = HCL_STACK_GETTOP (hcl);
-	HCL_STACK_POP (hcl);
-
-	HCL_ASSERT (hcl->sp >= -1);
-
-	/* the stack pointer in a context is a stack pointer of a process 
-	 * before it is activated. this stack pointer is stored to the context
-	 * so that it is used to restore the process stack pointer upon returning
-	 * from a method context. */
-	ctx->sp = HCL_SMOOI_TO_OOP(hcl->sp);
-
-	/* switch the active context to the newly instantiated one*/
-	SWITCH_ACTIVE_CONTEXT (hcl, ctx);
-
-	return 0;
 }
 
 static int start_initial_process_and_context (hcl_t* hcl)
@@ -1147,25 +1069,10 @@ static int start_initial_process_and_context (hcl_t* hcl)
 	hcl_poptmp (hcl);
 	if (!proc) return -1;
 
-
-#if 0
-	HCL_STACK_PUSH (hcl, ass->value); /* push the receiver - the object referenced by 'objname' */
-	STORE_ACTIVE_SP (hcl); /* hcl->active_context->sp = HCL_SMOOI_TO_OOP(hcl->sp) */
-
-	HCL_ASSERT (hcl->processor->active == proc);
-	HCL_ASSERT (hcl->processor->active->initial_context == ctx);
-	HCL_ASSERT (hcl->processor->active->current_context == ctx);
-	HCL_ASSERT (hcl->active_context == ctx);
-
-	/* emulate the message sending */
-	return activate_new_method (hcl, mth);
-#else
 	HCL_STACK_PUSH (hcl, (hcl_oop_t)ctx);
 	STORE_ACTIVE_SP (hcl); /* hcl->active_context->sp = HCL_SMOOI_TO_OOP(hcl->sp) */
 
 	return activate_context (hcl, 0);
-#endif
-	
 }
 
 /* ------------------------------------------------------------------------- */
@@ -1183,6 +1090,10 @@ static int execute (hcl_t* hcl)
 	hcl_uintmax_t inst_counter = 0;
 #endif
 
+#if defined(HCL_DEBUG_VM_EXEC)
+	hcl_ooi_t fetched_instruction_pointer;
+#endif
+
 	HCL_ASSERT (hcl->active_context != HCL_NULL);
 
 	vm_startup (hcl);
@@ -1190,7 +1101,7 @@ static int execute (hcl_t* hcl)
 
 	while (1)
 	{
-#if 0 /* XXX */
+
 		if (hcl->sem_heap_count > 0)
 		{
 			hcl_ntime_t ft, now;
@@ -1255,12 +1166,12 @@ static int execute (hcl_t* hcl)
 			HCL_ASSERT (hcl->processor->tally = HCL_SMOOI_TO_OOP(0));
 			HCL_LOG0 (hcl, HCL_LOG_IC | HCL_LOG_DEBUG, "No more runnable process\n");
 
-#if 0
-if (there is semaphore awaited.... )
-{
-/* DO SOMETHING */
-}
-#endif
+			#if 0
+			if (there is semaphore awaited.... )
+			{
+			/* DO SOMETHING */
+			}
+			#endif
 
 			break;
 		}
@@ -1286,17 +1197,10 @@ if (there is semaphore awaited.... )
 #endif
 
 		hcl->proc_switched = 0;
-#else
-	/* TODO: XXX this part is temporary. use if 0 part */
-	if (hcl->processor->active == hcl->nil_process) 
-	{
-		/* no more waiting semaphore and no more process */
-		HCL_ASSERT (hcl->processor->tally = HCL_SMOOI_TO_OOP(0));
-		HCL_LOG0 (hcl, HCL_LOG_IC | HCL_LOG_DEBUG, "No more runnable process\n");
-		break;
-	}
-#endif /* END XXX */
 
+#if defined(HCL_DEBUG_VM_EXEC)
+		fetched_instruction_pointer = hcl->ip;
+#endif
 		FETCH_BYTE_CODE_TO (hcl, bcode);
 		/*while (bcode == HCL_CODE_NOOP) FETCH_BYTE_CODE_TO (hcl, bcode);*/
 
@@ -1630,11 +1534,31 @@ return -1;
 			case HCL_CODE_CALL_1:
 			case HCL_CODE_CALL_2:
 			case HCL_CODE_CALL_3:
+			{
+				hcl_oop_t rcv;
+
 			handle_call:
 				b1 = bcode & 0x3; /* low 2 bits */
 				LOG_INST_1 (hcl, "call %zu", b1);
-				/* TODO: CALL */
+
+				rcv = HCL_STACK_GETRCV (hcl, b1);
+				if (HCL_IS_CONTEXT(hcl, rcv))
+				{
+					if (activate_context (hcl, b1) <= -1) return -1;
+				}
+				else if (HCL_IS_PRIM(hcl, rcv))
+				{
+					if (call_primitive (hcl, b1) <= -1) return -1;
+				}
+				else
+				{
+					/* run time error */
+					HCL_LOG1 (hcl, HCL_LOG_IC | HCL_LOG_ERROR, "Error - cannot call %O\n", rcv);
+					hcl->errnum = HCL_ECALL;
+					return -1;
+				}
 				break;
+			}
 			
 			/* -------------------------------------------------------- */
 
