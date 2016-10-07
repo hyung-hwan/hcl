@@ -197,7 +197,10 @@
 #elif defined(HCL_SIZEOF___INT128_T) && (HCL_SIZEOF___INT128_T == 16)
 #	define HCL_HAVE_UINT128_T
 #	define HCL_HAVE_INT128_T
-	#if defined(__clang__)
+	#if defined(HCL_SIZEOF___UINT128_T) && (HCL_SIZEOF___UINT128_T == HCL_SIZEOF___INT128_T)
+	typedef __uint128_t  hcl_uint128_t;
+	typedef __int128_t   hcl_int128_t;
+	#elif defined(__clang__)
 	typedef __uint128_t  hcl_uint128_t;
 	typedef __int128_t   hcl_int128_t;
 	#else
