@@ -457,17 +457,6 @@ next:
 			OUTPUT_STRX (pr, word[WORD_SET].ptr, word[WORD_SET].len);
 			break;
 
-#if 0
-		case HCL_BRAND_PROCEDURE:
-			OUTPUT_STR (pr, "#<PROCEDURE>");
-			break;
-
-		case HCL_BRAND_CLOSURE:
-			OUTPUT_STR (pr, "#<CLOSURE>");
-			break;
-#endif
-
-
 		case HCL_BRAND_CFRAME:
 			OUTPUT_STRX (pr, word[WORD_CFRAME].ptr, word[WORD_CFRAME].len);
 			break;

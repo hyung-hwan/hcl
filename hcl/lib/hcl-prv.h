@@ -284,13 +284,6 @@ struct hcl_cframe_t
 	hcl_oop_t operand;
 	union
 	{
-		struct 
-		{
-			hcl_oow_t nargs;
-			hcl_oow_t ntmprs;
-			hcl_oow_t jip; /* jump instruction position */
-		} lambda;
-
 		struct
 		{
 			int var_type;

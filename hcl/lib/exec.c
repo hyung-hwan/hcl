@@ -921,7 +921,6 @@ static int __activate_context (hcl_t* hcl, hcl_oop_context_t rcv_blkctx, hcl_ooi
 	               HCL_OOP_TO_SMOOI(((hcl_oop_context_t)rcv_blkctx->home)->ntmprs);
 	HCL_ASSERT (local_ntmprs >= nargs);
 
-
 	/* create a new block context to clone rcv_blkctx */
 	hcl_pushtmp (hcl, (hcl_oop_t*)&rcv_blkctx);
 	blkctx = (hcl_oop_context_t) make_context (hcl, local_ntmprs); 
@@ -2022,11 +2021,10 @@ return -1;
 				HCL_ASSERT (b2 >= b1);
 
 				/* the block context object created here is used as a base
-				 * object for block context activation. prim_block_value()
+				 * object for block context activation. activate_context()
 				 * clones a block context and activates the cloned context.
-				 * this base block context is created with no stack for 
-				 * this reason */
-				//blkctx = (hcl_oop_context_t)hcl_instantiate (hcl, hcl->_block_context, HCL_NULL, 0); 
+				 * this base block context is created with no temporaries
+				 * for this reason */
 				blkctx = (hcl_oop_context_t)make_context (hcl, 0);
 				if (!blkctx) return -1;
 

@@ -549,7 +549,6 @@ enum
 
 static int compile_lambda (hcl_t* hcl, hcl_oop_t src)
 {
-	hcl_cframe_t* cf;
 	hcl_oop_t obj, args;
 	hcl_oow_t nargs, ntmprs;
 	hcl_oow_t jump_inst_pos;
@@ -697,7 +696,11 @@ static int compile_lambda (hcl_t* hcl, hcl_oop_t src)
 	hcl->c->blk.depth++;
 	if (store_temporary_variable_count_for_block (hcl, hcl->c->tv.size) <= -1) return -1;
 
-	if (emit_double_param_instruction (hcl, HCL_CODE_MAKE_BLOCK, nargs, ntmprs) <= -1) return -1;
+	/* use the accumulated number of temporaries so far when generating
+	 * the make_block instruction. at context activation time, the actual 
+	 * count of temporaries for this block is derived by subtracting the 
+	 * count of temporaries in the home context */
+	if (emit_double_param_instruction (hcl, HCL_CODE_MAKE_BLOCK, nargs, hcl->c->tv.size/*ntmprs*/) <= -1) return -1;
 
 	/* specifying MAX_CODE_JUMP causes emit_single_param_instruction() to 
 	 * produce the long jump instruction (BCODE_JUMP_FORWARD_X) */
@@ -706,11 +709,8 @@ static int compile_lambda (hcl_t* hcl, hcl_oop_t src)
 
 	SWITCH_TOP_CFRAME (hcl, COP_COMPILE_OBJECT_LIST, obj);
 
-	PUSH_SUBCFRAME (hcl, COP_EMIT_LAMBDA, hcl->_nil); /* operand field is not used for COP_EMIT_LAMBDA */
-	cf = GET_SUBCFRAME (hcl); /* modify the EMIT_LAMBDA frame */
-	cf->u.lambda.jip = jump_inst_pos;
-	cf->u.lambda.nargs = nargs;
-	cf->u.lambda.ntmprs = ntmprs;
+	HCL_ASSERT (jump_inst_pos < HCL_SMOOI_MAX); /* guaranteed in emit_byte_instruction() */
+	PUSH_SUBCFRAME (hcl, COP_EMIT_LAMBDA, HCL_SMOOI_TO_OOP(jump_inst_pos));
 
 	return 0;
 }
@@ -1057,16 +1057,19 @@ static HCL_INLINE int emit_lambda (hcl_t* hcl)
 {
 	hcl_cframe_t* cf;
 	hcl_oow_t block_code_size;
+	hcl_oow_t jip;
 
 	cf = GET_TOP_CFRAME(hcl);
 	HCL_ASSERT (cf->opcode == COP_EMIT_LAMBDA);
-	HCL_ASSERT (HCL_IS_NIL(hcl, cf->operand));
+	HCL_ASSERT (HCL_OOP_IS_SMOOI(cf->operand));
+
+	jip = HCL_OOP_TO_SMOOI(cf->operand);
 
 	hcl->c->blk.depth--;
 	hcl->c->tv.size = hcl->c->blk.tmprcnt[hcl->c->blk.depth];
 
 	/* HCL_CODE_LONG_PARAM_SIZE + 1 => size of the long JUMP_FORWARD instruction */
-	block_code_size = hcl->code.bc.len - cf->u.lambda.jip - (HCL_BCODE_LONG_PARAM_SIZE + 1);
+	block_code_size = hcl->code.bc.len - jip - (HCL_BCODE_LONG_PARAM_SIZE + 1);
 
 	if (block_code_size == 0)
  	{
@@ -1093,7 +1096,7 @@ static HCL_INLINE int emit_lambda (hcl_t* hcl)
 		{
 			/* switch to JUMP2 instruction to allow a bigger jump offset.
 			 * up to twice MAX_CODE_JUMP only */
-			patch_instruction (hcl, cf->u.lambda.jip, HCL_CODE_JUMP2_FORWARD);
+			patch_instruction (hcl, jip, HCL_CODE_JUMP2_FORWARD);
 			jump_offset = block_code_size - MAX_CODE_JUMP;
 		}
 		else
@@ -1102,10 +1105,10 @@ static HCL_INLINE int emit_lambda (hcl_t* hcl)
 		}
 
 	#if (HCL_BCODE_LONG_PARAM_SIZE == 2)
-		patch_instruction (hcl, cf->u.lambda.jip + 1, jump_offset >> 8);
-		patch_instruction (hcl, cf->u.lambda.jip + 2, jump_offset & 0xFF);
+		patch_instruction (hcl, jip + 1, jump_offset >> 8);
+		patch_instruction (hcl, jip + 2, jump_offset & 0xFF);
 	#else
-		patch_instruction (hcl, cf->u.lambda.jip + 1, jump_offset);
+		patch_instruction (hcl, jip + 1, jump_offset);
 	#endif
 	}
 

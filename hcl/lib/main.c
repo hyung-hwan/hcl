@@ -399,7 +399,12 @@ if (mask & HCL_LOG_GC) return; /* don't show gc logs */
 		strcpy (ts, "0000-00-00 00:00:00 +0000");
 		tslen = 25; 
 	}
-	if (write_all (1, ts, tslen) <= -1) write (1, "XXXX ", 5);
+	if (write_all (1, ts, tslen) <= -1) 
+	{
+		char ttt[10];
+		snprintf (ttt, sizeof(ttt), "ERR: %d\n", errno);
+		write (1, ttt, strlen(ttt));
+	}
 
 	msgidx = 0;
 	while (len > 0)
