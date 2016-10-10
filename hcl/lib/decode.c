@@ -269,18 +269,28 @@ int hcl_decode (hcl_t* hcl, hcl_ooi_t start, hcl_ooi_t end)
 				break;
 
 			case BCODE_JUMP_IF_TRUE_X:
-			case BCODE_JUMP_IF_FALSE_X:
+				FETCH_PARAM_CODE_TO (hcl, b1);
+				LOG_INST_1 (hcl, "jump_if_true %zu", b1);
+				break;
+
 			case BCODE_JUMP_IF_TRUE_0:
 			case BCODE_JUMP_IF_TRUE_1:
 			case BCODE_JUMP_IF_TRUE_2:
 			case BCODE_JUMP_IF_TRUE_3:
-			case BCODE_JUMP_IF_FALSE_0:
-			case BCODE_JUMP_IF_FALSE_1:
-			case BCODE_JUMP_IF_FALSE_2:
-			case BCODE_JUMP_IF_FALSE_3:
-LOG_INST_0 (hcl, "<<<<<<<<<<<<<< JUMP NOT IMPLEMENTED YET >>>>>>>>>>>>");
-hcl->errnum = HCL_ENOIMPL;
-return -1;
+				LOG_INST_1 (hcl, "jump_if_true %zu", (hcl_oow_t)(bcode & 0x3)); /* low 2 bits */
+				break;
+
+			case HCL_CODE_JUMP_FORWARD_IF_FALSE_X:
+				FETCH_PARAM_CODE_TO (hcl, b1);
+				LOG_INST_1 (hcl, "jump_forward_if_false %zu", b1);
+				break;
+
+			case HCL_CODE_JUMP_FORWARD_IF_FALSE_0:
+			case HCL_CODE_JUMP_FORWARD_IF_FALSE_1:
+			case HCL_CODE_JUMP_FORWARD_IF_FALSE_2:
+			case HCL_CODE_JUMP_FORWARD_IF_FALSE_3:
+				LOG_INST_1 (hcl, "jump_forward_if_false %zu", (hcl_oow_t)(bcode & 0x3)); /* low 2 bits */
+				break;
 
 			case HCL_CODE_JUMP2_FORWARD:
 				FETCH_PARAM_CODE_TO (hcl, b1);

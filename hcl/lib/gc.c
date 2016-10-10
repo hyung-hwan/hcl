@@ -34,12 +34,14 @@ static struct
 	hcl_oow_t  offset;
 } syminfo[] =
 {
-	{  5, { 'b', 'e', 'g', 'i', 'n' },         HCL_SYNCODE_BEGIN,   HCL_OFFSETOF(hcl_t,_begin) },
-	{  5, { 'd', 'e', 'f', 'u', 'n' },         HCL_SYNCODE_DEFUN,   HCL_OFFSETOF(hcl_t,_defun) },
-	{  2, { 'i', 'f'                     },    HCL_SYNCODE_IF,      HCL_OFFSETOF(hcl_t,_if)     },
-	{  6, { 'l', 'a', 'm', 'b', 'd', 'a' },    HCL_SYNCODE_LAMBDA,  HCL_OFFSETOF(hcl_t,_lambda) },
-	{  5, { 'q', 'u', 'o', 't', 'e' },         HCL_SYNCODE_QUOTE,   HCL_OFFSETOF(hcl_t,_quote)  },
-	{  3, { 's', 'e', 't' },                   HCL_SYNCODE_SET,     HCL_OFFSETOF(hcl_t,_set)    }
+	{  5, { 'b','e','g','i','n' },         HCL_SYNCODE_BEGIN,   HCL_OFFSETOF(hcl_t,_begin)  },
+	{  5, { 'd','e','f','u','n' },         HCL_SYNCODE_DEFUN,   HCL_OFFSETOF(hcl_t,_defun)  },
+	{  2, { 'i','f' },                     HCL_SYNCODE_IF,      HCL_OFFSETOF(hcl_t,_if)     },
+	{  6, { 'l','a','m','b','d','a' },     HCL_SYNCODE_LAMBDA,  HCL_OFFSETOF(hcl_t,_lambda) },
+	{  5, { 'q','u','o','t','e' },         HCL_SYNCODE_QUOTE,   HCL_OFFSETOF(hcl_t,_quote)  },
+	{  6, { 'r','e','t','u','r','n'},      HCL_SYNCODE_RETURN,  HCL_OFFSETOF(hcl_t,_return) },
+	{  3, { 's','e','t' },                 HCL_SYNCODE_SET,     HCL_OFFSETOF(hcl_t,_set)    },
+	{  5, { 'w','h','i','l','e' },         HCL_SYNCODE_WHILE,   HCL_OFFSETOF(hcl_t,_while)  }
 };
 
 /* ========================================================================= */

@@ -241,7 +241,7 @@ static int emit_single_param_instruction (hcl_t* hcl, int cmd, hcl_oow_t param_1
 		case HCL_CODE_JUMP_FORWARD_0:
 		case HCL_CODE_JUMP_BACKWARD_0:
 		case BCODE_JUMP_IF_TRUE_0:
-		case BCODE_JUMP_IF_FALSE_0:
+		case HCL_CODE_JUMP_FORWARD_IF_FALSE_0:
 		case HCL_CODE_CALL_0:
 			if (param_1 < 4)
 			{
@@ -542,10 +542,17 @@ enum
 	COP_EMIT_POP,
 	COP_EMIT_CALL,
 	COP_EMIT_LAMBDA,
+	COP_EMIT_RETURN,
 	COP_EMIT_SET
 };
 
 /* ========================================================================= */
+
+static int compile_if (hcl_t* hcl, hcl_oop_t src)
+{
+/* TODO: NOT IMPLEMENTED */
+	return -1;
+}
 
 static int compile_lambda (hcl_t* hcl, hcl_oop_t src)
 {
@@ -702,15 +709,57 @@ static int compile_lambda (hcl_t* hcl, hcl_oop_t src)
 	 * count of temporaries in the home context */
 	if (emit_double_param_instruction (hcl, HCL_CODE_MAKE_BLOCK, nargs, hcl->c->tv.size/*ntmprs*/) <= -1) return -1;
 
+
+	jump_inst_pos = hcl->code.bc.len;
 	/* specifying MAX_CODE_JUMP causes emit_single_param_instruction() to 
 	 * produce the long jump instruction (BCODE_JUMP_FORWARD_X) */
-	jump_inst_pos = hcl->code.bc.len;
 	if (emit_single_param_instruction (hcl, HCL_CODE_JUMP_FORWARD_0, MAX_CODE_JUMP) <= -1) return -1;
 
 	SWITCH_TOP_CFRAME (hcl, COP_COMPILE_OBJECT_LIST, obj);
 
 	HCL_ASSERT (jump_inst_pos < HCL_SMOOI_MAX); /* guaranteed in emit_byte_instruction() */
 	PUSH_SUBCFRAME (hcl, COP_EMIT_LAMBDA, HCL_SMOOI_TO_OOP(jump_inst_pos));
+
+	return 0;
+}
+
+
+static int compile_return (hcl_t* hcl, hcl_oop_t src)
+{
+	hcl_oop_t obj, val;
+
+	obj = HCL_CONS_CDR(src);
+
+	HCL_ASSERT (HCL_BRANDOF(hcl,src) == HCL_BRAND_CONS);
+	HCL_ASSERT (HCL_CONS_CAR(src) == hcl->_return);
+
+	if (HCL_IS_NIL(hcl, obj))
+	{
+/* TODO: should i allow (return)? does it return the last value on the stack? */
+		/* no value */
+		HCL_DEBUG1 (hcl, "Syntax error - no value specified in return - %O\n", src);
+		hcl_setsynerr (hcl, HCL_SYNERR_ARGCOUNT, HCL_NULL, HCL_NULL); /* TODO: error location */
+		return -1;
+	}
+	else if (HCL_BRANDOF(hcl, obj) != HCL_BRAND_CONS)
+	{
+		HCL_DEBUG1 (hcl, "Syntax error - redundant cdr in return - %O\n", src);
+		hcl_setsynerr (hcl, HCL_SYNERR_DOTBANNED, HCL_NULL, HCL_NULL); /* TODO: error location */
+		return -1;
+	}
+
+	val = HCL_CONS_CAR(obj);
+
+	obj = HCL_CONS_CDR(obj);
+	if (!HCL_IS_NIL(hcl, obj))
+	{
+		HCL_DEBUG1 (hcl, "Synatx error - too many arguments to return - %O\n", src);
+		hcl_setsynerr (hcl, HCL_SYNERR_ARGCOUNT, HCL_NULL, HCL_NULL); /* TODO: error location */
+		return -1;
+	}
+
+	SWITCH_TOP_CFRAME (hcl, COP_COMPILE_OBJECT, val);
+	PUSH_SUBCFRAME (hcl, COP_EMIT_RETURN, hcl->_nil);
 
 	return 0;
 }
@@ -793,7 +842,58 @@ static int compile_set (hcl_t* hcl, hcl_oop_t src)
 	return 0;
 }
 
-static int compile_cons (hcl_t* hcl, hcl_oop_t obj)
+static int compile_while (hcl_t* hcl, hcl_oop_t src)
+{
+	/* (while (xxxx) ... ) */
+	hcl_oop_t obj, cond;
+	hcl_oow_t cond_pos;
+
+	obj = HCL_CONS_CDR(src);
+
+	HCL_ASSERT (HCL_BRANDOF(hcl,src) == HCL_BRAND_CONS);
+	HCL_ASSERT (HCL_CONS_CAR(src) == hcl->_while);
+
+	if (HCL_IS_NIL(hcl, obj))
+	{
+		/* no value */
+		HCL_DEBUG1 (hcl, "Syntax error - no condition specified in while - %O\n", src);
+		hcl_setsynerr (hcl, HCL_SYNERR_ARGCOUNT, HCL_NULL, HCL_NULL); /* TODO: error location */
+		return -1;
+	}
+	else if (HCL_BRANDOF(hcl, obj) != HCL_BRAND_CONS)
+	{
+		HCL_DEBUG1 (hcl, "Syntax error - redundant cdr in while - %O\n", src);
+		hcl_setsynerr (hcl, HCL_SYNERR_DOTBANNED, HCL_NULL, HCL_NULL); /* TODO: error location */
+		return -1;
+	}
+
+	cond_pos = hcl->code.bc.len;
+	cond = HCL_CONS_CAR(obj);
+
+	obj = HCL_CONS_CDR(obj);
+	if (!HCL_IS_NIL(hcl, obj))
+	{
+		HCL_DEBUG1 (hcl, "Synatx error - too many arguments to return - %O\n", src);
+		hcl_setsynerr (hcl, HCL_SYNERR_ARGCOUNT, HCL_NULL, HCL_NULL); /* TODO: error location */
+		return -1;
+	}
+
+
+/* specifying MAX_CODE_JUMP causes emit_single_param_instruction() to 
+	 * produce the long jump instruction (BCODE_JUMP_FORWARD_X) */
+	if (emit_single_param_instruction (hcl, HCL_CODE_JUMP_FORWARD_0, MAX_CODE_JUMP) <= -1) return -1;
+
+	SWITCH_TOP_CFRAME (hcl, COP_COMPILE_OBJECT_LIST, obj);
+
+	HCL_ASSERT (cond_pos < HCL_SMOOI_MAX); /* guaranteed in emit_byte_instruction() */
+	PUSH_SUBCFRAME (hcl, COP_EMIT_LAMBDA, HCL_SMOOI_TO_OOP(cond_pos));
+
+	return 0;
+}
+/* ========================================================================= */
+
+
+static int compile_cons_expression (hcl_t* hcl, hcl_oop_t obj)
 {
 	hcl_oop_t car;
 	int syncode;
@@ -807,8 +907,11 @@ static int compile_cons (hcl_t* hcl, hcl_oop_t obj)
 		{
 			case HCL_SYNCODE_BEGIN:
 			case HCL_SYNCODE_DEFUN:
+/* TODO: not implemented yet */
+				break;
+
 			case HCL_SYNCODE_IF:
-				/* TODO: */
+				if (compile_if (hcl, obj) <= -1) return -1;
 				break;
 
 			case HCL_SYNCODE_LAMBDA:
@@ -820,6 +923,16 @@ static int compile_cons (hcl_t* hcl, hcl_oop_t obj)
 				/* (set x 10) 
 				 * (set x (lambda (x y) (+ x y)) */
 				if (compile_set (hcl, obj) <= -1) return -1;
+				break;
+
+			case HCL_SYNCODE_RETURN:
+				/* (return 10)
+				 * (return (+ 10 20)) */
+				if (compile_return (hcl, obj) <= -1) return -1;
+				break;
+
+			case HCL_SYNCODE_WHILE:
+				if (compile_while (hcl, obj) <= -1) return -1;
 				break;
 
 			default:
@@ -981,7 +1094,7 @@ static int compile_object (hcl_t* hcl)
 			goto done;
 
 		case HCL_BRAND_CONS:
-			if (compile_cons (hcl, cf->operand) <= -1) return -1;
+			if (compile_cons_expression (hcl, cf->operand) <= -1) return -1;
 			break;
 
 		case HCL_BRAND_SYMBOL_ARRAY:
@@ -1146,6 +1259,21 @@ static HCL_INLINE int emit_call (hcl_t* hcl)
 	return n;
 }
 
+static HCL_INLINE int emit_return (hcl_t* hcl)
+{
+	hcl_cframe_t* cf;
+	int n;
+
+	cf = GET_TOP_CFRAME(hcl);
+	HCL_ASSERT (cf->opcode == COP_EMIT_RETURN);
+	HCL_ASSERT (HCL_IS_NIL(hcl, cf->operand));
+
+	n = emit_byte_instruction (hcl, HCL_CODE_RETURN_FROM_BLOCK);
+
+	POP_CFRAME (hcl);
+	return n;
+}
+
 static HCL_INLINE int emit_set (hcl_t* hcl)
 {
 	hcl_cframe_t* cf;
@@ -1230,6 +1358,10 @@ int hcl_compile (hcl_t* hcl, hcl_oop_t obj)
 
 			case COP_EMIT_LAMBDA:
 				if (emit_lambda (hcl) <= -1) goto oops;
+				break;
+
+			case COP_EMIT_RETURN:
+				if (emit_return (hcl) <= -1) goto oops;
 				break;
 
 			case COP_EMIT_SET:

@@ -1499,15 +1499,15 @@ static int execute (hcl_t* hcl)
 				break;
 
 			case BCODE_JUMP_IF_TRUE_X:
-			case BCODE_JUMP_IF_FALSE_X:
+			case HCL_CODE_JUMP_FORWARD_IF_FALSE_X:
 			case BCODE_JUMP_IF_TRUE_0:
 			case BCODE_JUMP_IF_TRUE_1:
 			case BCODE_JUMP_IF_TRUE_2:
 			case BCODE_JUMP_IF_TRUE_3:
-			case BCODE_JUMP_IF_FALSE_0:
-			case BCODE_JUMP_IF_FALSE_1:
-			case BCODE_JUMP_IF_FALSE_2:
-			case BCODE_JUMP_IF_FALSE_3:
+			case HCL_CODE_JUMP_FORWARD_IF_FALSE_0:
+			case HCL_CODE_JUMP_FORWARD_IF_FALSE_1:
+			case HCL_CODE_JUMP_FORWARD_IF_FALSE_2:
+			case HCL_CODE_JUMP_FORWARD_IF_FALSE_3:
 HCL_LOG0 (hcl, HCL_LOG_IC | HCL_LOG_FATAL, "<<<<<<<<<<<<<< JUMP NOT IMPLEMENTED YET >>>>>>>>>>>>\n");
 hcl->errnum = HCL_ENOIMPL;
 return -1;

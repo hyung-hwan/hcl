@@ -540,148 +540,148 @@ enum hcl_bcode_t
 	HCL_CODE_STORE_INTO_OBJECT_2      = 0x3A,
 	HCL_CODE_STORE_INTO_OBJECT_3      = 0x3B,
 
-	BCODE_POP_INTO_OBJECT_0        = 0x3C,
-	BCODE_POP_INTO_OBJECT_1        = 0x3D,
-	BCODE_POP_INTO_OBJECT_2        = 0x3E,
-	BCODE_POP_INTO_OBJECT_3        = 0x3F,
+	BCODE_POP_INTO_OBJECT_0           = 0x3C,
+	BCODE_POP_INTO_OBJECT_1           = 0x3D,
+	BCODE_POP_INTO_OBJECT_2           = 0x3E,
+	BCODE_POP_INTO_OBJECT_3           = 0x3F,
 
-	HCL_CODE_PUSH_OBJECT_0         = 0x40,
-	HCL_CODE_PUSH_OBJECT_1         = 0x41,
-	HCL_CODE_PUSH_OBJECT_2         = 0x42,
-	HCL_CODE_PUSH_OBJECT_3         = 0x43,
+	HCL_CODE_PUSH_OBJECT_0            = 0x40,
+	HCL_CODE_PUSH_OBJECT_1            = 0x41,
+	HCL_CODE_PUSH_OBJECT_2            = 0x42,
+	HCL_CODE_PUSH_OBJECT_3            = 0x43,
 
-	HCL_CODE_JUMP_FORWARD_0        = 0x44, /* 68 */
-	HCL_CODE_JUMP_FORWARD_1        = 0x45, /* 69 */
-	HCL_CODE_JUMP_FORWARD_2        = 0x46, /* 70 */
-	HCL_CODE_JUMP_FORWARD_3        = 0x47, /* 71 */
+	HCL_CODE_JUMP_FORWARD_0           = 0x44, /* 68 */
+	HCL_CODE_JUMP_FORWARD_1           = 0x45, /* 69 */
+	HCL_CODE_JUMP_FORWARD_2           = 0x46, /* 70 */
+	HCL_CODE_JUMP_FORWARD_3           = 0x47, /* 71 */
 
-	HCL_CODE_JUMP_BACKWARD_0       = 0x48,
-	HCL_CODE_JUMP_BACKWARD_1       = 0x49,
-	HCL_CODE_JUMP_BACKWARD_2       = 0x4A,
-	HCL_CODE_JUMP_BACKWARD_3       = 0x4B,
+	HCL_CODE_JUMP_BACKWARD_0          = 0x48,
+	HCL_CODE_JUMP_BACKWARD_1          = 0x49,
+	HCL_CODE_JUMP_BACKWARD_2          = 0x4A,
+	HCL_CODE_JUMP_BACKWARD_3          = 0x4B,
 
-	BCODE_JUMP_IF_TRUE_0           = 0x4C,
-	BCODE_JUMP_IF_TRUE_1           = 0x4D,
-	BCODE_JUMP_IF_TRUE_2           = 0x4E,
-	BCODE_JUMP_IF_TRUE_3           = 0x4F,
+	BCODE_JUMP_IF_TRUE_0              = 0x4C,
+	BCODE_JUMP_IF_TRUE_1              = 0x4D,
+	BCODE_JUMP_IF_TRUE_2              = 0x4E,
+	BCODE_JUMP_IF_TRUE_3              = 0x4F,
 
-	BCODE_JUMP_IF_FALSE_0          = 0x50, /* 80 */
-	BCODE_JUMP_IF_FALSE_1          = 0x51, /* 81 */
-	BCODE_JUMP_IF_FALSE_2          = 0x52, /* 82 */
-	BCODE_JUMP_IF_FALSE_3          = 0x53, /* 83 */
+	HCL_CODE_JUMP_FORWARD_IF_FALSE_0  = 0x50, /* 80 */
+	HCL_CODE_JUMP_FORWARD_IF_FALSE_1  = 0x51, /* 81 */
+	HCL_CODE_JUMP_FORWARD_IF_FALSE_2  = 0x52, /* 82 */
+	HCL_CODE_JUMP_FORWARD_IF_FALSE_3  = 0x53, /* 83 */
 
-	HCL_CODE_CALL_0                = 0x54, /* 84 */
-	HCL_CODE_CALL_1                = 0x55, /* 85 */
-	HCL_CODE_CALL_2                = 0x56, /* 86 */
-	HCL_CODE_CALL_3                = 0x57, /* 87 */
+	HCL_CODE_CALL_0                   = 0x54, /* 84 */
+	HCL_CODE_CALL_1                   = 0x55, /* 85 */
+	HCL_CODE_CALL_2                   = 0x56, /* 86 */
+	HCL_CODE_CALL_3                   = 0x57, /* 87 */
 
 	HCL_CODE_STORE_INTO_CTXTEMPVAR_0  = 0x58, /* 88 */
 	HCL_CODE_STORE_INTO_CTXTEMPVAR_1  = 0x59, /* 89 */
 	HCL_CODE_STORE_INTO_CTXTEMPVAR_2  = 0x5A, /* 90 */
 	HCL_CODE_STORE_INTO_CTXTEMPVAR_3  = 0x5B, /* 91 */
 
-	BCODE_POP_INTO_CTXTEMPVAR_0    = 0x5C, /* 92 */
-	BCODE_POP_INTO_CTXTEMPVAR_1    = 0x5D, /* 93 */
-	BCODE_POP_INTO_CTXTEMPVAR_2    = 0x5E, /* 94 */
-	BCODE_POP_INTO_CTXTEMPVAR_3    = 0x5F, /* 95 */
+	BCODE_POP_INTO_CTXTEMPVAR_0       = 0x5C, /* 92 */
+	BCODE_POP_INTO_CTXTEMPVAR_1       = 0x5D, /* 93 */
+	BCODE_POP_INTO_CTXTEMPVAR_2       = 0x5E, /* 94 */
+	BCODE_POP_INTO_CTXTEMPVAR_3       = 0x5F, /* 95 */
 
-	HCL_CODE_PUSH_CTXTEMPVAR_0     = 0x60, /* 96 */
-	HCL_CODE_PUSH_CTXTEMPVAR_1     = 0x61, /* 97 */
-	HCL_CODE_PUSH_CTXTEMPVAR_2     = 0x62, /* 98 */
-	HCL_CODE_PUSH_CTXTEMPVAR_3     = 0x63, /* 99 */
+	HCL_CODE_PUSH_CTXTEMPVAR_0        = 0x60, /* 96 */
+	HCL_CODE_PUSH_CTXTEMPVAR_1        = 0x61, /* 97 */
+	HCL_CODE_PUSH_CTXTEMPVAR_2        = 0x62, /* 98 */
+	HCL_CODE_PUSH_CTXTEMPVAR_3        = 0x63, /* 99 */
 
-	BCODE_PUSH_OBJVAR_0            = 0x64,
-	BCODE_PUSH_OBJVAR_1            = 0x65,
-	BCODE_PUSH_OBJVAR_2            = 0x66,
-	BCODE_PUSH_OBJVAR_3            = 0x67,
+	BCODE_PUSH_OBJVAR_0               = 0x64,
+	BCODE_PUSH_OBJVAR_1               = 0x65,
+	BCODE_PUSH_OBJVAR_2               = 0x66,
+	BCODE_PUSH_OBJVAR_3               = 0x67,
 
-	BCODE_STORE_INTO_OBJVAR_0      = 0x68,
-	BCODE_STORE_INTO_OBJVAR_1      = 0x69,
-	BCODE_STORE_INTO_OBJVAR_2      = 0x6A,
-	BCODE_STORE_INTO_OBJVAR_3      = 0x6B,
+	BCODE_STORE_INTO_OBJVAR_0         = 0x68,
+	BCODE_STORE_INTO_OBJVAR_1         = 0x69,
+	BCODE_STORE_INTO_OBJVAR_2         = 0x6A,
+	BCODE_STORE_INTO_OBJVAR_3         = 0x6B,
 
-	BCODE_POP_INTO_OBJVAR_0        = 0x6C,
-	BCODE_POP_INTO_OBJVAR_1        = 0x6D,
-	BCODE_POP_INTO_OBJVAR_2        = 0x6E,
-	BCODE_POP_INTO_OBJVAR_3        = 0x6F,
+	BCODE_POP_INTO_OBJVAR_0           = 0x6C,
+	BCODE_POP_INTO_OBJVAR_1           = 0x6D,
+	BCODE_POP_INTO_OBJVAR_2           = 0x6E,
+	BCODE_POP_INTO_OBJVAR_3           = 0x6F,
 
-	BCODE_SEND_MESSAGE_0           = 0x70,
-	BCODE_SEND_MESSAGE_1           = 0x71,
-	BCODE_SEND_MESSAGE_2           = 0x72,
-	BCODE_SEND_MESSAGE_3           = 0x73,
+	BCODE_SEND_MESSAGE_0              = 0x70,
+	BCODE_SEND_MESSAGE_1              = 0x71,
+	BCODE_SEND_MESSAGE_2              = 0x72,
+	BCODE_SEND_MESSAGE_3              = 0x73,
 
-	BCODE_SEND_MESSAGE_TO_SUPER_0  = 0x74,
-	BCODE_SEND_MESSAGE_TO_SUPER_1  = 0x75,
-	BCODE_SEND_MESSAGE_TO_SUPER_2  = 0x76,
-	BCODE_SEND_MESSAGE_TO_SUPER_3  = 0x77,
+	BCODE_SEND_MESSAGE_TO_SUPER_0     = 0x74,
+	BCODE_SEND_MESSAGE_TO_SUPER_1     = 0x75,
+	BCODE_SEND_MESSAGE_TO_SUPER_2     = 0x76,
+	BCODE_SEND_MESSAGE_TO_SUPER_3     = 0x77,
 
 	/* UNUSED 0x78 - 0x7F */
 
-	BCODE_STORE_INTO_INSTVAR_X     = 0x80, /* 128 */
-	BCODE_POP_INTO_INSTVAR_X       = 0x88, /* 136 */
-	BCODE_PUSH_INSTVAR_X           = 0x90, /* 144 */
+	BCODE_STORE_INTO_INSTVAR_X        = 0x80, /* 128 */
+	BCODE_POP_INTO_INSTVAR_X          = 0x88, /* 136 */
+	BCODE_PUSH_INSTVAR_X              = 0x90, /* 144 */
 
-	HCL_CODE_PUSH_TEMPVAR_X        = 0x98, /* 152 */
-	HCL_CODE_STORE_INTO_TEMPVAR_X  = 0xA0, /* 160 */
-	BCODE_POP_INTO_TEMPVAR_X       = 0xA8, /* 168 */
+	HCL_CODE_PUSH_TEMPVAR_X           = 0x98, /* 152 */
+	HCL_CODE_STORE_INTO_TEMPVAR_X     = 0xA0, /* 160 */
+	BCODE_POP_INTO_TEMPVAR_X          = 0xA8, /* 168 */
 
-	HCL_CODE_PUSH_LITERAL_X        = 0xB0, /* 176 */
-	HCL_CODE_PUSH_LITERAL_X2       = 0xB1, /* 177 */
+	HCL_CODE_PUSH_LITERAL_X           = 0xB0, /* 176 */
+	HCL_CODE_PUSH_LITERAL_X2          = 0xB1, /* 177 */
 
 	/* SEE FURTHER DOWN FOR SPECIAL CODES - 0xB2 - 0xB7  */
 
-	HCL_CODE_STORE_INTO_OBJECT_X   = 0xB8, /* 184 */
-	BCODE_POP_INTO_OBJECT_X        = 0xBC, /* 188 */
-	HCL_CODE_PUSH_OBJECT_X         = 0xC0, /* 192 */
+	HCL_CODE_STORE_INTO_OBJECT_X      = 0xB8, /* 184 */
+	BCODE_POP_INTO_OBJECT_X           = 0xBC, /* 188 */
+	HCL_CODE_PUSH_OBJECT_X            = 0xC0, /* 192 */
 
-	HCL_CODE_JUMP_FORWARD_X        = 0xC4, /* 196 */
-	HCL_CODE_JUMP_BACKWARD_X       = 0xC8, /* 200 */
-	BCODE_JUMP_IF_TRUE_X           = 0xCC, /* 204 */
-	BCODE_JUMP_IF_FALSE_X          = 0xD0, /* 208 */
+	HCL_CODE_JUMP_FORWARD_X           = 0xC4, /* 196 */
+	HCL_CODE_JUMP_BACKWARD_X          = 0xC8, /* 200 */
+	BCODE_JUMP_IF_TRUE_X              = 0xCC, /* 204 */
+	HCL_CODE_JUMP_FORWARD_IF_FALSE_X  = 0xD0, /* 208 */
 
-	HCL_CODE_CALL_X                = 0xD4, /* 212 */
+	HCL_CODE_CALL_X                   = 0xD4, /* 212 */
 
 	HCL_CODE_STORE_INTO_CTXTEMPVAR_X  = 0xD8, /* 216 */
-	BCODE_POP_INTO_CTXTEMPVAR_X    = 0xDC, /* 220 */
+	BCODE_POP_INTO_CTXTEMPVAR_X       = 0xDC, /* 220 */
 	HCL_CODE_PUSH_CTXTEMPVAR_X        = 0xE0, /* 224 */
 
-	BCODE_PUSH_OBJVAR_X            = 0xE4, /* 228 */
-	BCODE_STORE_INTO_OBJVAR_X      = 0xE8, /* 232 */
-	BCODE_POP_INTO_OBJVAR_X        = 0xEC, /* 236 */
+	BCODE_PUSH_OBJVAR_X               = 0xE4, /* 228 */
+	BCODE_STORE_INTO_OBJVAR_X         = 0xE8, /* 232 */
+	BCODE_POP_INTO_OBJVAR_X           = 0xEC, /* 236 */
 
-	BCODE_SEND_MESSAGE_X           = 0xF0, /* 240 */
-	BCODE_SEND_MESSAGE_TO_SUPER_X  = 0xF4, /* 244 */
+	BCODE_SEND_MESSAGE_X              = 0xF0, /* 240 */
+	BCODE_SEND_MESSAGE_TO_SUPER_X     = 0xF4, /* 244 */
 
 	/* -------------------------------------- */
 
-	HCL_CODE_JUMP2_FORWARD         = 0xC5, /* 197 */
-	HCL_CODE_JUMP2_BACKWARD        = 0xC9, /* 201 */
+	HCL_CODE_JUMP2_FORWARD            = 0xC5, /* 197 */
+	HCL_CODE_JUMP2_BACKWARD           = 0xC9, /* 201 */
 
-	BCODE_PUSH_RECEIVER            = 0x81, /* 129 */
-	HCL_CODE_PUSH_NIL              = 0x82, /* 130 */
-	HCL_CODE_PUSH_TRUE             = 0x83, /* 131 */
-	HCL_CODE_PUSH_FALSE            = 0x84, /* 132 */
-	BCODE_PUSH_CONTEXT             = 0x85, /* 133 */
-	BCODE_PUSH_PROCESS             = 0x86, /* 134 */
-	HCL_CODE_PUSH_NEGONE           = 0x87, /* 135 */
-	HCL_CODE_PUSH_ZERO             = 0x89, /* 137 */
-	HCL_CODE_PUSH_ONE              = 0x8A, /* 138 */
-	HCL_CODE_PUSH_TWO              = 0x8B, /* 139 */
+	BCODE_PUSH_RECEIVER               = 0x81, /* 129 */
+	HCL_CODE_PUSH_NIL                 = 0x82, /* 130 */
+	HCL_CODE_PUSH_TRUE                = 0x83, /* 131 */
+	HCL_CODE_PUSH_FALSE               = 0x84, /* 132 */
+	BCODE_PUSH_CONTEXT                = 0x85, /* 133 */
+	BCODE_PUSH_PROCESS                = 0x86, /* 134 */
+	HCL_CODE_PUSH_NEGONE              = 0x87, /* 135 */
+	HCL_CODE_PUSH_ZERO                = 0x89, /* 137 */
+	HCL_CODE_PUSH_ONE                 = 0x8A, /* 138 */
+	HCL_CODE_PUSH_TWO                 = 0x8B, /* 139 */
 
-	HCL_CODE_PUSH_INTLIT           = 0xB2, /* 178 */
-	HCL_CODE_PUSH_NEGINTLIT        = 0xB3, /* 179 */
-	HCL_CODE_PUSH_CHARLIT          = 0xB4, /* 180 */
+	HCL_CODE_PUSH_INTLIT              = 0xB2, /* 178 */
+	HCL_CODE_PUSH_NEGINTLIT           = 0xB3, /* 179 */
+	HCL_CODE_PUSH_CHARLIT             = 0xB4, /* 180 */
 
 	/* UNUSED 0xE8 - 0xF7 */
 
-	BCODE_DUP_STACKTOP             = 0xF8,
-	HCL_CODE_POP_STACKTOP          = 0xF9,
-	BCODE_RETURN_STACKTOP          = 0xFA, /* ^something */
-	BCODE_RETURN_RECEIVER          = 0xFB, /* ^self */
-	HCL_CODE_RETURN_FROM_BLOCK     = 0xFC, /* return the stack top from a block */
-	HCL_CODE_MAKE_BLOCK            = 0xFD,
-	BCODE_SEND_BLOCK_COPY          = 0xFE,
-	HCL_CODE_NOOP                  = 0xFF
+	BCODE_DUP_STACKTOP                = 0xF8,
+	HCL_CODE_POP_STACKTOP             = 0xF9,
+	BCODE_RETURN_STACKTOP             = 0xFA, /* ^something */
+	BCODE_RETURN_RECEIVER             = 0xFB, /* ^self */
+	HCL_CODE_RETURN_FROM_BLOCK        = 0xFC, /* return the stack top from a block */
+	HCL_CODE_MAKE_BLOCK               = 0xFD,
+	BCODE_SEND_BLOCK_COPY             = 0xFE,
+	HCL_CODE_NOOP                     = 0xFF
 };
 
 #if defined(__cplusplus)

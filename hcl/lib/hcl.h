@@ -837,7 +837,9 @@ struct hcl_t
 	hcl_oop_t _if;     /* symbol */
 	hcl_oop_t _lambda; /* symbol */
 	hcl_oop_t _quote; /* symbol */
+	hcl_oop_t _return; /* symbol */
 	hcl_oop_t _set; /* symbol */
+	hcl_oop_t _while; /* symbol */
 
 	/* == NEVER CHANGE THE ORDER OF FIELDS BELOW == */
 	/* hcl_ignite() assumes this order. make sure to update symnames in ignite_3() */
@@ -1022,7 +1024,9 @@ enum
 	HCL_SYNCODE_IF,
 	HCL_SYNCODE_LAMBDA,
 	HCL_SYNCODE_QUOTE,
-	HCL_SYNCODE_SET
+	HCL_SYNCODE_RETURN,
+	HCL_SYNCODE_SET,
+	HCL_SYNCODE_WHILE
 };
 
 struct hcl_cons_t
