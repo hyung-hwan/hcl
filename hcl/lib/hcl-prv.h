@@ -288,6 +288,11 @@ struct hcl_cframe_t
 		{
 			int var_type;
 		} set;
+
+		struct
+		{
+			hcl_ooi_t cond_pos;
+		} post_while;
 	} u;
 };
 

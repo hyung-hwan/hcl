@@ -850,7 +850,6 @@ struct hcl_t
 	hcl_oop_t _large_negative_integer; /* LargeNegativeInteger */
 	/* == NEVER CHANGE THE ORDER OF FIELDS ABOVE == */
 
-
 	hcl_oop_set_t symtab; /* system-wide symbol table. */
 	hcl_oop_set_t sysdic; /* system dictionary. */
 	hcl_oop_process_scheduler_t processor; /* instance of ProcessScheduler */

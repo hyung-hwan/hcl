@@ -1100,7 +1100,6 @@ static int execute (hcl_t* hcl)
 
 	while (1)
 	{
-
 		if (hcl->sem_heap_count > 0)
 		{
 			hcl_ntime_t ft, now;
@@ -1487,7 +1486,7 @@ static int execute (hcl_t* hcl)
 			case HCL_CODE_JUMP_BACKWARD_X:
 				FETCH_PARAM_CODE_TO (hcl, b1);
 				LOG_INST_1 (hcl, "jump_backward %zu", b1);
-				hcl->ip += b1;
+				hcl->ip -= b1;
 				break;
 
 			case HCL_CODE_JUMP_BACKWARD_0:
@@ -1499,18 +1498,27 @@ static int execute (hcl_t* hcl)
 				break;
 
 			case BCODE_JUMP_IF_TRUE_X:
-			case HCL_CODE_JUMP_FORWARD_IF_FALSE_X:
 			case BCODE_JUMP_IF_TRUE_0:
 			case BCODE_JUMP_IF_TRUE_1:
 			case BCODE_JUMP_IF_TRUE_2:
 			case BCODE_JUMP_IF_TRUE_3:
+HCL_LOG0 (hcl, HCL_LOG_IC | HCL_LOG_FATAL, "<<<<<<<<<<<<<< JUMP NOT IMPLEMENTED YET >>>>>>>>>>>>\n");
+hcl->errnum = HCL_ENOIMPL;
+return -1;
+
+			case HCL_CODE_JUMP_FORWARD_IF_FALSE_X:
+				FETCH_PARAM_CODE_TO (hcl, b1);
+				LOG_INST_1 (hcl, "jump_forward_if_false %zu", b1);
+				if (HCL_STACK_GETTOP(hcl) == hcl->_false) hcl->ip += b1;
+				break;
+
 			case HCL_CODE_JUMP_FORWARD_IF_FALSE_0:
 			case HCL_CODE_JUMP_FORWARD_IF_FALSE_1:
 			case HCL_CODE_JUMP_FORWARD_IF_FALSE_2:
 			case HCL_CODE_JUMP_FORWARD_IF_FALSE_3:
-HCL_LOG0 (hcl, HCL_LOG_IC | HCL_LOG_FATAL, "<<<<<<<<<<<<<< JUMP NOT IMPLEMENTED YET >>>>>>>>>>>>\n");
-hcl->errnum = HCL_ENOIMPL;
-return -1;
+				LOG_INST_1 (hcl, "jump_forward_if_false %zu", (hcl_oow_t)(bcode & 0x3));
+				if (HCL_STACK_GETTOP(hcl) == hcl->_false) hcl->ip += (bcode & 0x3); /* low 2 bits */
+				break;
 
 			case HCL_CODE_JUMP2_FORWARD:
 				FETCH_PARAM_CODE_TO (hcl, b1);
