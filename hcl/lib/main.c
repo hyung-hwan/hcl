@@ -595,7 +595,9 @@ static char* syntax_error_msg[] =
 	"too many arguments defined",
 	"too many variables defined",
 	"variable declaration disallowed",
-	"duplicate variable name"
+	"duplicate variable name",
+
+	"break outside loop"
 };
 
 static void print_synerr (hcl_t* hcl)

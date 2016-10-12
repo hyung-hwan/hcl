@@ -448,19 +448,15 @@ static int emit_push_literal (hcl_t* hcl, hcl_oop_t obj)
 }
 
 /* ========================================================================= */
-
-static int push_cframe (hcl_t* hcl, int opcode, hcl_oop_t operand)
+static HCL_INLINE int _insert_cframe (hcl_t* hcl, hcl_ooi_t index, int opcode, hcl_oop_t operand)
 {
 	hcl_cframe_t* tmp;
 
-	if (hcl->c->cfs.top == HCL_TYPE_MAX(hcl_ooi_t))
-	{
-		hcl->errnum = HCL_ETOOBIG;
-		return -1;
-	}
-
+	HCL_ASSERT (index >= 0);
+	
 	hcl->c->cfs.top++;
 	HCL_ASSERT (hcl->c->cfs.top >= 0);
+	HCL_ASSERT (index <= hcl->c->cfs.top);
 
 	if ((hcl_oow_t)hcl->c->cfs.top >= hcl->c->cfs.capa)
 	{
@@ -478,11 +474,38 @@ static int push_cframe (hcl_t* hcl, int opcode, hcl_oop_t operand)
 		hcl->c->cfs.ptr = tmp;
 	}
 
-	tmp = &hcl->c->cfs.ptr[hcl->c->cfs.top];
+	if (index < hcl->c->cfs.top)
+	{
+		HCL_MEMMOVE (&hcl->c->cfs.ptr[index + 1], &hcl->c->cfs.ptr[index], (hcl->c->cfs.top - index) * HCL_SIZEOF(*tmp));
+	}
+
+	tmp = &hcl->c->cfs.ptr[index];
 	tmp->opcode = opcode;
 	tmp->operand = operand;
 	/* leave tmp->u untouched/uninitialized */
 	return 0;
+}
+
+static int insert_cframe (hcl_t* hcl, hcl_ooi_t index, int opcode, hcl_oop_t operand)
+{
+	if (hcl->c->cfs.top == HCL_TYPE_MAX(hcl_ooi_t))
+	{
+		hcl->errnum = HCL_ETOOBIG;
+		return -1;
+	}
+
+	return _insert_cframe (hcl, index, opcode, operand);
+}
+
+static int push_cframe (hcl_t* hcl, int opcode, hcl_oop_t operand)
+{
+	if (hcl->c->cfs.top == HCL_TYPE_MAX(hcl_ooi_t))
+	{
+		hcl->errnum = HCL_ETOOBIG;
+		return -1;
+	}
+
+	return _insert_cframe (hcl, hcl->c->cfs.top + 1, opcode, operand);
 }
 
 static HCL_INLINE void pop_cframe (hcl_t* hcl)
@@ -493,6 +516,9 @@ static HCL_INLINE void pop_cframe (hcl_t* hcl)
 
 #define PUSH_CFRAME(hcl,opcode,operand) \
 	do { if (push_cframe(hcl,opcode,operand) <= -1) return -1; } while(0)
+
+#define INSERT_CFRAME(hcl,index,opcode,operand) \
+	do { if (insert_cframe(hcl,index,opcode,operand) <= -1) return -1; } while(0)
 
 #define POP_CFRAME(hcl) pop_cframe(hcl)
 
@@ -550,10 +576,60 @@ enum
 	COP_POST_UNTIL_BODY,
 	COP_POST_UNTIL_COND,
 	COP_POST_WHILE_BODY,
-	COP_POST_WHILE_COND
+	COP_POST_WHILE_COND,
+
+	COP_UPDATE_BREAK,
 };
 
 /* ========================================================================= */
+
+static int compile_break (hcl_t* hcl, hcl_oop_t src)
+{
+	hcl_oop_t obj;
+	hcl_ooi_t i;
+
+	HCL_ASSERT (HCL_BRANDOF(hcl,src) == HCL_BRAND_CONS);
+	HCL_ASSERT (HCL_CONS_CAR(src) == hcl->_break);
+
+	obj = HCL_CONS_CDR(src);
+	if (!HCL_IS_NIL(hcl,obj))
+	{
+		if (HCL_IS_CONS(hcl,obj))
+		{
+			HCL_DEBUG1 (hcl, "Syntax error - redundant argument in break - %O\n", src);
+			hcl_setsynerr (hcl, HCL_SYNERR_ARGCOUNT, HCL_NULL, HCL_NULL); /* TODO: error location */
+		}
+		else
+		{
+			HCL_DEBUG1 (hcl, "Syntax error - redundant cdr in break - %O\n", src);
+			hcl_setsynerr (hcl, HCL_SYNERR_DOTBANNED, HCL_NULL, HCL_NULL); /* TODO: error location */
+			return -1;
+		}
+		return -1;
+	}
+
+	for (i = hcl->c->cfs.top; i >= 0; --i)
+	{
+		const hcl_cframe_t* tcf;
+		tcf = &hcl->c->cfs.ptr[i];
+		if (tcf->opcode == COP_POST_UNTIL_BODY || tcf->opcode == COP_POST_WHILE_BODY)
+		{
+			hcl_oow_t jump_inst_pos;
+
+			jump_inst_pos = hcl->code.bc.len;
+			HCL_ASSERT (jump_inst_pos < HCL_SMOOI_MAX);
+			if (emit_single_param_instruction (hcl, HCL_CODE_JUMP_FORWARD_0, MAX_CODE_JUMP) <= -1) return -1;
+			INSERT_CFRAME (hcl, i, COP_UPDATE_BREAK, HCL_SMOOI_TO_OOP(jump_inst_pos));
+
+			POP_CFRAME (hcl);
+			return 0;
+		}
+	}
+
+	HCL_DEBUG1 (hcl, "Syntax error - break outside loop - %O\n", src);
+	hcl_setsynerr (hcl, HCL_SYNERR_BREAK, HCL_NULL, HCL_NULL); /* TODO: error location */
+	return -1;
+}
 
 static int compile_if (hcl_t* hcl, hcl_oop_t src)
 {
@@ -580,7 +656,7 @@ static int compile_lambda (hcl_t* hcl, hcl_oop_t src)
 		hcl_setsynerr (hcl, HCL_SYNERR_ARGNAMELIST, HCL_NULL, HCL_NULL); /* TODO: error location */
 		return -1;
 	}
-	else if (HCL_BRANDOF(hcl, obj) != HCL_BRAND_CONS)
+	else if (!HCL_IS_CONS(hcl, obj))
 	{
 		HCL_DEBUG1 (hcl, "Syntax error - redundant cdr in lambda - %O\n", src);
 		hcl_setsynerr (hcl, HCL_SYNERR_DOTBANNED, HCL_NULL, HCL_NULL); /* TODO: error location */
@@ -597,7 +673,7 @@ static int compile_lambda (hcl_t* hcl, hcl_oop_t src)
 	{
 		hcl_oop_t arg, ptr;
 
-		if (HCL_BRANDOF(hcl, args) != HCL_BRAND_CONS)
+		if (!HCL_IS_CONS(hcl, args))
 		{
 			HCL_DEBUG1 (hcl, "Syntax error - not a lambda argument list - %O\n", args);
 			hcl_setsynerr (hcl, HCL_SYNERR_ARGNAMELIST, HCL_NULL, HCL_NULL); /* TODO: error location */
@@ -610,7 +686,7 @@ static int compile_lambda (hcl_t* hcl, hcl_oop_t src)
 		do
 		{
 			arg = HCL_CONS_CAR(ptr);
-			if (HCL_BRANDOF(hcl, arg) != HCL_BRAND_SYMBOL)
+			if (!HCL_IS_SYMBOL(hcl, arg))
 			{
 				HCL_DEBUG1 (hcl, "Syntax error - lambda argument not a symbol - %O\n", arg);
 				hcl_setsynerr (hcl, HCL_SYNERR_ARGNAME, HCL_NULL, HCL_NULL); /* TODO: error location */
@@ -631,7 +707,7 @@ static int compile_lambda (hcl_t* hcl, hcl_oop_t src)
 			nargs++;
 
 			ptr = HCL_CONS_CDR(ptr);
-			if (HCL_BRANDOF(hcl, ptr) != HCL_BRAND_CONS) 
+			if (!HCL_IS_CONS(hcl, ptr)) 
 			{
 				if (!HCL_IS_NIL(hcl, ptr))
 				{
@@ -905,7 +981,17 @@ static int compile_cons_expression (hcl_t* hcl, hcl_oop_t obj)
 		switch (syncode)
 		{
 			case HCL_SYNCODE_BEGIN:
+HCL_DEBUG0 (hcl, "BEGIN NOT IMPLEMENTED...\n");
+/* TODO: not implemented yet */
+				break;
+
+			case HCL_SYNCODE_BREAK:
+				/* break */
+				if (compile_break (hcl, obj) <= -1) return -1;
+				break;
+
 			case HCL_SYNCODE_DEFUN:
+HCL_DEBUG0 (hcl, "DEFUN NOT IMPLEMENTED...\n");
 /* TODO: not implemented yet */
 				break;
 
@@ -949,7 +1035,7 @@ static int compile_cons_expression (hcl_t* hcl, hcl_oop_t obj)
 		/* normal function call 
 		 *  (<operator> <operand1> ...) */
 		hcl_ooi_t nargs;
-		hcl_oow_t oldtop;
+		hcl_ooi_t oldtop;
 		hcl_cframe_t* cf;
 		hcl_oop_t cdr;
 
@@ -1136,7 +1222,7 @@ static int compile_object_list (hcl_t* hcl)
 		hcl_oop_t car, cdr;
 		int cop;
 
-		if (HCL_BRANDOF(hcl, cf->operand) != HCL_BRAND_CONS)
+		if (!HCL_IS_CONS(hcl, cf->operand))
 		{
 			HCL_DEBUG1 (hcl, "Syntax error - redundant cdr in the object list - %O\n", cf->operand);
 			hcl_setsynerr (hcl, HCL_SYNERR_DOTBANNED, HCL_NULL, HCL_NULL); /* TODO: error location */
@@ -1150,7 +1236,9 @@ static int compile_object_list (hcl_t* hcl)
 
 		if (!HCL_IS_NIL(hcl, cdr))
 		{
-			/* (+ 1 2 3) - argument list. 1, 2, 3 pushed must remain in 
+			/* there is a next statement to compile 
+			 *
+			 * (+ 1 2 3) - argument list. 1, 2, 3 pushed must remain in 
 			 *             the stack until the function '+' is called.
 			 *
 			 * (lambda (x y) (+ x 10) (+ y 20)) 
@@ -1161,7 +1249,23 @@ static int compile_object_list (hcl_t* hcl)
 			if (cop == COP_COMPILE_OBJECT_LIST)
 			{
 				/* let's arrange to emit POP before generating code for the rest of the list */
-				PUSH_SUBCFRAME (hcl, COP_EMIT_POP, hcl->_nil);
+
+				hcl_oop_t tmp;
+
+				/* look ahead for some special functions */
+				tmp = HCL_CONS_CAR(cdr);
+				if (!HCL_IS_CONS(hcl, tmp))
+				{
+					/* this check is duplicate of the check at the beginning
+					 * of this function. if not for look-ahead, this block
+					 * could be removed */
+					HCL_DEBUG1 (hcl, "Syntax error - redundant cdr in the object list - %O\n", cf->operand);
+					hcl_setsynerr (hcl, HCL_SYNERR_DOTBANNED, HCL_NULL, HCL_NULL); /* TODO: error location */
+					return -1;
+				}
+
+				if (HCL_CONS_CAR(tmp) != hcl->_break) /* TODO: other special forms??? */
+					PUSH_SUBCFRAME (hcl, COP_EMIT_POP, hcl->_nil);
 			}
 		}
 	}
@@ -1251,6 +1355,14 @@ patch_instruction (hcl, jip + 2, jump_offset & 0xFF);
 
 	POP_CFRAME (hcl);
 	return 0;
+}
+
+/* ========================================================================= */
+
+static int update_break (hcl_t* hcl)
+{
+	HCL_DEBUG0 (hcl, "TOOD: update break...\n");
+	return -1;
 }
 
 /* ========================================================================= */
@@ -1347,7 +1459,6 @@ static HCL_INLINE int emit_pop (hcl_t* hcl)
 	POP_CFRAME (hcl);
 	return n;
 }
-
 
 static HCL_INLINE int emit_return (hcl_t* hcl)
 {
@@ -1469,6 +1580,10 @@ int hcl_compile (hcl_t* hcl, hcl_oop_t obj)
 			case COP_POST_UNTIL_COND:
 			case COP_POST_WHILE_COND:
 				if (post_while_cond (hcl) <= -1) goto oops;
+				break;
+
+			case COP_UPDATE_BREAK:
+				if (update_break (hcl) <= -1) goto oops;
 				break;
 
 			default:

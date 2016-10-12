@@ -104,7 +104,9 @@ enum hcl_synerrnum_t
 	HCL_SYNERR_ARGFLOOD,      /* too many arguments defined */
 	HCL_SYNERR_VARFLOOD,      /* too many variables defined */
 	HCL_SYNERR_VARDCLBANNED,  /* variable declaration disallowed */
-	HCL_SYNERR_VARNAMEDUP     /* duplicate variable name */
+	HCL_SYNERR_VARNAMEDUP,    /* duplicate variable name */
+
+	HCL_SYNERR_BREAK          /* break outside loop */
 };
 typedef enum hcl_synerrnum_t hcl_synerrnum_t;
 
@@ -833,6 +835,7 @@ struct hcl_t
 	hcl_oop_t _false;
 
 	hcl_oop_t _begin; /* symbol */
+	hcl_oop_t _break; /* symbol */
 	hcl_oop_t _defun; /* symbol */
 	hcl_oop_t _if;     /* symbol */
 	hcl_oop_t _lambda; /* symbol */
@@ -1019,7 +1022,8 @@ enum
 enum
 {
 	/* SYNCODE 0 means it's not a syncode object. so it begins with 1 */
-	HCL_SYNCODE_BEGIN = 1, 
+	HCL_SYNCODE_BEGIN = 1,
+	HCL_SYNCODE_BREAK,
 	HCL_SYNCODE_DEFUN,
 	HCL_SYNCODE_IF,
 	HCL_SYNCODE_LAMBDA,
