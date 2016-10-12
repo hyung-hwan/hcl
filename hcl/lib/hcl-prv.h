@@ -436,8 +436,10 @@ SHORT INSTRUCTION CODE                                        LONG INSTRUCTION C
 
 68-71    0100 01XX JUMP_FORWARD                               196  1100 0100 XXXXXXXX JUMP_FORWARD_X
 72-75    0100 10XX JUMP_BACKWARD                              200  1100 1000 XXXXXXXX JUMP_BACKWARD_X
-76-79    0100 11XX JUMP_IF_TRUE                               204  1100 1100 XXXXXXXX JUMP_IF_TRUE_X
-80-83    0101 00XX JUMP_IF_FALSE                              208  1101 0000 XXXXXXXX JUMP_IF_FALSE_X
+76-79    0100 11XX UNUSED                                     204  1100 1100 XXXXXXXX JUMP_FORWARD_IF_TRUE
+                                                              205  1100 1101 XXXXXXXX JUMP2_FORWARD_IF_TRUE
+80-83    0101 00XX UNUSED                                     208  1101 0000 XXXXXXXX JUMP_FORWARD_IF_FALSE
+                                                              209  1101 0001 XXXXXXXX JUMP2_FORWARD_IF_FALSE
 
 84-87    0101 01XX CALL                                       212  1101 0100 XXXXXXXX CALL_X
 
@@ -560,20 +562,11 @@ enum hcl_bcode_t
 	HCL_CODE_JUMP_FORWARD_2           = 0x46, /* 70 */
 	HCL_CODE_JUMP_FORWARD_3           = 0x47, /* 71 */
 
-	HCL_CODE_JUMP_BACKWARD_0          = 0x48,
-	HCL_CODE_JUMP_BACKWARD_1          = 0x49,
-	HCL_CODE_JUMP_BACKWARD_2          = 0x4A,
-	HCL_CODE_JUMP_BACKWARD_3          = 0x4B,
+	HCL_CODE_JUMP_BACKWARD_0          = 0x48, /* 72 */
+	HCL_CODE_JUMP_BACKWARD_1          = 0x49, /* 73 */
+	HCL_CODE_JUMP_BACKWARD_2          = 0x4A, /* 74 */
+	HCL_CODE_JUMP_BACKWARD_3          = 0x4B, /* 75 */
 
-	BCODE_JUMP_IF_TRUE_0              = 0x4C,
-	BCODE_JUMP_IF_TRUE_1              = 0x4D,
-	BCODE_JUMP_IF_TRUE_2              = 0x4E,
-	BCODE_JUMP_IF_TRUE_3              = 0x4F,
-
-	HCL_CODE_JUMP_FORWARD_IF_FALSE_0  = 0x50, /* 80 */
-	HCL_CODE_JUMP_FORWARD_IF_FALSE_1  = 0x51, /* 81 */
-	HCL_CODE_JUMP_FORWARD_IF_FALSE_2  = 0x52, /* 82 */
-	HCL_CODE_JUMP_FORWARD_IF_FALSE_3  = 0x53, /* 83 */
 
 	HCL_CODE_CALL_0                   = 0x54, /* 84 */
 	HCL_CODE_CALL_1                   = 0x55, /* 85 */
@@ -641,7 +634,7 @@ enum hcl_bcode_t
 
 	HCL_CODE_JUMP_FORWARD_X           = 0xC4, /* 196 */
 	HCL_CODE_JUMP_BACKWARD_X          = 0xC8, /* 200 */
-	BCODE_JUMP_IF_TRUE_X              = 0xCC, /* 204 */
+	HCL_CODE_JUMP_FORWARD_IF_TRUE_X   = 0xCC, /* 204 */
 	HCL_CODE_JUMP_FORWARD_IF_FALSE_X  = 0xD0, /* 208 */
 
 	HCL_CODE_CALL_X                   = 0xD4, /* 212 */
@@ -661,6 +654,10 @@ enum hcl_bcode_t
 
 	HCL_CODE_JUMP2_FORWARD            = 0xC5, /* 197 */
 	HCL_CODE_JUMP2_BACKWARD           = 0xC9, /* 201 */
+	HCL_CODE_JUMP_FORWARD_IF_TRUE     = 0xCC, /* 204 */
+	HCL_CODE_JUMP2_FORWARD_IF_TRUE    = 0xCD, /* 205 */
+	HCL_CODE_JUMP_FORWARD_IF_FALSE    = 0xD0, /* 208 */
+	HCL_CODE_JUMP2_FORWARD_IF_FALSE   = 0xD1, /* 209 */
 
 	BCODE_PUSH_RECEIVER               = 0x81, /* 129 */
 	HCL_CODE_PUSH_NIL                 = 0x82, /* 130 */

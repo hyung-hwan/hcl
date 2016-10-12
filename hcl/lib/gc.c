@@ -41,6 +41,7 @@ static struct
 	{  5, { 'q','u','o','t','e' },         HCL_SYNCODE_QUOTE,   HCL_OFFSETOF(hcl_t,_quote)  },
 	{  6, { 'r','e','t','u','r','n'},      HCL_SYNCODE_RETURN,  HCL_OFFSETOF(hcl_t,_return) },
 	{  3, { 's','e','t' },                 HCL_SYNCODE_SET,     HCL_OFFSETOF(hcl_t,_set)    },
+	{  5, { 'u','n','t','i','l' },         HCL_SYNCODE_UNTIL,   HCL_OFFSETOF(hcl_t,_until)  },
 	{  5, { 'w','h','i','l','e' },         HCL_SYNCODE_WHILE,   HCL_OFFSETOF(hcl_t,_while)  }
 };
 
