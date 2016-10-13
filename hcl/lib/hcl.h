@@ -106,6 +106,9 @@ enum hcl_synerrnum_t
 	HCL_SYNERR_VARDCLBANNED,  /* variable declaration disallowed */
 	HCL_SYNERR_VARNAMEDUP,    /* duplicate variable name */
 
+	HCL_SYNERR_BANNEDVARNAME, /* disallowed varible name */
+	HCL_SYNERR_BANNEDARGNAME, /* disallowed argument name */
+
 	HCL_SYNERR_BREAK          /* break outside loop */
 };
 typedef enum hcl_synerrnum_t hcl_synerrnum_t;

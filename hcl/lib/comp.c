@@ -124,8 +124,7 @@ static int find_temporary_variable_backward (hcl_t* hcl, hcl_oop_t name, hcl_oow
 			return 0;
 		}
 	}
-
-	HCL_DEBUG1 (hcl, "Info - cannot find a variable - %O\n", name);
+	
 	hcl->errnum = HCL_ENOENT;
 	return -1;
 }
@@ -626,9 +625,7 @@ static int compile_break (hcl_t* hcl, hcl_oop_t src)
 			 * x will get nill. */
 			if (emit_byte_instruction (hcl, HCL_CODE_PUSH_NIL) <= -1) return -1;
 
-			/* TODO: study if supporting expression after break is good.
-			 *       (break (+ 10 20))
-			 */
+/* TODO: study if supporting expression after break is good like return. (break (+ 10 20)) */
 			HCL_ASSERT (hcl->code.bc.len < HCL_SMOOI_MAX);
 			jump_inst_pos = hcl->code.bc.len;
 			
@@ -706,6 +703,14 @@ static int compile_lambda (hcl_t* hcl, hcl_oop_t src)
 				hcl_setsynerr (hcl, HCL_SYNERR_ARGNAME, HCL_NULL, HCL_NULL); /* TODO: error location */
 				return -1;
 			}
+
+			if (HCL_OBJ_GET_FLAGS_SYNCODE(arg))
+			{
+				HCL_DEBUG1 (hcl, "Syntax error - special symbol not to be declared as an argument name - %O\n", arg); 
+				hcl_setsynerr (hcl, HCL_SYNERR_BANNEDARGNAME, HCL_NULL, HCL_NULL); /* TOOD: error location */
+				return -1;
+			}
+
 	/* TODO: check duplicates within only the argument list. duplicates against outer-scope are ok.
 	 * is this check necessary? */
 
@@ -763,6 +768,13 @@ static int compile_lambda (hcl_t* hcl, hcl_oop_t src)
 			sz = HCL_OBJ_GET_SIZE(dcl);
 			for (i = 0; i < sz; i++)
 			{
+				if (HCL_OBJ_GET_FLAGS_SYNCODE(((hcl_oop_oop_t)dcl)->slot[i]))
+				{
+					HCL_DEBUG1 (hcl, "Syntax error - special symbol not to be declared as a variable name - %O\n", obj); 
+					hcl_setsynerr (hcl, HCL_SYNERR_BANNEDVARNAME, HCL_NULL, HCL_NULL); /* TOOD: error location */
+					return -1;
+				}
+
 				if (add_temporary_variable (hcl, ((hcl_oop_oop_t)dcl)->slot[i], tv_dup_start) <= -1) 
 				{
 					if (hcl->errnum == HCL_EEXIST)
@@ -888,6 +900,13 @@ static int compile_set (hcl_t* hcl, hcl_oop_t src)
 	{
 		HCL_DEBUG1 (hcl, "Syntax error - variable name not a symbol - %O\n", var);
 		hcl_setsynerr (hcl, HCL_SYNERR_VARNAME, HCL_NULL, HCL_NULL); /* TODO: error location */
+		return -1;
+	}
+
+	if (HCL_OBJ_GET_FLAGS_SYNCODE(var))
+	{
+		HCL_DEBUG1 (hcl, "Syntax error - special symbol not to be used as a variable name - %O\n", var); 
+		hcl_setsynerr (hcl, HCL_SYNERR_BANNEDVARNAME, HCL_NULL, HCL_NULL); /* TOOD: error location */
 		return -1;
 	}
 
@@ -1142,6 +1161,13 @@ static HCL_INLINE int compile_symbol (hcl_t* hcl, hcl_oop_t obj)
 	hcl_oow_t index;
 
 	HCL_ASSERT (HCL_BRANDOF(hcl,obj) == HCL_BRAND_SYMBOL);
+
+	if (HCL_OBJ_GET_FLAGS_SYNCODE(obj))
+	{
+		HCL_DEBUG1 (hcl, "Syntax error - special symbol not to be used as a variable name - %O\n", obj); 
+		hcl_setsynerr (hcl, HCL_SYNERR_BANNEDVARNAME, HCL_NULL, HCL_NULL); /* TOOD: error location */
+		return -1;
+	}
 
 	/* check if a symbol is a local variable */
 	if (find_temporary_variable_backward (hcl, obj, &index) <= -1)
