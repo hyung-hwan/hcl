@@ -192,6 +192,13 @@ static int put_ooch (hcl_t* hcl, hcl_oow_t mask, hcl_ooch_t ch, hcl_oow_t len)
 	if (hcl->log.len > 0 && hcl->log.last_mask != mask)
 	{
 		/* the mask has changed. commit the buffered text */
+/* TODO: HANDLE LINE ENDING CONVENTION BETTER... */
+		if (hcl->log.ptr[hcl->log.len - 1] != '\n')
+		{
+			/* no line ending - append a line terminator */
+			hcl->log.ptr[hcl->log.len++] = '\n';
+		}
+
 		hcl->vmprim.log_write (hcl, hcl->log.last_mask, hcl->log.ptr, hcl->log.len);
 		hcl->log.len = 0;
 	}
@@ -224,7 +231,7 @@ redo:
 		}
 
 		hcl->log.ptr = tmp;
-		hcl->log.capa = newcapa;
+		hcl->log.capa = newcapa - 1; /* -1 to handle line ending injection more easily */
 	}
 
 	while (len > 0)
@@ -244,6 +251,13 @@ static int put_oocs (hcl_t* hcl, hcl_oow_t mask, const hcl_ooch_t* ptr, hcl_oow_
 	if (hcl->log.len > 0 && hcl->log.last_mask != mask)
 	{
 		/* the mask has changed. commit the buffered text */
+/* TODO: HANDLE LINE ENDING CONVENTION BETTER... */
+		if (hcl->log.ptr[hcl->log.len - 1] != '\n')
+		{
+			/* no line ending - append a line terminator */
+			hcl->log.ptr[hcl->log.len++] = '\n';
+		}
+
 		hcl->vmprim.log_write (hcl, hcl->log.last_mask, hcl->log.ptr, hcl->log.len);
 		hcl->log.len = 0;
 	}
@@ -265,7 +279,7 @@ static int put_oocs (hcl_t* hcl, hcl_oow_t mask, const hcl_ooch_t* ptr, hcl_oow_
 		if (!tmp) return -1;
 
 		hcl->log.ptr = tmp;
-		hcl->log.capa = newcapa;
+		hcl->log.capa = newcapa - 1; /* -1 to handle line ending injection more easily */
 	}
 
 	HCL_MEMCPY (&hcl->log.ptr[hcl->log.len], ptr, len * HCL_SIZEOF(*ptr));

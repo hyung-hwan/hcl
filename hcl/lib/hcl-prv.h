@@ -292,6 +292,7 @@ struct hcl_cframe_t
 		struct
 		{
 			hcl_ooi_t cond_pos;
+			hcl_ooi_t body_pos;
 		} post_while;
 	} u;
 };
@@ -566,7 +567,6 @@ enum hcl_bcode_t
 	HCL_CODE_JUMP_BACKWARD_1          = 0x49, /* 73 */
 	HCL_CODE_JUMP_BACKWARD_2          = 0x4A, /* 74 */
 	HCL_CODE_JUMP_BACKWARD_3          = 0x4B, /* 75 */
-
 
 	HCL_CODE_CALL_0                   = 0x54, /* 84 */
 	HCL_CODE_CALL_1                   = 0x55, /* 85 */

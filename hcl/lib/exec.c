@@ -1196,6 +1196,12 @@ static int execute (hcl_t* hcl)
 
 		hcl->proc_switched = 0;
 
+		if (hcl->ip >= hcl->code.bc.len) 
+		{
+			HCL_DEBUG0 (hcl, "IP reached the end of bytecode. Stopping execution\n");
+			break;
+		}
+
 #if defined(HCL_DEBUG_VM_EXEC)
 		fetched_instruction_pointer = hcl->ip;
 #endif

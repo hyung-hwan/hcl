@@ -125,6 +125,7 @@ static int find_temporary_variable_backward (hcl_t* hcl, hcl_oop_t name, hcl_oow
 		}
 	}
 
+	HCL_DEBUG1 (hcl, "Info - cannot find a variable - %O\n", name);
 	hcl->errnum = HCL_ENOENT;
 	return -1;
 }
@@ -569,7 +570,7 @@ enum
 
 	COP_EMIT_CALL,
 	COP_EMIT_LAMBDA,
-	COP_EMIT_POP,
+	COP_EMIT_POP_STACKTOPP,
 	COP_EMIT_RETURN,
 	COP_EMIT_SET,
 
@@ -612,12 +613,25 @@ static int compile_break (hcl_t* hcl, hcl_oop_t src)
 	{
 		const hcl_cframe_t* tcf;
 		tcf = &hcl->c->cfs.ptr[i];
+
+		if (tcf->opcode == COP_EMIT_LAMBDA) break; /* seems to cross lambda boundary */
+
 		if (tcf->opcode == COP_POST_UNTIL_BODY || tcf->opcode == COP_POST_WHILE_BODY)
 		{
-			hcl_oow_t jump_inst_pos;
+			hcl_ooi_t jump_inst_pos;
 
+			/* (break) is not really a function call. but to make it look like a
+			 * function call, i generate PUSH_NIL so nil becomes a return value.
+			 *     (set x (until #f (break)))
+			 * x will get nill. */
+			if (emit_byte_instruction (hcl, HCL_CODE_PUSH_NIL) <= -1) return -1;
+
+			/* TODO: study if supporting expression after break is good.
+			 *       (break (+ 10 20))
+			 */
+			HCL_ASSERT (hcl->code.bc.len < HCL_SMOOI_MAX);
 			jump_inst_pos = hcl->code.bc.len;
-			HCL_ASSERT (jump_inst_pos < HCL_SMOOI_MAX);
+			
 			if (emit_single_param_instruction (hcl, HCL_CODE_JUMP_FORWARD_0, MAX_CODE_JUMP) <= -1) return -1;
 			INSERT_CFRAME (hcl, i, COP_UPDATE_BREAK, HCL_SMOOI_TO_OOP(jump_inst_pos));
 
@@ -641,7 +655,7 @@ static int compile_lambda (hcl_t* hcl, hcl_oop_t src)
 {
 	hcl_oop_t obj, args;
 	hcl_oow_t nargs, ntmprs;
-	hcl_oow_t jump_inst_pos;
+	hcl_ooi_t jump_inst_pos;
 	hcl_oow_t saved_tv_count, tv_dup_start;
 
 	HCL_ASSERT (HCL_BRANDOF(hcl,src) == HCL_BRAND_CONS);
@@ -792,15 +806,13 @@ static int compile_lambda (hcl_t* hcl, hcl_oop_t src)
 	 * count of temporaries in the home context */
 	if (emit_double_param_instruction (hcl, HCL_CODE_MAKE_BLOCK, nargs, hcl->c->tv.size/*ntmprs*/) <= -1) return -1;
 
-
+	HCL_ASSERT (hcl->code.bc.len < HCL_SMOOI_MAX);  /* guaranteed in emit_byte_instruction() */
 	jump_inst_pos = hcl->code.bc.len;
 	/* specifying MAX_CODE_JUMP causes emit_single_param_instruction() to 
 	 * produce the long jump instruction (BCODE_JUMP_FORWARD_X) */
 	if (emit_single_param_instruction (hcl, HCL_CODE_JUMP_FORWARD_0, MAX_CODE_JUMP) <= -1) return -1;
 
 	SWITCH_TOP_CFRAME (hcl, COP_COMPILE_OBJECT_LIST, obj);
-
-	HCL_ASSERT (jump_inst_pos < HCL_SMOOI_MAX); /* guaranteed in emit_byte_instruction() */
 	PUSH_SUBCFRAME (hcl, COP_EMIT_LAMBDA, HCL_SMOOI_TO_OOP(jump_inst_pos));
 
 	return 0;
@@ -952,7 +964,7 @@ static int compile_while (hcl_t* hcl, hcl_oop_t src, int next_cop)
 		return -1;
 	}
 
-	cond_pos = hcl->code.bc.len;
+	cond_pos = hcl->code.bc.len; /* position where the bytecode for the conditional is emitted */
 	HCL_ASSERT (cond_pos < HCL_SMOOI_MAX);
 
 	cond = HCL_CONS_CAR(obj);
@@ -962,6 +974,7 @@ static int compile_while (hcl_t* hcl, hcl_oop_t src, int next_cop)
 	PUSH_SUBCFRAME (hcl, next_cop, obj); /* 2 */
 	cf = GET_SUBCFRAME (hcl);
 	cf->u.post_while.cond_pos = cond_pos;
+	cf->u.post_while.body_pos = 0; /* unknown yet*/
 
 	return 0;
 }
@@ -1249,23 +1262,11 @@ static int compile_object_list (hcl_t* hcl)
 			if (cop == COP_COMPILE_OBJECT_LIST)
 			{
 				/* let's arrange to emit POP before generating code for the rest of the list */
-
 				hcl_oop_t tmp;
-
 				/* look ahead for some special functions */
 				tmp = HCL_CONS_CAR(cdr);
-				if (!HCL_IS_CONS(hcl, tmp))
-				{
-					/* this check is duplicate of the check at the beginning
-					 * of this function. if not for look-ahead, this block
-					 * could be removed */
-					HCL_DEBUG1 (hcl, "Syntax error - redundant cdr in the object list - %O\n", cf->operand);
-					hcl_setsynerr (hcl, HCL_SYNERR_DOTBANNED, HCL_NULL, HCL_NULL); /* TODO: error location */
-					return -1;
-				}
-
-				if (HCL_CONS_CAR(tmp) != hcl->_break) /* TODO: other special forms??? */
-					PUSH_SUBCFRAME (hcl, COP_EMIT_POP, hcl->_nil);
+				if (!HCL_IS_CONS(hcl, tmp) || HCL_CONS_CAR(tmp) != hcl->_break) /* TODO: other special forms??? */
+					PUSH_SUBCFRAME (hcl, COP_EMIT_POP_STACKTOPP, hcl->_nil);
 			}
 		}
 	}
@@ -1277,16 +1278,16 @@ static int compile_object_list (hcl_t* hcl)
 static HCL_INLINE int post_while_cond (hcl_t* hcl)
 {
 	hcl_cframe_t* cf;
-	hcl_oow_t jump_inst_pos;
-	hcl_ooi_t cond_pos;
+	hcl_ooi_t jump_inst_pos;
+	hcl_ooi_t cond_pos, body_pos;
 	int jump_inst, next_cop;
 
 	cf = GET_TOP_CFRAME(hcl);
 	HCL_ASSERT (cf->opcode == COP_POST_UNTIL_COND || cf->opcode == COP_POST_WHILE_COND);
 
 	cond_pos = cf->u.post_while.cond_pos;
+	HCL_ASSERT (hcl->code.bc.len < HCL_SMOOI_MAX);
 	jump_inst_pos = hcl->code.bc.len;
-	HCL_ASSERT (jump_inst_pos < HCL_SMOOI_MAX);
 
 	if (cf->opcode == COP_POST_UNTIL_COND)
 	{
@@ -1302,10 +1303,14 @@ static HCL_INLINE int post_while_cond (hcl_t* hcl)
 	if (emit_single_param_instruction (hcl, jump_inst, MAX_CODE_JUMP) <= -1) return -1;
 	if (emit_byte_instruction (hcl, HCL_CODE_POP_STACKTOP) <= -1) return -1;
 
+	HCL_ASSERT (hcl->code.bc.len < HCL_SMOOI_MAX);
+	body_pos = hcl->code.bc.len;
+
 	SWITCH_TOP_CFRAME (hcl, COP_COMPILE_OBJECT_LIST, cf->operand); /* 1 */
 	PUSH_SUBCFRAME (hcl, next_cop, HCL_SMOOI_TO_OOP(jump_inst_pos)); /* 2 */
 	cf = GET_SUBCFRAME(hcl);
 	cf->u.post_while.cond_pos = cond_pos; 
+	cf->u.post_while.body_pos = body_pos;
 	return 0;
 }
 
@@ -1313,42 +1318,50 @@ static HCL_INLINE int post_while_body (hcl_t* hcl)
 {
 	hcl_cframe_t* cf;
 	hcl_ooi_t jip;
-	hcl_oow_t jump_offset, body_size;
+	hcl_oow_t jump_offset, code_size;
 
 	cf = GET_TOP_CFRAME(hcl);
 	HCL_ASSERT (cf->opcode == COP_POST_UNTIL_BODY || cf->opcode == COP_POST_WHILE_BODY);
 	HCL_ASSERT (HCL_OOP_IS_SMOOI(cf->operand));
 
-
 	HCL_ASSERT (hcl->code.bc.len >= cf->u.post_while.cond_pos);
-	if (hcl->code.bc.len > cf->u.post_while.cond_pos)
+	if (hcl->code.bc.len > cf->u.post_while.body_pos)
 	{
-		hcl_ooi_t offset;
+		/* some code exist after POP_STACKTOP after JUMP_FORWARD_IF_TRUE/FALSE.
+		 * (until #f) =>
+		 *   push_false
+		 *   jump_forward_if_true XXXX
+		 *   pop_stacktop            <-- 1) emitted in post_while_cond();
+		 *   jump_backward YYYY      <-- 2) emitted below
+		 *   pop_stacktop
+		 * this check prevents another pop_stacktop between 1) and 2)
+		 */
 		if (emit_byte_instruction (hcl, HCL_CODE_POP_STACKTOP) <= -1) return -1;
-		offset = hcl->code.bc.len - cf->u.post_while.cond_pos + 1;
-		if (offset > 3) offset += HCL_BCODE_LONG_PARAM_SIZE;
-		if (emit_single_param_instruction (hcl, HCL_CODE_JUMP_BACKWARD_0, offset) <= -1) return -1;
 	}
+
+	jump_offset = hcl->code.bc.len - cf->u.post_while.cond_pos + 1;
+	if (jump_offset > 3) jump_offset += HCL_BCODE_LONG_PARAM_SIZE;
+	if (emit_single_param_instruction (hcl, HCL_CODE_JUMP_BACKWARD_0, jump_offset) <= -1) return -1;
 
 	jip = HCL_OOP_TO_SMOOI(cf->operand);
 	/* HCL_CODE_LONG_PARAM_SIZE + 1 => size of the long JUMP_FORWARD_IF_FALSE/JUMP_FORWARD_IF_TRUE instruction */
-	body_size = hcl->code.bc.len - jip - (HCL_BCODE_LONG_PARAM_SIZE + 1);
+	code_size = hcl->code.bc.len - jip - (HCL_BCODE_LONG_PARAM_SIZE + 1);
 
-	if (body_size > MAX_CODE_JUMP)
+	if (code_size > MAX_CODE_JUMP)
 	{
 		/* switch to JUMP2 instruction to allow a bigger jump offset.
 		 * up to twice MAX_CODE_JUMP only */
 		patch_instruction (hcl, jip, ((cf->opcode == COP_POST_UNTIL_BODY)? HCL_CODE_JUMP2_FORWARD_IF_TRUE: HCL_CODE_JUMP2_FORWARD_IF_FALSE)); 
-		jump_offset = body_size - MAX_CODE_JUMP;
+		jump_offset = code_size - MAX_CODE_JUMP;
 	}
 	else
 	{
-		jump_offset = body_size;
+		jump_offset = code_size;
 	}
 
 #if (HCL_BCODE_LONG_PARAM_SIZE == 2)
 	patch_instruction (hcl, jip + 1, jump_offset >> 8);
-patch_instruction (hcl, jip + 2, jump_offset & 0xFF);
+	patch_instruction (hcl, jip + 2, jump_offset & 0xFF);
 	#else
 	patch_instruction (hcl, jip + 1, jump_offset);
 #endif
@@ -1361,8 +1374,35 @@ patch_instruction (hcl, jip + 2, jump_offset & 0xFF);
 
 static int update_break (hcl_t* hcl)
 {
-	HCL_DEBUG0 (hcl, "TOOD: update break...\n");
-	return -1;
+	hcl_cframe_t* cf;
+	hcl_ooi_t jip, jump_offset;
+
+	cf = GET_TOP_CFRAME(hcl);
+	HCL_ASSERT (cf->opcode == COP_UPDATE_BREAK);
+	HCL_ASSERT (HCL_OOP_IS_SMOOI(cf->operand));
+
+	jip = HCL_OOP_TO_SMOOI(cf->operand);
+
+	/* HCL_CODE_LONG_PARAM_SIZE + 1 => size of the long JUMP_FORWARD instruction */
+	jump_offset = hcl->code.bc.len - jip - (HCL_BCODE_LONG_PARAM_SIZE + 1);
+
+	if (jump_offset > MAX_CODE_JUMP)
+	{
+		/* switch to JUMP2 instruction to allow a bigger jump offset.
+		 * up to twice MAX_CODE_JUMP only */
+		patch_instruction (hcl, jip, HCL_CODE_JUMP2_FORWARD); 
+		jump_offset -= MAX_CODE_JUMP;
+	}
+
+#if (HCL_BCODE_LONG_PARAM_SIZE == 2)
+	patch_instruction (hcl, jip + 1, jump_offset >> 8);
+patch_instruction (hcl, jip + 2, jump_offset & 0xFF);
+	#else
+	patch_instruction (hcl, jip + 1, jump_offset);
+#endif
+
+	POP_CFRAME (hcl);
+	return 0;
 }
 
 /* ========================================================================= */
@@ -1445,13 +1485,13 @@ static HCL_INLINE int emit_lambda (hcl_t* hcl)
 	return 0;
 }
 
-static HCL_INLINE int emit_pop (hcl_t* hcl)
+static HCL_INLINE int emit_pop_stacktop (hcl_t* hcl)
 {
 	hcl_cframe_t* cf;
 	int n;
 
 	cf = GET_TOP_CFRAME(hcl);
-	HCL_ASSERT (cf->opcode == COP_EMIT_POP);
+	HCL_ASSERT (cf->opcode == COP_EMIT_POP_STACKTOPP);
 	HCL_ASSERT (HCL_IS_NIL(hcl, cf->operand));
 
 	n = emit_byte_instruction (hcl, HCL_CODE_POP_STACKTOP);
@@ -1541,6 +1581,7 @@ int hcl_compile (hcl_t* hcl, hcl_oop_t obj)
 
 		cf = GET_TOP_CFRAME(hcl);
 
+/* TODO: tabulate this switch-based dispatch */
 		switch (cf->opcode)
 		{
 			case COP_COMPILE_OBJECT:
@@ -1560,8 +1601,8 @@ int hcl_compile (hcl_t* hcl, hcl_oop_t obj)
 				if (emit_lambda (hcl) <= -1) goto oops;
 				break;
 
-			case COP_EMIT_POP:
-				if (emit_pop (hcl) <= -1) goto oops;
+			case COP_EMIT_POP_STACKTOPP:
+				if (emit_pop_stacktop (hcl) <= -1) goto oops;
 				break;
 
 			case COP_EMIT_RETURN:
