@@ -585,6 +585,8 @@ static char* syntax_error_msg[] =
 	". disallowed",
 	"#include error",
 
+	"loop body too big",
+	"if body too big",
 	"lambda block too big",
 	"lambda block too deep",
 	"argument name list expected",

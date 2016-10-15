@@ -1506,13 +1506,15 @@ static int execute (hcl_t* hcl)
 			case HCL_CODE_JUMP_FORWARD_IF_TRUE:
 				FETCH_PARAM_CODE_TO (hcl, b1);
 				LOG_INST_1 (hcl, "jump_forward_if_true %zu", b1);
-				if (HCL_STACK_GETTOP(hcl) == hcl->_true) hcl->ip += b1;
+				/*if (HCL_STACK_GETTOP(hcl) == hcl->_true) hcl->ip += b1; TODO: _true or not _false?*/
+				if (HCL_STACK_GETTOP(hcl) != hcl->_false) hcl->ip += b1;
 				break;
 
 			case HCL_CODE_JUMP2_FORWARD_IF_TRUE:
 				FETCH_PARAM_CODE_TO (hcl, b1);
 				LOG_INST_1 (hcl, "jump2_forward_if_true %zu", b1);
-				if (HCL_STACK_GETTOP(hcl) == hcl->_true) hcl->ip += MAX_CODE_JUMP + b1;
+				/*if (HCL_STACK_GETTOP(hcl) == hcl->_true) hcl->ip += MAX_CODE_JUMP + b1;*/
+				if (HCL_STACK_GETTOP(hcl) != hcl->_false) hcl->ip += MAX_CODE_JUMP + b1;
 				break;
 
 			case HCL_CODE_JUMP_FORWARD_IF_FALSE:

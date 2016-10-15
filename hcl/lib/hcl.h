@@ -94,6 +94,8 @@ enum hcl_synerrnum_t
 	HCL_SYNERR_DOTBANNED,     /* . disallowed */
 	HCL_SYNERR_INCLUDE,       /* #include error */
 
+	HCL_SYNERR_LOOPFLOOD,     /* loop body too big */
+	HCL_SYNERR_IFFLOOD,       /* if body too big */
 	HCL_SYNERR_BLKFLOOD,      /* lambda block too big */
 	HCL_SYNERR_BLKDEPTH,      /* lambda block too deep */
 	HCL_SYNERR_ARGNAMELIST,   /* argument name list expected */

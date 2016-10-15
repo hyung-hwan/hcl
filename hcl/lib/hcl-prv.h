@@ -294,6 +294,12 @@ struct hcl_cframe_t
 			hcl_ooi_t cond_pos;
 			hcl_ooi_t body_pos;
 		} post_while;
+
+		struct
+		{
+			hcl_ooi_t cond_pos;
+			hcl_ooi_t body_pos;
+		} post_if;
 	} u;
 };
 
@@ -436,7 +442,9 @@ SHORT INSTRUCTION CODE                                        LONG INSTRUCTION C
 
 
 68-71    0100 01XX JUMP_FORWARD                               196  1100 0100 XXXXXXXX JUMP_FORWARD_X
+                                                              197  1100 0101 XXXXXXXX JUMP2_FORWARD
 72-75    0100 10XX JUMP_BACKWARD                              200  1100 1000 XXXXXXXX JUMP_BACKWARD_X
+                                                              201  1100 1001 XXXXXXXX JUMP2_BACKWARD
 76-79    0100 11XX UNUSED                                     204  1100 1100 XXXXXXXX JUMP_FORWARD_IF_TRUE
                                                               205  1100 1101 XXXXXXXX JUMP2_FORWARD_IF_TRUE
 80-83    0101 00XX UNUSED                                     208  1101 0000 XXXXXXXX JUMP_FORWARD_IF_FALSE
@@ -634,8 +642,6 @@ enum hcl_bcode_t
 
 	HCL_CODE_JUMP_FORWARD_X           = 0xC4, /* 196 */
 	HCL_CODE_JUMP_BACKWARD_X          = 0xC8, /* 200 */
-	HCL_CODE_JUMP_FORWARD_IF_TRUE_X   = 0xCC, /* 204 */
-	HCL_CODE_JUMP_FORWARD_IF_FALSE_X  = 0xD0, /* 208 */
 
 	HCL_CODE_CALL_X                   = 0xD4, /* 212 */
 

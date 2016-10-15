@@ -447,6 +447,33 @@ static int emit_push_literal (hcl_t* hcl, hcl_oop_t obj)
 	return 0;
 }
 
+static HCL_INLINE void patch_long_jump (hcl_t* hcl, hcl_ooi_t jip, hcl_ooi_t jump_offset)
+{
+	if (jump_offset > MAX_CODE_JUMP)
+	{
+		/* switch to JUMP2 instruction to allow a bigger jump offset.
+		 * up to twice MAX_CODE_JUMP only */
+		
+		HCL_ASSERT (jump_offset <= MAX_CODE_JUMP * 2);
+
+		HCL_ASSERT (hcl->code.bc.arr->slot[jip] == HCL_CODE_JUMP_FORWARD_X ||
+		            hcl->code.bc.arr->slot[jip] == HCL_CODE_JUMP_BACKWARD_X ||
+		            hcl->code.bc.arr->slot[jip] == HCL_CODE_JUMP_FORWARD_IF_TRUE ||
+		            hcl->code.bc.arr->slot[jip] == HCL_CODE_JUMP_FORWARD_IF_FALSE);
+
+		/* JUMP2 instructions are chosen to be greater than its JUMP counterpart by 1 */
+		patch_instruction (hcl, jip, hcl->code.bc.arr->slot[jip] + 1); 
+		jump_offset -= MAX_CODE_JUMP;
+	}
+
+#if (HCL_BCODE_LONG_PARAM_SIZE == 2)
+	patch_instruction (hcl, jip + 1, jump_offset >> 8);
+	patch_instruction (hcl, jip + 2, jump_offset & 0xFF);
+#else
+	patch_instruction (hcl, jip + 1, jump_offset);
+#endif
+}
+
 /* ========================================================================= */
 static HCL_INLINE int _insert_cframe (hcl_t* hcl, hcl_ooi_t index, int opcode, hcl_oop_t operand)
 {
@@ -573,6 +600,9 @@ enum
 	COP_EMIT_RETURN,
 	COP_EMIT_SET,
 
+	COP_POST_IF_COND,
+	COP_POST_IF_BODY,
+
 	COP_POST_UNTIL_BODY,
 	COP_POST_UNTIL_COND,
 	COP_POST_WHILE_BODY,
@@ -588,7 +618,7 @@ static int compile_break (hcl_t* hcl, hcl_oop_t src)
 	hcl_oop_t obj;
 	hcl_ooi_t i;
 
-	HCL_ASSERT (HCL_BRANDOF(hcl,src) == HCL_BRAND_CONS);
+	HCL_ASSERT (HCL_IS_CONS(hcl, src));
 	HCL_ASSERT (HCL_CONS_CAR(src) == hcl->_break);
 
 	obj = HCL_CONS_CDR(src);
@@ -644,8 +674,55 @@ static int compile_break (hcl_t* hcl, hcl_oop_t src)
 
 static int compile_if (hcl_t* hcl, hcl_oop_t src)
 {
-/* TODO: NOT IMPLEMENTED */
-	return -1;
+	hcl_oop_t obj, cond;
+	hcl_ooi_t cond_pos;
+	hcl_cframe_t* cf;
+
+	HCL_ASSERT (HCL_IS_CONS(hcl, src));
+	HCL_ASSERT (HCL_CONS_CAR(src) == hcl->_if);
+
+	/* (if (< 20 30) 
+	 * 	(do this)
+	 *   (do that)
+	 * elif (< 20 30)
+	 *   (do it)
+	 * else
+	 *   (do this finally)
+	 * )
+	 */
+	obj = HCL_CONS_CDR(src);
+
+	if (HCL_IS_NIL(hcl, obj))
+	{
+		/* no value */
+		HCL_DEBUG1 (hcl, "Syntax error - no condition specified in if - %O\n", src);
+		hcl_setsynerr (hcl, HCL_SYNERR_ARGCOUNT, HCL_NULL, HCL_NULL); /* TODO: error location */
+		return -1;
+	}
+	else if (HCL_BRANDOF(hcl, obj) != HCL_BRAND_CONS)
+	{
+		HCL_DEBUG1 (hcl, "Syntax error - redundant cdr in if - %O\n", src);
+		hcl_setsynerr (hcl, HCL_SYNERR_DOTBANNED, HCL_NULL, HCL_NULL); /* TODO: error location */
+		return -1;
+	}
+
+	cond_pos = hcl->code.bc.len; /* position where the bytecode for the conditional is emitted */
+	HCL_ASSERT (cond_pos < HCL_SMOOI_MAX);
+
+	cond = HCL_CONS_CAR(obj);
+	obj = HCL_CONS_CDR(obj);
+
+	SWITCH_TOP_CFRAME (hcl, COP_COMPILE_OBJECT, cond); /* 1 */
+	PUSH_SUBCFRAME (hcl, COP_POST_IF_COND, obj); /* 2 */
+	cf = GET_SUBCFRAME (hcl);
+	cf->u.post_if.cond_pos = cond_pos;
+	cf->u.post_if.body_pos = 0; /* unknown yet */
+/* TODO: pass information on the conditional if it's an absoluate true or absolute false to
+ *       eliminate some code .. i can't eliminate code because there can be else or elsif... 
+ *       if absoluate true, don't need else or other elsif part
+ *       if absoluate false, else or other elsif part is needed.
+ */
+	return 0;
 }
 
 static int compile_lambda (hcl_t* hcl, hcl_oop_t src)
@@ -655,7 +732,7 @@ static int compile_lambda (hcl_t* hcl, hcl_oop_t src)
 	hcl_ooi_t jump_inst_pos;
 	hcl_oow_t saved_tv_count, tv_dup_start;
 
-	HCL_ASSERT (HCL_BRANDOF(hcl,src) == HCL_BRAND_CONS);
+	HCL_ASSERT (HCL_IS_CONS(hcl, src));
 	HCL_ASSERT (HCL_CONS_CAR(src) == hcl->_lambda);
 
 	saved_tv_count = hcl->c->tv.size;
@@ -710,9 +787,6 @@ static int compile_lambda (hcl_t* hcl, hcl_oop_t src)
 				hcl_setsynerr (hcl, HCL_SYNERR_BANNEDARGNAME, HCL_NULL, HCL_NULL); /* TOOD: error location */
 				return -1;
 			}
-
-	/* TODO: check duplicates within only the argument list. duplicates against outer-scope are ok.
-	 * is this check necessary? */
 
 			if (add_temporary_variable (hcl, arg, tv_dup_start) <= -1) 
 			{
@@ -830,15 +904,14 @@ static int compile_lambda (hcl_t* hcl, hcl_oop_t src)
 	return 0;
 }
 
-
 static int compile_return (hcl_t* hcl, hcl_oop_t src)
 {
 	hcl_oop_t obj, val;
 
-	obj = HCL_CONS_CDR(src);
-
-	HCL_ASSERT (HCL_BRANDOF(hcl,src) == HCL_BRAND_CONS);
+	HCL_ASSERT (HCL_IS_CONS(hcl, src));
 	HCL_ASSERT (HCL_CONS_CAR(src) == hcl->_return);
+
+	obj = HCL_CONS_CDR(src);
 
 	if (HCL_IS_NIL(hcl, obj))
 	{
@@ -877,10 +950,10 @@ static int compile_set (hcl_t* hcl, hcl_oop_t src)
 	hcl_oop_t obj, var, val;
 	hcl_oow_t index;
 
-	obj = HCL_CONS_CDR(src);
-
-	HCL_ASSERT (HCL_BRANDOF(hcl,src) == HCL_BRAND_CONS);
+	HCL_ASSERT (HCL_IS_CONS(hcl, src));
 	HCL_ASSERT (HCL_CONS_CAR(src) == hcl->_set);
+
+	obj = HCL_CONS_CDR(src);
 
 	if (HCL_IS_NIL(hcl, obj))
 	{
@@ -963,11 +1036,11 @@ static int compile_while (hcl_t* hcl, hcl_oop_t src, int next_cop)
 	hcl_oow_t cond_pos;
 	hcl_cframe_t* cf;
 
-	obj = HCL_CONS_CDR(src);
-
-	HCL_ASSERT (HCL_BRANDOF(hcl,src) == HCL_BRAND_CONS);
+	HCL_ASSERT (HCL_IS_CONS(hcl, src));
 	HCL_ASSERT (HCL_CONS_CAR(src) == hcl->_until || HCL_CONS_CAR(src) == hcl->_while);
 	HCL_ASSERT (next_cop == COP_POST_UNTIL_COND || next_cop == COP_POST_WHILE_COND);
+
+	obj = HCL_CONS_CDR(src);
 
 	if (HCL_IS_NIL(hcl, obj))
 	{
@@ -1005,10 +1078,10 @@ static int compile_cons_expression (hcl_t* hcl, hcl_oop_t obj)
 	hcl_oop_t car;
 	int syncode;
 
-	HCL_ASSERT (HCL_BRANDOF(hcl,obj) == HCL_BRAND_CONS);
+	HCL_ASSERT (HCL_IS_CONS(hcl, obj));
 
 	car = HCL_CONS_CAR(obj);
-	if (HCL_BRANDOF(hcl,car) == HCL_BRAND_SYMBOL && (syncode = HCL_OBJ_GET_FLAGS_SYNCODE(car)))
+	if (HCL_IS_SYMBOL(hcl,car) && (syncode = HCL_OBJ_GET_FLAGS_SYNCODE(car)))
 	{
 		switch (syncode)
 		{
@@ -1301,6 +1374,75 @@ static int compile_object_list (hcl_t* hcl)
 }
 
 /* ========================================================================= */
+static HCL_INLINE int post_if_cond (hcl_t* hcl)
+{
+	hcl_cframe_t* cf;
+	hcl_ooi_t jump_inst_pos;
+	hcl_ooi_t cond_pos, body_pos;
+
+	cf = GET_TOP_CFRAME(hcl);
+	HCL_ASSERT (cf->opcode == COP_POST_IF_COND);
+
+	cond_pos = cf->u.post_while.cond_pos;
+	HCL_ASSERT (hcl->code.bc.len < HCL_SMOOI_MAX);
+	jump_inst_pos = hcl->code.bc.len;
+
+	if (emit_single_param_instruction (hcl, HCL_CODE_JUMP_FORWARD_IF_FALSE, MAX_CODE_JUMP) <= -1) return -1;
+	/* to drop the result of the conditional when it is true */
+	if (emit_byte_instruction (hcl, HCL_CODE_POP_STACKTOP) <= -1) return -1; 
+
+	HCL_ASSERT (hcl->code.bc.len < HCL_SMOOI_MAX);
+	body_pos = hcl->code.bc.len;
+
+	SWITCH_TOP_CFRAME (hcl, COP_COMPILE_OBJECT_LIST, cf->operand); /* 1 */
+	PUSH_SUBCFRAME (hcl, COP_POST_IF_BODY, HCL_SMOOI_TO_OOP(jump_inst_pos)); /* 2 */
+	cf = GET_SUBCFRAME(hcl);
+	cf->u.post_if.cond_pos = cond_pos;
+	cf->u.post_if.body_pos = body_pos;
+	return 0;
+}
+
+static HCL_INLINE int post_if_body (hcl_t* hcl)
+{
+	hcl_cframe_t* cf;
+	hcl_ooi_t jip;
+	hcl_oow_t jump_offset;
+
+	cf = GET_TOP_CFRAME(hcl);
+	HCL_ASSERT (cf->opcode == COP_POST_IF_BODY);
+	HCL_ASSERT (HCL_OOP_IS_SMOOI(cf->operand));
+
+	jip = HCL_OOP_TO_SMOOI(cf->operand);
+
+	if (hcl->code.bc.len <= cf->u.post_while.body_pos)
+	{
+		/* if body is empty */
+		/*if (emit_byte_instruction (hcl, HCL_CODE_PUSH_NIL) <= -1) return -1;*/
+
+		/* if body is empty, remove all instructions generated for the body so far */
+		hcl->code.bc.len = jip;
+		goto done;
+	}
+
+	HCL_ASSERT (hcl->code.bc.len >= cf->u.post_while.cond_pos);
+	/* HCL_CODE_LONG_PARAM_SIZE + 1 => size of the long JUMP_FORWARD_IF_FALSE instruction */
+	jump_offset = hcl->code.bc.len - jip - (HCL_BCODE_LONG_PARAM_SIZE + 1);
+
+	if (jump_offset > MAX_CODE_JUMP * 2)
+	{
+		HCL_DEBUG1 (hcl, "code in if body too big - size %zu\n", jump_offset);
+		hcl_setsynerr (hcl, HCL_SYNERR_BLKFLOOD, HCL_NULL, HCL_NULL); /* error location */
+		return -1;
+	}
+	patch_long_jump (hcl, jip, jump_offset);
+
+/* TOOD: if 'else' or 'elsif' appears, process further... */
+done:
+	POP_CFRAME (hcl);
+	return 0;
+}
+
+/* ========================================================================= */
 static HCL_INLINE int post_while_cond (hcl_t* hcl)
 {
 	hcl_cframe_t* cf;
@@ -1344,7 +1486,7 @@ static HCL_INLINE int post_while_body (hcl_t* hcl)
 {
 	hcl_cframe_t* cf;
 	hcl_ooi_t jip;
-	hcl_oow_t jump_offset, code_size;
+	hcl_ooi_t jump_offset;
 
 	cf = GET_TOP_CFRAME(hcl);
 	HCL_ASSERT (cf->opcode == COP_POST_UNTIL_BODY || cf->opcode == COP_POST_WHILE_BODY);
@@ -1365,32 +1507,21 @@ static HCL_INLINE int post_while_body (hcl_t* hcl)
 		if (emit_byte_instruction (hcl, HCL_CODE_POP_STACKTOP) <= -1) return -1;
 	}
 
+	HCL_ASSERT (hcl->code.bc.len < HCL_SMOOI_MAX);
 	jump_offset = hcl->code.bc.len - cf->u.post_while.cond_pos + 1;
 	if (jump_offset > 3) jump_offset += HCL_BCODE_LONG_PARAM_SIZE;
 	if (emit_single_param_instruction (hcl, HCL_CODE_JUMP_BACKWARD_0, jump_offset) <= -1) return -1;
 
 	jip = HCL_OOP_TO_SMOOI(cf->operand);
 	/* HCL_CODE_LONG_PARAM_SIZE + 1 => size of the long JUMP_FORWARD_IF_FALSE/JUMP_FORWARD_IF_TRUE instruction */
-	code_size = hcl->code.bc.len - jip - (HCL_BCODE_LONG_PARAM_SIZE + 1);
-
-	if (code_size > MAX_CODE_JUMP)
+	jump_offset = hcl->code.bc.len - jip - (HCL_BCODE_LONG_PARAM_SIZE + 1);
+	if (jump_offset > MAX_CODE_JUMP * 2)
 	{
-		/* switch to JUMP2 instruction to allow a bigger jump offset.
-		 * up to twice MAX_CODE_JUMP only */
-		patch_instruction (hcl, jip, ((cf->opcode == COP_POST_UNTIL_BODY)? HCL_CODE_JUMP2_FORWARD_IF_TRUE: HCL_CODE_JUMP2_FORWARD_IF_FALSE)); 
-		jump_offset = code_size - MAX_CODE_JUMP;
+		HCL_DEBUG1 (hcl, "code in loop body too big - size %zu\n", jump_offset);
+		hcl_setsynerr (hcl, HCL_SYNERR_BLKFLOOD, HCL_NULL, HCL_NULL); /* error location */
+		return -1;
 	}
-	else
-	{
-		jump_offset = code_size;
-	}
-
-#if (HCL_BCODE_LONG_PARAM_SIZE == 2)
-	patch_instruction (hcl, jip + 1, jump_offset >> 8);
-	patch_instruction (hcl, jip + 2, jump_offset & 0xFF);
-	#else
-	patch_instruction (hcl, jip + 1, jump_offset);
-#endif
+	patch_long_jump (hcl, jip, jump_offset);
 
 	POP_CFRAME (hcl);
 	return 0;
@@ -1412,20 +1543,11 @@ static int update_break (hcl_t* hcl)
 	/* HCL_CODE_LONG_PARAM_SIZE + 1 => size of the long JUMP_FORWARD instruction */
 	jump_offset = hcl->code.bc.len - jip - (HCL_BCODE_LONG_PARAM_SIZE + 1);
 
-	if (jump_offset > MAX_CODE_JUMP)
-	{
-		/* switch to JUMP2 instruction to allow a bigger jump offset.
-		 * up to twice MAX_CODE_JUMP only */
-		patch_instruction (hcl, jip, HCL_CODE_JUMP2_FORWARD); 
-		jump_offset -= MAX_CODE_JUMP;
-	}
-
-#if (HCL_BCODE_LONG_PARAM_SIZE == 2)
-	patch_instruction (hcl, jip + 1, jump_offset >> 8);
-patch_instruction (hcl, jip + 2, jump_offset & 0xFF);
-	#else
-	patch_instruction (hcl, jip + 1, jump_offset);
-#endif
+	/* no explicit about jump_offset. because break can only place inside
+	 * a loop, the same check in post_while_body() must assert
+	 * this break jump_offset to be small enough */
+	HCL_ASSERT (jump_offset <= MAX_CODE_JUMP * 2);
+	patch_long_jump (hcl, jip, jump_offset);
 
 	POP_CFRAME (hcl);
 	return 0;
@@ -1483,29 +1605,7 @@ static HCL_INLINE int emit_lambda (hcl_t* hcl)
 		hcl_setsynerr (hcl, HCL_SYNERR_BLKFLOOD, HCL_NULL, HCL_NULL); /* error location */
 		return -1;
 	}
-	else 
-	{
-		hcl_oow_t jump_offset;
-
-		if (block_code_size > MAX_CODE_JUMP)
-		{
-			/* switch to JUMP2 instruction to allow a bigger jump offset.
-			 * up to twice MAX_CODE_JUMP only */
-			patch_instruction (hcl, jip, HCL_CODE_JUMP2_FORWARD);
-			jump_offset = block_code_size - MAX_CODE_JUMP;
-		}
-		else
-		{
-			jump_offset = block_code_size;
-		}
-
-	#if (HCL_BCODE_LONG_PARAM_SIZE == 2)
-		patch_instruction (hcl, jip + 1, jump_offset >> 8);
-		patch_instruction (hcl, jip + 2, jump_offset & 0xFF);
-	#else
-		patch_instruction (hcl, jip + 1, jump_offset);
-	#endif
-	}
+	patch_long_jump (hcl, jip, block_code_size);
 
 	POP_CFRAME (hcl);
 	return 0;
@@ -1637,6 +1737,14 @@ int hcl_compile (hcl_t* hcl, hcl_oop_t obj)
 
 			case COP_EMIT_SET:
 				if (emit_set (hcl) <= -1) goto oops;
+				break;
+
+			case COP_POST_IF_COND:
+				if (post_if_cond (hcl) <= -1) goto oops;
+				break;
+
+			case COP_POST_IF_BODY:
+				if (post_if_body (hcl) <= -1) goto oops;
 				break;
 
 			case COP_POST_UNTIL_BODY:
