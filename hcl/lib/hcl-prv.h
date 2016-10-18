@@ -297,7 +297,6 @@ struct hcl_cframe_t
 
 		struct
 		{
-			hcl_ooi_t cond_pos;
 			hcl_ooi_t body_pos;
 		} post_if;
 	} u;

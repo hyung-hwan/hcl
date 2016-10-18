@@ -37,6 +37,8 @@ static struct
 	{  5, { 'b','e','g','i','n' },         HCL_SYNCODE_BEGIN,   HCL_OFFSETOF(hcl_t,_begin)  },
 	{  5, { 'b','r','e','a','k' },         HCL_SYNCODE_BREAK,   HCL_OFFSETOF(hcl_t,_break)  },
 	{  5, { 'd','e','f','u','n' },         HCL_SYNCODE_DEFUN,   HCL_OFFSETOF(hcl_t,_defun)  },
+	{  4, { 'e','l','i','f' },             HCL_SYNCODE_ELIF,    HCL_OFFSETOF(hcl_t,_elif)   },
+	{  4, { 'e','l','s','e' },             HCL_SYNCODE_ELSE,    HCL_OFFSETOF(hcl_t,_else)   },
 	{  2, { 'i','f' },                     HCL_SYNCODE_IF,      HCL_OFFSETOF(hcl_t,_if)     },
 	{  6, { 'l','a','m','b','d','a' },     HCL_SYNCODE_LAMBDA,  HCL_OFFSETOF(hcl_t,_lambda) },
 	{  5, { 'q','u','o','t','e' },         HCL_SYNCODE_QUOTE,   HCL_OFFSETOF(hcl_t,_quote)  },

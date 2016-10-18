@@ -601,6 +601,8 @@ static char* syntax_error_msg[] =
 	"disallowed variable name",
 	"disallowed argument name",
 
+	"elif without if",
+	"else without if",
 	"break outside loop"
 };
 

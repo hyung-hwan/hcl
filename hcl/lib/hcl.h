@@ -111,6 +111,8 @@ enum hcl_synerrnum_t
 	HCL_SYNERR_BANNEDVARNAME, /* disallowed varible name */
 	HCL_SYNERR_BANNEDARGNAME, /* disallowed argument name */
 
+	HCL_SYNERR_ELIF,          /* elif without if */
+	HCL_SYNERR_ELSE,          /* else without if */
 	HCL_SYNERR_BREAK          /* break outside loop */
 };
 typedef enum hcl_synerrnum_t hcl_synerrnum_t;
@@ -839,16 +841,18 @@ struct hcl_t
 	hcl_oop_t _true;
 	hcl_oop_t _false;
 
-	hcl_oop_t _begin; /* symbol */
-	hcl_oop_t _break; /* symbol */
-	hcl_oop_t _defun; /* symbol */
+	hcl_oop_t _begin;  /* symbol */
+	hcl_oop_t _break;  /* symbol */
+	hcl_oop_t _defun;  /* symbol */
+	hcl_oop_t _elif;   /* symbol */
+	hcl_oop_t _else;   /* symbol */
 	hcl_oop_t _if;     /* symbol */
 	hcl_oop_t _lambda; /* symbol */
-	hcl_oop_t _quote; /* symbol */
+	hcl_oop_t _quote;  /* symbol */
 	hcl_oop_t _return; /* symbol */
-	hcl_oop_t _set; /* symbol */
-	hcl_oop_t _until; /* symbol */
-	hcl_oop_t _while; /* symbol */
+	hcl_oop_t _set;    /* symbol */
+	hcl_oop_t _until;  /* symbol */
+	hcl_oop_t _while;  /* symbol */
 
 	/* == NEVER CHANGE THE ORDER OF FIELDS BELOW == */
 	/* hcl_ignite() assumes this order. make sure to update symnames in ignite_3() */
@@ -1030,6 +1034,8 @@ enum
 	HCL_SYNCODE_BEGIN = 1,
 	HCL_SYNCODE_BREAK,
 	HCL_SYNCODE_DEFUN,
+	HCL_SYNCODE_ELIF,
+	HCL_SYNCODE_ELSE,
 	HCL_SYNCODE_IF,
 	HCL_SYNCODE_LAMBDA,
 	HCL_SYNCODE_QUOTE,
