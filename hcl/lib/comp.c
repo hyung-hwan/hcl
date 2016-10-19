@@ -605,16 +605,19 @@ static HCL_INLINE hcl_cframe_t* find_cframe_from_top (hcl_t* hcl, int opcode)
 enum 
 {
 	COP_COMPILE_OBJECT,
+
 	COP_COMPILE_OBJECT_LIST,
-	COP_COMPILE_ARGUMENT_LIST,
 	COP_COMPILE_IF_OBJECT_LIST,
+	COP_COMPILE_ARGUMENT_LIST,
+	COP_COMPILE_OBJECT_LIST_TAIL,
+	COP_COMPILE_IF_OBJECT_LIST_TAIL,
 
 	COP_SUBCOMPILE_ELIF,
 	COP_SUBCOMPILE_ELSE,
 
 	COP_EMIT_CALL,
 	COP_EMIT_LAMBDA,
-	COP_EMIT_POP_STACKTOPP,
+	COP_EMIT_POP_STACKTOP,
 	COP_EMIT_RETURN,
 	COP_EMIT_SET,
 
@@ -693,14 +696,13 @@ static int compile_break (hcl_t* hcl, hcl_oop_t src)
 static int compile_if (hcl_t* hcl, hcl_oop_t src)
 {
 	hcl_oop_t obj, cond;
-	hcl_ooi_t cond_pos;
 	hcl_cframe_t* cf;
 
 	HCL_ASSERT (HCL_IS_CONS(hcl, src));
 	HCL_ASSERT (HCL_CONS_CAR(src) == hcl->_if);
 
 	/* (if (< 20 30) 
-	 * 	(do this)
+	 *   (do this)
 	 *   (do that)
 	 * elif (< 20 30)
 	 *   (do it)
@@ -724,9 +726,6 @@ static int compile_if (hcl_t* hcl, hcl_oop_t src)
 		return -1;
 	}
 
-	HCL_ASSERT (hcl->code.bc.len < HCL_SMOOI_MAX);
-	cond_pos = hcl->code.bc.len; /* position where the bytecode for the conditional is emitted */
-
 	cond = HCL_CONS_CAR(obj);
 	obj = HCL_CONS_CDR(obj);
 
@@ -736,9 +735,9 @@ static int compile_if (hcl_t* hcl, hcl_oop_t src)
 	cf->u.post_if.body_pos = -1; /* unknown yet */
 /* TODO: OPTIMIZATION:
  *       pass information on the conditional if it's an absoluate true or absolute false to
- *       eliminate some code .. i can't eliminate code because there can be else or elsif... 
- *       if absoluate true, don't need else or other elsif part
- *       if absoluate false, else or other elsif part is needed.
+ *       eliminate some code .. i can't eliminate code because there can be else or elif... 
+ *       if absoluate true, don't need else or other elif part
+ *       if absoluate false, else or other elif part is needed.
  */
 	return 0;
 }
@@ -1347,42 +1346,72 @@ done:
 static int compile_object_list (hcl_t* hcl)
 {
 	hcl_cframe_t* cf;
+	hcl_oop_t coperand;
+	int cop;
 
 	cf = GET_TOP_CFRAME(hcl);
 	HCL_ASSERT (cf->opcode == COP_COMPILE_OBJECT_LIST ||
+	            cf->opcode == COP_COMPILE_IF_OBJECT_LIST ||
 	            cf->opcode == COP_COMPILE_ARGUMENT_LIST ||
-	            cf->opcode == COP_COMPILE_IF_OBJECT_LIST);
+	            cf->opcode == COP_COMPILE_IF_OBJECT_LIST_TAIL ||
+	            cf->opcode == COP_COMPILE_OBJECT_LIST_TAIL);
 
-	if (HCL_IS_NIL(hcl, cf->operand))
+	cop = cf->opcode;
+	coperand = cf->operand;
+
+	if (HCL_IS_NIL(hcl, coperand))
 	{
 		POP_CFRAME (hcl);
 	}
 	else
 	{
-		hcl_oop_t car, cdr;
-		int cop;
 
-		if (!HCL_IS_CONS(hcl, cf->operand))
+		hcl_oop_t car, cdr;
+
+		if (cop != COP_COMPILE_ARGUMENT_LIST)
 		{
-			HCL_DEBUG1 (hcl, "Syntax error - redundant cdr in the object list - %O\n", cf->operand);
+			/* eliminate unnecessary non-function calls. keep the last one */
+			while (HCL_IS_CONS(hcl, coperand))
+			{
+				cdr = HCL_CONS_CDR(coperand);
+				if (HCL_IS_NIL(hcl,cdr)) break; /* keep the last one */
+
+				if (HCL_IS_CONS(hcl, cdr))
+				{
+					/* look ahead */
+					/* keep the last one before elif or else... */
+					car = HCL_CONS_CAR(cdr);
+					if (HCL_IS_SYMBOL(hcl, car) && HCL_OBJ_GET_FLAGS_SYNCODE(car)) break;
+				}
+
+				car = HCL_CONS_CAR(coperand);
+				if (HCL_IS_CONS(hcl, car) || (HCL_IS_SYMBOL(hcl, car) && HCL_OBJ_GET_FLAGS_SYNCODE(car))) break;
+				coperand = cdr;
+			}
+
+			HCL_ASSERT (!HCL_IS_NIL(hcl, coperand));
+		}
+
+		if (!HCL_IS_CONS(hcl, coperand))
+		{
+			HCL_DEBUG1 (hcl, "Syntax error - redundant cdr in the object list - %O\n", coperand);
 			hcl_setsynerr (hcl, HCL_SYNERR_DOTBANNED, HCL_NULL, HCL_NULL); /* TODO: error location */
 			return -1;
 		}
 
-		cop = cf->opcode;
-		car = HCL_CONS_CAR(cf->operand);
-		cdr = HCL_CONS_CDR(cf->operand);
+		car = HCL_CONS_CAR(coperand);
+		cdr = HCL_CONS_CDR(coperand);
 
-		if (cop == COP_COMPILE_IF_OBJECT_LIST)
+		if (cop == COP_COMPILE_IF_OBJECT_LIST || cop == COP_COMPILE_IF_OBJECT_LIST_TAIL)
 		{
 			if (car == hcl->_elif)
 			{
-				SWITCH_TOP_CFRAME (hcl, COP_SUBCOMPILE_ELIF, cf->operand);
+				SWITCH_TOP_CFRAME (hcl, COP_SUBCOMPILE_ELIF, coperand);
 				goto done;
 			}
 			else if (car == hcl->_else)
 			{
-				SWITCH_TOP_CFRAME (hcl, COP_SUBCOMPILE_ELSE, cf->operand);
+				SWITCH_TOP_CFRAME (hcl, COP_SUBCOMPILE_ELSE, coperand);
 				goto done;
 			}
 		}
@@ -1403,18 +1432,18 @@ static int compile_object_list (hcl_t* hcl)
 			 * for the latter, inject POP_STACKTOP after each object evaluation
 			 * except the last.
 			 */
-			PUSH_SUBCFRAME (hcl, cop, cdr);
-			if (cop == COP_COMPILE_OBJECT_LIST)
-			{
-				/* let's arrange to emit POP_STACKTOP before generating
-				 * code for the rest of the list. */
+			int nextcop;
+			nextcop = (cop == COP_COMPILE_OBJECT_LIST)?    COP_COMPILE_OBJECT_LIST_TAIL:
+			          (cop == COP_COMPILE_IF_OBJECT_LIST)? COP_COMPILE_IF_OBJECT_LIST_TAIL: cop;
+			PUSH_SUBCFRAME (hcl, nextcop, cdr);
+		}
 
-				hcl_oop_t tmp;
-				/* look ahead for some special functions */
-				tmp = HCL_CONS_CAR(cdr);
-				if (!HCL_IS_CONS(hcl, tmp) || HCL_CONS_CAR(tmp) != hcl->_break) /* TODO: other special forms??? */
-					PUSH_SUBCFRAME (hcl, COP_EMIT_POP_STACKTOPP, hcl->_nil);
-			}
+		if (cop == COP_COMPILE_OBJECT_LIST_TAIL ||
+		    cop == COP_COMPILE_IF_OBJECT_LIST_TAIL)
+		{
+			/* emit POP_STACKTOP before evaluating the second objects 
+			 * and onwards. this goes above COP_COMPILE_OBJECT */
+			PUSH_CFRAME (hcl, COP_EMIT_POP_STACKTOP, hcl->_nil);
 		}
 	}
 
@@ -1423,18 +1452,102 @@ done:
 }
 /* ========================================================================= */
 
+static HCL_INLINE int patch_nearest_post_if_body (hcl_t* hcl)
+{
+	hcl_ooi_t jump_inst_pos, body_pos;
+	hcl_ooi_t jip, jump_offset;
+	hcl_cframe_t* cf;
+
+	cf = find_cframe_from_top (hcl, COP_POST_IF_BODY);
+	HCL_ASSERT (cf != HCL_NULL);
+
+	/* jump instruction position of the JUMP_FORWARD_IF_FALSE after the conditional of the previous if or elif*/
+	jip = HCL_OOP_TO_SMOOI(cf->operand); 
+
+	if (hcl->code.bc.len <= cf->u.post_if.body_pos)
+	{
+		/* the if body is empty. */
+		if (emit_byte_instruction (hcl, HCL_CODE_PUSH_NIL) <= -1) return -1;
+	}
+
+	HCL_ASSERT (hcl->code.bc.len < HCL_SMOOI_MAX);
+	jump_inst_pos = hcl->code.bc.len;
+
+	/* emit jump_forward before the beginning of the else block.
+	 * this is to make the earlier if or elif block to skip
+	 * the else part. it is to be patched in post_else_body(). */
+	if (emit_single_param_instruction (hcl, HCL_CODE_JUMP_FORWARD_0, MAX_CODE_JUMP) <= -1) return -1;
+
+	/* HCL_CODE_LONG_PARAM_SIZE + 1 => size of the long JUMP_FORWARD instruction */
+	jump_offset = hcl->code.bc.len - jip - (HCL_BCODE_LONG_PARAM_SIZE + 1);
+
+	if (jump_offset > MAX_CODE_JUMP * 2)
+	{
+		HCL_DEBUG1 (hcl, "code in elif/else body too big - size %zu\n", jump_offset);
+		hcl_setsynerr (hcl, HCL_SYNERR_IFFLOOD, HCL_NULL, HCL_NULL); /* error location */
+		return -1;
+	}
+	patch_long_jump (hcl, jip, jump_offset);
+
+	/* beginning of the elif/else block code */
+	/* to drop the result of the conditional when the conditional is false */
+	if (emit_byte_instruction (hcl, HCL_CODE_POP_STACKTOP) <= -1) return -1; 
+
+	/* this is the actual beginning */
+	HCL_ASSERT (hcl->code.bc.len < HCL_SMOOI_MAX);
+	body_pos = hcl->code.bc.len;
+
+	/* modify the POST_IF_BODY frame */
+	HCL_ASSERT (cf->opcode == COP_POST_IF_BODY);
+	HCL_ASSERT (HCL_OOP_IS_SMOOI(cf->operand));
+	cf->operand = HCL_SMOOI_TO_OOP(jump_inst_pos); 
+	cf->u.post_if.body_pos = body_pos;
+
+	return 0;
+}
 
 static HCL_INLINE int subcompile_elif (hcl_t* hcl)
 {
-HCL_DEBUG0 (hcl, "TODO: ELIF HANDLING\n");
-return -1;
+	hcl_oop_t obj, cond, src;
+	hcl_cframe_t* cf;
+
+	cf = GET_TOP_CFRAME(hcl);
+	HCL_ASSERT (cf->opcode == COP_SUBCOMPILE_ELIF);
+
+	src = cf->operand;
+	HCL_ASSERT (HCL_IS_CONS(hcl, src));
+	HCL_ASSERT (HCL_CONS_CAR(src) == hcl->_elif);
+
+	obj = HCL_CONS_CDR(src);
+
+	if (HCL_IS_NIL(hcl, obj))
+	{
+		/* no value */
+		HCL_DEBUG1 (hcl, "Syntax error - no condition specified in elif - %O\n", src);
+		hcl_setsynerr (hcl, HCL_SYNERR_ARGCOUNT, HCL_NULL, HCL_NULL); /* TODO: error location */
+		return -1;
+	}
+	else if (!HCL_IS_CONS(hcl, obj))
+	{
+		HCL_DEBUG1 (hcl, "Syntax error - redundant cdr in elif - %O\n", src);
+		hcl_setsynerr (hcl, HCL_SYNERR_DOTBANNED, HCL_NULL, HCL_NULL); /* TODO: error location */
+		return -1;
+	}
+
+	cond = HCL_CONS_CAR(obj);
+	obj = HCL_CONS_CDR(obj);
+
+	SWITCH_TOP_CFRAME (hcl, COP_COMPILE_OBJECT, cond); /* 1 */
+	PUSH_SUBCFRAME (hcl, COP_POST_IF_COND, obj); /* 2 */
+	cf = GET_SUBCFRAME (hcl);
+	cf->u.post_if.body_pos = -1; /* unknown yet */
+
+	return patch_nearest_post_if_body (hcl);
 }
 
 static HCL_INLINE int subcompile_else (hcl_t* hcl)
 {
 	hcl_oop_t obj, src;
-	hcl_ooi_t jump_inst_pos, body_pos;
-	hcl_ooi_t jip, jump_offset;
 	hcl_cframe_t* cf;
 
 	cf = GET_TOP_CFRAME(hcl);
@@ -1453,53 +1566,9 @@ static HCL_INLINE int subcompile_else (hcl_t* hcl)
 		return -1;
 	}
 
-	cf = find_cframe_from_top (hcl, COP_POST_IF_BODY);
-	HCL_ASSERT (cf != HCL_NULL);
-
-	/* jump instruction position of the JUMP_FORWARD_IF_FALSE after the conditional */
-	jip = HCL_OOP_TO_SMOOI(cf->operand); 
-
-	if (hcl->code.bc.len <= cf->u.post_if.body_pos)
-	{
-		/* the if body is empty. */
-		if (emit_byte_instruction (hcl, HCL_CODE_PUSH_NIL) <= -1) return -1;
-	}
-
-	HCL_ASSERT (hcl->code.bc.len < HCL_SMOOI_MAX);
-	jump_inst_pos = hcl->code.bc.len;
-
-	/* emit jump_forward at the beginning of the else block.
-	 * this is to make the earlier if or elsif block to skip
-	 * the else part. it is to be patched in post_else_body(). */
-	if (emit_single_param_instruction (hcl, HCL_CODE_JUMP_FORWARD_0, MAX_CODE_JUMP) <= -1) return -1;
-
-	/* HCL_CODE_LONG_PARAM_SIZE + 1 => size of the long JUMP_FORWARD instruction */
-	jump_offset = hcl->code.bc.len - jip - (HCL_BCODE_LONG_PARAM_SIZE + 1);
-
-	if (jump_offset > MAX_CODE_JUMP * 2)
-	{
-		HCL_DEBUG1 (hcl, "code in else body too big - size %zu\n", jump_offset);
-		hcl_setsynerr (hcl, HCL_SYNERR_IFFLOOD, HCL_NULL, HCL_NULL); /* error location */
-		return -1;
-	}
-	patch_long_jump (hcl, jip, jump_offset);
-
-	/* beginning of the else block code */
-	/* to drop the result of the conditional when the conditional is false */
-	if (emit_byte_instruction (hcl, HCL_CODE_POP_STACKTOP) <= -1) return -1; 
-
-	/* this is the actual beginning */
-	HCL_ASSERT (hcl->code.bc.len < HCL_SMOOI_MAX);
-	body_pos = hcl->code.bc.len;
-
-	/* modify the POST_IF_BODY frame */
-	HCL_ASSERT (cf->opcode == COP_POST_IF_BODY);
-	HCL_ASSERT (HCL_OOP_IS_SMOOI(cf->operand));
-	cf->operand = HCL_SMOOI_TO_OOP(jump_inst_pos); 
-	cf->u.post_if.body_pos = body_pos;
-
 	SWITCH_TOP_CFRAME (hcl, COP_COMPILE_OBJECT_LIST, obj);
-	return 0;
+
+	return patch_nearest_post_if_body (hcl);
 }
 
 /* ========================================================================= */
@@ -1739,7 +1808,7 @@ static HCL_INLINE int emit_pop_stacktop (hcl_t* hcl)
 	int n;
 
 	cf = GET_TOP_CFRAME(hcl);
-	HCL_ASSERT (cf->opcode == COP_EMIT_POP_STACKTOPP);
+	HCL_ASSERT (cf->opcode == COP_EMIT_POP_STACKTOP);
 	HCL_ASSERT (HCL_IS_NIL(hcl, cf->operand));
 
 	n = emit_byte_instruction (hcl, HCL_CODE_POP_STACKTOP);
@@ -1837,8 +1906,10 @@ int hcl_compile (hcl_t* hcl, hcl_oop_t obj)
 				break;
 
 			case COP_COMPILE_OBJECT_LIST:
-			case COP_COMPILE_ARGUMENT_LIST:
+			case COP_COMPILE_OBJECT_LIST_TAIL:
 			case COP_COMPILE_IF_OBJECT_LIST:
+			case COP_COMPILE_IF_OBJECT_LIST_TAIL:
+			case COP_COMPILE_ARGUMENT_LIST:
 				if (compile_object_list (hcl) <= -1) goto oops;
 				break;
 
@@ -1850,7 +1921,7 @@ int hcl_compile (hcl_t* hcl, hcl_oop_t obj)
 				if (emit_lambda (hcl) <= -1) goto oops;
 				break;
 
-			case COP_EMIT_POP_STACKTOPP:
+			case COP_EMIT_POP_STACKTOP:
 				if (emit_pop_stacktop (hcl) <= -1) goto oops;
 				break;
 
