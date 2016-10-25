@@ -163,9 +163,97 @@ static int prim_log (hcl_t* hcl, hcl_ooi_t nargs)
 
 /* ------------------------------------------------------------------------- */
 
+static int oop_to_ooi (hcl_t* hcl, hcl_oop_t iv, hcl_ooi_t* ov)
+{
+	if (HCL_OOP_IS_SMOOI(iv))
+	{
+		*ov = HCL_OOP_TO_SMOOI(iv);
+		return 0;
+	}
+	else if (HCL_IS_INTEGER(hcl, iv))
+	{
+		*ov = (hcl_ooi_t)((hcl_oop_word_t)iv)->slot[0];
+		return 0;
+	}
+	else
+	{
+		/* TODO: set error number or something...to indicate primitive failure... */
+		return -1;
+	}
+}
+
+static int prim_plus (hcl_t* hcl, hcl_ooi_t nargs)
+{
+	hcl_ooi_t x = 0;
+	hcl_oow_t i;
+	hcl_oop_t arg, ret;
+
+	for (i = 0; i < nargs; i++)
+	{
+		hcl_ooi_t v;
+
+		arg = HCL_STACK_GETARG(hcl, nargs, i);
+		if (oop_to_ooi(hcl, arg, &v) <= -1) return -1;
+		x += v;
+	}
+
+	ret = hcl_makeinteger (hcl, x);
+	if (!ret) return -1;
+
+	HCL_STACK_SETRET (hcl, nargs, ret);
+	return 0;
+}
+
+static int prim_minus (hcl_t* hcl, hcl_ooi_t nargs)
+{
+	hcl_ooi_t x = 0;
+	hcl_oow_t i;
+	hcl_oop_t arg, ret;
+
+	if (nargs > 0)
+	{
+		arg = HCL_STACK_GETARG(hcl, nargs, 0);
+		if (oop_to_ooi(hcl, arg, &x) <= -1) return -1;
+		for (i = 1; i < nargs; i++)
+		{
+			hcl_ooi_t v;
+			arg = HCL_STACK_GETARG(hcl, nargs, i);
+			if (oop_to_ooi(hcl, arg, &v) <= -1) return -1;
+			x -= v;
+		}
+	}
+
+	ret = hcl_makeinteger (hcl, x);
+	if (!ret) return -1;
+
+	HCL_STACK_SETRET (hcl, nargs, ret);
+	return 0;
+}
+
+/* ------------------------------------------------------------------------- */
+
 static prim_t builtin_prims[] =
 {
-	{ 0, HCL_TYPE_MAX(hcl_oow_t), prim_log,   3,  { 'l','o','g' } }
+	{ 0, HCL_TYPE_MAX(hcl_oow_t), prim_log,   3,  { 'l','o','g' } },
+
+	/*
+	{ 2, 2,                       prim_gt,    1,  { '>' } },
+	{ 2, 2,                       prim_ge,    2,  { '>','=' } },
+	{ 2, 2,                       prim_lt,    1,  { '<' } },
+	{ 2, 2,                       prim_le,    2,  { '<','=' } },
+	{ 2, 2,                       prim_eq,    1,  { '=' } },
+	{ 2, 2,                       prim_ne,    2,  { '/','=' } },
+
+	{ 2, 2,                       prim_eql,   3,  { 'e','q','l' } },
+	{ 2, 2,                       prim_max,   3,  { 'm','a','x' } },
+	{ 2, 2,                       prim_min,   3,  { 'm','i','n' } },
+
+	{ 2, 2,                       prim_and,   3,  { 'a','n','d' } },
+	{ 2, 2,                       prim_or,    2,  { 'o','r' } },
+	{ 1, 1,                       prim_not,   3,  { 'n','o','t' } }, */
+
+	{ 0, HCL_TYPE_MAX(hcl_oow_t), prim_plus,  1,  { '+' } },
+	{ 0, HCL_TYPE_MAX(hcl_oow_t), prim_minus, 1,  { '-' } }
 };
 
 

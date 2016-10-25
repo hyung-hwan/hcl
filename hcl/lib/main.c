@@ -46,6 +46,7 @@
 #	include <os2.h>
 #elif defined(__MSDOS__)
 #	include <dos.h>
+#	include <time.h>
 #elif defined(macintosh)
 #	include <Timer.h>
 #else
@@ -353,10 +354,15 @@ static int write_all (int fd, const char* ptr, hcl_oow_t len)
 
 		if (wr <= -1)
 		{
-			if (errno == EAGAIN || errno == EWOULDBLOCK)
-			{
-				continue;
-			}
+		#if defined(EAGAIN) && defined(EWOULDBLOCK) && (EAGAIN == EWOULDBLOCK)
+			if (errno == EAGAIN) continue;
+		#else
+			#	if defined(EAGAIN)
+			if (errno == EAGAIN) continue;
+			#elif defined(EWOULDBLOCK)
+			if (errno == EWOULDBLOCK) continue;
+			#endif
+		#endif
 			return -1;
 		}
 
@@ -401,8 +407,12 @@ if (mask & HCL_LOG_GC) return; /* don't show gc logs */
 	}
 	if (write_all (1, ts, tslen) <= -1) 
 	{
-		char ttt[10];
+		char ttt[20];
+#if defined(__MSDOS__) && defined(_INTELC32_)
+		sprintf (ttt, "ERR: %d\n", errno);
+#else
 		snprintf (ttt, sizeof(ttt), "ERR: %d\n", errno);
+#endif
 		write (1, ttt, strlen(ttt));
 	}
 

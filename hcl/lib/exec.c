@@ -889,7 +889,6 @@ static int __activate_context (hcl_t* hcl, hcl_oop_context_t rcv_blkctx, hcl_ooi
 	 */
 
 	/* the receiver must be a block context */
-	//HCL_ASSERT (HCL_CLASSOF(hcl, rcv_blkctx) == hcl->_block_context);
 	HCL_ASSERT (HCL_IS_CONTEXT (hcl, rcv_blkctx));
 	if (rcv_blkctx->receiver_or_source != hcl->_nil)
 	{
@@ -1042,7 +1041,7 @@ static int start_initial_process_and_context (hcl_t* hcl)
 	ctx->method_or_nargs = HCL_SMOOI_TO_OOP(0);
 /* TODO: XXXXX */
 	ctx->ntmprs = HCL_SMOOI_TO_OOP(0);
-	ctx->home = ctx; // is this correct???
+	ctx->home = ctx; /* // is this correct??? */
 /* END XXXXX */
 
 	/* [NOTE]
@@ -1867,9 +1866,10 @@ static int execute (hcl_t* hcl)
 					 * }
 					 */
 
+/*
 //					HCL_ASSERT (HCL_CLASSOF(hcl, hcl->active_context) == hcl->_block_context);
 //					HCL_ASSERT (HCL_CLASSOF(hcl, hcl->processor->active->initial_context) == hcl->_block_context);
-
+*/
 					/* decrement the instruction pointer back to the return instruction.
 					 * even if the context is reentered, it will just return.
 					 *hcl->ip--;*/
@@ -1886,7 +1886,9 @@ static int execute (hcl_t* hcl)
 					if (hcl->active_context->origin == hcl->active_context)
 					{
 						/* returning from a method */
+/*
 //						HCL_ASSERT (HCL_CLASSOF(hcl, hcl->active_context) == hcl->_method_context);
+*/
 						hcl->ip = -1;
 					}
 					else
@@ -1894,13 +1896,14 @@ static int execute (hcl_t* hcl)
 						hcl_oop_context_t ctx;
 
 						/* method return from within a block(including a non-local return) */
+/*
 //						HCL_ASSERT (HCL_CLASSOF(hcl, hcl->active_context) == hcl->_block_context);
-
+*/
 						ctx = hcl->active_context;
 						while ((hcl_oop_t)ctx != hcl->_nil)
 						{
 						#if 0
-//							/* TODO: XXXXXXXXXXXXXX for STACK UNWINDING... */
+							/* TODO: XXXXXXXXXXXXXX for STACK UNWINDING... */
 							if (HCL_CLASSOF(hcl, ctx) == hcl->_method_context)
 							{
 								hcl_ooi_t preamble;
@@ -1921,7 +1924,9 @@ static int execute (hcl_t* hcl)
 						}
 
 						/* cannot return from a method that has returned already */
+/*
 //						HCL_ASSERT (HCL_CLASSOF(hcl, hcl->active_context->origin) == hcl->_method_context);
+*/
 						HCL_ASSERT (hcl->active_context->origin->ip == HCL_SMOOI_TO_OOP(-1));
 
 						HCL_LOG0 (hcl, HCL_LOG_IC | HCL_LOG_ERROR, "Error - cannot return from dead context\n");
@@ -1933,11 +1938,15 @@ static int execute (hcl_t* hcl)
 						hcl->active_context->origin->ip = HCL_SMOOI_TO_OOP(-1);
 					}
 
+/*
 //					HCL_ASSERT (HCL_CLASSOF(hcl, hcl->active_context->origin) == hcl->_method_context);
+*/
 					/* restore the stack pointer */
 					hcl->sp = HCL_OOP_TO_SMOOI(hcl->active_context->origin->sp);
 					SWITCH_ACTIVE_CONTEXT (hcl, hcl->active_context->origin->sender);
 
+#if 0 
+XXXXX
 					if (unwind_protect)
 					{
 						static hcl_ooch_t fbm[] = { 
@@ -1953,6 +1962,7 @@ static int execute (hcl_t* hcl)
 					}
 					else
 					{
+#endif
 						/* push the return value to the stack of the new active context */
 						HCL_STACK_PUSH (hcl, return_value);
 
@@ -1961,7 +1971,9 @@ static int execute (hcl_t* hcl)
 							/* the new active context is the fake initial context.
 							 * this context can't get executed further. */
 							HCL_ASSERT ((hcl_oop_t)hcl->active_context->sender == hcl->_nil);
+/*
 //							HCL_ASSERT (HCL_CLASSOF(hcl, hcl->active_context) == hcl->_method_context);
+*/
 							HCL_ASSERT (hcl->active_context->receiver_or_source == hcl->_nil);
 							HCL_ASSERT (hcl->active_context == hcl->processor->active->initial_context);
 							HCL_ASSERT (hcl->active_context->origin == hcl->processor->active->initial_context->origin);
@@ -1984,15 +1996,18 @@ static int execute (hcl_t* hcl)
 							 * the caller to hcl_execute() can fetch it to return it to the system */
 						}
 					}
+#if 0
 				}
+#endif
 
 				break;
 
 			case HCL_CODE_RETURN_FROM_BLOCK:
 				LOG_INST_0 (hcl, "return_from_block");
 
+/*
 //				HCL_ASSERT(HCL_CLASSOF(hcl, hcl->active_context) == hcl->_block_context);
-
+*/
 				if (hcl->active_context == hcl->processor->active->initial_context)
 				{
 					/* the active context to return from is an initial context of
@@ -2010,7 +2025,9 @@ static int execute (hcl_t* hcl)
 
 					/* the process stack is shared. the return value 
 					 * doesn't need to get moved. */
+/*
 					//XXX SWITCH_ACTIVE_CONTEXT (hcl, (hcl_oop_context_t)hcl->active_context->sender);
+*/
 					if (hcl->active_context->sender == hcl->processor->active->initial_context)
 					{
 						terminate_process (hcl, hcl->processor->active);
@@ -2099,7 +2116,6 @@ static int execute (hcl_t* hcl)
 				 * context and activates the cloned context.
 				 * this base block context is created with no 
 				 * stack for this reason. */
-				//blkctx = (hcl_oop_context_t)hcl_instantiate (hcl, hcl->_block_context, HCL_NULL, 0); 
 				blkctx = (hcl_oop_context_t)make_context (hcl, 0);
 				if (!blkctx) return -1;
 

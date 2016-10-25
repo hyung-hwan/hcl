@@ -629,7 +629,7 @@ enum
 	COP_POST_WHILE_BODY,
 	COP_POST_WHILE_COND,
 
-	COP_UPDATE_BREAK,
+	COP_UPDATE_BREAK
 };
 
 /* ========================================================================= */
@@ -1365,7 +1365,6 @@ static int compile_object_list (hcl_t* hcl)
 	}
 	else
 	{
-
 		hcl_oop_t car, cdr;
 
 		if (cop != COP_COMPILE_ARGUMENT_LIST)
