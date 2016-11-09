@@ -192,7 +192,7 @@ static int is_normalized_integer (hcl_t* hcl, hcl_oop_t oop)
 	return 0;
 }
 
-HCL_INLINE int is_bigint (hcl_t* hcl, hcl_oop_t x)
+HCL_INLINE static int is_bigint (hcl_t* hcl, hcl_oop_t x)
 {
 	hcl_oop_t c;
 

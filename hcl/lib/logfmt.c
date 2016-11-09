@@ -217,7 +217,8 @@ redo:
 		}
 
 		newcapa = HCL_ALIGN(hcl->log.len + len, 512); /* TODO: adjust this capacity */
-		tmp = hcl_reallocmem (hcl, hcl->log.ptr, newcapa * HCL_SIZEOF(*tmp));
+		/* +1 to handle line ending injection more easily */
+		tmp = hcl_reallocmem (hcl, hcl->log.ptr, (newcapa + 1) * HCL_SIZEOF(*tmp));
 		if (!tmp) 
 		{
 			if (hcl->log.len > 0)
@@ -231,7 +232,7 @@ redo:
 		}
 
 		hcl->log.ptr = tmp;
-		hcl->log.capa = newcapa - 1; /* -1 to handle line ending injection more easily */
+		hcl->log.capa = newcapa; 
 	}
 
 	while (len > 0)
