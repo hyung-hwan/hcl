@@ -276,11 +276,12 @@ static int put_oocs (hcl_t* hcl, hcl_oow_t mask, const hcl_ooch_t* ptr, hcl_oow_
 		}
 
 		newcapa = HCL_ALIGN(hcl->log.len + len, 512); /* TODO: adjust this capacity */
-		tmp = hcl_reallocmem (hcl, hcl->log.ptr, newcapa * HCL_SIZEOF(*tmp));
+		/* +1 to handle line ending injection more easily */
+		tmp = hcl_reallocmem (hcl, hcl->log.ptr, (newcapa + 1) * HCL_SIZEOF(*tmp));
 		if (!tmp) return -1;
 
 		hcl->log.ptr = tmp;
-		hcl->log.capa = newcapa - 1; /* -1 to handle line ending injection more easily */
+		hcl->log.capa = newcapa;
 	}
 
 	HCL_MEMCPY (&hcl->log.ptr[hcl->log.len], ptr, len * HCL_SIZEOF(*ptr));
