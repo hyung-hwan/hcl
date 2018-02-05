@@ -474,6 +474,12 @@ struct hcl_obj_word_t
 	hcl_oow_t slot[1];
 };
 
+#define HCL_OBJ_GET_OOP_SLOT(oop)      (((hcl_oop_oop_t)(oop))->slot)
+#define HCL_OBJ_GET_CHAR_SLOT(oop)     (((hcl_oop_char_t)(oop))->slot)
+#define HCL_OBJ_GET_BYTE_SLOT(oop)     (((hcl_oop_byte_t)(oop))->slot)
+#define HCL_OBJ_GET_HALFWORD_SLOT(oop) (((hcl_oop_halfword_t)(oop))->slot)
+#define HCL_OBJ_GET_WORD_SLOT(oop)     (((hcl_oop_word_t)(oop))->slot)
+
 typedef struct hcl_trailer_t hcl_trailer_t;
 struct hcl_trailer_t
 {

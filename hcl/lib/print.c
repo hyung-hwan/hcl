@@ -26,33 +26,9 @@
 
 #include "hcl-prv.h"
 
+
 #define PRINT_STACK_ALIGN 128
 
-struct printer_t
-{
-	hcl_t*          hcl;
-	hcl_ioimpl_t    printer;
-	hcl_iooutarg_t* outarg;
-};
-typedef struct printer_t printer_t;
-
-#define OUTPUT_STRX(pr,p,l) \
-do { \
-	(pr)->outarg->ptr = p; \
-	(pr)->outarg->len = l; \
-	if ((pr)->printer((pr)->hcl, HCL_IO_WRITE, (pr)->outarg) <= -1) \
-	{ \
-		hcl_seterrnum ((pr)->hcl, HCL_EIOERR); \
-		return -1; \
-	} \
-} while(0)
-
-#define OUTPUT_STR(pr,p) OUTPUT_STRX(pr,p,hcl_countoocstr(p))
-
-#define OUTPUT_CHAR(pr,ch) do { \
-	hcl_ooch_t tmp = ch; \
-	OUTPUT_STRX (pr, &tmp, 1); \
-} while(0)
 
 #define PRINT_STACK_ARRAY_END    0
 #define PRINT_STACK_CONS         1
@@ -94,107 +70,13 @@ static HCL_INLINE void pop (hcl_t* hcl, print_stack_t* info)
 	*info = ((print_stack_t*)hcl->p.s.ptr)[hcl->p.s.size];
 }
 
-static hcl_oow_t long_to_str (
-	hcl_ooi_t value, int radix, 
-	const hcl_ooch_t* prefix, hcl_ooch_t* buf, hcl_oow_t size)
-{
-	hcl_ooi_t t, rem;
-	hcl_oow_t len, ret, i;
-	hcl_oow_t prefix_len;
-
-	prefix_len = (prefix != HCL_NULL)? hcl_countoocstr(prefix): 0;
-
-	t = value;
-	if (t == 0)
-	{
-		/* zero */
-		if (buf == HCL_NULL) 
-		{
-			/* if buf is not given, 
-			 * return the number of bytes required */
-			return prefix_len + 1;
-		}
-
-		if (size < prefix_len + 1) 
-		{
-			/* buffer too small */
-			return (hcl_oow_t)-1;
-		}
-
-		for (i = 0; i < prefix_len; i++) buf[i] = prefix[i];
-		buf[prefix_len] = '0';
-		if (size > prefix_len+1) buf[prefix_len+1] = '\0';
-		return prefix_len+1;
-	}
-
-	/* non-zero values */
-	len = prefix_len;
-	if (t < 0) { t = -t; len++; }
-	while (t > 0) { len++; t /= radix; }
-
-	if (buf == HCL_NULL)
-	{
-		/* if buf is not given, return the number of bytes required */
-		return len;
-	}
-
-	if (size < len) return (hcl_oow_t)-1; /* buffer too small */
-	if (size > len) buf[len] = '\0';
-	ret = len;
-
-	t = value;
-	if (t < 0) t = -t;
-
-	while (t > 0) 
-	{
-		rem = t % radix;
-		if (rem >= 10)
-			buf[--len] = (hcl_ooch_t)rem + 'a' - 10;
-		else
-			buf[--len] = (hcl_ooch_t)rem + '0';
-		t /= radix;
-	}
-
-	if (value < 0) 
-	{
-		for (i = 1; i <= prefix_len; i++) 
-		{
-			buf[i] = prefix[i-1];
-			len--;
-		}
-		buf[--len] = '-';
-	}
-	else
-	{
-		for (i = 0; i < prefix_len; i++) buf[i] = prefix[i];
-	}
-
-	return ret;
-}
-
-static HCL_INLINE int print_ooi (printer_t* pr, hcl_ooi_t nval)
-{
-	hcl_ooch_t tmp[HCL_SIZEOF(hcl_ooi_t)*8+2];
-	hcl_oow_t len;
-
-	len = long_to_str (nval, 10, HCL_NULL, tmp, HCL_COUNTOF(tmp));
-	OUTPUT_STRX (pr, tmp, len);
-	return 0;
-}
-
-static HCL_INLINE int print_char (printer_t* pr, hcl_ooch_t ch)
-{
-	OUTPUT_CHAR (pr, ch);
-	return 0;
-}
-
 enum
 {
 	WORD_NIL,
 	WORD_TRUE,
 	WORD_FALSE,
-	WORD_SET,
 
+	WORD_SET,
 	WORD_CFRAME,
 	WORD_PRIM,
 
@@ -217,50 +99,52 @@ static struct
 	{  6,  { '#','<','S','E','T','>' } },
 	{  9,  { '#','<','C','F','R','A','M','E','>' } },
 	{  7,  { '#','<','P','R','I','M','>' } },
+
 	{  10, { '#','<','C','O','N','T','E','X','T','>' } },
 	{  10, { '#','<','P','R','O','C','E','S','S','>' } },
 	{  20, { '#','<','P','R','O','C','E','S','S','-','S','C','H','E','D','U','L','E','R','>' } },
 	{  12, { '#','<','S','E','M','A','P','H','O','R','E','>' } }
 };
 
-static int print_object (printer_t* pr, hcl_oop_t obj)
+
+int hcl_outfmtobj (hcl_t* hcl, hcl_oow_t mask, hcl_oop_t obj, hcl_outbfmt_t outbfmt)
 {
-	hcl_t* hcl;
 	hcl_oop_t cur;
 	print_stack_t ps;
 	int brand;
-
-	hcl = pr->hcl;
+	int word_index;
 
 next:
 	if (HCL_OOP_IS_SMOOI(obj))
 	{
-		if (print_ooi (pr, HCL_OOP_TO_SMOOI(obj)) <= -1) return -1;
+		if (outbfmt(hcl, mask, "%zd", HCL_OOP_TO_SMOOI(obj)) <= -1) return -1;
 		goto done;
 	}
 	else if (HCL_OOP_IS_CHAR(obj))
 	{
-		if (print_char (pr, HCL_OOP_TO_CHAR(obj)) <= -1) return -1;
+		if (outbfmt(hcl, mask, "$%.1jc", HCL_OOP_TO_CHAR(obj)) <= -1) return -1;
 		goto done;
 	}
 
 	switch ((brand = HCL_OBJ_GET_FLAGS_BRAND(obj))) 
 	{
 		case HCL_BRAND_NIL:
-			OUTPUT_STRX (pr, word[WORD_NIL].ptr, word[WORD_NIL].len);
-			break;
+			word_index = WORD_NIL;
+			goto print_word;
 
 		case HCL_BRAND_TRUE:
-			OUTPUT_STRX (pr, word[WORD_TRUE].ptr, word[WORD_TRUE].len);
-			break;
+			word_index = WORD_TRUE;
+			goto print_word;
 
 		case HCL_BRAND_FALSE:
-			OUTPUT_STRX (pr, word[WORD_FALSE].ptr, word[WORD_FALSE].len);
-			break;
+			word_index = WORD_FALSE;
+			goto print_word;
+
 
 		case HCL_BRAND_INTEGER:
+/* TODO: print properly... print big int */
 			HCL_ASSERT (hcl, HCL_OBJ_GET_SIZE(obj) == 1);
-			if (print_ooi (pr, ((hcl_oop_word_t)obj)->slot[0]) <= -1) return -1;
+			if (outbfmt(hcl, mask, "%zu", ((hcl_oop_word_t)obj)->slot[0]) <= -1) return -1;
 			break;
 
 #if 0
@@ -287,19 +171,93 @@ next:
 			/* Any needs for special action if SYNT(obj) is true?
 			 * I simply treat the syntax symbol as a normal symbol
 			 * for printing currently. */
-			OUTPUT_STRX (pr, ((hcl_oop_char_t)obj)->slot, HCL_OBJ_GET_SIZE(obj));
+			if (outbfmt(hcl, mask, "%.*js", HCL_OBJ_GET_SIZE(obj), HCL_OBJ_GET_CHAR_SLOT(obj)) <= -1) return -1;
 			break;
 
 		case HCL_BRAND_STRING:
-			OUTPUT_CHAR (pr, '\"');
-			/* TODO: deescaping */
-			OUTPUT_STRX (pr, ((hcl_oop_char_t)obj)->slot, HCL_OBJ_GET_SIZE(obj));
-			OUTPUT_CHAR (pr, '\"');
+		{
+			hcl_ooch_t ch;
+			hcl_oow_t i;
+			int escape = 0;
+
+			for (i = 0; i < HCL_OBJ_GET_SIZE(obj); i++)
+			{
+				ch = ((hcl_oop_char_t)obj)->slot[i];
+				if (ch < ' ') 
+				{
+					escape = 1;
+					break;
+				}
+			}
+
+			if (escape)
+			{
+				hcl_ooch_t escaped;
+
+				if (outbfmt(hcl, mask, "\"") <= -1) return -1;
+				for (i = 0; i < HCL_OBJ_GET_SIZE(obj); i++)
+				{
+					ch = ((hcl_oop_char_t)obj)->slot[i];
+					if (ch < ' ') 
+					{
+						switch (ch)
+						{
+							case '\0':
+								escaped = '0';
+								break;
+							case '\n':
+								escaped = 'n';
+								break;
+							case '\r':
+								escaped = 'r';
+								break;
+							case '\t':
+								escaped = 't';
+								break;
+							case '\f':
+								escaped = 'f';
+								break;
+							case '\b':
+								escaped = 'b';
+								break;
+							case '\v':
+								escaped = 'v';
+								break;
+							case '\a':
+								escaped = 'a';
+								break;
+							default:
+								escaped = ch;
+								break;
+						}
+
+						if (escaped == ch)
+						{
+							if (outbfmt(hcl, mask, "\\x%X", ch) <= -1) return -1;
+						}
+						else
+						{
+							if (outbfmt(hcl, mask, "\\%jc", escaped) <= -1) return -1;
+						}
+					}
+					else
+					{
+						if (outbfmt(hcl, mask, "%jc", ch) <= -1) return -1;
+					}
+				}
+
+				if (outbfmt(hcl, mask, "\"") <= -1) return -1;
+			}
+			else
+			{
+				if (outbfmt(hcl, mask, "\"%.*js\"", HCL_OBJ_GET_SIZE(obj), HCL_OBJ_GET_CHAR_SLOT(obj)) <= -1) return -1;
+			}
 			break;
+		}
 
 		case HCL_BRAND_CONS:
 		{
-			OUTPUT_CHAR (pr, '(');
+			if (outbfmt(hcl, mask, "(") <= -1) return -1;
 			cur = obj;
 
 			do
@@ -332,9 +290,7 @@ next:
 				if (!HCL_OOP_IS_POINTER(cur) || HCL_OBJ_GET_FLAGS_BRAND(cur) != HCL_BRAND_CONS) 
 				{
 					/* The CDR part does not point to a pair. */
-					OUTPUT_CHAR (pr, ' ');
-					OUTPUT_CHAR (pr, '.');
-					OUTPUT_CHAR (pr, ' ');
+					if (outbfmt(hcl, mask, " . ") <= -1) return -1;
 
 					/* Push NIL so that the HCL_IS_NIL(hcl,p) test in 
 					 * the 'if' statement above breaks the loop
@@ -351,10 +307,10 @@ next:
 				}
 
 				/* The CDR part points to a pair. proceed to it */
-				OUTPUT_CHAR (pr, ' ');
+				if (outbfmt(hcl, mask, " ") <= -1) return -1;
 			}
 			while (1);
-			OUTPUT_CHAR (pr, ')');
+			if (outbfmt(hcl, mask, ")") <= -1) return -1;
 			break;
 		}
 
@@ -364,20 +320,23 @@ next:
 
 			if (brand == HCL_BRAND_ARRAY)
 			{
-				OUTPUT_CHAR (pr, '#');
-				OUTPUT_CHAR (pr, '(');
+				if (outbfmt(hcl, mask, "#(") <= -1) return -1;
 			}
 			else
 			{
-				OUTPUT_CHAR (pr, '|');
+				if (outbfmt(hcl, mask, "|") <= -1) return -1;
 			}
 
 			if (HCL_OBJ_GET_SIZE(obj) <= 0) 
 			{
 				if (brand == HCL_BRAND_ARRAY)
-					OUTPUT_CHAR (pr, ')');
+				{
+					if (outbfmt(hcl, mask, ")") <= -1) return -1;
+				}
 				else
-					OUTPUT_CHAR (pr, '|');
+				{
+					if (outbfmt(hcl, mask, "|") <= -1) return -1;
+				}
 				break;
 			}
 			arridx = 0;
@@ -403,7 +362,10 @@ next:
 				if (x <= -1) return -1;
 
 				obj = ((hcl_oop_oop_t)obj)->slot[arridx];
-				if (arridx > 0) OUTPUT_CHAR (pr, ' ');
+				if (arridx > 0) 
+				{
+					if (outbfmt(hcl, mask, " ") <= -1) return -1;
+				}
 				/* Jump to the 'next' label so that the object 
 				 * pointed to by 'obj' is printed. Once it 
 				 * ends, a jump back to the 'resume' label
@@ -423,15 +385,13 @@ next:
 		{
 			hcl_oow_t i;
 
-			OUTPUT_CHAR (pr, '#');
-			OUTPUT_CHAR (pr, '[');
+			if (outbfmt(hcl, mask, "#[") <= -1) return -1;
 
 			for (i = 0; i < HCL_OBJ_GET_SIZE(obj); i++)
 			{
-				if (i > 0) OUTPUT_CHAR (pr, ' ');
-				if (print_ooi (pr, ((hcl_oop_byte_t)obj)->slot[i]) <= -1) return -1;
+				if (outbfmt(hcl, mask, "%hs%d", ((i > 0)? " ": ""), ((hcl_oop_byte_t)obj)->slot[i]) <= -1) return -1;
 			}
-			OUTPUT_CHAR (pr, ']');
+			if (outbfmt(hcl, mask, "]") <= -1) return -1;
 			break;
 		}
 
@@ -439,53 +399,56 @@ next:
 		{
 			hcl_oow_t i;
 
-			OUTPUT_CHAR (pr, '|');
+			if (outbfmt(hcl, mask, "|") <= -1) return -1;
 
 			for (i = 0; i < HCL_OBJ_GET_SIZE(obj); i++)
 			{
 				hcl_oop_t s;
 				s = ((hcl_oop_oop_t)obj)->slot[i];
-				OUTPUT_CHAR (pr, ' ');
-				OUTPUT_STRX (pr, ((hcl_oop_char_t)s)->slot, HCL_OBJ_GET_SIZE(s));
+				if (outbfmt(hcl, mask, " %.*js", HCL_OBJ_GET_SIZE(s), HCL_OBJ_GET_CHAR_SLOT(s)) <= -1) return -1;
 			}
-			OUTPUT_CHAR (pr, ' ');
-			OUTPUT_CHAR (pr, '|');
+			if (outbfmt(hcl, mask, " |") <= -1) return -1;
 			break;
 		}
 
 		case HCL_BRAND_SET:
-			OUTPUT_STRX (pr, word[WORD_SET].ptr, word[WORD_SET].len);
-			break;
+			word_index = WORD_SET;
+			goto print_word;
 
 		case HCL_BRAND_CFRAME:
-			OUTPUT_STRX (pr, word[WORD_CFRAME].ptr, word[WORD_CFRAME].len);
-			break;
+			word_index = WORD_CFRAME;
+			goto print_word;
 
 		case HCL_BRAND_PRIM:
-			OUTPUT_STRX (pr, word[WORD_PRIM].ptr, word[WORD_PRIM].len);
-			break;
+			word_index = WORD_PRIM;
+			goto print_word;
+			
 
 		case HCL_BRAND_CONTEXT:
-			OUTPUT_STRX (pr, word[WORD_CONTEXT].ptr, word[WORD_CONTEXT].len);
-			break;
+			word_index = WORD_CONTEXT;
+			goto print_word;
 
 		case HCL_BRAND_PROCESS:
-			OUTPUT_STRX (pr, word[WORD_PROCESS].ptr, word[WORD_PROCESS].len);
-			break;
+			word_index = WORD_PROCESS;
+			goto print_word;
 
 		case HCL_BRAND_PROCESS_SCHEDULER:
-			OUTPUT_STRX (pr, word[WORD_PROCESS_SCHEDULER].ptr, word[WORD_PROCESS_SCHEDULER].len);
-			break;
+			word_index = WORD_PROCESS_SCHEDULER;
+			goto print_word;
 
 		case HCL_BRAND_SEMAPHORE:
-			OUTPUT_STRX (pr, word[WORD_SEMAPHORE].ptr, word[WORD_SEMAPHORE].len);
-			break;
+			word_index = WORD_SEMAPHORE;
+			goto print_word;
 
 		default:
 			HCL_DEBUG3 (hcl, "Internal error - unknown object type %d at %s:%d\n", (int)brand, __FILE__, __LINE__);
 			HCL_ASSERT (hcl, "Unknown object type" == HCL_NULL);
-			hcl_seterrnum (hcl, HCL_EINTERN);
+			hcl_seterrbfmt (hcl, HCL_EINTERN, "unknown object type %d", (int)brand);
 			return -1;
+
+		print_word:
+			if (outbfmt(hcl, mask, "%.*js", word[word_index].len, word[word_index].ptr) <= -1) return -1;
+			break;
 	}
 
 done:
@@ -502,24 +465,21 @@ done:
 				goto resume_array;
 
 			case PRINT_STACK_ARRAY_END:
-				OUTPUT_CHAR (pr, ')');
+				if (outbfmt(hcl, mask, ")") <= -1) return -1;
 				break;
 
 			default:
 				HCL_DEBUG3 (hcl, "Internal error - unknown print stack type %d at %s:%d\n", (int)ps.type, __FILE__, __LINE__);
-				hcl_seterrnum (hcl, HCL_EINTERN);
+				hcl_seterrbfmt (hcl, HCL_EINTERN, "unknown print stack type %d", (int)ps.type);
 				return -1;
 		}
 	}
-
 	return 0;
 }
 
-/* hcl_printobj() is for internal use only. it's called by hcl_print() and a logger. */
-HCL_INLINE int hcl_printobj (hcl_t* hcl, hcl_oop_t obj, hcl_ioimpl_t printer, hcl_iooutarg_t* outarg)
+int hcl_print (hcl_t* hcl, hcl_oop_t obj)
 {
 	int n;
-	printer_t pr;
 
 	HCL_ASSERT (hcl, hcl->c->printer != HCL_NULL);
 
@@ -527,10 +487,7 @@ HCL_INLINE int hcl_printobj (hcl_t* hcl, hcl_oop_t obj, hcl_ioimpl_t printer, hc
 	HCL_ASSERT (hcl, hcl->p.s.size == 0); 
 
 	hcl->p.e = obj; /* remember the head of the object to print */
-	pr.hcl = hcl;
-	pr.printer = printer;
-	pr.outarg = outarg;
-	n = print_object (&pr, obj); /* call the actual printing routine */
+	n = hcl_outfmtobj (hcl, HCL_LOG_APP | HCL_LOG_FATAL, obj, hcl_proutbfmt);
 	hcl->p.e = hcl->_nil; /* reset what's remembered */
 
 	/* clear the printing stack if an error has occurred for GC not to keep
@@ -541,9 +498,4 @@ HCL_INLINE int hcl_printobj (hcl_t* hcl, hcl_oop_t obj, hcl_ioimpl_t printer, hc
 	HCL_ASSERT (hcl, hcl->p.s.size == 0); 
 
 	return n;
-}
-
-int hcl_print (hcl_t* hcl, hcl_oop_t obj)
-{
-	return hcl_printobj (hcl, obj, hcl->c->printer, &hcl->c->outarg);
 }

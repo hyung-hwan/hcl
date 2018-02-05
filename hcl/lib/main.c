@@ -1027,14 +1027,14 @@ int main (int argc, char* argv[])
 
 	if (hcl_ignite(hcl) <= -1)
 	{
-		printf ("cannot ignite hcl - %d\n", hcl_geterrnum(hcl));
+		hcl_logbfmt (hcl, HCL_LOG_STDERR, "cannot ignite hcl - [%d] %js\n", hcl_geterrnum(hcl), hcl_geterrmsg(hcl));
 		hcl_close (hcl);
 		return -1;
 	}
 
 	if (hcl_addbuiltinprims(hcl) <= -1)
 	{
-		printf ("cannot add builtin primitives - %d\n", hcl_geterrnum(hcl));
+		hcl_logbfmt (hcl, HCL_LOG_STDERR, "cannot add builtin primitives - [%d] %js\n", hcl_geterrnum(hcl), hcl_geterrmsg(hcl));
 		hcl_close (hcl);
 		return -1;
 	}
@@ -1044,7 +1044,7 @@ int main (int argc, char* argv[])
 
 	if (hcl_attachio (hcl, read_handler, print_handler) <= -1)
 	{
-		printf ("ERROR: cannot attache input stream - %d\n", hcl_geterrnum(hcl));
+		hcl_logbfmt (hcl, HCL_LOG_STDERR, "ERROR: cannot attache input stream - [%d] %js\n", hcl_geterrnum(hcl), hcl_geterrmsg(hcl));
 		hcl_close (hcl);
 		return -1;
 	}
@@ -1067,7 +1067,7 @@ int main (int argc, char* argv[])
 			}
 			else
 			{
-				printf ("ERROR: cannot read object - %d\n", hcl_geterrnum(hcl));
+				hcl_logbfmt (hcl, HCL_LOG_STDERR, "ERROR: cannot read object - [%d] %js\n", hcl_geterrnum(hcl), hcl_geterrmsg(hcl));
 			}
 
 			break;
@@ -1076,11 +1076,11 @@ int main (int argc, char* argv[])
 
 		if (hcl_print(hcl, obj) <= -1)
 		{
-			printf ("ERROR: cannot print object - %d\n", hcl_geterrnum(hcl));
+			hcl_logbfmt (hcl, HCL_LOG_STDERR, "ERROR: cannot print object - [%d] %js\n", hcl_geterrnum(hcl), hcl_geterrmsg(hcl));
 		}
 		else
 		{
-			hcl_print (hcl, HCL_CHAR_TO_OOP('\n'));
+			hcl_proutbfmt (hcl, 0, "\n");
 			if (hcl_compile(hcl, obj) <= -1)
 			{
 				if (hcl->errnum == HCL_ESYNERR)
@@ -1089,7 +1089,7 @@ int main (int argc, char* argv[])
 				}
 				else
 				{
-					printf ("ERROR: cannot compile object - %d\n", hcl_geterrnum(hcl));
+					hcl_logbfmt (hcl, HCL_LOG_STDERR, "ERROR: cannot compile object - [%d] %js\n", hcl_geterrnum(hcl), hcl_geterrmsg(hcl));
 				}
 
 				/* carry on? */
@@ -1100,13 +1100,13 @@ int main (int argc, char* argv[])
 hcl_decode (hcl, 0, hcl->code.bc.len);
 HCL_LOG0 (hcl, HCL_LOG_MNEMONIC, "------------------------------------------\n");
 g_hcl = hcl;
-setup_tick ();
+//setup_tick ();
 if (hcl_execute(hcl) <= -1)
 {
 	hcl_logbfmt (hcl, HCL_LOG_STDERR, "ERROR: cannot execute - [%d] %js\n", hcl_geterrnum(hcl), hcl_geterrmsg(hcl));
 
 }
-cancel_tick();
+//cancel_tick();
 g_hcl = HCL_NULL;
 
 

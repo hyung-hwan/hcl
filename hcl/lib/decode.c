@@ -26,13 +26,21 @@
 
 #include "hcl-prv.h"
 
+#define DECODE_LOG_MASK (HCL_LOG_MNEMONIC | HCL_LOG_INFO)
 
-#define DECODE_LOG_MASK (HCL_LOG_MNEMONIC)
-
-#define LOG_INST_0(hcl,fmt) HCL_LOG1(hcl, DECODE_LOG_MASK, "%010zd " fmt "\n", fetched_instruction_pointer)
-#define LOG_INST_1(hcl,fmt,a1) HCL_LOG2(hcl, DECODE_LOG_MASK, "%010zd " fmt "\n", fetched_instruction_pointer, a1)
-#define LOG_INST_2(hcl,fmt,a1,a2) HCL_LOG3(hcl, DECODE_LOG_MASK, "%010zd " fmt "\n", fetched_instruction_pointer, a1, a2)
-#define LOG_INST_3(hcl,fmt,a1,a2,a3) HCL_LOG4(hcl, DECODE_LOG_MASK, "%010zd " fmt "\n", fetched_instruction_pointer, a1, a2, a3)
+#if defined(NDEBUG)
+	/* get rid of instruction logging regardless of the log mask
+	 * in the release build */
+#	define LOG_INST_0(hcl,fmt)
+#	define LOG_INST_1(hcl,fmt,a1)
+#	define LOG_INST_2(hcl,fmt,a1,a2)
+#	define LOG_INST_3(hcl,fmt,a1,a2,a3)
+#else
+#	define LOG_INST_0(hcl,fmt) HCL_LOG1(hcl, DECODE_LOG_MASK, " %06zd " fmt "\n", fetched_instruction_pointer)
+#	define LOG_INST_1(hcl,fmt,a1) HCL_LOG2(hcl, DECODE_LOG_MASK, " %06zd " fmt "\n", fetched_instruction_pointer, a1)
+#	define LOG_INST_2(hcl,fmt,a1,a2) HCL_LOG3(hcl, DECODE_LOG_MASK, " %06zd " fmt "\n", fetched_instruction_pointer, a1, a2)
+#	define LOG_INST_3(hcl,fmt,a1,a2,a3) HCL_LOG4(hcl, DECODE_LOG_MASK, " %06zd " fmt "\n", fetched_instruction_pointer, a1, a2, a3)
+#endif
 
 #define FETCH_BYTE_CODE(hcl) (cdptr[ip++])
 #define FETCH_BYTE_CODE_TO(hcl,v_ooi) (v_ooi = FETCH_BYTE_CODE(hcl))

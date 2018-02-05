@@ -73,7 +73,6 @@
 
 #include <stdio.h> /* TODO: delete these header inclusion lines */
 #include <string.h>
-#include <assert.h>
 
 #if defined(__has_builtin)
 #	if __has_builtin(__builtin_memset)
@@ -234,6 +233,8 @@
 #	define HCL_OBJ_SIZE_BITS_MAX (HCL_OBJ_SIZE_MAX * 8)
 #endif
 
+
+typedef hcl_ooi_t (*hcl_outbfmt_t) (hcl_t* hcl, hcl_oow_t mask, const hcl_bch_t* fmt, ...);
 
 #if defined(HCL_INCLUDE_COMPILER)
 
@@ -1090,6 +1091,32 @@ HCL_EXPORT int hcl_compile (
 int hcl_addbuiltinprims (
 	hcl_t*         hcl
 );
+
+/* ========================================================================= */
+/* logfmt.c                                                                  */
+/* ========================================================================= */
+hcl_ooi_t hcl_proutbfmt (
+	hcl_t*           hcl,
+	hcl_oow_t        mask,
+	const hcl_bch_t* fmt,
+	...
+);
+
+hcl_ooi_t hcl_proutufmt (
+	hcl_t*           hcl,
+	hcl_oow_t        mask,
+	const hcl_uch_t* fmt,
+	...
+);
+
+int hcl_outfmtobj (
+	hcl_t*        hcl,
+	hcl_oow_t     mask,
+	hcl_oop_t     obj,
+	hcl_outbfmt_t outbfmt
+);
+
+
 
 /* TODO: remove debugging functions */
 /* ========================================================================= */

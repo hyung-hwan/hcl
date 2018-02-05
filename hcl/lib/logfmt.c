@@ -158,7 +158,6 @@ struct hcl_fmtout_t
  * written in the buffer (i.e., the first character of the string).
  * The buffer pointed to by `nbuf' must have length >= MAXNBUF.
  */
-
 static hcl_bch_t* sprintn_lower (hcl_bch_t* nbuf, hcl_uintmax_t num, int base, hcl_ooi_t* lenp)
 {
 	hcl_bch_t* p;
@@ -372,220 +371,6 @@ redo:
 
 /* ------------------------------------------------------------------------- */
 
-typedef hcl_ooi_t (*outbfmt_t) (hcl_t* hcl, hcl_oow_t mask, const hcl_bch_t* fmt, ...);
-
-
-static hcl_ooi_t log_object (hcl_t* hcl, hcl_iocmd_t cmd, void* arg)
-{
-	hcl_iooutarg_t* outarg = (hcl_iooutarg_t*)arg;
-	put_oocs (hcl, (hcl_oow_t)outarg->handle, outarg->ptr, outarg->len);
-	return outarg->len; /* don't really care about failure as it's for logging */
-}
-
-static int print_object (hcl_t* hcl, hcl_oow_t mask, hcl_oop_t obj)
-{
-	hcl_iooutarg_t outarg;
-	outarg.handle = (void*)mask;
-	return hcl_printobj (hcl, obj, log_object, &outarg);
-}
-
-#if 0
-static void print_object (hcl_t* hcl, hcl_oow_t mask, hcl_oop_t oop, outbfmt_t outbfmt)
-{
-
-
-	if (oop == hcl->_nil)
-	{
-		outbfmt (hcl, mask, "nil");
-	}
-	else if (oop == hcl->_true)
-	{
-		outbfmt (hcl, mask, "true");
-	}
-	else if (oop == hcl->_false)
-	{
-		outbfmt (hcl, mask, "false");
-	}
-	else if (HCL_OOP_IS_SMOOI(oop))
-	{
-		outbfmt (hcl, mask, "%zd", HCL_OOP_TO_SMOOI(oop));
-	}
-	else if (HCL_OOP_IS_SMPTR(oop))
-	{
-		outbfmt (hcl, mask, "%p", HCL_OOP_TO_SMPTR(oop));
-	}
-	else if (HCL_OOP_IS_CHAR(oop))
-	{
-		outbfmt (hcl, mask, "$%.1C", HCL_OOP_TO_CHAR(oop));
-	}
-	else if (HCL_OOP_IS_ERROR(oop))
-	{
-		outbfmt (hcl, mask, "error(%zd)", HCL_OOP_TO_ERROR(oop));
-	}
-	else
-	{
-		hcl_oop_class_t c;
-		hcl_oow_t i;
-
-		HCL_ASSERT (hcl, HCL_OOP_IS_POINTER(oop));
-		c = (hcl_oop_class_t)HCL_OBJ_GET_CLASS(oop); /*HCL_CLASSOF(hcl, oop);*/
-
-		if (c == hcl->_large_negative_integer)
-		{
-			hcl_oow_t i;
-			outbfmt (hcl, mask, "-16r");
-			for (i = HCL_OBJ_GET_SIZE(oop); i > 0;)
-			{
-				outbfmt (hcl, mask, "%0*lX", (int)(HCL_SIZEOF(hcl_liw_t) * 2), (unsigned long)((hcl_oop_liword_t)oop)->slot[--i]);
-			}
-		}
-		else if (c == hcl->_large_positive_integer)
-		{
-			hcl_oow_t i;
-			outbfmt (hcl, mask, "16r");
-			for (i = HCL_OBJ_GET_SIZE(oop); i > 0;)
-			{
-				outbfmt (hcl, mask, "%0*lX", (int)(HCL_SIZEOF(hcl_liw_t) * 2), (unsigned long)((hcl_oop_liword_t)oop)->slot[--i]);
-			}
-		}
-		else if (HCL_OBJ_GET_FLAGS_TYPE(oop) == HCL_OBJ_TYPE_CHAR)
-		{
-			if (c == hcl->_symbol) 
-			{
-				outbfmt (hcl, mask, "#%.*js", HCL_OBJ_GET_SIZE(oop), ((hcl_oop_char_t)oop)->slot);
-			}
-			else /*if ((hcl_oop_t)c == hcl->_string)*/
-			{
-				hcl_ooch_t ch;
-				int escape = 0;
-
-				for (i = 0; i < HCL_OBJ_GET_SIZE(oop); i++)
-				{
-					ch = ((hcl_oop_char_t)oop)->slot[i];
-					if (ch < ' ') 
-					{
-						escape = 1;
-						break;
-					}
-				}
-
-				if (escape)
-				{
-					hcl_ooch_t escaped;
-
-					outbfmt (hcl, mask, "S'");
-					for (i = 0; i < HCL_OBJ_GET_SIZE(oop); i++)
-					{
-						ch = ((hcl_oop_char_t)oop)->slot[i];
-						if (ch < ' ') 
-						{
-							switch (ch)
-							{
-								case '\0':
-									escaped = '0';
-									break;
-								case '\n':
-									escaped = 'n';
-									break;
-								case '\r':
-									escaped = 'r';
-									break;
-								case '\t':
-									escaped = 't';
-									break;
-								case '\f':
-									escaped = 'f';
-									break;
-								case '\b':
-									escaped = 'b';
-									break;
-								case '\v':
-									escaped = 'v';
-									break;
-								case '\a':
-									escaped = 'a';
-									break;
-								default:
-									escaped = ch;
-									break;
-							}
-
-							if (escaped == ch)
-								outbfmt (hcl, mask, "\\x%X", ch);
-							else
-								outbfmt (hcl, mask, "\\%jc", escaped);
-						}
-						else
-						{
-							outbfmt (hcl, mask, "%jc", ch);
-						}
-					}
-					
-					outbfmt (hcl, mask, "'");
-				}
-				else
-				{
-					outbfmt (hcl, mask, "'%.*js'", HCL_OBJ_GET_SIZE(oop), ((hcl_oop_char_t)oop)->slot);
-				}
-			}
-		}
-		else if (HCL_OBJ_GET_FLAGS_TYPE(oop) == HCL_OBJ_TYPE_BYTE)
-		{
-			outbfmt (hcl, mask, "#[");
-			for (i = 0; i < HCL_OBJ_GET_SIZE(oop); i++)
-			{
-				outbfmt (hcl, mask, " %d", ((hcl_oop_byte_t)oop)->slot[i]);
-			}
-			outbfmt (hcl, mask, "]");
-		}
-		
-		else if (HCL_OBJ_GET_FLAGS_TYPE(oop) == HCL_OBJ_TYPE_HALFWORD)
-		{
-			outbfmt (hcl, mask, "#[["); /* TODO: fix this symbol/notation */
-			for (i = 0; i < HCL_OBJ_GET_SIZE(oop); i++)
-			{
-				outbfmt (hcl, mask, " %zX", (hcl_oow_t)((hcl_oop_halfword_t)oop)->slot[i]);
-			}
-			outbfmt (hcl, mask, "]]");
-		}
-		else if (HCL_OBJ_GET_FLAGS_TYPE(oop) == HCL_OBJ_TYPE_WORD)
-		{
-			outbfmt (hcl, mask, "#[[["); /* TODO: fix this symbol/notation */
-			for (i = 0; i < HCL_OBJ_GET_SIZE(oop); i++)
-			{
-				outbfmt (hcl, mask, " %zX", ((hcl_oop_word_t)oop)->slot[i]);
-			}
-			outbfmt (hcl, mask, "]]]");
-		}
-		else if (c == hcl->_array)
-		{
-			outbfmt (hcl, mask, "#(");
-			for (i = 0; i < HCL_OBJ_GET_SIZE(oop); i++)
-			{
-				outbfmt (hcl, mask, " ");
-				print_object (hcl, mask, ((hcl_oop_oop_t)oop)->slot[i], outbfmt);
-			}
-			outbfmt (hcl, mask, ")");
-		}
-		else if (c == hcl->_class)
-		{
-			/* print the class name */
-			outbfmt (hcl, mask, "%.*js", HCL_OBJ_GET_SIZE(((hcl_oop_class_t)oop)->name), ((hcl_oop_class_t)oop)->name->slot);
-		}
-		else if (c == hcl->_association)
-		{
-			outbfmt (hcl, mask, "%O -> %O", ((hcl_oop_association_t)oop)->key, ((hcl_oop_association_t)oop)->value);
-		}
-		else
-		{
-			outbfmt (hcl, mask, "<<%.*js>>", HCL_OBJ_GET_SIZE(c->name), ((hcl_oop_char_t)c->name)->slot);
-		}
-	}
-}
-#endif
-
-/* ------------------------------------------------------------------------- */
-
 #undef FMTCHAR_IS_BCH
 #undef FMTCHAR_IS_UCH
 #undef FMTCHAR_IS_OOCH
@@ -685,7 +470,90 @@ hcl_ooi_t hcl_logufmt (hcl_t* hcl, hcl_oow_t mask, const hcl_uch_t* fmt, ...)
 	return (x <= -1)? -1: fo.count;
 }
 
+/* -------------------------------------------------------------------------- 
+ * HELPER FOR PRINTING
+ * -------------------------------------------------------------------------- */
 
+static int put_prch (hcl_t* hcl, hcl_oow_t mask, hcl_ooch_t ch, hcl_oow_t len)
+{
+/* TODO: error handling, buffering */
+	hcl->c->outarg.ptr = &ch;
+	hcl->c->outarg.len = 1;
+	hcl->c->printer (hcl, HCL_IO_WRITE, &hcl->c->outarg);
+	return 1; /* success */
+}
+
+static int put_prcs (hcl_t* hcl, hcl_oow_t mask, const hcl_ooch_t* ptr, hcl_oow_t len)
+{
+	/* TODO: error handling, buffering */
+	hcl->c->outarg.ptr = (hcl_ooch_t*)ptr;
+	hcl->c->outarg.len = len;
+	hcl->c->printer (hcl, HCL_IO_WRITE, &hcl->c->outarg);
+	return 1; /* success */
+}
+
+static hcl_ooi_t __prbfmtv (hcl_t* hcl, hcl_oow_t mask, const hcl_bch_t* fmt, ...);
+
+static int _prbfmtv (hcl_t* hcl, const hcl_bch_t* fmt, hcl_fmtout_t* data, va_list ap)
+{
+	return __logbfmtv (hcl, fmt, data, ap, __prbfmtv);
+}
+
+static int _prufmtv (hcl_t* hcl, const hcl_uch_t* fmt, hcl_fmtout_t* data, va_list ap)
+{
+	return __logufmtv (hcl, fmt, data, ap, __prbfmtv);
+}
+
+static hcl_ooi_t __prbfmtv (hcl_t* hcl, hcl_oow_t mask, const hcl_bch_t* fmt, ...)
+{
+	va_list ap;
+	hcl_fmtout_t fo;
+
+	fo.mask = 0; /* not used */
+	fo.putch = put_prch;
+	fo.putcs = put_prcs;
+
+	va_start (ap, fmt);
+	_prbfmtv (hcl, fmt, &fo, ap);
+	va_end (ap);
+
+	return fo.count;
+}
+
+hcl_ooi_t hcl_proutbfmt (hcl_t* hcl, hcl_oow_t mask, const hcl_bch_t* fmt, ...)
+{
+	int x;
+	va_list ap;
+	hcl_fmtout_t fo;
+
+	fo.mask = 0; /* not used */
+	fo.putch = put_prch;
+	fo.putcs = put_prcs;
+
+	va_start (ap, fmt);
+	x = _prbfmtv (hcl, fmt, &fo, ap);
+	va_end (ap);
+
+	return (x <= -1)? -1: fo.count;
+}
+
+hcl_ooi_t hcl_proutufmt (hcl_t* hcl, hcl_oow_t mask, const hcl_uch_t* fmt, ...)
+{
+	int x;
+	va_list ap;
+	hcl_fmtout_t fo;
+
+	fo.mask = 0; /* not used */
+	fo.putch = put_prch;
+	fo.putcs = put_prcs;
+
+	va_start (ap, fmt);
+	x = _prufmtv (hcl, fmt, &fo, ap);
+	va_end (ap);
+
+	return (x <= -1)? -1: fo.count;
+}
+ 
 /* -------------------------------------------------------------------------- 
  * ERROR MESSAGE FORMATTING
  * -------------------------------------------------------------------------- */
@@ -816,3 +684,4 @@ void hcl_seterrufmtv (hcl_t* hcl, hcl_errnum_t errnum, const hcl_uch_t* fmt, va_
 
 	_errufmtv (hcl, fmt, &fo, ap);
 }
+

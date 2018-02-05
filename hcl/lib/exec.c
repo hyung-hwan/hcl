@@ -108,7 +108,7 @@
 
 
 #if defined(HCL_DEBUG_VM_EXEC)
-#	define LOG_MASK_INST (HCL_LOG_IC | HCL_LOG_MNEMONIC)
+#	define LOG_MASK_INST (HCL_LOG_IC | HCL_LOG_MNEMONIC | HCL_LOG_INFO)
 
 #	define LOG_INST_0(hcl,fmt) HCL_LOG1(hcl, LOG_MASK_INST, "%010zd " fmt "\n", fetched_instruction_pointer)
 #	define LOG_INST_1(hcl,fmt,a1) HCL_LOG2(hcl, LOG_MASK_INST, "%010zd " fmt "\n",fetched_instruction_pointer, a1)
@@ -903,7 +903,7 @@ static int __activate_context (hcl_t* hcl, hcl_oop_context_t rcv_blkctx, hcl_ooi
 		HCL_ASSERT (hcl, HCL_OBJ_GET_SIZE(rcv_blkctx) > HCL_CONTEXT_NAMED_INSTVARS);
 		HCL_LOG1 (hcl, HCL_LOG_IC | HCL_LOG_ERROR, 
 			"Error - re-valuing of a block context - %O\n", rcv_blkctx);
-		hcl_seterrnum (hcl, HCL_ERECALL);
+		hcl_seterrbfmt (hcl, HCL_ERECALL, "cannot recall %O", rcv_blkctx);
 		return -1;
 	}
 	HCL_ASSERT (hcl, HCL_OBJ_GET_SIZE(rcv_blkctx) == HCL_CONTEXT_NAMED_INSTVARS);
@@ -1560,16 +1560,16 @@ static int execute (hcl_t* hcl)
 			handle_call:
 				LOG_INST_1 (hcl, "call %zu", b1);
 
-				rcv = HCL_STACK_GETRCV (hcl, b1);
+				rcv = HCL_STACK_GETRCV(hcl, b1);
 				if (HCL_OOP_IS_POINTER(rcv))
 				{
 					switch (HCL_OBJ_GET_FLAGS_BRAND(rcv))
 					{
 						case HCL_BRAND_CONTEXT:
-							if (activate_context (hcl, b1) <= -1) return -1;
+							if (activate_context(hcl, b1) <= -1) return -1;
 							break;
 						case HCL_BRAND_PRIM:
-							if (call_primitive (hcl, b1) <= -1) return -1;
+							if (call_primitive(hcl, b1) <= -1) return -1;
 							break;
 						default:
 							goto cannot_call;

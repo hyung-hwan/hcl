@@ -1325,7 +1325,7 @@ static int compile_object (hcl_t* hcl)
 			break;
 
 		case HCL_BRAND_SYMBOL_ARRAY:
-			HCL_DEBUG1 (hcl, "Syntax error - variable declartion disallowed - %O\n", cf->operand);
+			HCL_DEBUG1 (hcl, "Syntax error - variable declaration disallowed - %O\n", cf->operand);
 			hcl_setsynerr (hcl, HCL_SYNERR_VARDCLBANNED, HCL_NULL, HCL_NULL); /* TODO: error location */
 			return -1;
 
