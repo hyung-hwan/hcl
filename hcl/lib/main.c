@@ -25,11 +25,14 @@
  */
 
 #include "hcl-prv.h"
+#include "hcl-opt.h"
 
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <limits.h>
+#include <errno.h>
+#include <locale.h>
 
 
 #if defined(_WIN32)
@@ -52,6 +55,7 @@
 #else
 #	include <errno.h>
 #	include <unistd.h>
+#	include <fcntl.h>
 #	include <ltdl.h>
 #	define USE_LTDL
 
@@ -73,7 +77,9 @@ struct bb_t
 	char buf[1024];
 	hcl_oow_t pos;
 	hcl_oow_t len;
+
 	FILE* fp;
+	hcl_bch_t* fn;
 };
 
 typedef struct xtn_t xtn_t;
@@ -81,6 +87,10 @@ struct xtn_t
 {
 	const char* read_path; /* main source file */
 	const char* print_path; 
+
+	int logfd;
+	int logmask;
+	int logfd_istty;
 };
 
 /* ========================================================================= */
@@ -110,84 +120,109 @@ static hcl_mmgr_t sys_mmgr =
 
 /* ========================================================================= */
 
+
+#if defined(_WIN32) || defined(__OS2__) || defined(__DOS__)
+#	define IS_PATH_SEP(c) ((c) == '/' || (c) == '\\')
+#else
+#	define IS_PATH_SEP(c) ((c) == '/')
+#endif
+
+
+static const hcl_bch_t* get_base_name (const hcl_bch_t* path)
+{
+	const hcl_bch_t* p, * last = HCL_NULL;
+
+	for (p = path; *p != '\0'; p++)
+	{
+		if (IS_PATH_SEP(*p)) last = p;
+	}
+
+	return (last == HCL_NULL)? path: (last + 1);
+}
+
 static HCL_INLINE hcl_ooi_t open_input (hcl_t* hcl, hcl_ioinarg_t* arg)
 {
 	xtn_t* xtn = hcl_getxtn(hcl);
-	bb_t* bb;
-	FILE* infp = HCL_NULL, * outfp = HCL_NULL;
+	bb_t* bb = HCL_NULL;
 
+/* TOOD: support predefined include directory as well */
 	if (arg->includer)
 	{
 		/* includee */
-		hcl_bch_t bcs[1024]; /* TODO: right buffer size */
-		hcl_oow_t bcslen = HCL_COUNTOF(bcs);
-		hcl_oow_t ucslen = ~(hcl_oow_t)0;
+		hcl_oow_t ucslen, bcslen, parlen;
+		const hcl_bch_t* fn, * fb;
 
-		if (hcl_ucstoutf8 (arg->name, &ucslen, bcs, &bcslen) <= -1)
-		{
-			hcl_seterrnum (hcl, HCL_EECERR);
-			return -1;
-		}
+	#if defined(HCL_OOCH_IS_UCH)
+		if (hcl_convootobcstr (hcl, arg->name, &ucslen, HCL_NULL, &bcslen) <= -1) goto oops;
+	#else
+		bcslen = hcl_countbcstr (arg->name);
+	#endif
 
-/* TODO: make bcs relative to the includer */
-#if defined(__MSDOS__) || defined(_WIN32) || defined(__OS2__)
-		infp = fopen (bcs, "rb");
-#else
-		infp = fopen (bcs, "r");
-#endif
+		fn = ((bb_t*)arg->includer->handle)->fn;
 
-		if (!infp)
-		{
-			hcl_seterrnum (hcl, HCL_EIOERR);
-			return -1;
-		}
+		fb = get_base_name (fn);
+		parlen = fb - fn;
+
+		bb = hcl_callocmem (hcl, HCL_SIZEOF(*bb) + (HCL_SIZEOF(hcl_bch_t) * (parlen + bcslen + 1)));
+		if (!bb) goto oops;
+
+		bb->fn = (hcl_bch_t*)(bb + 1);
+		hcl_copybchars (bb->fn, fn, parlen);
+	#if defined(HCL_OOCH_IS_UCH)
+		hcl_convootobcstr (hcl, arg->name, &ucslen, &bb->fn[parlen], &bcslen);
+	#else
+		hcl_copybcstr (&bb->fn[parlen], bcslen + 1, arg->name);
+	#endif
 	}
 	else
 	{
 		/* main stream */
-#if defined(__MSDOS__) || defined(_WIN32) || defined(__OS2__)
-		infp = fopen (xtn->read_path, "rb");
-		if (xtn->print_path) outfp = fopen (xtn->print_path, "wb");
-		else outfp = stdout;
+		hcl_oow_t pathlen;
+
+		pathlen = hcl_countbcstr (xtn->read_path);
+
+		bb = hcl_callocmem (hcl, HCL_SIZEOF(*bb) + (HCL_SIZEOF(hcl_bch_t) * (pathlen + 1)));
+		if (!bb) goto oops;
+
+		bb->fn = (hcl_bch_t*)(bb + 1);
+		hcl_copybcstr (bb->fn, pathlen + 1, xtn->read_path);
+	}
+
+#if defined(__DOS__) || defined(_WIN32) || defined(__OS2__)
+	bb->fp = fopen (bb->fn, "rb");
 #else
-		infp = fopen (xtn->read_path, "r");
-		if (xtn->print_path) outfp = fopen (xtn->print_path, "w");
-		else outfp = stdout;
+	bb->fp = fopen (bb->fn, "r");
 #endif
-		if (!infp || !outfp)
-		{
-			if (infp) fclose (infp);
-			if (outfp && outfp != stdout) fclose (outfp);
-			hcl_seterrnum (hcl, HCL_EIOERR);
-			return -1;
-		}
-	}
-
-	bb = hcl_callocmem (hcl, HCL_SIZEOF(*bb));
-	if (!bb)
+	if (!bb->fp)
 	{
-		if (infp) fclose (infp);
-		if (outfp && outfp != stdout) fclose (outfp);
-		return -1;
+		hcl_seterrnum (hcl, HCL_EIOERR);
+		goto oops;
 	}
 
-	bb->fp = infp;
 	arg->handle = bb;
 	return 0;
+
+oops:
+	if (bb) 
+	{
+		if (bb->fp) fclose (bb->fp);
+		hcl_freemem (hcl, bb);
+	}
+	return -1;
 }
-  
+
 static HCL_INLINE hcl_ooi_t close_input (hcl_t* hcl, hcl_ioinarg_t* arg)
 {
-	xtn_t* xtn = hcl_getxtn(hcl);
+	/*xtn_t* xtn = hcl_getxtn(hcl);*/
 	bb_t* bb;
 
 	bb = (bb_t*)arg->handle;
-	HCL_ASSERT (bb != HCL_NULL && bb->fp != HCL_NULL);
+	HCL_ASSERT (hcl, bb != HCL_NULL && bb->fp != HCL_NULL);
 
-	if (bb->fp) fclose (bb->fp);
+	fclose (bb->fp);
 	hcl_freemem (hcl, bb);
-	arg->handle = HCL_NULL;
 
+	arg->handle = HCL_NULL;
 	return 0;
 }
 
@@ -199,9 +234,8 @@ static HCL_INLINE hcl_ooi_t read_input (hcl_t* hcl, hcl_ioinarg_t* arg)
 	hcl_oow_t bcslen, ucslen, remlen;
 	int x;
 
-
 	bb = (bb_t*)arg->handle;
-	HCL_ASSERT (bb != HCL_NULL && bb->fp != HCL_NULL);
+	HCL_ASSERT (hcl, bb != HCL_NULL && bb->fp != HCL_NULL);
 	do
 	{
 		x = fgetc (bb->fp);
@@ -219,14 +253,18 @@ static HCL_INLINE hcl_ooi_t read_input (hcl_t* hcl, hcl_ioinarg_t* arg)
 	}
 	while (bb->len < HCL_COUNTOF(bb->buf) && x != '\r' && x != '\n');
 
+#if defined(HCL_OOCH_IS_UCH)
 	bcslen = bb->len;
 	ucslen = HCL_COUNTOF(arg->buf);
-	x = hcl_utf8toucs (bb->buf, &bcslen, arg->buf, &ucslen);
-	if (x <= -1 && ucslen <= 0)
-	{
-		hcl_seterrnum (hcl, HCL_EECERR);
-		return -1;
-	}
+	x = hcl_convbtooochars (hcl, bb->buf, &bcslen, arg->buf, &ucslen);
+	if (x <= -1 && ucslen <= 0) return -1;
+	/* if ucslen is greater than 0, i see that some characters have been
+	 * converted properly */
+#else
+	bcslen = (bb->len < HCL_COUNTOF(arg->buf))? bb->len: HCL_COUNTOF(arg->buf);
+	ucslen = bcslen;
+	hcl_copybchars (arg->buf, bb->buf, bcslen);
+#endif
 
 	remlen = bb->len - bcslen;
 	if (remlen > 0) memmove (bb->buf, &bb->buf[bcslen], remlen);
@@ -249,7 +287,7 @@ static hcl_ooi_t read_handler (hcl_t* hcl, hcl_iocmd_t cmd, void* arg)
 			return read_input (hcl, (hcl_ioinarg_t*)arg);
 
 		default:
-			hcl->errnum = HCL_EINTERN;
+			hcl_seterrnum (hcl, HCL_EINTERN);
 			return -1;
 	}
 }
@@ -282,7 +320,7 @@ static HCL_INLINE hcl_ooi_t close_output (hcl_t* hcl, hcl_iooutarg_t* arg)
 	FILE* fp;
 
 	fp = (FILE*)arg->handle;
-	HCL_ASSERT (fp != HCL_NULL);
+	HCL_ASSERT (hcl, fp != HCL_NULL);
 
 	fclose (fp);
 	arg->handle = HCL_NULL;
@@ -301,14 +339,18 @@ static HCL_INLINE hcl_ooi_t write_output (hcl_t* hcl, hcl_iooutarg_t* arg)
 
 	do 
 	{
+#if defined(HCL_OOCH_IS_UCH)
 		bcslen = HCL_COUNTOF(bcsbuf);
 		ucslen = arg->len - donelen;
-		x = hcl_ucstoutf8 (&arg->ptr[donelen], &ucslen, bcsbuf, &bcslen);
-		if (x <= -1 && ucslen <= 0)
-		{
-			hcl_seterrnum (hcl, HCL_EECERR);
-			return -1;
-		}
+		x = hcl_convootobchars (hcl, &arg->ptr[donelen], &ucslen, bcsbuf, &bcslen);
+		if (x <= -1 && ucslen <= 0) return -1;
+#else
+		bcslen = HCL_COUNTOF(bcsbuf);
+		ucslen = arg->len - donelen;
+		if (ucslen > bcslen) ucslen = bcslen;
+		else if (ucslen < bcslen) bcslen = ucslen;
+		hcl_copybchars (&arg->buf[donelen], bcsbuf, bcslen);
+#endif
 
 		if (fwrite (bcsbuf, HCL_SIZEOF(bcsbuf[0]), bcslen, (FILE*)arg->handle) < bcslen)
 		{
@@ -337,7 +379,7 @@ static hcl_ooi_t print_handler (hcl_t* hcl, hcl_iocmd_t cmd, void* arg)
 			return write_output (hcl, (hcl_iooutarg_t*)arg);
 
 		default:
-			hcl->errnum = HCL_EINTERN;
+			hcl_seterrnum (hcl, HCL_EINTERN);
 			return -1;
 	}
 }
@@ -378,51 +420,85 @@ static void log_write (hcl_t* hcl, hcl_oow_t mask, const hcl_ooch_t* msg, hcl_oo
 #if defined(_WIN32)
 #	error NOT IMPLEMENTED 
 	
+#elif defined(macintosh)
+#	error NOT IMPLEMENTED
 #else
 	hcl_bch_t buf[256];
 	hcl_oow_t ucslen, bcslen, msgidx;
 	int n;
-	char ts[64];
-	size_t tslen;
-	struct tm tm, *tmp;
-	time_t now;
 
+	xtn_t* xtn = hcl_getxtn(hcl);
+	int logfd;
 
-if (mask & HCL_LOG_GC) return; /* don't show gc logs */
+	if (mask & HCL_LOG_STDERR)
+	{
+		/* the messages that go to STDERR don't get masked out */
+		logfd = 2;
+	}
+	else
+	{
+		if (!(xtn->logmask & mask & ~HCL_LOG_ALL_LEVELS)) return;  /* check log types */
+		if (!(xtn->logmask & mask & ~HCL_LOG_ALL_TYPES)) return;  /* check log levels */
+
+		if (mask & HCL_LOG_STDOUT) logfd = 1;
+		else
+		{
+
+			logfd = xtn->logfd;
+			if (logfd <= -1) return;
+		}
+	}
 
 /* TODO: beautify the log message.
  *       do classification based on mask. */
-
-	now = time(NULL);
-#if defined(__MSDOS__)
-	tmp = localtime (&now);
-#else
-	tmp = localtime_r (&now, &tm);
-#endif
-	tslen = strftime (ts, sizeof(ts), "%Y-%m-%d %H:%M:%S %z ", tmp);
-	if (tslen == 0) 
+	if (!(mask & (HCL_LOG_STDOUT | HCL_LOG_STDERR)))
 	{
-		strcpy (ts, "0000-00-00 00:00:00 +0000");
-		tslen = 25; 
-	}
-	if (write_all (1, ts, tslen) <= -1) 
-	{
-		char ttt[20];
-#if defined(__MSDOS__) && defined(_INTELC32_)
-		sprintf (ttt, "ERR: %d\n", errno);
-#else
-		snprintf (ttt, sizeof(ttt), "ERR: %d\n", errno);
-#endif
-		write (1, ttt, strlen(ttt));
+		time_t now;
+		char ts[32];
+		size_t tslen;
+		struct tm tm, *tmp;
+
+		now = time(NULL);
+	#if defined(__DOS__)
+		tmp = localtime (&now);
+		tslen = strftime (ts, sizeof(ts), "%Y-%m-%d %H:%M:%S ", tmp); /* no timezone info */
+		if (tslen == 0) 
+		{
+			strcpy (ts, "0000-00-00 00:00:00");
+			tslen = 19; 
+		}
+	#else
+		tmp = localtime_r (&now, &tm);
+		#if defined(HAVE_STRFTIME_SMALL_Z)
+		tslen = strftime (ts, sizeof(ts), "%Y-%m-%d %H:%M:%S %z ", tmp);
+		#else
+		tslen = strftime (ts, sizeof(ts), "%Y-%m-%d %H:%M:%S %Z ", tmp); 
+		#endif
+		if (tslen == 0) 
+		{
+			strcpy (ts, "0000-00-00 00:00:00 +0000");
+			tslen = 25; 
+		}
+	#endif
+		write_all (logfd, ts, tslen);
 	}
 
+
+	if (xtn->logfd_istty)
+	{
+		if (mask & HCL_LOG_FATAL) write_all (logfd, "\x1B[1;31m", 7);
+		else if (mask & HCL_LOG_ERROR) write_all (logfd, "\x1B[1;32m", 7);
+		else if (mask & HCL_LOG_WARN) write_all (logfd, "\x1B[1;33m", 7);
+	}
+
+#if defined(HCL_OOCH_IS_UCH)
 	msgidx = 0;
 	while (len > 0)
 	{
 		ucslen = len;
 		bcslen = HCL_COUNTOF(buf);
 
-		n = hcl_ucstoutf8 (&msg[msgidx], &ucslen, buf, &bcslen);
+		n = hcl_convootobchars (hcl, &msg[msgidx], &ucslen, buf, &bcslen);
 		if (n == 0 || n == -2)
 		{
 			/* n = 0: 
@@ -431,10 +507,10 @@ if (mask & HCL_LOG_GC) return; /* don't show gc logs */
 			 *    buffer not sufficient. not all got converted yet.
 			 *    write what have been converted this round. */
 
-			HCL_ASSERT (ucslen > 0); /* if this fails, the buffer size must be increased */
+			HCL_ASSERT (hcl, ucslen > 0); /* if this fails, the buffer size must be increased */
 
 			/* attempt to write all converted characters */
-			if (write_all (1, buf, bcslen) <= -1) break;
+			if (write_all (logfd, buf, bcslen) <= -1) break;
 
 			if (n == 0) break;
 			else
@@ -449,9 +525,154 @@ if (mask & HCL_LOG_GC) return; /* don't show gc logs */
 			break;
 		}
 	}
+#else
+	write_all (logfd, msg, len);
+#endif
+
+	if (xtn->logfd_istty)
+	{
+		if (mask & (HCL_LOG_FATAL | HCL_LOG_ERROR | HCL_LOG_WARN)) write_all (logfd, "\x1B[0m", 4);
+	}
+
 #endif
 }
 
+
+static void syserrstrb (hcl_t* hcl, int syserr, hcl_bch_t* buf, hcl_oow_t len)
+{
+#if defined(HAVE_STRERROR_R)
+	strerror_r (syserr, buf, len);
+#else
+	/* this is not thread safe */
+	hcl_copybcstr (buf, len, strerror(syserr));
+#endif
+}
+
+static void fini_hcl (hcl_t* hcl)
+{
+	xtn_t* xtn = hcl_getxtn(hcl);
+	if (xtn->logfd >= 0)
+	{
+		close (xtn->logfd);
+		xtn->logfd = -1;
+		xtn->logfd_istty = 0;
+	}
+}
+
+
+static int handle_logopt (hcl_t* hcl, const hcl_bch_t* str)
+{
+	xtn_t* xtn = hcl_getxtn (hcl);
+	hcl_bch_t* xstr = (hcl_bch_t*)str;
+	hcl_bch_t* cm, * flt;
+
+	cm = hcl_findbcharinbcstr (xstr, ',');
+	if (cm) 
+	{
+		/* i duplicate this string for open() below as open() doesn't 
+		 * accept a length-bounded string */
+		xstr = hcl_dupbchars (hcl, str, hcl_countbcstr(str));
+		if (!xstr) 
+		{
+			fprintf (stderr, "ERROR: out of memory in duplicating %s\n", str);
+			return -1;
+		}
+
+		cm = hcl_findbcharinbcstr(xstr, ',');
+		*cm = '\0';
+
+		do
+		{
+			flt = cm + 1;
+
+			cm = hcl_findbcharinbcstr(flt, ',');
+			if (cm) *cm = '\0';
+
+			if (hcl_compbcstr(flt, "app") == 0) xtn->logmask |= HCL_LOG_APP;
+			else if (hcl_compbcstr(flt, "compiler") == 0) xtn->logmask |= HCL_LOG_COMPILER;
+			else if (hcl_compbcstr(flt, "vm") == 0) xtn->logmask |= HCL_LOG_VM;
+			else if (hcl_compbcstr(flt, "mnemonic") == 0) xtn->logmask |= HCL_LOG_MNEMONIC;
+			else if (hcl_compbcstr(flt, "gc") == 0) xtn->logmask |= HCL_LOG_GC;
+			else if (hcl_compbcstr(flt, "ic") == 0) xtn->logmask |= HCL_LOG_IC;
+			else if (hcl_compbcstr(flt, "primitive") == 0) xtn->logmask |= HCL_LOG_PRIMITIVE;
+
+			else if (hcl_compbcstr(flt, "fatal") == 0) xtn->logmask |= HCL_LOG_FATAL;
+			else if (hcl_compbcstr(flt, "error") == 0) xtn->logmask |= HCL_LOG_ERROR;
+			else if (hcl_compbcstr(flt, "warn") == 0) xtn->logmask |= HCL_LOG_WARN;
+			else if (hcl_compbcstr(flt, "info") == 0) xtn->logmask |= HCL_LOG_INFO;
+			else if (hcl_compbcstr(flt, "debug") == 0) xtn->logmask |= HCL_LOG_DEBUG;
+
+			else if (hcl_compbcstr(flt, "fatal+") == 0) xtn->logmask |= HCL_LOG_FATAL;
+			else if (hcl_compbcstr(flt, "error+") == 0) xtn->logmask |= HCL_LOG_FATAL | HCL_LOG_ERROR;
+			else if (hcl_compbcstr(flt, "warn+") == 0) xtn->logmask |= HCL_LOG_FATAL | HCL_LOG_ERROR | HCL_LOG_WARN;
+			else if (hcl_compbcstr(flt, "info+") == 0) xtn->logmask |= HCL_LOG_FATAL | HCL_LOG_ERROR | HCL_LOG_WARN | HCL_LOG_INFO;
+			else if (hcl_compbcstr(flt, "debug+") == 0) xtn->logmask |= HCL_LOG_FATAL | HCL_LOG_ERROR | HCL_LOG_WARN | HCL_LOG_INFO | HCL_LOG_DEBUG;
+
+			else
+			{
+				fprintf (stderr, "ERROR: unknown log option value - %s\n", flt);
+				if (str != xstr) hcl_freemem (hcl, xstr);
+				return -1;
+			}
+		}
+		while (cm);
+
+
+		if (!(xtn->logmask & HCL_LOG_ALL_TYPES)) xtn->logmask |= HCL_LOG_ALL_TYPES;  /* no types specified. force to all types */
+		if (!(xtn->logmask & HCL_LOG_ALL_LEVELS)) xtn->logmask |= HCL_LOG_ALL_LEVELS;  /* no levels specified. force to all levels */
+	}
+	else
+	{
+		xtn->logmask = HCL_LOG_ALL_LEVELS | HCL_LOG_ALL_TYPES;
+	}
+
+	xtn->logfd = open (xstr, O_CREAT | O_WRONLY | O_APPEND , 0644);
+	if (xtn->logfd == -1)
+	{
+		fprintf (stderr, "ERROR: cannot open a log file %s\n", xstr);
+		if (str != xstr) hcl_freemem (hcl, xstr);
+		return -1;
+	}
+
+#if defined(HAVE_ISATTY)
+	xtn->logfd_istty = isatty(xtn->logfd);
+#endif
+
+	if (str != xstr) hcl_freemem (hcl, xstr);
+	return 0;
+}
+
+#if !defined(NDEBUG)
+static int handle_dbgopt (hcl_t* hcl, const hcl_bch_t* str)
+{
+	xtn_t* xtn = hcl_getxtn (hcl);
+	const hcl_bch_t* cm, * flt;
+	hcl_oow_t len;
+	unsigned int trait, dbgopt = 0;
+
+	cm = str - 1;
+	do
+	{
+		flt = cm + 1;
+
+		cm = hcl_findbcharinbcstr(flt, ',');
+		len = cm? (cm - flt): hcl_countbcstr(flt);
+		if (hcl_compbcharsbcstr (flt, len, "gc") == 0)  dbgopt |= HCL_DEBUG_GC;
+		else if (hcl_compbcharsbcstr (flt, len, "bigint") == 0)  dbgopt |= HCL_DEBUG_BIGINT;
+		else
+		{
+			fprintf (stderr, "ERROR: unknown debug option value - %.*s\n", (int)len, flt);
+			return -1;
+		}
+	}
+	while (cm);
+
+	hcl_getoption (hcl, HCL_TRAIT, &trait);
+	trait |= dbgopt;
+	hcl_setoption (hcl, HCL_TRAIT, &trait);
+	return 0;
+}
+#endif
 /* ========================================================================= */
 
 static hcl_t* g_hcl = HCL_NULL;
@@ -619,65 +840,125 @@ static char* syntax_error_msg[] =
 static void print_synerr (hcl_t* hcl)
 {
 	hcl_synerr_t synerr;
-	hcl_bch_t bcs[1024]; /* TODO: right buffer size */
-	hcl_oow_t bcslen, ucslen;
 	xtn_t* xtn;
 
 	xtn = hcl_getxtn (hcl);
 	hcl_getsynerr (hcl, &synerr);
 
-	printf ("ERROR: ");
+	hcl_logbfmt (hcl,HCL_LOG_STDERR, "ERROR: ");
 	if (synerr.loc.file)
 	{
-		bcslen = HCL_COUNTOF(bcs);
-		ucslen = ~(hcl_oow_t)0;
-		if (hcl_ucstoutf8 (synerr.loc.file, &ucslen, bcs, &bcslen) >= 0)
-		{
-			printf ("%.*s ", (int)bcslen, bcs);
-		}
+		hcl_logbfmt (hcl, HCL_LOG_STDERR, "%js", synerr.loc.file);
 	}
 	else
 	{
-		printf ("%s ", xtn->read_path);
+		hcl_logbfmt (hcl, HCL_LOG_STDERR, "%s", xtn->read_path);
 	}
 
-	printf ("syntax error at line %lu column %lu - %s", 
+	hcl_logbfmt (hcl, HCL_LOG_STDERR, "syntax error at line %lu column %lu - %hs", 
 		(unsigned long int)synerr.loc.line, (unsigned long int)synerr.loc.colm,
 		syntax_error_msg[synerr.num]);
+
 	if (synerr.tgt.len > 0)
 	{
-		bcslen = HCL_COUNTOF(bcs);
-		ucslen = synerr.tgt.len;
-
-		if (hcl_ucstoutf8 (synerr.tgt.ptr, &ucslen, bcs, &bcslen) >= 0)
-		{
-			printf (" [%.*s]", (int)bcslen, bcs);
-		}
-
+		hcl_logbfmt (hcl, HCL_LOG_STDERR, " - %.*js", synerr.tgt.len, synerr.tgt.ptr);
 	}
-	printf ("\n");
+
+	hcl_logbfmt (hcl, HCL_LOG_STDERR, "\n");
 }
 
 hcl_ooch_t str_hcl[] = { 'S', 't', 'i', 'x' };
 hcl_ooch_t str_my_object[] = { 'M', 'y', 'O', 'b','j','e','c','t' };
 hcl_ooch_t str_main[] = { 'm', 'a', 'i', 'n' };
 
+
+#define MIN_MEMSIZE 2048000ul
+ 
 int main (int argc, char* argv[])
 {
 	hcl_t* hcl;
 	xtn_t* xtn;
 	hcl_vmprim_t vmprim;
+	hcl_cb_t hclcb;
+
+	hcl_bci_t c;
+	static hcl_bopt_lng_t lopt[] =
+	{
+		{ ":log",         'l' },
+		{ ":memsize",     'm' },
+#if !defined(NDEBUG)
+		{ ":debug",       '\0' }, /* NOTE: there is no short option for --debug */
+#endif
+		{ HCL_NULL,       '\0' }
+	};
+	static hcl_bopt_t opt =
+	{
+		"l:m:",
+		lopt
+	};
+
+	const char* logopt = HCL_NULL;
+	hcl_oow_t memsize = MIN_MEMSIZE;
+
+#if !defined(NDEBUG)
+	const char* dbgopt = HCL_NULL;
+#endif
+
+	setlocale (LC_ALL, "");
 
 #if !defined(macintosh)
 	if (argc < 2)
 	{
+	print_usage:
 		fprintf (stderr, "Usage: %s filename ...\n", argv[0]);
 		return -1;
 	}
+
+	while ((c = hcl_getbopt (argc, argv, &opt)) != HCL_BCI_EOF)
+	{
+		switch (c)
+		{
+			case 'l':
+				logopt = opt.arg;
+				break;
+
+			case 'm':
+				memsize = strtoul(opt.arg, HCL_NULL, 0);
+				if (memsize <= MIN_MEMSIZE) memsize = MIN_MEMSIZE;
+				break;
+
+			case '\0':
+				
+			#if !defined(NDEBUG)
+				if (hcl_compbcstr(opt.lngopt, "debug") == 0)
+				{
+					dbgopt = opt.arg;
+					break;
+				}
+			#endif
+
+				goto print_usage;
+
+			case ':':
+				if (opt.lngopt)
+					fprintf (stderr, "bad argument for '%s'\n", opt.lngopt);
+				else
+					fprintf (stderr, "bad argument for '%c'\n", opt.opt);
+
+				return -1;
+
+			default:
+				goto print_usage;
+		}
+	}
+
+	if (opt.ind >= argc) goto print_usage;
 #endif
+
 
 	memset (&vmprim, 0, HCL_SIZEOF(vmprim));
 	vmprim.log_write = log_write;
+	vmprim.syserrstrb = syserrstrb;
 
 	hcl = hcl_open (&sys_mmgr, HCL_SIZEOF(xtn_t), 2048000lu, &vmprim, HCL_NULL);
 	if (!hcl)
@@ -704,7 +985,45 @@ int main (int argc, char* argv[])
 		/*trait |= HCL_NOGC;*/
 		trait |= HCL_AWAIT_PROCS;
 		hcl_setoption (hcl, HCL_TRAIT, &trait);
+
+		/* disable GC logs */
+		trait = ~HCL_LOG_GC;
+		hcl_setoption (hcl, HCL_LOG_MASK, &trait);
 	}
+
+	xtn = hcl_getxtn (hcl);
+	xtn->logfd = -1;
+	xtn->logfd_istty = 0;
+
+	memset (&hclcb, 0, HCL_SIZEOF(hclcb));
+	hclcb.fini = fini_hcl;
+	hcl_regcb (hcl, &hclcb);
+
+
+	if (logopt)
+	{
+		if (handle_logopt (hcl, logopt) <= -1) 
+		{
+			hcl_close (hcl);
+			return -1;
+		}
+	}
+	else
+	{
+		/* default logging mask when no logging option is set */
+		xtn->logmask = HCL_LOG_ALL_TYPES | HCL_LOG_ERROR | HCL_LOG_FATAL;
+	}
+
+#if !defined(NDEBUG)
+	if (dbgopt)
+	{
+		if (handle_dbgopt (hcl, dbgopt) <= -1)
+		{
+			hcl_close (hcl);
+			return -1;
+		}
+	}
+#endif
 
 	if (hcl_ignite(hcl) <= -1)
 	{
@@ -720,15 +1039,8 @@ int main (int argc, char* argv[])
 		return -1;
 	}
 
-	xtn = hcl_getxtn (hcl);
-
-#if defined(macintosh)
-	i = 20;
-	xtn->read_path = "test.st";
-#endif
-
-	xtn->read_path = argv[1];
-	if (argc >= 2) xtn->print_path = argv[2];
+	xtn->read_path = argv[opt.ind++];
+	if (opt.ind < argc) xtn->print_path = argv[opt.ind++];
 
 	if (hcl_attachio (hcl, read_handler, print_handler) <= -1)
 	{
@@ -741,7 +1053,7 @@ int main (int argc, char* argv[])
 	{
 		hcl_oop_t obj;
 
-		obj = hcl_read (hcl);
+		obj = hcl_read(hcl);
 		if (!obj)
 		{
 			if (hcl->errnum == HCL_EFINIS)
@@ -762,14 +1074,14 @@ int main (int argc, char* argv[])
 		}
 
 
-		if (hcl_print (hcl, obj) <= -1)
+		if (hcl_print(hcl, obj) <= -1)
 		{
 			printf ("ERROR: cannot print object - %d\n", hcl_geterrnum(hcl));
 		}
 		else
 		{
 			hcl_print (hcl, HCL_CHAR_TO_OOP('\n'));
-			if (hcl_compile (hcl, obj) <= -1)
+			if (hcl_compile(hcl, obj) <= -1)
 			{
 				if (hcl->errnum == HCL_ESYNERR)
 				{
@@ -789,12 +1101,14 @@ hcl_decode (hcl, 0, hcl->code.bc.len);
 HCL_LOG0 (hcl, HCL_LOG_MNEMONIC, "------------------------------------------\n");
 g_hcl = hcl;
 setup_tick ();
-if (hcl_execute (hcl) <= -1)
+if (hcl_execute(hcl) <= -1)
 {
-	printf ("ERROR: cannot execute - %d\n", hcl_geterrnum(hcl));
+	hcl_logbfmt (hcl, HCL_LOG_STDERR, "ERROR: cannot execute - [%d] %js\n", hcl_geterrnum(hcl), hcl_geterrmsg(hcl));
+
 }
 cancel_tick();
 g_hcl = HCL_NULL;
+
 
 
 {
@@ -803,8 +1117,10 @@ HCL_LOG2 (hcl, HCL_LOG_MNEMONIC, "BYTECODES hcl->code.bc.len = > %lu hcl->code.l
 	(unsigned long int)hcl->code.bc.len, (unsigned long int)hcl->code.lit.len);
 hcl_decode (hcl, 0, hcl->code.bc.len);
 
-hcl_dumpsymtab (hcl);
+/*hcl_dumpsymtab (hcl);*/
 }
+
+
 	hcl_close (hcl);
 
 #if defined(_WIN32) && defined(_DEBUG)

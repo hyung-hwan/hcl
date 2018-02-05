@@ -54,7 +54,7 @@ static hcl_oop_oop_t expand_bucket (hcl_t* hcl, hcl_oop_oop_t oldbuc)
 			if (inc_max > 0) inc = inc_max;
 			else
 			{
-				hcl->errnum = HCL_EOOMEM;
+				hcl_seterrnum (hcl, HCL_EOOMEM);
 				return HCL_NULL;
 			}
 		}
@@ -71,12 +71,12 @@ static hcl_oop_oop_t expand_bucket (hcl_t* hcl, hcl_oop_oop_t oldbuc)
 		ass = (hcl_oop_cons_t)oldbuc->slot[--oldsz];
 		if ((hcl_oop_t)ass != hcl->_nil)
 		{
-			HCL_ASSERT (HCL_BRANDOF(hcl,ass) == HCL_BRAND_CONS);
+			HCL_ASSERT (hcl, HCL_BRANDOF(hcl,ass) == HCL_BRAND_CONS);
 
 			key = (hcl_oop_char_t)ass->car;
-			HCL_ASSERT (HCL_BRANDOF(hcl,key) == HCL_BRAND_SYMBOL);
+			HCL_ASSERT (hcl, HCL_BRANDOF(hcl,key) == HCL_BRAND_SYMBOL);
 
-			index = hcl_hashchars(key->slot, HCL_OBJ_GET_SIZE(key)) % newsz;
+			index = hcl_hashoochars(key->slot, HCL_OBJ_GET_SIZE(key)) % newsz;
 			while (newbuc->slot[index] != hcl->_nil) index = (index + 1) % newsz;
 			newbuc->slot[index] = (hcl_oop_t)ass;
 		}
@@ -94,22 +94,22 @@ static hcl_oop_cons_t find_or_upsert (hcl_t* hcl, hcl_oop_set_t dic, hcl_oop_cha
 
 	/* the system dictionary is not a generic dictionary.
 	 * it accepts only a symbol as a key. */
-	HCL_ASSERT (HCL_IS_SYMBOL(hcl,key));
-	HCL_ASSERT (HCL_OOP_IS_SMOOI(dic->tally));
-	HCL_ASSERT (HCL_IS_ARRAY(hcl,dic->bucket));
+	HCL_ASSERT (hcl, HCL_IS_SYMBOL(hcl,key));
+	HCL_ASSERT (hcl, HCL_OOP_IS_SMOOI(dic->tally));
+	HCL_ASSERT (hcl, HCL_IS_ARRAY(hcl,dic->bucket));
 
-	index = hcl_hashchars(key->slot, HCL_OBJ_GET_SIZE(key)) % HCL_OBJ_GET_SIZE(dic->bucket);
+	index = hcl_hashoochars(key->slot, HCL_OBJ_GET_SIZE(key)) % HCL_OBJ_GET_SIZE(dic->bucket);
 
 	/* find */
 	while (dic->bucket->slot[index] != hcl->_nil) 
 	{
 		ass = (hcl_oop_cons_t)dic->bucket->slot[index];
 
-		HCL_ASSERT (HCL_BRANDOF(hcl,ass) == HCL_BRAND_CONS);
-		HCL_ASSERT (HCL_BRANDOF(hcl,ass->car) == HCL_BRAND_SYMBOL);
+		HCL_ASSERT (hcl, HCL_BRANDOF(hcl,ass) == HCL_BRAND_CONS);
+		HCL_ASSERT (hcl, HCL_BRANDOF(hcl,ass->car) == HCL_BRAND_SYMBOL);
 
 		if (HCL_OBJ_GET_SIZE(key) == HCL_OBJ_GET_SIZE(ass->car) &&
-		    hcl_equalchars (key->slot, ((hcl_oop_char_t)ass->car)->slot, HCL_OBJ_GET_SIZE(key))) 
+		    hcl_equaloochars (key->slot, ((hcl_oop_char_t)ass->car)->slot, HCL_OBJ_GET_SIZE(key))) 
 		{
 			/* the value of HCL_NULL indicates no insertion or update. */
 			if (value) ass->cdr = value; /* update */
@@ -123,18 +123,18 @@ static hcl_oop_cons_t find_or_upsert (hcl_t* hcl, hcl_oop_set_t dic, hcl_oop_cha
 	{
 		/* when value is HCL_NULL, perform no insertion.
 		 * the value of HCL_NULL indicates no insertion or update. */
-		hcl->errnum = HCL_ENOENT;
+		hcl_seterrnum (hcl, HCL_ENOENT);
 		return HCL_NULL;
 	}
 
 	/* the key is not found. insert it. */
-	HCL_ASSERT (HCL_OOP_IS_SMOOI(dic->tally));
+	HCL_ASSERT (hcl, HCL_OOP_IS_SMOOI(dic->tally));
 	tally = HCL_OOP_TO_SMOOI(dic->tally);
 	if (tally >= HCL_SMOOI_MAX)
 	{
 		/* this built-in dictionary is not allowed to hold more than 
 		 * HCL_SMOOI_MAX items for efficiency sake */
-		hcl->errnum = HCL_EDFULL;
+		hcl_seterrnum (hcl, HCL_EDFULL);
 		return HCL_NULL;
 	}
 
@@ -164,7 +164,7 @@ static hcl_oop_cons_t find_or_upsert (hcl_t* hcl, hcl_oop_set_t dic, hcl_oop_cha
 		dic->bucket = bucket;
 
 		/* recalculate the index for the expanded bucket */
-		index = hcl_hashchars(key->slot, HCL_OBJ_GET_SIZE(key)) % HCL_OBJ_GET_SIZE(dic->bucket);
+		index = hcl_hashoochars(key->slot, HCL_OBJ_GET_SIZE(key)) % HCL_OBJ_GET_SIZE(dic->bucket);
 
 		while (dic->bucket->slot[index] != hcl->_nil) 
 			index = (index + 1) % HCL_OBJ_GET_SIZE(dic->bucket);
@@ -177,7 +177,7 @@ static hcl_oop_cons_t find_or_upsert (hcl_t* hcl, hcl_oop_set_t dic, hcl_oop_cha
 
 	/* the current tally must be less than the maximum value. otherwise,
 	 * it overflows after increment below */
-	HCL_ASSERT (tally < HCL_SMOOI_MAX);
+	HCL_ASSERT (hcl, tally < HCL_SMOOI_MAX);
 	dic->tally = HCL_SMOOI_TO_OOP(tally + 1);
 	dic->bucket->slot[index] = (hcl_oop_t)ass;
 
@@ -197,20 +197,20 @@ static hcl_oop_cons_t lookup (hcl_t* hcl, hcl_oop_set_t dic, const hcl_oocs_t* n
 	hcl_oow_t index;
 	hcl_oop_cons_t ass;
 
-	HCL_ASSERT (HCL_OOP_IS_SMOOI(dic->tally));
-	HCL_ASSERT (HCL_BRANDOF(hcl,dic->bucket) == HCL_BRAND_ARRAY);
+	HCL_ASSERT (hcl, HCL_OOP_IS_SMOOI(dic->tally));
+	HCL_ASSERT (hcl, HCL_BRANDOF(hcl,dic->bucket) == HCL_BRAND_ARRAY);
 
-	index = hcl_hashchars(name->ptr, name->len) % HCL_OBJ_GET_SIZE(dic->bucket);
+	index = hcl_hashoochars(name->ptr, name->len) % HCL_OBJ_GET_SIZE(dic->bucket);
 
 	while (dic->bucket->slot[index] != hcl->_nil) 
 	{
 		ass = (hcl_oop_cons_t)dic->bucket->slot[index];
 
-		HCL_ASSERT (HCL_BRANDOF(hcl,ass) == HCL_BRAND_CONS);
-		HCL_ASSERT (HCL_BRANDOF(hcl,ass->car) == HCL_BRAND_SYMBOL);
+		HCL_ASSERT (hcl, HCL_BRANDOF(hcl,ass) == HCL_BRAND_CONS);
+		HCL_ASSERT (hcl, HCL_BRANDOF(hcl,ass->car) == HCL_BRAND_SYMBOL);
 
 		if (name->len == HCL_OBJ_GET_SIZE(ass->car) &&
-		    hcl_equalchars(name->ptr, ((hcl_oop_char_t)ass->car)->slot, name->len)) 
+		    hcl_equaloochars(name->ptr, ((hcl_oop_char_t)ass->car)->slot, name->len)) 
 		{
 			return ass;
 		}
@@ -219,19 +219,19 @@ static hcl_oop_cons_t lookup (hcl_t* hcl, hcl_oop_set_t dic, const hcl_oocs_t* n
 	}
 
 	/* when value is HCL_NULL, perform no insertion */
-	hcl->errnum = HCL_ENOENT;
+	hcl_seterrnum (hcl, HCL_ENOENT);
 	return HCL_NULL;
 }
 
 hcl_oop_cons_t hcl_putatsysdic (hcl_t* hcl, hcl_oop_t key, hcl_oop_t value)
 {
-	HCL_ASSERT (HCL_IS_SYMBOL(hcl,key));
+	HCL_ASSERT (hcl, HCL_IS_SYMBOL(hcl,key));
 	return find_or_upsert (hcl, hcl->sysdic, (hcl_oop_char_t)key, value);
 }
 
 hcl_oop_cons_t hcl_getatsysdic (hcl_t* hcl, hcl_oop_t key)
 {
-	HCL_ASSERT (HCL_IS_SYMBOL(hcl,key));
+	HCL_ASSERT (hcl, HCL_IS_SYMBOL(hcl,key));
 	return find_or_upsert (hcl, hcl->sysdic, (hcl_oop_char_t)key, HCL_NULL);
 }
 
@@ -242,13 +242,13 @@ hcl_oop_cons_t hcl_lookupsysdic (hcl_t* hcl, const hcl_oocs_t* name)
 
 hcl_oop_cons_t hcl_putatdic (hcl_t* hcl, hcl_oop_set_t dic, hcl_oop_t key, hcl_oop_t value)
 {
-	HCL_ASSERT (HCL_BRANDOF(hcl,key) == HCL_BRAND_SYMBOL);
+	HCL_ASSERT (hcl, HCL_BRANDOF(hcl,key) == HCL_BRAND_SYMBOL);
 	return find_or_upsert (hcl, dic, (hcl_oop_char_t)key, value);
 }
 
 hcl_oop_cons_t hcl_getatdic (hcl_t* hcl, hcl_oop_set_t dic, hcl_oop_t key)
 {
-	HCL_ASSERT (HCL_BRANDOF(hcl,key) == HCL_BRAND_SYMBOL);
+	HCL_ASSERT (hcl, HCL_BRANDOF(hcl,key) == HCL_BRAND_SYMBOL);
 	return find_or_upsert (hcl, dic, (hcl_oop_char_t)key, HCL_NULL);
 }
 

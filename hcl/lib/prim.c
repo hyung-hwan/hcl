@@ -63,7 +63,7 @@ static void log_char_object (hcl_t* hcl, hcl_oow_t mask, hcl_oop_char_t msg)
 	hcl_oow_t rem;
 	const hcl_ooch_t* ptr;
 
-	HCL_ASSERT (HCL_OBJ_GET_FLAGS_TYPE(msg) == HCL_OBJ_TYPE_CHAR);
+	HCL_ASSERT (hcl, HCL_OBJ_GET_FLAGS_TYPE(msg) == HCL_OBJ_TYPE_CHAR);
 
 	rem = HCL_OBJ_GET_SIZE(msg);
 	ptr = msg->slot;
@@ -74,7 +74,7 @@ start_over:
 		if (*ptr == '\0') 
 		{
 			n = hcl_logbfmt (hcl, mask, "%C", *ptr);
-			HCL_ASSERT (n == 1);
+			HCL_ASSERT (hcl, n == 1);
 			rem -= n;
 			ptr += n;
 			goto start_over;
@@ -88,7 +88,7 @@ start_over:
 			 * actually, this check is not needed because of '\0' skipping
 			 * at the beginning  of the loop */
 			n = hcl_logbfmt (hcl, mask, "%C", *ptr);
-			HCL_ASSERT (n == 1);
+			HCL_ASSERT (hcl, n == 1);
 		}
 		rem -= n;
 		ptr += n;

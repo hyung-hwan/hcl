@@ -56,9 +56,9 @@ int hcl_decode (hcl_t* hcl, hcl_ooi_t start, hcl_ooi_t end)
 	/* the instruction at the offset 'end' is not decoded.
 	 * decoding offset range is from start to end - 1. */
 
-	HCL_ASSERT (start >= 0 && end >= 0);
-	HCL_ASSERT (hcl->code.bc.len < HCL_SMOOI_MAX); /* asserted by the compiler */
-	HCL_ASSERT (end <= hcl->code.bc.len); /* not harmful though this fails */
+	HCL_ASSERT (hcl, start >= 0 && end >= 0);
+	HCL_ASSERT (hcl, hcl->code.bc.len < HCL_SMOOI_MAX); /* asserted by the compiler */
+	HCL_ASSERT (hcl, end <= hcl->code.bc.len); /* not harmful though this fails */
 
 	ip = start;
 	cdptr = ((hcl_oop_byte_t)hcl->code.bc.arr)->slot;
@@ -513,8 +513,8 @@ int hcl_decode (hcl_t* hcl, hcl_ooi_t start, hcl_ooi_t end)
 
 				LOG_INST_2 (hcl, "make_block %zu %zu", b1, b2);
 
-				HCL_ASSERT (b1 >= 0);
-				HCL_ASSERT (b2 >= b1);
+				HCL_ASSERT (hcl, b1 >= 0);
+				HCL_ASSERT (hcl, b2 >= b1);
 				break;
 
 			case BCODE_SEND_BLOCK_COPY:
@@ -528,7 +528,7 @@ int hcl_decode (hcl_t* hcl, hcl_ooi_t start, hcl_ooi_t end)
 
 			default:
 				LOG_INST_1 (hcl, "UNKNOWN BYTE CODE ENCOUNTERED %x", (int)bcode);
-				hcl->errnum = HCL_EINTERN;
+				hcl_seterrnum (hcl, HCL_EINTERN);
 				break;
 		}
 	}

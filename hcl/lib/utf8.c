@@ -1,7 +1,7 @@
 /*
  * $Id$
  *
-    Copyright (c) 2014-2015 Chung, Hyung-Hwan. All rights reserved.
+    Copyright (c) 2014-2017 Chung, Hyung-Hwan. All rights reserved.
 
     Redistribution and use in source and binary forms, with or without
     modification, are permitted provided that the following conditions
@@ -26,8 +26,6 @@
 
 #include "hcl-prv.h"
 
-#define HCL_BCLEN_MAX 6
-
 /*
  * from RFC 2279 UTF-8, a transformation format of ISO 10646
  *
@@ -47,7 +45,7 @@ struct __utf8_t
 	hcl_uint8_t   fbyte;  /* mask to the first utf8 byte */
 	hcl_uint8_t   mask;
 	hcl_uint8_t   fmask;
-	int            length; /* number of bytes */
+	int           length; /* number of bytes */
 };
 
 typedef struct __utf8_t __utf8_t;
@@ -66,8 +64,8 @@ static HCL_INLINE __utf8_t* get_utf8_slot (hcl_uch_t uc)
 {
 	__utf8_t* cur, * end;
 
-	HCL_ASSERT (HCL_SIZEOF(hcl_bch_t) == 1);
-	HCL_ASSERT (HCL_SIZEOF(hcl_uch_t) >= 2);
+	/*HCL_ASSERT (hcl, HCL_SIZEOF(hcl_bch_t) == 1);
+	HCL_ASSERT (hcl, HCL_SIZEOF(hcl_uch_t) >= 2);*/
 
 	end = utf8_table + HCL_COUNTOF(utf8_table);
 	cur = utf8_table;
@@ -112,10 +110,10 @@ hcl_oow_t hcl_utf8touc (const hcl_bch_t* utf8, hcl_oow_t size, hcl_uch_t* uc)
 {
 	__utf8_t* cur, * end;
 
-	HCL_ASSERT (utf8 != HCL_NULL);
-	HCL_ASSERT (size > 0);
-	HCL_ASSERT (HCL_SIZEOF(hcl_bch_t) == 1);
-	HCL_ASSERT (HCL_SIZEOF(hcl_uch_t) >= 2);
+	/*HCL_ASSERT (hcl, utf8 != HCL_NULL);
+	HCL_ASSERT (hcl, size > 0);
+	HCL_ASSERT (hcl, HCL_SIZEOF(hcl_bch_t) == 1);
+	HCL_ASSERT (hcl, HCL_SIZEOF(hcl_uch_t) >= 2);*/
 
 	end = utf8_table + HCL_COUNTOF(utf8_table);
 	cur = utf8_table;
@@ -179,342 +177,147 @@ hcl_oow_t hcl_utf8touc (const hcl_bch_t* utf8, hcl_oow_t size, hcl_uch_t* uc)
 	return 0; /* error - invalid sequence */
 }
 
-/* ----------------------------------------------------------------------- */
-
-static HCL_INLINE int bcsn_to_ucsn_with_cmgr (
-	const hcl_bch_t* bcs, hcl_oow_t* bcslen,
-	hcl_uch_t* ucs, hcl_oow_t* ucslen, hcl_cmgr_t* cmgr, int all)
-{
-	const hcl_bch_t* p;
-	int ret = 0;
-	hcl_oow_t mlen;
-
-	if (ucs)
-	{
-		/* destination buffer is specified. 
-		 * copy the conversion result to the buffer */
-
-		hcl_uch_t* q, * qend;
-
-		p = bcs;
-		q = ucs;
-		qend = ucs + *ucslen;
-		mlen = *bcslen;
-
-		while (mlen > 0)
-		{
-			hcl_oow_t n;
-
-			if (q >= qend)
-			{
-				/* buffer too small */
-				ret = -2;
-				break;
-			}
-
-			n = cmgr->bctouc (p, mlen, q);
-			if (n == 0)
-			{
-				/* invalid sequence */
-				if (all)
-				{
-					n = 1;
-					*q = '?';
-				}
-				else
-				{
-					ret = -1;
-					break;
-				}
-			}
-			if (n > mlen)
-			{
-				/* incomplete sequence */
-				if (all)
-				{
-					n = 1;
-					*q = '?';
-				}
-				else
-				{
-					ret = -3;
-					break;
-				}
-			}
-
-			q++;
-			p += n;
-			mlen -= n;
-		}
-
-		*ucslen = q - ucs;
-		*bcslen = p - bcs;
-	}
-	else
-	{
-		/* no destination buffer is specified. perform conversion
-		 * but don't copy the result. the caller can call this function
-		 * without a buffer to find the required buffer size, allocate
-		 * a buffer with the size and call this function again with 
-		 * the buffer. */
-
-		hcl_uch_t w;
-		hcl_oow_t wlen = 0;
-
-		p = bcs;
-		mlen = *bcslen;
-
-		while (mlen > 0)
-		{
-			hcl_oow_t n;
-
-			n = cmgr->bctouc (p, mlen, &w);
-			if (n == 0)
-			{
-				/* invalid sequence */
-				if (all) n = 1;
-				else
-				{
-					ret = -1;
-					break;
-				}
-			}
-			if (n > mlen)
-			{
-				/* incomplete sequence */
-				if (all) n = 1;
-				else
-				{
-					ret = -3;
-					break;
-				}
-			}
-
-			p += n;
-			mlen -= n;
-			wlen += 1;
-		}
-
-		*ucslen = wlen;
-		*bcslen = p - bcs;
-	}
-
-	return ret;
-}
-
-static HCL_INLINE int bcs_to_ucs_with_cmgr (
-	const hcl_bch_t* bcs, hcl_oow_t* bcslen,
-	hcl_uch_t* ucs, hcl_oow_t* ucslen, hcl_cmgr_t* cmgr, int all)
-{
-	const hcl_bch_t* bp;
-	hcl_oow_t mlen, wlen;
-	int n;
-
-	for (bp = bcs; *bp != '\0'; bp++) /* nothing */ ;
-
-	mlen = bp - bcs; wlen = *ucslen;
-	n = bcsn_to_ucsn_with_cmgr (bcs, &mlen, ucs, &wlen, cmgr, all);
-	if (ucs)
-	{
-		/* null-terminate the target buffer if it has room for it. */
-		if (wlen < *ucslen) ucs[wlen] = '\0';
-		else n = -2; /* buffer too small */
-	}
-	*bcslen = mlen; *ucslen = wlen;
-
-	return n;
-}
-
-static HCL_INLINE int ucsn_to_bcsn_with_cmgr (
-	const hcl_uch_t* ucs, hcl_oow_t* ucslen,
-	hcl_bch_t* bcs, hcl_oow_t* bcslen, hcl_cmgr_t* cmgr)
-{
-	const hcl_uch_t* p = ucs;
-	const hcl_uch_t* end = ucs + *ucslen;
-	int ret = 0; 
-
-	if (bcs)
-	{
-		hcl_oow_t rem = *bcslen;
-
-		while (p < end) 
-		{
-			hcl_oow_t n;
-
-			if (rem <= 0)
-			{
-				ret = -2; /* buffer too small */
-				break;
-			}
-
-			n = cmgr->uctobc (*p, bcs, rem);
-			if (n == 0) 
-			{
-				ret = -1;
-				break; /* illegal character */
-			}
-			if (n > rem) 
-			{
-				ret = -2; /* buffer too small */
-				break;
-			}
-			bcs += n; rem -= n; p++;
-		}
-
-		*bcslen -= rem; 
-	}
-	else
-	{
-		hcl_bch_t bcsbuf[HCL_BCLEN_MAX];
-		hcl_oow_t mlen = 0;
-
-		while (p < end)
-		{
-			hcl_oow_t n;
-
-			n = cmgr->uctobc (*p, bcsbuf, HCL_COUNTOF(bcsbuf));
-			if (n == 0) 
-			{
-				ret = -1;
-				break; /* illegal character */
-			}
-
-			/* it assumes that bcsbuf is large enough to hold a character */
-			HCL_ASSERT (n <= HCL_COUNTOF(bcsbuf));
-
-			p++; mlen += n;
-		}
-
-		/* this length excludes the terminating null character. 
-		 * this function doesn't even null-terminate the result. */
-		*bcslen = mlen;
-	}
-
-	*ucslen = p - ucs;
-	return ret;
-}
-
-
-static int ucs_to_bcs_with_cmgr (
-	const hcl_uch_t* ucs, hcl_oow_t* ucslen,
-	hcl_bch_t* bcs, hcl_oow_t* bcslen, hcl_cmgr_t* cmgr)
-{
-	const hcl_uch_t* p = ucs;
-	int ret = 0;
-
-	if (bcs)
-	{
-		hcl_oow_t rem = *bcslen;
-
-		while (*p != '\0')
-		{
-			hcl_oow_t n;
-
-			if (rem <= 0)
-			{
-				ret = -2;
-				break;
-			}
-			
-			n = cmgr->uctobc (*p, bcs, rem);
-			if (n == 0) 
-			{
-				ret = -1;
-				break; /* illegal character */
-			}
-			if (n > rem) 
-			{
-				ret = -2;
-				break; /* buffer too small */
-			}
-
-			bcs += n; rem -= n; p++;
-		}
-
-		/* update bcslen to the length of the bcs string converted excluding
-		 * terminating null */
-		*bcslen -= rem; 
-
-		/* null-terminate the multibyte sequence if it has sufficient space */
-		if (rem > 0) *bcs = '\0';
-		else 
-		{
-			/* if ret is -2 and cs[cslen] == '\0', 
-			 * this means that the bcs buffer was lacking one
-			 * slot for the terminating null */
-			ret = -2; /* buffer too small */
-		}
-	}
-	else
-	{
-		hcl_bch_t bcsbuf[HCL_BCLEN_MAX];
-		hcl_oow_t mlen = 0;
-
-		while (*p != '\0')
-		{
-			hcl_oow_t n;
-
-			n = cmgr->uctobc (*p, bcsbuf, HCL_COUNTOF(bcsbuf));
-			if (n == 0) 
-			{
-				ret = -1;
-				break; /* illegal character */
-			}
-
-			/* it assumes that bcs is large enough to hold a character */
-			HCL_ASSERT (n <= HCL_COUNTOF(bcs));
-
-			p++; mlen += n;
-		}
-
-		/* this length holds the number of resulting multi-byte characters 
-		 * excluding the terminating null character */
-		*bcslen = mlen;
-	}
-
-	*ucslen = p - ucs;  /* the number of wide characters handled. */
-	return ret;
-}
-
-static hcl_cmgr_t utf8_cmgr =
-{
-	hcl_utf8touc,
-	hcl_uctoutf8
-};
-
-int hcl_utf8toucs (const hcl_bch_t* bcs, hcl_oow_t* bcslen, hcl_uch_t* ucs, hcl_oow_t* ucslen)
-{
-	if (*bcslen == ~(hcl_oow_t)0)
-	{
-		/* the source is null-terminated. */
-		return bcs_to_ucs_with_cmgr (bcs, bcslen, ucs, ucslen, &utf8_cmgr, 0);
-	}
-	else
-	{
-		/* the source is length bound */
-		return bcsn_to_ucsn_with_cmgr (bcs, bcslen, ucs, ucslen, &utf8_cmgr, 0);
-	}
-}
-
-int hcl_ucstoutf8 (const hcl_uch_t* ucs, hcl_oow_t *ucslen, hcl_bch_t* bcs, hcl_oow_t* bcslen)
-{
-	if (*ucslen == ~(hcl_oow_t)0)
-	{
-		/* null-terminated */
-		return ucs_to_bcs_with_cmgr (ucs, ucslen, bcs, bcslen, &utf8_cmgr);
-	}
-	else
-	{
-		/* length bound */
-		return ucsn_to_bcsn_with_cmgr (ucs, ucslen, bcs, bcslen, &utf8_cmgr);
-	}
-}
 
 /*
-hcl_oow_t hcl_ucslen (const hcl_uch_t* ucs)
+ * See http://www.cl.cam.ac.uk/~mgk25/ucs/wcwidth.c 
+ */
+struct interval 
 {
-	const hcl_uch_t* ptr = ucs;
-	while  (*ptr) ptr = HCL_INCPTR(const hcl_uch_t, ptr, 1);
-	return HCL_SUBPTR(const hcl_uch_t, ptr, ucs);
+	int first;
+	int last;
+};
+
+/* auxiliary function for binary search in interval table */
+static int bisearch(hcl_uch_t ucs, const struct interval *table, int max) 
+{
+	int min = 0;
+	int mid;
+
+	if (ucs < table[0].first || ucs > table[max].last) return 0;
+	while (max >= min)
+	{
+		mid = (min + max) / 2;
+		if (ucs > table[mid].last) min = mid + 1;
+		else if (ucs < table[mid].first) max = mid - 1;
+		else return 1;
+	}
+
+	return 0;
 }
-*/
+
+/* The following two functions define the column width of an ISO 10646
+ * character as follows:
+ *
+ *    - The null character (U+0000) has a column width of 0.
+ *
+ *    - Other C0/C1 control characters and DEL will lead to a return
+ *      value of -1.
+ *
+ *    - Non-spacing and enclosing combining characters (general
+ *      category code Mn or Me in the Unicode database) have a
+ *      column width of 0.
+ *
+ *    - SOFT HYPHEN (U+00AD) has a column width of 1.
+ *
+ *    - Other format characters (general category code Cf in the Unicode
+ *      database) and ZERO WIDTH SPACE (U+200B) have a column width of 0.
+ *
+ *    - Hangul Jamo medial vowels and final consonants (U+1160-U+11FF)
+ *      have a column width of 0.
+ *
+ *    - Spacing characters in the East Asian Wide (W) or East Asian
+ *      Full-width (F) category as defined in Unicode Technical
+ *      Report #11 have a column width of 2.
+ *
+ *    - All remaining characters (including all printable
+ *      ISO 8859-1 and WGL4 characters, Unicode control characters,
+ *      etc.) have a column width of 1.
+ *
+ * This implementation assumes that wchar_t characters are encoded
+ * in ISO 10646.
+ */
+
+int hcl_ucwidth (hcl_uch_t uc)
+{
+	/* sorted list of non-overlapping intervals of non-spacing characters */
+	/* generated by "uniset +cat=Me +cat=Mn +cat=Cf -00AD +1160-11FF +200B c" */
+	static const struct interval combining[] = {
+		{ 0x0300, 0x036F }, { 0x0483, 0x0486 }, { 0x0488, 0x0489 },
+		{ 0x0591, 0x05BD }, { 0x05BF, 0x05BF }, { 0x05C1, 0x05C2 },
+		{ 0x05C4, 0x05C5 }, { 0x05C7, 0x05C7 }, { 0x0600, 0x0603 },
+		{ 0x0610, 0x0615 }, { 0x064B, 0x065E }, { 0x0670, 0x0670 },
+		{ 0x06D6, 0x06E4 }, { 0x06E7, 0x06E8 }, { 0x06EA, 0x06ED },
+		{ 0x070F, 0x070F }, { 0x0711, 0x0711 }, { 0x0730, 0x074A },
+		{ 0x07A6, 0x07B0 }, { 0x07EB, 0x07F3 }, { 0x0901, 0x0902 },
+		{ 0x093C, 0x093C }, { 0x0941, 0x0948 }, { 0x094D, 0x094D },
+		{ 0x0951, 0x0954 }, { 0x0962, 0x0963 }, { 0x0981, 0x0981 },
+		{ 0x09BC, 0x09BC }, { 0x09C1, 0x09C4 }, { 0x09CD, 0x09CD },
+		{ 0x09E2, 0x09E3 }, { 0x0A01, 0x0A02 }, { 0x0A3C, 0x0A3C },
+		{ 0x0A41, 0x0A42 }, { 0x0A47, 0x0A48 }, { 0x0A4B, 0x0A4D },
+		{ 0x0A70, 0x0A71 }, { 0x0A81, 0x0A82 }, { 0x0ABC, 0x0ABC },
+		{ 0x0AC1, 0x0AC5 }, { 0x0AC7, 0x0AC8 }, { 0x0ACD, 0x0ACD },
+		{ 0x0AE2, 0x0AE3 }, { 0x0B01, 0x0B01 }, { 0x0B3C, 0x0B3C },
+		{ 0x0B3F, 0x0B3F }, { 0x0B41, 0x0B43 }, { 0x0B4D, 0x0B4D },
+		{ 0x0B56, 0x0B56 }, { 0x0B82, 0x0B82 }, { 0x0BC0, 0x0BC0 },
+		{ 0x0BCD, 0x0BCD }, { 0x0C3E, 0x0C40 }, { 0x0C46, 0x0C48 },
+		{ 0x0C4A, 0x0C4D }, { 0x0C55, 0x0C56 }, { 0x0CBC, 0x0CBC },
+		{ 0x0CBF, 0x0CBF }, { 0x0CC6, 0x0CC6 }, { 0x0CCC, 0x0CCD },
+		{ 0x0CE2, 0x0CE3 }, { 0x0D41, 0x0D43 }, { 0x0D4D, 0x0D4D },
+		{ 0x0DCA, 0x0DCA }, { 0x0DD2, 0x0DD4 }, { 0x0DD6, 0x0DD6 },
+		{ 0x0E31, 0x0E31 }, { 0x0E34, 0x0E3A }, { 0x0E47, 0x0E4E },
+		{ 0x0EB1, 0x0EB1 }, { 0x0EB4, 0x0EB9 }, { 0x0EBB, 0x0EBC },
+		{ 0x0EC8, 0x0ECD }, { 0x0F18, 0x0F19 }, { 0x0F35, 0x0F35 },
+		{ 0x0F37, 0x0F37 }, { 0x0F39, 0x0F39 }, { 0x0F71, 0x0F7E },
+		{ 0x0F80, 0x0F84 }, { 0x0F86, 0x0F87 }, { 0x0F90, 0x0F97 },
+		{ 0x0F99, 0x0FBC }, { 0x0FC6, 0x0FC6 }, { 0x102D, 0x1030 },
+		{ 0x1032, 0x1032 }, { 0x1036, 0x1037 }, { 0x1039, 0x1039 },
+		{ 0x1058, 0x1059 }, { 0x1160, 0x11FF }, { 0x135F, 0x135F },
+		{ 0x1712, 0x1714 }, { 0x1732, 0x1734 }, { 0x1752, 0x1753 },
+		{ 0x1772, 0x1773 }, { 0x17B4, 0x17B5 }, { 0x17B7, 0x17BD },
+		{ 0x17C6, 0x17C6 }, { 0x17C9, 0x17D3 }, { 0x17DD, 0x17DD },
+		{ 0x180B, 0x180D }, { 0x18A9, 0x18A9 }, { 0x1920, 0x1922 },
+		{ 0x1927, 0x1928 }, { 0x1932, 0x1932 }, { 0x1939, 0x193B },
+		{ 0x1A17, 0x1A18 }, { 0x1B00, 0x1B03 }, { 0x1B34, 0x1B34 },
+		{ 0x1B36, 0x1B3A }, { 0x1B3C, 0x1B3C }, { 0x1B42, 0x1B42 },
+		{ 0x1B6B, 0x1B73 }, { 0x1DC0, 0x1DCA }, { 0x1DFE, 0x1DFF },
+		{ 0x200B, 0x200F }, { 0x202A, 0x202E }, { 0x2060, 0x2063 },
+		{ 0x206A, 0x206F }, { 0x20D0, 0x20EF }, { 0x302A, 0x302F },
+		{ 0x3099, 0x309A }, { 0xA806, 0xA806 }, { 0xA80B, 0xA80B },
+		{ 0xA825, 0xA826 }, { 0xFB1E, 0xFB1E }, { 0xFE00, 0xFE0F },
+		{ 0xFE20, 0xFE23 }, { 0xFEFF, 0xFEFF }, { 0xFFF9, 0xFFFB },
+		{ 0x10A01, 0x10A03 }, { 0x10A05, 0x10A06 }, { 0x10A0C, 0x10A0F },
+		{ 0x10A38, 0x10A3A }, { 0x10A3F, 0x10A3F }, { 0x1D167, 0x1D169 },
+		{ 0x1D173, 0x1D182 }, { 0x1D185, 0x1D18B }, { 0x1D1AA, 0x1D1AD },
+		{ 0x1D242, 0x1D244 }, { 0xE0001, 0xE0001 }, { 0xE0020, 0xE007F },
+		{ 0xE0100, 0xE01EF }
+	};
+
+	/* test for 8-bit control characters */
+	if (uc == 0) return 0;
+	if (uc < 32 || (uc >= 0x7f && uc < 0xa0)) return -1;
+
+	/* binary search in table of non-spacing characters */
+	if (bisearch(uc, combining, sizeof(combining) / sizeof(struct interval) - 1)) return 0;
+
+	/* if we arrive here, uc is not a combining or C0/C1 control character */
+
+	if (uc >= 0x1100)
+	{
+		if (uc <= 0x115f || /* Hangul Jamo init. consonants */
+		    uc == 0x2329 || uc == 0x232a ||
+		    (uc >= 0x2e80 && uc <= 0xa4cf && uc != 0x303f) || /* CJK ... Yi */
+		    (uc >= 0xac00 && uc <= 0xd7a3) || /* Hangul Syllables */
+		    (uc >= 0xf900 && uc <= 0xfaff) || /* CJK Compatibility Ideographs */
+		    (uc >= 0xfe10 && uc <= 0xfe19) || /* Vertical forms */
+		    (uc >= 0xfe30 && uc <= 0xfe6f) || /* CJK Compatibility Forms */
+		    (uc >= 0xff00 && uc <= 0xff60) || /* Fullwidth Forms */
+		    (uc >= 0xffe0 && uc <= 0xffe6) ||
+		    (uc >= 0x20000 && uc <= 0x2fffd) ||
+		    (uc >= 0x30000 && uc <= 0x3fffd))
+		{
+			return 2;
+		}
+	}
+
+	return 1; 
+}

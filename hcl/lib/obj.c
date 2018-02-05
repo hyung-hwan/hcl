@@ -26,20 +26,26 @@
 
 #include "hcl-prv.h"
 
+
 void* hcl_allocbytes (hcl_t* hcl, hcl_oow_t size)
 {
 	hcl_uint8_t* ptr;
 
-#if defined(HCL_DEBUG_GC)
-	if (!(hcl->option.trait & HCL_NOGC)) hcl_gc (hcl);
+#if !defined(NDEBUG)
+	if ((hcl->option.trait & HCL_DEBUG_GC) && !(hcl->option.trait & HCL_NOGC)) hcl_gc (hcl);
 #endif
 
 	ptr = hcl_allocheapmem (hcl, hcl->curheap, size);
-	if (!ptr && !(hcl->option.trait & HCL_NOGC))
+	if (!ptr && hcl->errnum == HCL_EOOMEM && !(hcl->option.trait & HCL_NOGC))
 	{
 		hcl_gc (hcl);
+		HCL_LOG4 (hcl, HCL_LOG_INFO,
+			"GC completed - current heap ptr %p limit %p size %zd free %zd\n", 
+			hcl->curheap->ptr, hcl->curheap->limit,
+			(hcl_oow_t)(hcl->curheap->limit - hcl->curheap->base),
+			(hcl_oow_t)(hcl->curheap->limit - hcl->curheap->ptr)
+		);
 		ptr = hcl_allocheapmem (hcl, hcl->curheap, size);
-
 /* TODO: grow heap if ptr is still null. */
 	}
 
@@ -182,10 +188,10 @@ static HCL_INLINE int decode_spec (hcl_t* hcl, hcl_oop_t _class, hcl_oow_t vlen,
 	hcl_oow_t named_instvar;
 	hcl_obj_type_t indexed_type;
 
-	HCL_ASSERT (HCL_OOP_IS_POINTER(_class));
-	HCL_ASSERT (HCL_CLASSOF(hcl, _class) == hcl->_class);
+	HCL_ASSERT (hcl, HCL_OOP_IS_POINTER(_class));
+	HCL_ASSERT (hcl, HCL_CLASSOF(hcl, _class) == hcl->_class);
 
-	HCL_ASSERT (HCL_OOP_IS_SMOOI(((hcl_oop_class_t)_class)->spec));
+	HCL_ASSERT (hcl, HCL_OOP_IS_SMOOI(((hcl_oop_class_t)_class)->spec));
 	spec = HCL_OOP_TO_SMOOI(((hcl_oop_class_t)_class)->spec);
 
 	named_instvar = HCL_CLASS_SPEC_NAMED_INSTVAR(spec); /* size of the named_instvar part */
@@ -202,7 +208,7 @@ static HCL_INLINE int decode_spec (hcl_t* hcl, hcl_oop_t _class, hcl_oow_t vlen,
 				return -1;
 			}
 
-			HCL_ASSERT (named_instvar + vlen <= HCL_OBJ_SIZE_MAX);
+			HCL_ASSERT (hcl, named_instvar + vlen <= HCL_OBJ_SIZE_MAX);
 		}
 		else
 		{
@@ -219,7 +225,7 @@ static HCL_INLINE int decode_spec (hcl_t* hcl, hcl_oop_t _class, hcl_oow_t vlen,
 		vlen = 0; /* vlen is not used */
 
 		if (named_instvar > HCL_MAX_NAMED_INSTVARS) return -1;
-		HCL_ASSERT (named_instvar <= HCL_OBJ_SIZE_MAX);
+		HCL_ASSERT (hcl, named_instvar <= HCL_OBJ_SIZE_MAX);
 	}
 
 	*type = indexed_type;
@@ -235,11 +241,11 @@ hcl_oop_t hcl_instantiate (hcl_t* hcl, hcl_oop_t _class, const void* vptr, hcl_o
 	hcl_oow_t alloclen;
 	hcl_oow_t tmp_count = 0;
 
-	HCL_ASSERT (hcl->_nil != HCL_NULL);
+	HCL_ASSERT (hcl, hcl->_nil != HCL_NULL);
 
 	if (decode_spec (hcl, _class, vlen, &type, &alloclen) <= -1) 
 	{
-		hcl->errnum = HCL_EINVAL;
+		hcl_seterrnum (hcl, HCL_EINVAL);
 		return HCL_NULL;
 	}
 
@@ -252,7 +258,7 @@ hcl_oop_t hcl_instantiate (hcl_t* hcl, hcl_oop_t _class, const void* vptr, hcl_o
 			 * the variable part(indexed instance variables) are allowed. */
 			oop = hcl_allocoopobj (hcl, alloclen);
 
-			HCL_ASSERT (vptr == HCL_NULL);
+			HCL_ASSERT (hcl, vptr == HCL_NULL);
 			/*
 			This function is not GC-safe. so i don't want to initialize
 			the payload of a pointer object. The caller can call this
@@ -287,7 +293,7 @@ hcl_oop_t hcl_instantiate (hcl_t* hcl, hcl_oop_t _class, const void* vptr, hcl_o
 			break;
 
 		default:
-			hcl->errnum = HCL_EINTERN;
+			hcl_seterrnum (hcl, HCL_EINTERN);
 			oop = HCL_NULL;
 			break;
 	}
@@ -297,7 +303,7 @@ hcl_oop_t hcl_instantiate (hcl_t* hcl, hcl_oop_t _class, const void* vptr, hcl_o
 	return oop;
 #endif
 
-	hcl->errnum = HCL_ENOIMPL;
+	hcl_seterrnum (hcl, HCL_ENOIMPL);
 	return HCL_NULL;
 }
 
@@ -311,11 +317,11 @@ hcl_oop_t hcl_instantiatewithtrailer (hcl_t* hcl, hcl_oop_t _class, hcl_oow_t vl
 	hcl_oow_t alloclen;
 	hcl_oow_t tmp_count = 0;
 
-	HCL_ASSERT (hcl->_nil != HCL_NULL);
+	HCL_ASSERT (hcl, hcl->_nil != HCL_NULL);
 
 	if (decode_spec (hcl, _class, vlen, &type, &alloclen) <= -1) 
 	{
-		hcl->errnum = HCL_EINVAL;
+		hcl_seterrnum (hcl, HCL_EINVAL);
 		return HCL_NULL;
 	}
 
@@ -329,7 +335,7 @@ hcl_oop_t hcl_instantiatewithtrailer (hcl_t* hcl, hcl_oop_t _class, hcl_oow_t vl
 			break;
 
 		default:
-			hcl->errnum = HCL_EINTERN;
+			hcl_seterrnum (hcl, HCL_EINTERN);
 			oop = HCL_NULL;
 			break;
 	}
@@ -339,7 +345,7 @@ hcl_oop_t hcl_instantiatewithtrailer (hcl_t* hcl, hcl_oop_t _class, hcl_oow_t vl
 	return oop;
 #endif
 
-	hcl->errnum = HCL_ENOIMPL;
+	hcl_seterrnum (hcl, HCL_ENOIMPL);
 	return HCL_NULL;
 }
 #endif
@@ -447,7 +453,7 @@ hcl_oop_t hcl_remakengcbytearray (hcl_t* hcl, hcl_oop_t obj, hcl_oow_t newsize)
 {
 	hcl_oop_t tmp;
 
-	HCL_ASSERT (!obj || (HCL_OOP_IS_POINTER(obj) && HCL_OBJ_GET_FLAGS_NGC(obj)));
+	HCL_ASSERT (hcl, !obj || (HCL_OOP_IS_POINTER(obj) && HCL_OBJ_GET_FLAGS_NGC(obj)));
 
 	/* no hcl_pushtmp() is needed because 'obj' is a non-GC object. */
 	/* TODO: improve this by using realloc */
@@ -475,7 +481,7 @@ hcl_oop_t hcl_remakengcarray (hcl_t* hcl, hcl_oop_t obj, hcl_oow_t newsize)
 {
 	hcl_oop_t tmp;
 
-	HCL_ASSERT (!obj || (HCL_OOP_IS_POINTER(obj) && HCL_OBJ_GET_FLAGS_NGC(obj)));
+	HCL_ASSERT (hcl, !obj || (HCL_OOP_IS_POINTER(obj) && HCL_OBJ_GET_FLAGS_NGC(obj)));
 
 	/* no hcl_pushtmp() is needed because 'obj' is a non-GC object. */
 	/* TODO: improve this by using realloc */
@@ -503,7 +509,7 @@ hcl_oow_t hcl_countcons (hcl_t* hcl, hcl_oop_t cons)
 	/* this function ignores the last cdr */
 	hcl_oow_t count = 1;
 
-	HCL_ASSERT (HCL_BRANDOF(hcl, cons));
+	HCL_ASSERT (hcl, HCL_BRANDOF(hcl, cons));
 	do
 	{
 		cons = HCL_CONS_CDR(cons);
@@ -517,7 +523,7 @@ hcl_oow_t hcl_countcons (hcl_t* hcl, hcl_oop_t cons)
 
 hcl_oop_t hcl_getlastconscdr (hcl_t* hcl, hcl_oop_t cons)
 {
-	HCL_ASSERT (HCL_BRANDOF(hcl, cons));
+	HCL_ASSERT (hcl, HCL_BRANDOF(hcl, cons));
 	do
 	{
 		cons = HCL_CONS_CDR(cons);
@@ -535,7 +541,7 @@ hcl_oop_t hcl_reversecons (hcl_t* hcl, hcl_oop_t cons)
 	/* Note: The non-nil cdr in the last cons cell gets lost.
 	 *  e.g.) Reversing (1 2 3 . 4) results in (3 2 1) */
 
-	HCL_ASSERT (HCL_BRANDOF(hcl, cons));
+	HCL_ASSERT (hcl, HCL_BRANDOF(hcl, cons));
 
 	prev = hcl->_nil;
 	ptr = cons;

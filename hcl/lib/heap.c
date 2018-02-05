@@ -33,7 +33,7 @@ hcl_heap_t* hcl_makeheap (hcl_t* hcl, hcl_oow_t size)
 	heap = (hcl_heap_t*)HCL_MMGR_ALLOC(hcl->mmgr, HCL_SIZEOF(*heap) + size);
 	if (!heap)
 	{
-		hcl->errnum = HCL_ESYSMEM;
+		hcl_seterrnum (hcl, HCL_ESYSMEM);
 		return HCL_NULL;
 	}
 
@@ -44,9 +44,9 @@ hcl_heap_t* hcl_makeheap (hcl_t* hcl, hcl_oow_t size)
 	heap->ptr = (hcl_uint8_t*)HCL_ALIGN(((hcl_uintptr_t)heap->base), HCL_SIZEOF(hcl_oop_t));
 	heap->limit = heap->base + size;
 
-	HCL_ASSERT (heap->ptr >= heap->base);
-	HCL_ASSERT (heap->limit >= heap->base ); 
-	HCL_ASSERT (heap->limit - heap->base == size);
+	HCL_ASSERT (hcl, heap->ptr >= heap->base);
+	HCL_ASSERT (hcl, heap->limit >= heap->base ); 
+	HCL_ASSERT (hcl, heap->limit - heap->base == size);
 
 	/* if size is too small, heap->ptr may go past heap->limit even at 
 	 * this moment depending on the alignment of heap->base. subsequent
@@ -68,7 +68,7 @@ void* hcl_allocheapmem (hcl_t* hcl, hcl_heap_t* heap, hcl_oow_t size)
 	/* check the heap size limit */
 	if (heap->ptr >= heap->limit || heap->limit - heap->ptr < size)
 	{
-		hcl->errnum = HCL_EOOMEM;
+		hcl_seterrnum (hcl, HCL_EOOMEM);
 		return HCL_NULL;
 	}
 

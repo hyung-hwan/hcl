@@ -41,12 +41,43 @@
 enum hcl_errnum_t
 {
 	HCL_ENOERR,   /**< no error */
-	HCL_EOTHER,   /**< other error */
+	HCL_EGENERIC, /**< generic error */
+
 	HCL_ENOIMPL,  /**< not implemented */
 	HCL_ESYSERR,  /**< subsystem error */
 	HCL_EINTERN,  /**< internal error */
 	HCL_ESYSMEM,  /**< insufficient system memory */
 	HCL_EOOMEM,   /**< insufficient object memory */
+	HCL_ETYPE,    /**< invalid class/type */
+
+	HCL_EINVAL,   /**< invalid parameter or data */
+	HCL_ENOENT,   /**< data not found */
+	HCL_EEXIST,   /**< existing/duplicate data */
+	HCL_EBUSY, 
+	HCL_EACCES,
+	HCL_EPERM,
+	HCL_ENOTDIR,
+	HCL_EINTR,
+	HCL_EPIPE,
+	HCL_EAGAIN,
+	HCL_EBADHND,
+
+	HCL_EFRMFLOOD, /**< too many frames */
+	HCL_EMSGRCV,   /**< mesasge receiver error */
+	HCL_EMSGSND,   /**< message sending error. even doesNotUnderstand: is not found */
+	HCL_ENUMARGS,  /**< wrong number of arguments */
+	HCL_ERANGE,    /**< range error. overflow and underflow */
+	HCL_EBCFULL,   /**< byte-code full */
+	HCL_EDFULL,    /**< dictionary full */
+	HCL_EPFULL,    /**< processor full */
+	HCL_EFINIS,    /**< unexpected end of data/input/stream/etc */
+	HCL_EXXXXX2,   /**< **** not used ***** */
+	HCL_EDIVBY0,   /**< divide by zero */
+	HCL_EIOERR,    /**< I/O error */
+	HCL_EECERR,    /**< encoding conversion error */
+	HCL_EBUFFULL,  /**< buffer full */
+
+#if 0
 	HCL_EINVAL,   /**< invalid parameter or data */
 	HCL_ETOOBIG,  /**< data too large */
 	HCL_EPERM,    /**< operation not permitted */
@@ -62,6 +93,8 @@ enum hcl_errnum_t
 	HCL_EIOERR,   /**< I/O error */
 	HCL_EECERR,   /**< encoding conversion error */
 	HCL_EFINIS,   /**< end of data/input/stream/etc */
+#endif
+
 	HCL_ESYNERR,  /**< syntax error */
 	HCL_ECALL,    /**< runtime error - cannot call */
 	HCL_ERECALL,  /**< runtime error - cannot call again */
@@ -121,14 +154,19 @@ enum hcl_option_t
 {
 	HCL_TRAIT,
 	HCL_LOG_MASK,
+	HCL_LOG_MAXCAPA,
 	HCL_SYMTAB_SIZE,  /* default system table size */
 	HCL_SYSDIC_SIZE,  /* default system dictionary size */
 	HCL_PROCSTK_SIZE  /* default process stack size */
 };
 typedef enum hcl_option_t hcl_option_t;
 
+/* [NOTE] ensure that it is a power of 2 */
+#define HCL_LOG_CAPA_ALIGN 512
+
 enum hcl_option_dflval_t
 {
+	HCL_DFL_LOG_MAXCAPA = HCL_LOG_CAPA_ALIGN * 16,
 	HCL_DFL_SYMTAB_SIZE = 5000,
 	HCL_DFL_SYSDIC_SIZE = 5000,
 	HCL_DFL_PROCSTK_SIZE = 5000
@@ -137,12 +175,17 @@ typedef enum hcl_option_dflval_t hcl_option_dflval_t;
 
 enum hcl_trait_t
 {
+#if !defined(NDEBUG)
+	HCL_DEBUG_GC     = (1 << 0),
+	HCL_DEBUG_BIGINT = (1 << 1),
+#endif
+
 	/* perform no garbage collection when the heap is full. 
 	 * you still can use hcl_gc() explicitly. */
-	HCL_NOGC = (1 << 0),
+	HCL_NOGC = (1 << 8),
 
 	/* wait for running process when exiting from the main method */
-	HCL_AWAIT_PROCS = (1 << 1)
+	HCL_AWAIT_PROCS = (1 << 9)
 };
 typedef enum hcl_trait_t hcl_trait_t;
 
@@ -172,13 +215,15 @@ typedef struct hcl_obj_word_t*     hcl_oop_word_t;
 /* ========================================================================= */
 /* BIGINT TYPES AND MACROS                                                   */
 /* ========================================================================= */
-#if HCL_SIZEOF_UINTMAX_T > HCL_SIZEOF_OOW_T
+#if (HCL_SIZEOF_UINTMAX_T > HCL_SIZEOF_OOW_T)
 #	define HCL_USE_FULL_WORD
 #endif
 
 #if defined(HCL_USE_FULL_WORD)
 	typedef hcl_oow_t          hcl_liw_t; /* large integer word */
+	typedef hcl_ooi_t          hcl_lii_t;
 	typedef hcl_uintmax_t      hcl_lidw_t; /* large integer double word */
+	typedef hcl_intmax_t       hcl_lidi_t;
 #	define HCL_SIZEOF_LIW_T    HCL_SIZEOF_OOW_T
 #	define HCL_SIZEOF_LIDW_T   HCL_SIZEOF_UINTMAX_T
 #	define HCL_LIW_BITS        HCL_OOW_BITS
@@ -189,7 +234,9 @@ typedef struct hcl_obj_word_t*     hcl_oop_word_t;
 
 #else
 	typedef hcl_oohw_t         hcl_liw_t;
+	typedef hcl_oohi_t         hcl_lii_t;
 	typedef hcl_oow_t          hcl_lidw_t;
+	typedef hcl_ooi_t          hcl_lidi_t;
 #	define HCL_SIZEOF_LIW_T    HCL_SIZEOF_OOHW_T
 #	define HCL_SIZEOF_LIDW_T   HCL_SIZEOF_OOW_T
 #	define HCL_LIW_BITS        HCL_OOHW_BITS
@@ -634,17 +681,22 @@ typedef struct hcl_t hcl_t;
  * ========================================================================= */
 #define HCL_MOD_NAME_LEN_MAX 120
 
-typedef void* (*hcl_mod_open_t) (hcl_t* hcl, const hcl_uch_t* name);
-typedef void (*hcl_mod_close_t) (hcl_t* hcl, void* handle);
-typedef void* (*hcl_mod_getsym_t) (hcl_t* hcl, void* handle, const hcl_uch_t* name);
+typedef void* (*hcl_vmprim_dlopen_t) (hcl_t* hcl, const hcl_uch_t* name);
+typedef void (*hcl_vmprim_dlclose_t) (hcl_t* hcl, void* handle);
+typedef void* (*hcl_vmprim_dlsym_t) (hcl_t* hcl, void* handle, const hcl_uch_t* name);
+
 typedef void (*hcl_log_write_t) (hcl_t* hcl, hcl_oow_t mask, const hcl_ooch_t* msg, hcl_oow_t len);
+typedef void (*hcl_syserrstrb_t) (hcl_t* hcl, int syserr, hcl_bch_t* buf, hcl_oow_t len);
+typedef void (*hcl_syserrstru_t) (hcl_t* hcl, int syserr, hcl_uch_t* buf, hcl_oow_t len);
 
 struct hcl_vmprim_t
 {
-	hcl_mod_open_t mod_open;
-	hcl_mod_close_t mod_close;
-	hcl_mod_getsym_t mod_getsym;
-	hcl_log_write_t log_write;
+	hcl_vmprim_dlopen_t   dl_open;
+	hcl_vmprim_dlclose_t  dl_close;
+	hcl_vmprim_dlsym_t    dl_getsym;
+	hcl_log_write_t       log_write;
+	hcl_syserrstrb_t      syserrstrb;
+	hcl_syserrstru_t      syserrstru;
 };
 
 typedef struct hcl_vmprim_t hcl_vmprim_t;
@@ -789,6 +841,15 @@ struct hcl_prim_mod_data_t
 };
 typedef struct hcl_prim_mod_data_t hcl_prim_mod_data_t;
 
+
+struct hcl_sbuf_t
+{
+	hcl_ooch_t* ptr;
+	hcl_oow_t   len;
+	hcl_oow_t   capa;
+};
+typedef struct hcl_sbuf_t hcl_sbuf_t;
+
 /* =========================================================================
  * HCL VM
  * ========================================================================= */
@@ -807,15 +868,34 @@ typedef struct hcl_compiler_t hcl_compiler_t;
 struct hcl_t
 {
 	hcl_mmgr_t*  mmgr;
+	hcl_cmgr_t*  cmgr;
 	hcl_errnum_t errnum;
+
+	struct
+	{
+		union
+		{
+			hcl_ooch_t ooch[2048];
+			hcl_bch_t bch[2048];
+			hcl_uch_t uch[2048];
+		} tmpbuf;
+		hcl_ooch_t buf[2048];
+		hcl_oow_t len;
+	} errmsg;
 
 	struct
 	{
 		int trait;
 		unsigned int log_mask;
+		hcl_oow_t log_maxcapa;
 		hcl_oow_t dfl_symtab_size;
 		hcl_oow_t dfl_sysdic_size;
 		hcl_oow_t dfl_procstk_size; 
+
+#if !defined(NDEBUG)
+		/* set automatically when trait is set */
+		int karatsuba_cutoff;
+#endif
 	} option;
 
 	hcl_vmprim_t vmprim;
@@ -829,6 +909,7 @@ struct hcl_t
 		hcl_oow_t len;
 		hcl_oow_t capa;
 		int last_mask;
+		int default_type_mask;
 	} log;
 	/* ========================= */
 
@@ -899,6 +980,8 @@ struct hcl_t
 	} bigint[37];
 	/* == END BIGINT CONVERSION == */
 
+	hcl_sbuf_t sbuf[64];
+
 	struct
 	{
 		struct
@@ -959,26 +1042,198 @@ struct hcl_t
 #define HCL_STACK_SETRETTORCV(hcl,nargs) (HCL_STACK_POPS(hcl, nargs))
 
 
+
+/* =========================================================================
+ * STRING ENCODING CONVERSION
+ * ========================================================================= */
+
+#if defined(HCL_OOCH_IS_UCH)
+#	define hcl_convootobchars(hcl,oocs,oocslen,bcs,bcslen) hcl_convutobchars(hcl,oocs,oocslen,bcs,bcslen)
+#	define hcl_convbtooochars(hcl,bcs,bcslen,oocs,oocslen) hcl_convbtouchars(hcl,bcs,bcslen,oocs,oocslen)
+#	define hcl_convootobcstr(hcl,oocs,oocslen,bcs,bcslen) hcl_convutobcstr(hcl,oocs,oocslen,bcs,bcslen)
+#	define hcl_convbtooocstr(hcl,bcs,bcslen,oocs,oocslen) hcl_convbtoucstr(hcl,bcs,bcslen,oocs,oocslen)
+#else
+#	define hcl_convootouchars(hcl,oocs,oocslen,bcs,bcslen) hcl_convbtouchars(hcl,oocs,oocslen,bcs,bcslen)
+#	define hcl_convutooochars(hcl,bcs,bcslen,oocs,oocslen) hcl_convutobchars(hcl,bcs,bcslen,oocs,oocslen)
+#	define hcl_convootoucstr(hcl,oocs,oocslen,bcs,bcslen) hcl_convbtoucstr(hcl,oocs,oocslen,bcs,bcslen)
+#	define hcl_convutooocstr(hcl,bcs,bcslen,oocs,oocslen) hcl_convutobcstr(hcl,bcs,bcslen,oocs,oocslen)
+#endif
+
+HCL_EXPORT int hcl_convbtouchars (
+	hcl_t*           hcl,
+	const hcl_bch_t* bcs,
+	hcl_oow_t*       bcslen,
+	hcl_uch_t*       ucs,
+	hcl_oow_t*       ucslen
+);
+
+HCL_EXPORT int hcl_convutobchars (
+	hcl_t*           hcl,
+	const hcl_uch_t* ucs,
+	hcl_oow_t*       ucslen,
+	hcl_bch_t*       bcs,
+	hcl_oow_t*       bcslen
+);
+
+
+/**
+ * The hcl_convbtoucstr() function converts a null-terminated byte string 
+ * to a wide string.
+ */
+HCL_EXPORT int hcl_convbtoucstr (
+	hcl_t*           hcl,
+	const hcl_bch_t* bcs,
+	hcl_oow_t*       bcslen,
+	hcl_uch_t*       ucs,
+	hcl_oow_t*       ucslen
+);
+
+
+/**
+ * The hcl_convutobcstr() function converts a null-terminated wide string
+ * to a byte string.
+ */
+int hcl_convutobcstr (
+	hcl_t*           hcl,
+	const hcl_uch_t* ucs,
+	hcl_oow_t*       ucslen,
+	hcl_bch_t*       bcs,
+	hcl_oow_t*       bcslen
+);
+
+
+#if defined(HCL_OOCH_IS_UCH)
+#	define hcl_dupootobcharswithheadroom(hcl,hrb,oocs,oocslen,bcslen) hcl_duputobcharswithheadroom(hcl,hrb,oocs,oocslen,bcslen)
+#	define hcl_dupbtooocharswithheadroom(hcl,hrb,bcs,bcslen,oocslen) hcl_dupbtoucharswithheadroom(hcl,hrb,bcs,bcslen,oocslen)
+#	define hcl_dupootobchars(hcl,oocs,oocslen,bcslen) hcl_duputobchars(hcl,oocs,oocslen,bcslen)
+#	define hcl_dupbtooochars(hcl,bcs,bcslen,oocslen) hcl_dupbtouchars(hcl,bcs,bcslen,oocslen)
+
+#	define hcl_dupootobcstrwithheadroom(hcl,hrb,oocs,bcslen) hcl_duputobcstrwithheadroom(hcl,hrb,oocs,bcslen)
+#	define hcl_dupbtooocstrwithheadroom(hcl,hrb,bcs,oocslen) hcl_dupbtoucstrwithheadroom(hcl,hrb,bcs,oocslen)
+#	define hcl_dupootobcstr(hcl,oocs,bcslen) hcl_duputobcstr(hcl,oocs,bcslen)
+#	define hcl_dupbtooocstr(hcl,bcs,oocslen) hcl_dupbtoucstr(hcl,bcs,oocslen)
+#else
+#	define hcl_dupootoucharswithheadroom(hcl,hrb,oocs,oocslen,ucslen) hcl_dupbtoucharswithheadroom(hcl,hrb,oocs,oocslen,ucslen)
+#	define hcl_duputooocharswithheadroom(hcl,hrb,ucs,ucslen,oocslen) hcl_duputobcharswithheadroom(hcl,hrb,ucs,ucslen,oocslen)
+#	define hcl_dupootouchars(hcl,oocs,oocslen,ucslen) hcl_dupbtouchars(hcl,oocs,oocslen,ucslen)
+#	define hcl_duputooochars(hcl,ucs,ucslen,oocslen) hcl_duputobchars(hcl,ucs,ucslen,oocslen)
+
+#	define hcl_dupootoucstrwithheadroom(hcl,hrb,oocs,ucslen) hcl_dupbtoucstrwithheadroom(hcl,hrb,oocs,ucslen)
+#	define hcl_duputooocstrwithheadroom(hcl,hrb,ucs,oocslen) hcl_duputobcstrwithheadroom(hcl,hrb,ucs,oocslen)
+#	define hcl_dupootoucstr(hcl,oocs,ucslen) hcl_dupbtoucstr(hcl,oocs,ucslen)
+#	define hcl_duputooocstr(hcl,ucs,oocslen) hcl_duputobcstr(hcl,ucs,oocslen)
+#endif
+
+
+HCL_EXPORT hcl_uch_t* hcl_dupbtoucharswithheadroom (
+	hcl_t*           hcl,
+	hcl_oow_t        headroom_bytes,
+	const hcl_bch_t* bcs,
+	hcl_oow_t        bcslen,
+	hcl_oow_t*       ucslen
+);
+
+HCL_EXPORT hcl_bch_t* hcl_duputobcharswithheadroom (
+	hcl_t*           hcl,
+	hcl_oow_t        headroom_bytes,
+	const hcl_uch_t* ucs,
+	hcl_oow_t        ucslen,
+	hcl_oow_t*       bcslen
+);
+
+HCL_EXPORT hcl_uch_t* hcl_dupbtouchars (
+	hcl_t*           hcl,
+	const hcl_bch_t* bcs,
+	hcl_oow_t        bcslen,
+	hcl_oow_t*       ucslen
+);
+
+HCL_EXPORT hcl_bch_t* hcl_duputobchars (
+	hcl_t*           hcl,
+	const hcl_uch_t* ucs,
+	hcl_oow_t        ucslen,
+	hcl_oow_t*       bcslen
+);
+
+
+HCL_EXPORT hcl_uch_t* hcl_dupbtoucstrwithheadroom (
+	hcl_t*           hcl,
+	hcl_oow_t        headroom_bytes,
+	const hcl_bch_t* bcs,
+	hcl_oow_t*       ucslen
+);
+
+HCL_EXPORT hcl_bch_t* hcl_duputobcstrwithheadroom (
+	hcl_t*           hcl,
+	hcl_oow_t        headroom_bytes,
+	const hcl_uch_t* ucs,
+	hcl_oow_t* bcslen
+);
+
+HCL_EXPORT hcl_uch_t* hcl_dupbtoucstr (
+	hcl_t*           hcl,
+	const hcl_bch_t* bcs,
+	hcl_oow_t*       ucslen /* optional: length of returned string */
+);
+
+HCL_EXPORT hcl_bch_t* hcl_duputobcstr (
+	hcl_t*           hcl,
+	const hcl_uch_t* ucs,
+	hcl_oow_t*       bcslen /* optional: length of returned string */
+);
+
+
+#if defined(HCL_OOCH_IS_UCH)
+#	define hcl_dupoochars(hcl,oocs,oocslen) hcl_dupuchars(hcl,oocs,oocslen)
+#else
+#	define hcl_dupoochars(hcl,oocs,oocslen) hcl_dupbchars(hcl,oocs,oocslen)
+#endif
+
+HCL_EXPORT hcl_uch_t* hcl_dupuchars (
+	hcl_t*           hcl,
+	const hcl_uch_t* ucs,
+	hcl_oow_t        ucslen
+);
+
+HCL_EXPORT hcl_bch_t* hcl_dupbchars (
+	hcl_t*           hcl,
+	const hcl_bch_t* bcs,
+	hcl_oow_t        bcslen
+);
+
 /* =========================================================================
  * HCL VM LOGGING
  * ========================================================================= */
 
 enum hcl_log_mask_t
 {
-	HCL_LOG_DEBUG     = (1 << 0),
-	HCL_LOG_INFO      = (1 << 1),
-	HCL_LOG_WARN      = (1 << 2),
-	HCL_LOG_ERROR     = (1 << 3),
-	HCL_LOG_FATAL     = (1 << 4),
+	HCL_LOG_DEBUG      = (1 << 0),
+	HCL_LOG_INFO       = (1 << 1),
+	HCL_LOG_WARN       = (1 << 2),
+	HCL_LOG_ERROR      = (1 << 3),
+	HCL_LOG_FATAL      = (1 << 4),
 
-	HCL_LOG_MNEMONIC  = (1 << 8),  /* bytecode mnemonic */
-	HCL_LOG_GC        = (1 << 9),
-	HCL_LOG_IC        = (1 << 10), /* instruction cycle, fetch-decode-execute */
-	HCL_LOG_APP       = (1 << 11)  /* hcl applications, set by hcl logging primitive */
+	HCL_LOG_UNTYPED    = (1 << 6), /* only to be used by HCL_DEBUGx() and HCL_INFOx() */
+	HCL_LOG_COMPILER   = (1 << 7),
+	HCL_LOG_VM         = (1 << 8),
+	HCL_LOG_MNEMONIC   = (1 << 9), /* bytecode mnemonic */
+	HCL_LOG_GC         = (1 << 10),
+	HCL_LOG_IC         = (1 << 11), /* instruction cycle, fetch-decode-execute */
+	HCL_LOG_PRIMITIVE  = (1 << 12),
+	HCL_LOG_APP        = (1 << 13), /* hcl applications, set by hcl logging primitive */
+
+	HCL_LOG_ALL_LEVELS = (HCL_LOG_DEBUG  | HCL_LOG_INFO | HCL_LOG_WARN | HCL_LOG_ERROR | HCL_LOG_FATAL),
+	HCL_LOG_ALL_TYPES  = (HCL_LOG_UNTYPED | HCL_LOG_COMPILER | HCL_LOG_VM | HCL_LOG_MNEMONIC | HCL_LOG_GC | HCL_LOG_IC | HCL_LOG_PRIMITIVE | HCL_LOG_APP),
+
+
+	HCL_LOG_STDOUT     = (1 << 14), /* write log messages to stdout without timestamp. HCL_LOG_STDOUT wins over HCL_LOG_STDERR. */
+	HCL_LOG_STDERR     = (1 << 15)  /* write log messages to stderr without timestamp. */
+
 };
 typedef enum hcl_log_mask_t hcl_log_mask_t;
 
-#define HCL_LOG_ENABLED(hcl,mask) ((hcl)->option.log_mask & (mask))
+/* all bits must be set to get enabled */
+#define HCL_LOG_ENABLED(hcl,mask) (((hcl)->option.log_mask & (mask)) == (mask))
 
 #define HCL_LOG0(hcl,mask,fmt) do { if (HCL_LOG_ENABLED(hcl,mask)) hcl_logbfmt(hcl, mask, fmt); } while(0)
 #define HCL_LOG1(hcl,mask,fmt,a1) do { if (HCL_LOG_ENABLED(hcl,mask)) hcl_logbfmt(hcl, mask, fmt, a1); } while(0)
@@ -986,20 +1241,47 @@ typedef enum hcl_log_mask_t hcl_log_mask_t;
 #define HCL_LOG3(hcl,mask,fmt,a1,a2,a3) do { if (HCL_LOG_ENABLED(hcl,mask)) hcl_logbfmt(hcl, mask, fmt, a1, a2, a3); } while(0)
 #define HCL_LOG4(hcl,mask,fmt,a1,a2,a3,a4) do { if (HCL_LOG_ENABLED(hcl,mask)) hcl_logbfmt(hcl, mask, fmt, a1, a2, a3, a4); } while(0)
 #define HCL_LOG5(hcl,mask,fmt,a1,a2,a3,a4,a5) do { if (HCL_LOG_ENABLED(hcl,mask)) hcl_logbfmt(hcl, mask, fmt, a1, a2, a3, a4, a5); } while(0)
+#define HCL_LOG6(hcl,mask,fmt,a1,a2,a3,a4,a5,a6) do { if (HCL_LOG_ENABLED(hcl,mask)) hcl_logbfmt(hcl, mask, fmt, a1, a2, a3, a4, a5, a6); } while(0)
 
-#define HCL_DEBUG0(hcl,fmt) HCL_LOG0(hcl, HCL_LOG_DEBUG, fmt)
-#define HCL_DEBUG1(hcl,fmt,a1) HCL_LOG1(hcl, HCL_LOG_DEBUG, fmt, a1)
-#define HCL_DEBUG2(hcl,fmt,a1,a2) HCL_LOG2(hcl, HCL_LOG_DEBUG, fmt, a1, a2)
-#define HCL_DEBUG3(hcl,fmt,a1,a2,a3) HCL_LOG3(hcl, HCL_LOG_DEBUG, fmt, a1, a2, a3)
-#define HCL_DEBUG4(hcl,fmt,a1,a2,a3,a4) HCL_LOG4(hcl, HCL_LOG_DEBUG, fmt, a1, a2, a3, a4)
-#define HCL_DEBUG5(hcl,fmt,a1,a2,a3,a4,a5) HCL_LOG5(hcl, HCL_LOG_DEBUG, fmt, a1, a2, a3, a4, a5)
+#if defined(NDEBUG)
+	/* [NOTE]
+	 *  get rid of debugging message totally regardless of
+	 *  the log mask in the release build.
+	 */
+#	define HCL_DEBUG0(hcl,fmt)
+#	define HCL_DEBUG1(hcl,fmt,a1)
+#	define HCL_DEBUG2(hcl,fmt,a1,a2)
+#	define HCL_DEBUG3(hcl,fmt,a1,a2,a3)
+#	define HCL_DEBUG4(hcl,fmt,a1,a2,a3,a4)
+#	define HCL_DEBUG5(hcl,fmt,a1,a2,a3,a4,a5)
+#	define HCL_DEBUG6(hcl,fmt,a1,a2,a3,a4,a5,a6)
+#else
+#	define HCL_DEBUG0(hcl,fmt) HCL_LOG0(hcl, HCL_LOG_DEBUG | HCL_LOG_UNTYPED, fmt)
+#	define HCL_DEBUG1(hcl,fmt,a1) HCL_LOG1(hcl, HCL_LOG_DEBUG | HCL_LOG_UNTYPED, fmt, a1)
+#	define HCL_DEBUG2(hcl,fmt,a1,a2) HCL_LOG2(hcl, HCL_LOG_DEBUG | HCL_LOG_UNTYPED, fmt, a1, a2)
+#	define HCL_DEBUG3(hcl,fmt,a1,a2,a3) HCL_LOG3(hcl, HCL_LOG_DEBUG | HCL_LOG_UNTYPED, fmt, a1, a2, a3)
+#	define HCL_DEBUG4(hcl,fmt,a1,a2,a3,a4) HCL_LOG4(hcl, HCL_LOG_DEBUG | HCL_LOG_UNTYPED, fmt, a1, a2, a3, a4)
+#	define HCL_DEBUG5(hcl,fmt,a1,a2,a3,a4,a5) HCL_LOG5(hcl, HCL_LOG_DEBUG | HCL_LOG_UNTYPED, fmt, a1, a2, a3, a4, a5)
+#	define HCL_DEBUG6(hcl,fmt,a1,a2,a3,a4,a5,a6) HCL_LOG6(hcl, HCL_LOG_DEBUG | HCL_LOG_UNTYPED, fmt, a1, a2, a3, a4, a5, a6)
+#endif
 
-#define HCL_INFO0(hcl,fmt) HCL_LOG0(hcl, HCL_LOG_INFO, fmt)
-#define HCL_INFO1(hcl,fmt,a1) HCL_LOG1(hcl, HCL_LOG_INFO, fmt, a1)
-#define HCL_INFO2(hcl,fmt,a1,a2) HCL_LOG2(hcl, HCL_LOG_INFO, fmt, a1, a2)
-#define HCL_INFO3(hcl,fmt,a1,a2,a3) HCL_LOG3(hcl, HCL_LOG_INFO, fmt, a1, a2, a3)
-#define HCL_INFO4(hcl,fmt,a1,a2,a3,a4) HCL_LOG4(hcl, HCL_LOG_INFO, fmt, a1, a2, a3, a4)
-#define HCL_INFO5(hcl,fmt,a1,a2,a3,a4,a5) HCL_LOG5(hcl, HCL_LOG_INFO, fmt, a1, a2, a3, a4, a5
+#define HCL_INFO0(hcl,fmt) HCL_LOG0(hcl, HCL_LOG_INFO | HCL_LOG_UNTYPED, fmt)
+#define HCL_INFO1(hcl,fmt,a1) HCL_LOG1(hcl, HCL_LOG_INFO | HCL_LOG_UNTYPED, fmt, a1)
+#define HCL_INFO2(hcl,fmt,a1,a2) HCL_LOG2(hcl, HCL_LOG_INFO | HCL_LOG_UNTYPED, fmt, a1, a2)
+#define HCL_INFO3(hcl,fmt,a1,a2,a3) HCL_LOG3(hcl, HCL_LOG_INFO | HCL_LOG_UNTYPED, fmt, a1, a2, a3)
+#define HCL_INFO4(hcl,fmt,a1,a2,a3,a4) HCL_LOG4(hcl, HCL_LOG_INFO | HCL_LOG_UNTYPED, fmt, a1, a2, a3, a4)
+#define HCL_INFO5(hcl,fmt,a1,a2,a3,a4,a5) HCL_LOG5(hcl, HCL_LOG_INFO | HCL_LOG_UNTYPED, fmt, a1, a2, a3, a4, a5)
+#define HCL_INFO6(hcl,fmt,a1,a2,a3,a4,a5,a6) HCL_LOG6(hcl, HCL_LOG_INFO | HCL_LOG_UNTYPED, fmt, a1, a2, a3, a4, a5, a6)
+
+
+/* =========================================================================
+ * HCL ASSERTION
+ * ========================================================================= */
+#if defined(NDEBUG)
+#	define HCL_ASSERT(hcl,expr) ((void)0)
+#else
+#	define HCL_ASSERT(hcl,expr) ((void)((expr) || (hcl_assertfailed (hcl, #expr, __FILE__, __LINE__), 0)))
+#endif
 
 /* =========================================================================
  * HCL COMMON OBJECTS
@@ -1098,22 +1380,55 @@ HCL_EXPORT void hcl_fini (
 );
 
 
-HCL_EXPORT hcl_mmgr_t* hcl_getmmgr (
+#if defined(HCL_HAVE_INLINE)
+	static HCL_INLINE hcl_mmgr_t* hcl_getmmgr (hcl_t* hcl) { return hcl->mmgr; }
+	static HCL_INLINE void* hcl_getxtn (hcl_t* hcl) { return (void*)(hcl + 1); }
+
+	/*static HCL_INLINE hcl_cmgr_t* hcl_getcmgr (hcl_t* hcl) { return hcl->cmgr; }
+	static HCL_INLINE void hcl_setcmgr (hcl_t* hcl, hcl_cmgr_t* cmgr) { hcl->cmgr = cmgr; }*/
+
+	static HCL_INLINE hcl_errnum_t hcl_geterrnum (hcl_t* hcl) { return hcl->errnum; }
+	static HCL_INLINE void hcl_seterrnum (hcl_t* hcl, hcl_errnum_t errnum) { hcl->errnum = errnum; hcl->errmsg.len = 0; }
+#else
+#	define hcl_getmmgr(hcl) ((hcl)->mmgr)
+#	define hcl_getxtn(hcl) ((void*)((hcl) + 1))
+
+#	define hcl_getcmgr(hcl) ((hcl)->cmgr)
+#	define hcl_setcmgr(hcl,mgr) ((hcl)->cmgr = (mgr))
+
+#	define hcl_geterrnum(hcl) ((hcl)->errnum)
+#	define hcl_seterrnum(hcl,num) ((hcl)->errmsg.len = 0, (hcl)->errnum = (num))
+#endif
+
+HCL_EXPORT void hcl_seterrbfmt (
+	hcl_t*           hcl,
+	hcl_errnum_t     errnum,
+	const hcl_bch_t* fmt,
+	...
+);
+
+HCL_EXPORT void hcl_seterrufmt (
+	hcl_t*           hcl,
+	hcl_errnum_t     errnum,
+	const hcl_uch_t* fmt,
+	...
+);
+
+HCL_EXPORT void hcl_seterrwithsyserr (
+	hcl_t* hcl,
+	int    syserr
+);
+
+HCL_EXPORT const hcl_ooch_t* hcl_geterrstr (
 	hcl_t* hcl
 );
 
-HCL_EXPORT void* hcl_getxtn (
+HCL_EXPORT const hcl_ooch_t* hcl_geterrmsg (
 	hcl_t* hcl
 );
 
-
-HCL_EXPORT hcl_errnum_t hcl_geterrnum (
+HCL_EXPORT const hcl_ooch_t* hcl_backuperrmsg (
 	hcl_t* hcl
-);
-
-HCL_EXPORT void hcl_seterrnum (
-	hcl_t*       hcl,
-	hcl_errnum_t errnum
 );
 
 /**
@@ -1123,8 +1438,8 @@ HCL_EXPORT void hcl_seterrnum (
  * \return 0 on success, -1 on failure
  */
 HCL_EXPORT int hcl_getoption (
-	hcl_t*        hcl,
-	hcl_option_t  id,
+	hcl_t*         hcl,
+	hcl_option_t   id,
 	void*          value
 );
 
@@ -1135,8 +1450,8 @@ HCL_EXPORT int hcl_getoption (
  * \return 0 on success, -1 on failure
  */
 HCL_EXPORT int hcl_setoption (
-	hcl_t*       hcl,
-	hcl_option_t id,
+	hcl_t*        hcl,
+	hcl_option_t  id,
 	const void*   value
 );
 
@@ -1414,6 +1729,14 @@ HCL_EXPORT hcl_oop_t hcl_makeprim (
 	hcl_prim_impl_t primimpl,
 	hcl_oow_t       minargs,
 	hcl_oow_t       maxargs
+);
+
+
+HCL_EXPORT void hcl_assertfailed (
+	hcl_t*           hcl,
+	const hcl_bch_t* expr,
+	const hcl_bch_t* file,
+	hcl_oow_t        line
 );
 
 #if defined(__cplusplus)

@@ -42,7 +42,7 @@ do { \
 	(pr)->outarg->len = l; \
 	if ((pr)->printer((pr)->hcl, HCL_IO_WRITE, (pr)->outarg) <= -1) \
 	{ \
-		(pr)->hcl->errnum = HCL_EIOERR; \
+		hcl_seterrnum ((pr)->hcl, HCL_EIOERR); \
 		return -1; \
 	} \
 } while(0)
@@ -89,7 +89,7 @@ static HCL_INLINE int push (hcl_t* hcl, print_stack_t* info)
 
 static HCL_INLINE void pop (hcl_t* hcl, print_stack_t* info)
 {
-	HCL_ASSERT (hcl->p.s.size > 0);
+	HCL_ASSERT (hcl, hcl->p.s.size > 0);
 	hcl->p.s.size--;
 	*info = ((print_stack_t*)hcl->p.s.ptr)[hcl->p.s.size];
 }
@@ -259,7 +259,7 @@ next:
 			break;
 
 		case HCL_BRAND_INTEGER:
-			HCL_ASSERT (HCL_OBJ_GET_SIZE(obj) == 1);
+			HCL_ASSERT (hcl, HCL_OBJ_GET_SIZE(obj) == 1);
 			if (print_ooi (pr, ((hcl_oop_word_t)obj)->slot[0]) <= -1) return -1;
 			break;
 
@@ -321,7 +321,7 @@ next:
 				goto next; 
 
 			resume_cons:
-				HCL_ASSERT (ps.type == PRINT_STACK_CONS);
+				HCL_ASSERT (hcl, ps.type == PRINT_STACK_CONS);
 				cur = ps.obj; /* Get back the CDR pushed */
 				if (HCL_IS_NIL(hcl,cur)) 
 				{
@@ -395,7 +395,7 @@ next:
 				}
 				else
 				{
-					HCL_ASSERT (ps.type == PRINT_STACK_ARRAY);
+					HCL_ASSERT (hcl, ps.type == PRINT_STACK_ARRAY);
 					ps.obj = obj;
 				}
 				
@@ -411,7 +411,7 @@ next:
 				goto next; 
 
 			resume_array:
-				HCL_ASSERT (ps.type == PRINT_STACK_ARRAY);
+				HCL_ASSERT (hcl, ps.type == PRINT_STACK_ARRAY);
 				arridx = ps.idx;
 				obj = ps.obj;
 			} 
@@ -483,8 +483,8 @@ next:
 
 		default:
 			HCL_DEBUG3 (hcl, "Internal error - unknown object type %d at %s:%d\n", (int)brand, __FILE__, __LINE__);
-			HCL_ASSERT ("Unknown object type" == HCL_NULL);
-			hcl->errnum = HCL_EINTERN;
+			HCL_ASSERT (hcl, "Unknown object type" == HCL_NULL);
+			hcl_seterrnum (hcl, HCL_EINTERN);
 			return -1;
 	}
 
@@ -507,7 +507,7 @@ done:
 
 			default:
 				HCL_DEBUG3 (hcl, "Internal error - unknown print stack type %d at %s:%d\n", (int)ps.type, __FILE__, __LINE__);
-				hcl->errnum = HCL_EINTERN;
+				hcl_seterrnum (hcl, HCL_EINTERN);
 				return -1;
 		}
 	}
@@ -521,10 +521,10 @@ HCL_INLINE int hcl_printobj (hcl_t* hcl, hcl_oop_t obj, hcl_ioimpl_t printer, hc
 	int n;
 	printer_t pr;
 
-	HCL_ASSERT (hcl->c->printer != HCL_NULL);
+	HCL_ASSERT (hcl, hcl->c->printer != HCL_NULL);
 
 	/* the printer stack must be empty. buggy if not. */
-	HCL_ASSERT (hcl->p.s.size == 0); 
+	HCL_ASSERT (hcl, hcl->p.s.size == 0); 
 
 	hcl->p.e = obj; /* remember the head of the object to print */
 	pr.hcl = hcl;
@@ -538,7 +538,7 @@ HCL_INLINE int hcl_printobj (hcl_t* hcl, hcl_oop_t obj, hcl_ioimpl_t printer, hc
 	if (n <= -1) hcl->p.s.size = 0;
 
 	/* the printer stack must get empty when done. buggy if not */
-	HCL_ASSERT (hcl->p.s.size == 0); 
+	HCL_ASSERT (hcl, hcl->p.s.size == 0); 
 
 	return n;
 }

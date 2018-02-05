@@ -63,9 +63,9 @@ static void compact_symbol_table (hcl_t* hcl, hcl_oop_t _nil)
 
 	/* the symbol table doesn't allow more data items than HCL_SMOOI_MAX.
 	 * so hcl->symtab->tally must always be a small integer */
-	HCL_ASSERT (HCL_OOP_IS_SMOOI(hcl->symtab->tally));
+	HCL_ASSERT (hcl, HCL_OOP_IS_SMOOI(hcl->symtab->tally));
 	tally = HCL_OOP_TO_SMOOI(hcl->symtab->tally);
-	HCL_ASSERT (tally >= 0); /* it must not be less than 0 */
+	HCL_ASSERT (hcl, tally >= 0); /* it must not be less than 0 */
 	if (tally <= 0) return;
 
 	/* NOTE: in theory, the bucket size can be greater than HCL_SMOOI_MAX
@@ -80,7 +80,7 @@ static void compact_symbol_table (hcl_t* hcl, hcl_oop_t _nil)
 			continue;
 		}
 
-		HCL_ASSERT (hcl->symtab->bucket->slot[index] != _nil);
+		HCL_ASSERT (hcl, hcl->symtab->bucket->slot[index] != _nil);
 
 		for (i = 0, x = index, y = index; i < bucket_size; i++)
 		{
@@ -93,9 +93,9 @@ static void compact_symbol_table (hcl_t* hcl, hcl_oop_t _nil)
 			 * at the current hash index */
 			symbol = (hcl_oop_char_t)hcl->symtab->bucket->slot[y];
 
-			HCL_ASSERT (HCL_BRANDOF(hcl,symbol) == HCL_BRAND_SYMBOL);
+			HCL_ASSERT (hcl, HCL_BRANDOF(hcl,symbol) == HCL_BRAND_SYMBOL);
 
-			z = hcl_hashchars(symbol->slot, HCL_OBJ_GET_SIZE(symbol)) % bucket_size;
+			z = hcl_hashoochars(symbol->slot, HCL_OBJ_GET_SIZE(symbol)) % bucket_size;
 
 			/* move an element if necessary */
 			if ((y > x && (z <= x || z > y)) ||
@@ -110,8 +110,8 @@ static void compact_symbol_table (hcl_t* hcl, hcl_oop_t _nil)
 		tally--;
 	}
 
-	HCL_ASSERT (tally >= 0);
-	HCL_ASSERT (tally <= HCL_SMOOI_MAX);
+	HCL_ASSERT (hcl, tally >= 0);
+	HCL_ASSERT (hcl, tally <= HCL_SMOOI_MAX);
 	hcl->symtab->tally = HCL_SMOOI_TO_OOP(tally);
 }
 
@@ -137,9 +137,9 @@ static HCL_INLINE hcl_oow_t get_payload_bytes (hcl_t* hcl, hcl_oop_t oop)
 		 * |   Z       | <-- if TRAILER is set, it is the number of bytes in the trailer
 		 * |  |  |  |  | 
 		 */
-		HCL_ASSERT (HCL_OBJ_GET_FLAGS_TYPE(oop) == HCL_OBJ_TYPE_OOP);
-		HCL_ASSERT (HCL_OBJ_GET_FLAGS_UNIT(oop) == HCL_SIZEOF(hcl_oow_t));
-		HCL_ASSERT (HCL_OBJ_GET_FLAGS_EXTRA(oop) == 0); /* no 'extra' for an OOP object */
+		HCL_ASSERT (hcl, HCL_OBJ_GET_FLAGS_TYPE(oop) == HCL_OBJ_TYPE_OOP);
+		HCL_ASSERT (hcl, HCL_OBJ_GET_FLAGS_UNIT(oop) == HCL_SIZEOF(hcl_oow_t));
+		HCL_ASSERT (hcl, HCL_OBJ_GET_FLAGS_EXTRA(oop) == 0); /* no 'extra' for an OOP object */
 
 		nbytes = HCL_OBJ_BYTESOF(oop) + HCL_SIZEOF(hcl_oow_t) + \
 		         (hcl_oow_t)((hcl_oop_oop_t)oop)->slot[HCL_OBJ_GET_SIZE(oop)];
@@ -191,7 +191,7 @@ hcl_oop_t hcl_moveoop (hcl_t* hcl, hcl_oop_t oop)
 		 * assuming the new heap is as large as the old heap,
 		 * and garbage collection doesn't allocate more objects
 		 * than in the old heap, it must not fail. */
-		HCL_ASSERT (tmp != HCL_NULL); 
+		HCL_ASSERT (hcl, tmp != HCL_NULL); 
 
 		/* copy the payload to the new object */
 		HCL_MEMCPY (tmp, oop, HCL_SIZEOF(hcl_obj_t) + nbytes_aligned);
@@ -224,9 +224,9 @@ static hcl_uint8_t* scan_new_heap (hcl_t* hcl, hcl_uint8_t* ptr)
 		{
 			hcl_oow_t nbytes;
 
-			HCL_ASSERT (HCL_OBJ_GET_FLAGS_TYPE(oop) == HCL_OBJ_TYPE_OOP);
-			HCL_ASSERT (HCL_OBJ_GET_FLAGS_UNIT(oop) == HCL_SIZEOF(hcl_oow_t));
-			HCL_ASSERT (HCL_OBJ_GET_FLAGS_EXTRA(oop) == 0); /* no 'extra' for an OOP object */
+			HCL_ASSERT (hcl, HCL_OBJ_GET_FLAGS_TYPE(oop) == HCL_OBJ_TYPE_OOP);
+			HCL_ASSERT (hcl, HCL_OBJ_GET_FLAGS_UNIT(oop) == HCL_SIZEOF(hcl_oow_t));
+			HCL_ASSERT (hcl, HCL_OBJ_GET_FLAGS_EXTRA(oop) == 0); /* no 'extra' for an OOP object */
 
 			nbytes = HCL_OBJ_BYTESOF(oop) + HCL_SIZEOF(hcl_oow_t) + \
 			         (hcl_oow_t)((hcl_oop_oop_t)oop)->slot[HCL_OBJ_GET_SIZE(oop)];
@@ -253,7 +253,7 @@ static hcl_uint8_t* scan_new_heap (hcl_t* hcl, hcl_uint8_t* ptr)
 				 * are garbages. */
 				size = HCL_PROCESS_NAMED_INSTVARS +
 				       HCL_OOP_TO_SMOOI(((hcl_oop_process_t)oop)->sp) + 1;
-				HCL_ASSERT (size <= HCL_OBJ_GET_SIZE(oop));
+				HCL_ASSERT (hcl, size <= HCL_OBJ_GET_SIZE(oop));
 			}
 			else
 			{
@@ -291,8 +291,8 @@ void hcl_gc (hcl_t* hcl)
 
 	if (hcl->active_context)
 	{
-		HCL_ASSERT ((hcl_oop_t)hcl->processor != hcl->_nil);
-		HCL_ASSERT ((hcl_oop_t)hcl->processor->active != hcl->_nil);
+		HCL_ASSERT (hcl, (hcl_oop_t)hcl->processor != hcl->_nil);
+		HCL_ASSERT (hcl, (hcl_oop_t)hcl->processor->active != hcl->_nil);
 		/* store the stack pointer to the active process */
 		hcl->processor->active->sp = HCL_SMOOI_TO_OOP(hcl->sp);
 
@@ -422,19 +422,19 @@ void hcl_pushtmp (hcl_t* hcl, hcl_oop_t* oop_ptr)
 {
 	/* if you have too many temporaries pushed, something must be wrong.
 	 * change your code not to exceede the stack limit */
-	HCL_ASSERT (hcl->tmp_count < HCL_COUNTOF(hcl->tmp_stack));
+	HCL_ASSERT (hcl, hcl->tmp_count < HCL_COUNTOF(hcl->tmp_stack));
 	hcl->tmp_stack[hcl->tmp_count++] = oop_ptr;
 }
 
 void hcl_poptmp (hcl_t* hcl)
 {
-	HCL_ASSERT (hcl->tmp_count > 0);
+	HCL_ASSERT (hcl, hcl->tmp_count > 0);
 	hcl->tmp_count--;
 }
 
 void hcl_poptmps (hcl_t* hcl, hcl_oow_t count)
 {
-	HCL_ASSERT (hcl->tmp_count >= count);
+	HCL_ASSERT (hcl, hcl->tmp_count >= count);
 	hcl->tmp_count -= count;
 }
 
@@ -471,6 +471,7 @@ int hcl_ignite (hcl_t* hcl)
 		hcl->_nil = hcl_makenil (hcl);
 		if (!hcl->_nil) return -1;
 	}
+
 	if (!hcl->_true) 
 	{
 		hcl->_true = hcl_maketrue (hcl);
@@ -481,6 +482,7 @@ int hcl_ignite (hcl_t* hcl)
 		hcl->_false = hcl_makefalse (hcl);
 		if (!hcl->_false) return -1;
 	}
+
 
 	if (!hcl->symtab) 
 	{

@@ -1,7 +1,7 @@
 /*
  * $Id$
  *
-    Copyright (c) 2014-2015 Chung, Hyung-Hwan. All rights reserved.
+    Copyright (c) 2014-2017 Chung, Hyung-Hwan. All rights reserved.
 
     Redistribution and use in source and binary forms, with or without
     modification, are permitted provided that the following conditions
@@ -58,68 +58,68 @@
 HCL_INLINE hcl_rbt_pair_t* hcl_rbt_allocpair (
 	hcl_rbt_t* rbt, void* kptr, hcl_oow_t klen, void* vptr, hcl_oow_t vlen)
 {
-	hcl_rbt_pair_t* n;
+	hcl_rbt_pair_t* pair;
 
 	copier_t kcop = rbt->style->copier[HCL_RBT_KEY];
 	copier_t vcop = rbt->style->copier[HCL_RBT_VAL];
 
 	hcl_oow_t as = HCL_SIZEOF(hcl_rbt_pair_t);
-	if (kcop == HCL_RBT_COPIER_INLINE) as += KTOB(rbt,klen);
+	if (kcop == HCL_RBT_COPIER_INLINE) as += HCL_ALIGN_POW2(KTOB(rbt,klen), HCL_SIZEOF_VOID_P);
 	if (vcop == HCL_RBT_COPIER_INLINE) as += VTOB(rbt,vlen);
 
-	n = (hcl_rbt_pair_t*) HCL_MMGR_ALLOC (rbt->mmgr, as);
-	if (n == HCL_NULL) return HCL_NULL;
+	pair = (hcl_rbt_pair_t*) HCL_MMGR_ALLOC (rbt->hcl->mmgr, as);
+	if (pair == HCL_NULL) return HCL_NULL;
 
-	n->color = HCL_RBT_RED;
-	n->parent = HCL_NULL;
-	n->child[LEFT] = &rbt->xnil;
-	n->child[RIGHT] = &rbt->xnil;
+	pair->color = HCL_RBT_RED;
+	pair->parent = HCL_NULL;
+	pair->child[LEFT] = &rbt->xnil;
+	pair->child[RIGHT] = &rbt->xnil;
 
-	KLEN(n) = klen;
+	KLEN(pair) = klen;
 	if (kcop == HCL_RBT_COPIER_SIMPLE)
 	{
-		KPTR(n) = kptr;
+		KPTR(pair) = kptr;
 	}
 	else if (kcop == HCL_RBT_COPIER_INLINE)
 	{
-		KPTR(n) = n + 1;
-		if (kptr) HCL_MEMCPY (KPTR(n), kptr, KTOB(rbt,klen));
+		KPTR(pair) = pair + 1;
+		if (kptr) HCL_MEMCPY (KPTR(pair), kptr, KTOB(rbt,klen));
 	}
 	else
 	{
-		KPTR(n) = kcop (rbt, kptr, klen);
-		if (KPTR(n) == HCL_NULL)
+		KPTR(pair) = kcop (rbt, kptr, klen);
+		if (KPTR(pair) == HCL_NULL)
 		{
-			HCL_MMGR_FREE (rbt->mmgr, n);
+			HCL_MMGR_FREE (rbt->hcl->mmgr, pair);
 			return HCL_NULL;
 		}
 	}
 
-	VLEN(n) = vlen;
+	VLEN(pair) = vlen;
 	if (vcop == HCL_RBT_COPIER_SIMPLE)
 	{
-		VPTR(n) = vptr;
+		VPTR(pair) = vptr;
 	}
 	else if (vcop == HCL_RBT_COPIER_INLINE)
 	{
-		VPTR(n) = n + 1;
+		VPTR(pair) = pair + 1;
 		if (kcop == HCL_RBT_COPIER_INLINE)
-			VPTR(n) = (hcl_oob_t*)VPTR(n) + KTOB(rbt,klen);
-		if (vptr) HCL_MEMCPY (VPTR(n), vptr, VTOB(rbt,vlen));
+			VPTR(pair) = (hcl_oob_t*)VPTR(pair) + HCL_ALIGN_POW2(KTOB(rbt,klen), HCL_SIZEOF_VOID_P);
+		if (vptr) HCL_MEMCPY (VPTR(pair), vptr, VTOB(rbt,vlen));
 	}
 	else
 	{
-		VPTR(n) = vcop (rbt, vptr, vlen);
-		if (VPTR(n) != HCL_NULL)
+		VPTR(pair) = vcop (rbt, vptr, vlen);
+		if (VPTR(pair) != HCL_NULL)
 		{
 			if (rbt->style->freeer[HCL_RBT_KEY] != HCL_NULL)
-				rbt->style->freeer[HCL_RBT_KEY] (rbt, KPTR(n), KLEN(n));
-			HCL_MMGR_FREE (rbt->mmgr, n);
+				rbt->style->freeer[HCL_RBT_KEY] (rbt, KPTR(pair), KLEN(pair));
+			HCL_MMGR_FREE (rbt->hcl->mmgr, pair);
 			return HCL_NULL;
 		}
 	}
 
-	return n;
+	return pair;
 }
 
 HCL_INLINE void hcl_rbt_freepair (hcl_rbt_t* rbt, hcl_rbt_pair_t* pair)
@@ -128,7 +128,7 @@ HCL_INLINE void hcl_rbt_freepair (hcl_rbt_t* rbt, hcl_rbt_pair_t* pair)
 		rbt->style->freeer[HCL_RBT_KEY] (rbt, KPTR(pair), KLEN(pair));
 	if (rbt->style->freeer[HCL_RBT_VAL] != HCL_NULL)
 		rbt->style->freeer[HCL_RBT_VAL] (rbt, VPTR(pair), VLEN(pair));
-	HCL_MMGR_FREE (rbt->mmgr, pair);
+	HCL_MMGR_FREE (rbt->hcl->mmgr, pair);
 }
 
 static hcl_rbt_style_t style[] =
@@ -191,16 +191,16 @@ const hcl_rbt_style_t* hcl_getrbtstyle (hcl_rbt_style_kind_t kind)
 	return &style[kind];
 }
 
-hcl_rbt_t* hcl_rbt_open (hcl_mmgr_t* mmgr, hcl_oow_t xtnsize, int kscale, int vscale)
+hcl_rbt_t* hcl_rbt_open (hcl_t* hcl, hcl_oow_t xtnsize, int kscale, int vscale)
 {
 	hcl_rbt_t* rbt;
 
-	rbt = (hcl_rbt_t*) HCL_MMGR_ALLOC (mmgr, HCL_SIZEOF(hcl_rbt_t) + xtnsize);
+	rbt = (hcl_rbt_t*) HCL_MMGR_ALLOC (hcl->mmgr, HCL_SIZEOF(hcl_rbt_t) + xtnsize);
 	if (rbt == HCL_NULL) return HCL_NULL;
 
-	if (hcl_rbt_init (rbt, mmgr, kscale, vscale) <= -1)
+	if (hcl_rbt_init (rbt, hcl, kscale, vscale) <= -1)
 	{
-		HCL_MMGR_FREE (mmgr, rbt);
+		HCL_MMGR_FREE (hcl->mmgr, rbt);
 		return HCL_NULL;
 	}
 
@@ -211,14 +211,14 @@ hcl_rbt_t* hcl_rbt_open (hcl_mmgr_t* mmgr, hcl_oow_t xtnsize, int kscale, int vs
 void hcl_rbt_close (hcl_rbt_t* rbt)
 {
 	hcl_rbt_fini (rbt);
-	HCL_MMGR_FREE (rbt->mmgr, rbt);
+	HCL_MMGR_FREE (rbt->hcl->mmgr, rbt);
 }
 
-int hcl_rbt_init (hcl_rbt_t* rbt, hcl_mmgr_t* mmgr, int kscale, int vscale)
+int hcl_rbt_init (hcl_rbt_t* rbt, hcl_t* hcl, int kscale, int vscale)
 {
 	/* do not zero out the extension */
 	HCL_MEMSET (rbt, 0, HCL_SIZEOF(*rbt));
-	rbt->mmgr = mmgr;
+	rbt->hcl = hcl;
 
 	rbt->scale[HCL_RBT_KEY] = (kscale < 1)? 1: kscale;
 	rbt->scale[HCL_RBT_VAL] = (vscale < 1)? 1: vscale;
@@ -243,11 +243,6 @@ void hcl_rbt_fini (hcl_rbt_t* rbt)
 	hcl_rbt_clear (rbt);
 }
 
-hcl_mmgr_t* hcl_rbt_getmmgr (hcl_rbt_t* rbt)
-{
-	return rbt->mmgr;
-}
-
 void* hcl_rbt_getxtn (hcl_rbt_t* rbt)
 {
 	return (void*)(rbt + 1);
@@ -260,7 +255,7 @@ const hcl_rbt_style_t* hcl_rbt_getstyle (const hcl_rbt_t* rbt)
 
 void hcl_rbt_setstyle (hcl_rbt_t* rbt, const hcl_rbt_style_t* style)
 {
-	HCL_ASSERT (style != HCL_NULL);
+	HCL_ASSERT (rbt->hcl, style != HCL_NULL);
 	rbt->style = style;
 }
 
@@ -324,7 +319,7 @@ static void rotate (hcl_rbt_t* rbt, hcl_rbt_pair_t* pivot, int leftwise)
 	hcl_rbt_pair_t* parent, * z, * c;
 	int cid1, cid2;
 
-	HCL_ASSERT (pivot != HCL_NULL);
+	HCL_ASSERT (rbt->hcl, pivot != HCL_NULL);
 
 	if (leftwise)
 	{
@@ -352,13 +347,13 @@ static void rotate (hcl_rbt_t* rbt, hcl_rbt_pair_t* pivot, int leftwise)
 		}
 		else
 		{
-			HCL_ASSERT (parent->right == pivot);
+			HCL_ASSERT (rbt->hcl, parent->right == pivot);
 			parent->right = z;
 		}
 	}
 	else
 	{
-		HCL_ASSERT (rbt->root == pivot);
+		HCL_ASSERT (rbt->hcl, rbt->root == pivot);
 		rbt->root = z;
 	}
 
@@ -379,7 +374,7 @@ static void adjust (hcl_rbt_t* rbt, hcl_rbt_pair_t* pair)
 		x_par = pair->parent;
 		if (x_par->color == HCL_RBT_BLACK) break;
 
-		HCL_ASSERT (x_par->parent != HCL_NULL);
+		HCL_ASSERT (rbt->hcl, x_par->parent != HCL_NULL);
 
 		if (x_par == x_par->parent->child[LEFT])
 		{
@@ -469,7 +464,7 @@ static hcl_rbt_pair_t* change_pair_val (
 					}
 					else
 					{
-						HCL_ASSERT (pair->parent->right == pair);
+						HCL_ASSERT (rbt->hcl, pair->parent->right == pair);
 						pair->parent->right = p;
 					}
 				}
@@ -542,7 +537,7 @@ static hcl_rbt_pair_t* insert (
 	if (x_par == HCL_NULL)
 	{
 		/* the tree contains no pair */
-		HCL_ASSERT (rbt->root == &rbt->xnil);
+		HCL_ASSERT (rbt->hcl, rbt->root == &rbt->xnil);
 		rbt->root = x_new;
 	}
 	else
@@ -551,12 +546,12 @@ static hcl_rbt_pair_t* insert (
 		int n = rbt->style->comper (rbt, kptr, klen, KPTR(x_par), KLEN(x_par));
 		if (n > 0)
 		{
-			HCL_ASSERT (x_par->right == &rbt->xnil);
+			HCL_ASSERT (rbt->hcl, x_par->right == &rbt->xnil);
 			x_par->right = x_new;
 		}
 		else
 		{
-			HCL_ASSERT (x_par->left == &rbt->xnil);
+			HCL_ASSERT (rbt->hcl, x_par->left == &rbt->xnil);
 			x_par->left = x_new;
 		}
 
@@ -639,7 +634,7 @@ hcl_rbt_pair_t* hcl_rbt_cbsert (
 					}
 					else
 					{
-						HCL_ASSERT (tmp.parent->right == x_cur);
+						HCL_ASSERT (rbt->hcl, tmp.parent->right == x_cur);
 						tmp.parent->right = x_new;
 					}
 				}
@@ -664,7 +659,7 @@ hcl_rbt_pair_t* hcl_rbt_cbsert (
 	if (x_par == HCL_NULL)
 	{
 		/* the tree contains no pair */
-		HCL_ASSERT (rbt->root == &rbt->xnil);
+		HCL_ASSERT (rbt->hcl, rbt->root == &rbt->xnil);
 		rbt->root = x_new;
 	}
 	else
@@ -673,12 +668,12 @@ hcl_rbt_pair_t* hcl_rbt_cbsert (
 		int n = rbt->style->comper (rbt, kptr, klen, KPTR(x_par), KLEN(x_par));
 		if (n > 0)
 		{
-			HCL_ASSERT (x_par->right == &rbt->xnil);
+			HCL_ASSERT (rbt->hcl, x_par->right == &rbt->xnil);
 			x_par->right = x_new;
 		}
 		else
 		{
-			HCL_ASSERT (x_par->left == &rbt->xnil);
+			HCL_ASSERT (rbt->hcl, x_par->left == &rbt->xnil);
 			x_par->left = x_new;
 		}
 
@@ -738,7 +733,7 @@ static void adjust_for_delete (hcl_rbt_t* rbt, hcl_rbt_pair_t* pair, hcl_rbt_pai
 		}
 		else
 		{
-			HCL_ASSERT (pair == par->right);
+			HCL_ASSERT (rbt->hcl, pair == par->right);
 			tmp = par->left;
 			if (tmp->color == HCL_RBT_RED)
 			{
@@ -783,7 +778,7 @@ static void delete_pair (hcl_rbt_t* rbt, hcl_rbt_pair_t* pair)
 {
 	hcl_rbt_pair_t* x, * y, * par;
 
-	HCL_ASSERT (pair && !IS_NIL(rbt,pair));
+	HCL_ASSERT (rbt->hcl, pair && !IS_NIL(rbt,pair));
 
 	if (IS_NIL(rbt,pair->left) || IS_NIL(rbt,pair->right))
 	{
@@ -961,7 +956,7 @@ static HCL_INLINE void walk (hcl_rbt_t* rbt, walker_t walker, void* ctx, int l, 
 		else
 		{
 			/* both the left child and the right child have been traversed */
-			HCL_ASSERT (prev == x_cur->child[r]);
+			HCL_ASSERT (rbt->hcl, prev == x_cur->child[r]);
 			/* just move up to the parent */
 			prev = x_cur;
 			x_cur = x_cur->parent;

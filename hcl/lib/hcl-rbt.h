@@ -1,7 +1,7 @@
 /*
  * $Id$
  *
-    Copyright (c) 2014-2015 Chung, Hyung-Hwan. All rights reserved.
+    Copyright (c) 2014-2017 Chung, Hyung-Hwan. All rights reserved.
 
     Redistribution and use in source and binary forms, with or without
     modification, are permitted provided that the following conditions
@@ -29,14 +29,14 @@
 
 #include "hcl-cmn.h"
 
-/**@file
+/** \file
  * This file provides a red-black tree encapsulated in the #hcl_rbt_t type that
  * implements a self-balancing binary search tree.Its interface is very close 
  * to #hcl_htb_t.
  *
  * This sample code adds a series of keys and values and print them
  * in descending key order.
- * @code
+ * \code
  * #include <hcl/cmn/rbt.h>
  * #include <hcl/cmn/mem.h>
  * #include <hcl/cmn/sio.h>
@@ -67,7 +67,7 @@
  *   hcl_rbt_close (s1);
  *   return 0;
  * }
- * @endcode
+ * \endcode
  */
 
 typedef struct hcl_rbt_t hcl_rbt_t;
@@ -99,9 +99,9 @@ typedef enum hcl_rbt_id_t hcl_rbt_id_t;
  * The hcl_rbt_copier_t type defines a pair contruction callback.
  */
 typedef void* (*hcl_rbt_copier_t) (
-	hcl_rbt_t* rbt  /* red-black tree */,
-	void*       dptr /* pointer to a key or a value */, 
-	hcl_oow_t dlen /* length of a key or a value */
+	hcl_rbt_t* rbt  /**< red-black tree */,
+	void*      dptr /**< pointer to a key or a value */, 
+	hcl_oow_t  dlen /**< length of a key or a value */
 );
 
 /**
@@ -136,7 +136,7 @@ typedef int (*hcl_rbt_comper_t) (
  */
 typedef void (*hcl_rbt_keeper_t) (
 	hcl_rbt_t* rbt,    /**< red-black tree */
-	void*      vptr,   /**< value pointer */
+	void*       vptr,   /**< value pointer */
 	hcl_oow_t vlen    /**< value length */
 );
 
@@ -152,8 +152,8 @@ typedef hcl_rbt_walk_t (*hcl_rbt_walker_t) (
 /**
  * The hcl_rbt_cbserter_t type defines a callback function for hcl_rbt_cbsert().
  * The hcl_rbt_cbserter() function calls it to allocate a new pair for the 
- * key pointed to by @a kptr of the length @a klen and the callback context
- * @a ctx. The second parameter @a pair is passed the pointer to the existing
+ * key pointed to by \a kptr of the length \a klen and the callback context
+ * \a ctx. The second parameter \a pair is passed the pointer to the existing
  * pair for the key or #HCL_NULL in case of no existing key. The callback
  * must return a pointer to a new or a reallocated pair. When reallocating the
  * existing pair, this callback must destroy the existing pair and return the 
@@ -162,9 +162,9 @@ typedef hcl_rbt_walk_t (*hcl_rbt_walker_t) (
 typedef hcl_rbt_pair_t* (*hcl_rbt_cbserter_t) (
 	hcl_rbt_t*      rbt,    /**< red-black tree */
 	hcl_rbt_pair_t* pair,   /**< pair pointer */
-	void*            kptr,   /**< key pointer */
-	hcl_oow_t      klen,   /**< key length */
-	void*            ctx     /**< callback context */
+	void*           kptr,   /**< key pointer */
+	hcl_oow_t       klen,   /**< key length */
+	void*           ctx     /**< callback context */
 );
 
 /**
@@ -177,7 +177,7 @@ struct hcl_rbt_pair_t
 {
 	struct
 	{
-		void*       ptr;
+		void*     ptr;
 		hcl_oow_t len;
 	} key;
 
@@ -234,11 +234,11 @@ typedef enum hcl_rbt_style_kind_t  hcl_rbt_style_kind_t;
  */
 struct hcl_rbt_t
 {
-	hcl_mmgr_t*            mmgr;
+	hcl_t*                 hcl;
 	const hcl_rbt_style_t* style;
-	hcl_oob_t             scale[2];  /**< length scale */
+	hcl_oob_t              scale[2];  /**< length scale */
 	hcl_rbt_pair_t         xnil;      /**< internal nil node */
-	hcl_oow_t             size;      /**< number of pairs */
+	hcl_oow_t              size;      /**< number of pairs */
 	hcl_rbt_pair_t*        root;      /**< root pair */
 };
 
@@ -290,13 +290,13 @@ HCL_EXPORT const hcl_rbt_style_t* hcl_getrbtstyle (
 
 /**
  * The hcl_rbt_open() function creates a red-black tree.
- * @return hcl_rbt_t pointer on success, HCL_NULL on failure.
+ * \return hcl_rbt_t pointer on success, HCL_NULL on failure.
  */
 HCL_EXPORT hcl_rbt_t* hcl_rbt_open (
-	hcl_mmgr_t* mmgr,    /**< memory manager */
-	hcl_oow_t  xtnsize, /**< extension size in bytes */
-	int          kscale,  /**< key scale */
-	int          vscale   /**< value scale */
+	hcl_t*      hcl,
+	hcl_oow_t   xtnsize, /**< extension size in bytes */
+	int         kscale,  /**< key scale */
+	int         vscale   /**< value scale */
 );
 
 /**
@@ -311,9 +311,9 @@ HCL_EXPORT void hcl_rbt_close (
  */
 HCL_EXPORT int hcl_rbt_init (
 	hcl_rbt_t*  rbt,    /**< red-black tree */
-	hcl_mmgr_t* mmgr,   /**< memory manager */
-	int          kscale, /**< key scale */
-	int          vscale  /**< value scale */
+	hcl_t*      hcl,
+	int         kscale, /**< key scale */
+	int         vscale  /**< value scale */
 );
 
 /**
@@ -321,10 +321,6 @@ HCL_EXPORT int hcl_rbt_init (
  */
 HCL_EXPORT void hcl_rbt_fini (
 	hcl_rbt_t* rbt  /**< red-black tree */
-);
-
-HCL_EXPORT hcl_mmgr_t* hcl_rbt_getmmgr (
-	hcl_rbt_t* rbt
 );
 
 HCL_EXPORT void* hcl_rbt_getxtn (
@@ -361,13 +357,13 @@ HCL_EXPORT hcl_oow_t hcl_rbt_getsize (
  * The hcl_rbt_search() function searches red-black tree to find a pair with a 
  * matching key. It returns the pointer to the pair found. If it fails
  * to find one, it returns HCL_NULL.
- * @return pointer to the pair with a maching key, 
+ * \return pointer to the pair with a maching key, 
  *         or HCL_NULL if no match is found.
  */
 HCL_EXPORT hcl_rbt_pair_t* hcl_rbt_search (
 	const hcl_rbt_t* rbt,   /**< red-black tree */
-	const void*       kptr,  /**< key pointer */
-	hcl_oow_t       klen   /**< the size of the key */
+	const void*      kptr,  /**< key pointer */
+	hcl_oow_t        klen   /**< the size of the key */
 );
 
 /**
@@ -375,56 +371,56 @@ HCL_EXPORT hcl_rbt_pair_t* hcl_rbt_search (
  * matching key. If one is found, it updates the pair. Otherwise, it inserts
  * a new pair with the key and the value given. It returns the pointer to the 
  * pair updated or inserted.
- * @return a pointer to the updated or inserted pair on success, 
+ * \return a pointer to the updated or inserted pair on success, 
  *         HCL_NULL on failure. 
  */
 HCL_EXPORT hcl_rbt_pair_t* hcl_rbt_upsert (
 	hcl_rbt_t* rbt,   /**< red-black tree */
-	void*       kptr,  /**< key pointer */
-	hcl_oow_t klen,  /**< key length */
-	void*       vptr,  /**< value pointer */
-	hcl_oow_t vlen   /**< value length */
+	void*      kptr,  /**< key pointer */
+	hcl_oow_t  klen,  /**< key length */
+	void*      vptr,  /**< value pointer */
+	hcl_oow_t  vlen   /**< value length */
 );
 
 /**
  * The hcl_rbt_ensert() function inserts a new pair with the key and the value
  * given. If there exists a pair with the key given, the function returns 
  * the pair containing the key.
- * @return pointer to a pair on success, HCL_NULL on failure. 
+ * \return pointer to a pair on success, HCL_NULL on failure. 
  */
 HCL_EXPORT hcl_rbt_pair_t* hcl_rbt_ensert (
 	hcl_rbt_t* rbt,   /**< red-black tree */
-	void*       kptr,  /**< key pointer */
-	hcl_oow_t klen,  /**< key length */
-	void*       vptr,  /**< value pointer */
-	hcl_oow_t vlen   /**< value length */
+	void*      kptr,  /**< key pointer */
+	hcl_oow_t  klen,  /**< key length */
+	void*      vptr,  /**< value pointer */
+	hcl_oow_t  vlen   /**< value length */
 );
 
 /**
  * The hcl_rbt_insert() function inserts a new pair with the key and the value
  * given. If there exists a pair with the key given, the function returns 
  * HCL_NULL without channging the value.
- * @return pointer to the pair created on success, HCL_NULL on failure. 
+ * \return pointer to the pair created on success, HCL_NULL on failure. 
  */
 HCL_EXPORT hcl_rbt_pair_t* hcl_rbt_insert (
 	hcl_rbt_t* rbt,   /**< red-black tree */
-	void*       kptr,  /**< key pointer */
-	hcl_oow_t klen,  /**< key length */
-	void*       vptr,  /**< value pointer */
-	hcl_oow_t vlen   /**< value length */
+	void*      kptr,  /**< key pointer */
+	hcl_oow_t  klen,  /**< key length */
+	void*      vptr,  /**< value pointer */
+	hcl_oow_t  vlen   /**< value length */
 );
 
 /**
  * The hcl_rbt_update() function updates the value of an existing pair
  * with a matching key.
- * @return pointer to the pair on success, HCL_NULL on no matching pair
+ * \return pointer to the pair on success, HCL_NULL on no matching pair
  */
 HCL_EXPORT hcl_rbt_pair_t* hcl_rbt_update (
 	hcl_rbt_t* rbt,   /**< red-black tree */
 	void*      kptr,  /**< key pointer */
-	hcl_oow_t klen,  /**< key length */
+	hcl_oow_t  klen,  /**< key length */
 	void*      vptr,  /**< value pointer */
-	hcl_oow_t vlen   /**< value length */
+	hcl_oow_t  vlen   /**< value length */
 );
 
 /**
@@ -435,7 +431,7 @@ HCL_EXPORT hcl_rbt_pair_t* hcl_rbt_update (
  * a new pair if the key is not found and appends the new value to the
  * existing value delimited by a comma if the key is found.
  *
- * @code
+ * \code
  * hcl_rbt_walk_t print_map_pair (hcl_rbt_t* map, hcl_rbt_pair_t* pair, void* ctx)
  * {
  *   hcl_printf (HCL_T("%.*s[%d] => %.*s[%d]\n"),
@@ -460,7 +456,7 @@ HCL_EXPORT hcl_rbt_pair_t* hcl_rbt_update (
  *     // in this sample, i will append the new value to the old value 
  *     // separated by a comma
  *     hcl_rbt_pair_t* new_pair;
- *     hcl_char_t comma = HCL_T(',');
+ *     hcl_ooch_t comma = HCL_T(',');
  *     hcl_oob_t* vptr;
  * 
  *     // allocate a new pair, but without filling the actual value. 
@@ -471,11 +467,11 @@ HCL_EXPORT hcl_rbt_pair_t* hcl_rbt_update (
  * 
  *     // fill in the value space 
  *     vptr = new_pair->vptr;
- *     hcl_memcpy (vptr, pair->vptr, pair->vlen*HCL_SIZEOF(hcl_char_t));
- *     vptr += pair->vlen*HCL_SIZEOF(hcl_char_t);
- *     hcl_memcpy (vptr, &comma, HCL_SIZEOF(hcl_char_t));
- *     vptr += HCL_SIZEOF(hcl_char_t);
- *     hcl_memcpy (vptr, v->ptr, v->len*HCL_SIZEOF(hcl_char_t));
+ *     hcl_memcpy (vptr, pair->vptr, pair->vlen*HCL_SIZEOF(hcl_ooch_t));
+ *     vptr += pair->vlen*HCL_SIZEOF(hcl_ooch_t);
+ *     hcl_memcpy (vptr, &comma, HCL_SIZEOF(hcl_ooch_t));
+ *     vptr += HCL_SIZEOF(hcl_ooch_t);
+ *     hcl_memcpy (vptr, v->ptr, v->len*HCL_SIZEOF(hcl_ooch_t));
  * 
  *     // this callback requires the old pair to be destroyed 
  *     hcl_rbt_freepair (rbt, pair);
@@ -489,12 +485,12 @@ HCL_EXPORT hcl_rbt_pair_t* hcl_rbt_update (
  * {
  *   hcl_rbt_t* s1;
  *   int i;
- *   hcl_char_t* keys[] = { HCL_T("one"), HCL_T("two"), HCL_T("three") };
- *   hcl_char_t* vals[] = { HCL_T("1"), HCL_T("2"), HCL_T("3"), HCL_T("4"), HCL_T("5") };
+ *   hcl_ooch_t* keys[] = { HCL_T("one"), HCL_T("two"), HCL_T("three") };
+ *   hcl_ooch_t* vals[] = { HCL_T("1"), HCL_T("2"), HCL_T("3"), HCL_T("4"), HCL_T("5") };
  * 
  *   s1 = hcl_rbt_open (
  *     HCL_MMGR_GETDFL(), 0,
- *     HCL_SIZEOF(hcl_char_t), HCL_SIZEOF(hcl_char_t)
+ *     HCL_SIZEOF(hcl_ooch_t), HCL_SIZEOF(hcl_ooch_t)
  *   ); // note error check is skipped 
  *   hcl_rbt_setstyle (s1, &style1);
  * 
@@ -512,24 +508,24 @@ HCL_EXPORT hcl_rbt_pair_t* hcl_rbt_update (
  *   hcl_rbt_close (s1);
  *   return 0;
  * }
- * @endcode
+ * \endcode
  */
 HCL_EXPORT hcl_rbt_pair_t* hcl_rbt_cbsert (
 	hcl_rbt_t*         rbt,      /**< red-black tree */
-	void*               kptr,     /**< key pointer */
-	hcl_oow_t         klen,     /**< key length */
+	void*              kptr,     /**< key pointer */
+	hcl_oow_t          klen,     /**< key length */
 	hcl_rbt_cbserter_t cbserter, /**< callback function */
-	void*               ctx       /**< callback context */
+	void*              ctx       /**< callback context */
 );
 
 /**
  * The hcl_rbt_delete() function deletes a pair with a matching key 
- * @return 0 on success, -1 on failure
+ * \return 0 on success, -1 on failure
  */
 HCL_EXPORT int hcl_rbt_delete (
-	hcl_rbt_t* rbt,   /**< red-black tree */
-	const void* kptr, /**< key pointer */
-	hcl_oow_t klen   /**< key size */
+	hcl_rbt_t*  rbt,   /**< red-black tree */
+	const void* kptr,  /**< key pointer */
+	hcl_oow_t   klen   /**< key size */
 );
 
 /**
@@ -546,7 +542,7 @@ HCL_EXPORT void hcl_rbt_clear (
 HCL_EXPORT void hcl_rbt_walk (
 	hcl_rbt_t*       rbt,    /**< red-black tree */
 	hcl_rbt_walker_t walker, /**< callback function for each pair */
-	void*             ctx     /**< pointer to user-specific data */
+	void*            ctx     /**< pointer to user-specific data */
 );
 
 /**
@@ -556,32 +552,32 @@ HCL_EXPORT void hcl_rbt_walk (
 HCL_EXPORT void hcl_rbt_rwalk (
 	hcl_rbt_t*       rbt,    /**< red-black tree */
 	hcl_rbt_walker_t walker, /**< callback function for each pair */
-	void*             ctx     /**< pointer to user-specific data */
+	void*            ctx     /**< pointer to user-specific data */
 );
 
 /**
  * The hcl_rbt_allocpair() function allocates a pair for a key and a value 
- * given. But it does not chain the pair allocated into the red-black tree @a rbt.
+ * given. But it does not chain the pair allocated into the red-black tree \a rbt.
  * Use this function at your own risk. 
  *
  * Take note of he following special behavior when the copier is 
  * #HCL_RBT_COPIER_INLINE.
- * - If @a kptr is #HCL_NULL, the key space of the size @a klen is reserved but
+ * - If \a kptr is #HCL_NULL, the key space of the size \a klen is reserved but
  *   not propagated with any data.
- * - If @a vptr is #HCL_NULL, the value space of the size @a vlen is reserved
+ * - If \a vptr is #HCL_NULL, the value space of the size \a vlen is reserved
  *   but not propagated with any data.
  */
 HCL_EXPORT hcl_rbt_pair_t* hcl_rbt_allocpair (
-	hcl_rbt_t* rbt,
+	hcl_rbt_t*  rbt,
 	void*       kptr, 
-	hcl_oow_t klen,
+	hcl_oow_t   klen,
 	void*       vptr,
-	hcl_oow_t vlen
+	hcl_oow_t   vlen
 );
 
 /**
  * The hcl_rbt_freepair() function destroys a pair. But it does not detach
- * the pair destroyed from the red-black tree @a rbt. Use this function at your
+ * the pair destroyed from the red-black tree \a rbt. Use this function at your
  * own risk.
  */
 HCL_EXPORT void hcl_rbt_freepair (
@@ -594,10 +590,10 @@ HCL_EXPORT void hcl_rbt_freepair (
  */
 HCL_EXPORT int hcl_rbt_dflcomp (
 	const hcl_rbt_t* rbt,
-	const void*       kptr1,
-	hcl_oow_t       klen1,
-	const void*       kptr2,
-	hcl_oow_t       klen2
+	const void*      kptr1,
+	hcl_oow_t        klen1,
+	const void*      kptr2,
+	hcl_oow_t        klen2 
 );
 
 #if defined(__cplusplus)

@@ -109,7 +109,7 @@ static int string_to_ooi (hcl_t* hcl, hcl_oocs_t* str, int radixed, hcl_ooi_t* n
 	ptr = str->ptr,
 	end = str->ptr + str->len;
 
-	HCL_ASSERT (ptr < end);
+	HCL_ASSERT (hcl, ptr < end);
 
 	if (*ptr == '+' || *ptr == '-')
 	{
@@ -119,11 +119,11 @@ static int string_to_ooi (hcl_t* hcl, hcl_oocs_t* str, int radixed, hcl_ooi_t* n
 
 	if (radixed)
 	{
-		HCL_ASSERT (ptr < end);
+		HCL_ASSERT (hcl, ptr < end);
 
 		if (*ptr != '#') 
 		{
-			hcl->errnum = HCL_EINVAL;
+			hcl_seterrnum (hcl, HCL_EINVAL);
 			return -1;
 		}
 		ptr++; /* skip '#' */
@@ -133,14 +133,14 @@ static int string_to_ooi (hcl_t* hcl, hcl_oocs_t* str, int radixed, hcl_ooi_t* n
 		else if (*ptr == 'b') base = 2;
 		else
 		{
-			hcl->errnum = HCL_EINVAL;
+			hcl_seterrnum (hcl, HCL_EINVAL);
 			return -1;
 		}
 		ptr++;
 	}
 	else base = 10;
 
-	HCL_ASSERT (ptr < end);
+	HCL_ASSERT (hcl, ptr < end);
 
 	value = old_value = 0;
 	while (ptr < end && (v = CHAR_TO_NUM(*ptr, base)) < base)
@@ -149,7 +149,7 @@ static int string_to_ooi (hcl_t* hcl, hcl_oocs_t* str, int radixed, hcl_ooi_t* n
 		if (value < old_value) 
 		{
 			/* overflow must have occurred */
-			hcl->errnum = HCL_ERANGE;
+			hcl_seterrnum (hcl, HCL_ERANGE);
 			return -1;
 		}
 		old_value = value;
@@ -159,13 +159,13 @@ static int string_to_ooi (hcl_t* hcl, hcl_oocs_t* str, int radixed, hcl_ooi_t* n
 	if (ptr < end)
 	{
 		/* trailing garbage? */
-		hcl->errnum = HCL_EINVAL;
+		hcl_seterrnum (hcl, HCL_EINVAL);
 		return -1;
 	}
 
 	if (value > HCL_TYPE_MAX(hcl_ooi_t) + (negsign? 1: 0)) /* assume 2's complement */
 	{
-		hcl->errnum = HCL_ERANGE;
+		hcl_seterrnum (hcl, HCL_ERANGE);
 		return -1;
 	}
 
@@ -306,7 +306,7 @@ static HCL_INLINE int add_token_str (hcl_t* hcl, const hcl_ooch_t* ptr, hcl_oow_
 static HCL_INLINE int does_token_name_match (hcl_t* hcl, voca_id_t id)
 {
 	return hcl->c->tok.name.len == vocas[id].len &&
-	       hcl_equalchars(hcl->c->tok.name.ptr, vocas[id].str, vocas[id].len);
+	       hcl_equaloochars(hcl->c->tok.name.ptr, vocas[id].str, vocas[id].len);
 }
 
 static HCL_INLINE int add_token_char (hcl_t* hcl, hcl_ooch_t c)
@@ -321,7 +321,7 @@ static HCL_INLINE int add_token_char (hcl_t* hcl, hcl_ooch_t c)
 static HCL_INLINE void unget_char (hcl_t* hcl, const hcl_iolxc_t* c)
 {
 	/* Make sure that the unget buffer is large enough */
-	HCL_ASSERT (hcl->c->nungots < HCL_COUNTOF(hcl->c->ungot));
+	HCL_ASSERT (hcl, hcl->c->nungots < HCL_COUNTOF(hcl->c->ungot));
 	hcl->c->ungot[hcl->c->nungots++] = *c;
 }
 
@@ -656,7 +656,7 @@ static int get_sharp_token (hcl_t* hcl)
 	hcl_ooci_t c;
 	int radix;
 
-	HCL_ASSERT (hcl->c->lxc.c == '#');
+	HCL_ASSERT (hcl, hcl->c->lxc.c == '#');
 
 	GET_CHAR_TO (hcl, c);
 
@@ -799,7 +799,7 @@ HCL_DEBUG2 (hcl, "INVALID CHARACTER LITERAL [%.*S]\n", (hcl_ooi_t)hcl->c->tok.na
 			}
 			else
 			{
-				HCL_ASSERT (TOKEN_NAME_LEN(hcl) == 3);
+				HCL_ASSERT (hcl, TOKEN_NAME_LEN(hcl) == 3);
 				c = TOKEN_NAME_CHAR(hcl,2);
 			}
 
@@ -1033,7 +1033,7 @@ retry:
 			break;
 	}
 
-HCL_DEBUG2 (hcl, "TOKEN: [%.*S]\n", (hcl_ooi_t)TOKEN_NAME_LEN(hcl), TOKEN_NAME_PTR(hcl));
+HCL_DEBUG2 (hcl, "TOKEN: [%.*js]\n", (hcl_ooi_t)TOKEN_NAME_LEN(hcl), TOKEN_NAME_PTR(hcl));
 
 	return 0;
 }
@@ -1042,7 +1042,7 @@ static void clear_io_names (hcl_t* hcl)
 {
 	hcl_iolink_t* cur;
 
-	HCL_ASSERT (hcl->c != HCL_NULL);
+	HCL_ASSERT (hcl, hcl->c != HCL_NULL);
 
 	while (hcl->c->io_names)
 	{
@@ -1149,7 +1149,7 @@ static int end_include (hcl_t* hcl)
 	cur = hcl->c->curinp;
 	hcl->c->curinp = hcl->c->curinp->includer;
 
-	HCL_ASSERT (cur->name != HCL_NULL);
+	HCL_ASSERT (hcl, cur->name != HCL_NULL);
 	hcl_freemem (hcl, cur);
 	/* hcl->parse.depth.incl--; */
 
@@ -1179,7 +1179,7 @@ static HCL_INLINE hcl_oop_t push (hcl_t* hcl, hcl_oop_t obj)
 static HCL_INLINE void pop (hcl_t* hcl)
 {
 	/* the stack is empty. called pop() more than push()? */
-	HCL_ASSERT (!HCL_IS_NIL(hcl,hcl->c->r.s));
+	HCL_ASSERT (hcl, !HCL_IS_NIL(hcl,hcl->c->r.s));
 	hcl->c->r.s = HCL_CONS_CDR(hcl->c->r.s);
 }
 
@@ -1223,7 +1223,7 @@ static HCL_INLINE hcl_oop_t leave_list (hcl_t* hcl, int* flagv, int* oldflagv)
 	int fv;
 
 	/* the stack must not be empty - cannot leave a list without entering it */
-	HCL_ASSERT (!HCL_IS_NIL(hcl,hcl->c->r.s));
+	HCL_ASSERT (hcl, !HCL_IS_NIL(hcl,hcl->c->r.s));
 
 	/*head = HCL_CONS_CAR(HCL_CONS_CDR(hcl->c->r.s));*/
 
@@ -1247,7 +1247,7 @@ static HCL_INLINE hcl_oop_t leave_list (hcl_t* hcl, int* flagv, int* oldflagv)
 		count = 0;
 		while (ptr != hcl->_nil)
 		{
-			HCL_ASSERT (HCL_OBJ_GET_FLAGS_BRAND(ptr) == HCL_BRAND_CONS);
+			HCL_ASSERT (hcl, HCL_OBJ_GET_FLAGS_BRAND(ptr) == HCL_BRAND_CONS);
 			ptr = HCL_CONS_CDR(ptr);
 			count++;
 		}
@@ -1280,7 +1280,7 @@ static HCL_INLINE hcl_oop_t leave_list (hcl_t* hcl, int* flagv, int* oldflagv)
 	{
 		/* restore the flag for the outer returning level */
 		hcl_oop_t flag = HCL_CONS_CDR(HCL_CONS_CDR(hcl->c->r.s));
-		HCL_ASSERT (HCL_OOP_IS_SMOOI(HCL_CONS_CAR(flag)));
+		HCL_ASSERT (hcl, HCL_OOP_IS_SMOOI(HCL_CONS_CAR(flag)));
 		*flagv = HCL_OOP_TO_SMOOI(HCL_CONS_CAR(flag));
 	}
 
@@ -1293,7 +1293,7 @@ static HCL_INLINE int dot_list (hcl_t* hcl)
 	hcl_oop_t cons;
 	int flagv;
 
-	HCL_ASSERT (!HCL_IS_NIL(hcl,hcl->c->r.s));
+	HCL_ASSERT (hcl, !HCL_IS_NIL(hcl,hcl->c->r.s));
 
 	/* mark the state that a dot has appeared in the list */
 	cons = HCL_CONS_CDR(HCL_CONS_CDR(hcl->c->r.s));
@@ -1313,19 +1313,19 @@ static hcl_oop_t chain_to_list (hcl_t* hcl, hcl_oop_t obj)
 
 	/* the stack top is the pair pointing to the list tail */
 	tail = hcl->c->r.s;
-	HCL_ASSERT (!HCL_IS_NIL(hcl,tail));
+	HCL_ASSERT (hcl, !HCL_IS_NIL(hcl,tail));
 
 	/* the pair pointing to the list head is below the tail cell
 	 * connected via cdr. */
 	head = HCL_CONS_CDR(tail);
-	HCL_ASSERT (!HCL_IS_NIL(hcl,head));
+	HCL_ASSERT (hcl, !HCL_IS_NIL(hcl,head));
 
 	/* the pair pointing to the flag is below the head cell
 	 * connected via cdr */
 	flag = HCL_CONS_CDR(head);
 
 	/* retrieve the numeric flag value */
-	HCL_ASSERT(HCL_OOP_IS_SMOOI(HCL_CONS_CAR(flag)));
+	HCL_ASSERT (hcl, HCL_OOP_IS_SMOOI(HCL_CONS_CAR(flag)));
 	flagv = (int)HCL_OOP_TO_SMOOI(HCL_CONS_CAR(flag));
 
 	if (flagv & CLOSED)
@@ -1337,7 +1337,7 @@ static hcl_oop_t chain_to_list (hcl_t* hcl, hcl_oop_t obj)
 	else if (flagv & DOTTED)
 	{
 		/* the list must not be empty to have reached the dotted state */
-		HCL_ASSERT (!HCL_IS_NIL(hcl,HCL_CONS_CAR(tail)));
+		HCL_ASSERT (hcl, !HCL_IS_NIL(hcl,HCL_CONS_CAR(tail)));
 
 		/* chain the object via 'cdr' of the tail cell */
 		HCL_CONS_CDR(HCL_CONS_CAR(tail)) = obj;
@@ -1362,7 +1362,7 @@ static hcl_oop_t chain_to_list (hcl_t* hcl, hcl_oop_t obj)
 			/* the list head is not set yet. it is the first
 			 * element added to the list. let both head and tail
 			 * point to the new cons cell */
-			HCL_ASSERT (HCL_IS_NIL (hcl, HCL_CONS_CAR(tail)));
+			HCL_ASSERT (hcl, HCL_IS_NIL (hcl, HCL_CONS_CAR(tail)));
 			HCL_CONS_CAR(head) = cons; 
 			HCL_CONS_CAR(tail) = cons;
 		}
@@ -1381,7 +1381,7 @@ static hcl_oop_t chain_to_list (hcl_t* hcl, hcl_oop_t obj)
 static HCL_INLINE int is_list_empty (hcl_t* hcl)
 {
 	/* the stack must not be empty */
-	HCL_ASSERT (!HCL_IS_NIL(hcl,hcl->c->r.s));
+	HCL_ASSERT (hcl, !HCL_IS_NIL(hcl,hcl->c->r.s));
 
 	/* if the tail pointer is pointing to nil, the list is empty */
 	return HCL_IS_NIL(hcl,HCL_CONS_CAR(hcl->c->r.s));
@@ -1412,9 +1412,9 @@ static int get_byte_array_literal (hcl_t* hcl, hcl_oop_t* xlit)
 	hcl_ooi_t tmp;
 	hcl_oop_t ba;
 
-	HCL_ASSERT (hcl->c->r.balit.size == 0);
+	HCL_ASSERT (hcl, hcl->c->r.balit.size == 0);
 
-	HCL_ASSERT (TOKEN_TYPE(hcl) == HCL_IOTOK_BAPAREN);
+	HCL_ASSERT (hcl, TOKEN_TYPE(hcl) == HCL_IOTOK_BAPAREN);
 	GET_TOKEN(hcl); /* skip #[ */
 
 	while (TOKEN_TYPE(hcl) == HCL_IOTOK_NUMLIT || TOKEN_TYPE(hcl) == HCL_IOTOK_RADNUMLIT)
@@ -1425,7 +1425,7 @@ static int get_byte_array_literal (hcl_t* hcl, hcl_oop_t* xlit)
 		{
 			/* the token reader reads a valid token. no other errors
 			 * than the range error must not occur */
-			HCL_ASSERT (hcl->errnum == HCL_ERANGE);
+			HCL_ASSERT (hcl, hcl->errnum == HCL_ERANGE);
 
 			/* if the token is out of the SMOOI range, it's too big or 
 			 * to small to be a byte */
@@ -1487,9 +1487,9 @@ static int get_symbol_array_literal (hcl_t* hcl, hcl_oop_t* xlit)
 	hcl_oop_t sa, sym;
 	hcl_oow_t i;
 
-	HCL_ASSERT (hcl->c->r.salit.size == 0);
+	HCL_ASSERT (hcl, hcl->c->r.salit.size == 0);
 
-	HCL_ASSERT (TOKEN_TYPE(hcl) == HCL_IOTOK_VBAR);
+	HCL_ASSERT (hcl, TOKEN_TYPE(hcl) == HCL_IOTOK_VBAR);
 	GET_TOKEN(hcl); /* skip #[ */
 
 	while (TOKEN_TYPE(hcl) == HCL_IOTOK_IDENT)
@@ -1540,8 +1540,8 @@ static int read_object (hcl_t* hcl)
 		switch (TOKEN_TYPE(hcl)) 
 		{
 			default:
-				HCL_ASSERT (!"should never happen - invalid token type");
-				hcl->errnum = HCL_EINTERN;
+				HCL_ASSERT (hcl, !"should never happen - invalid token type");
+				hcl_seterrnum (hcl, HCL_EINTERN);
 				return -1;
 
 			case HCL_IOTOK_EOF:
@@ -1715,7 +1715,7 @@ static int read_object (hcl_t* hcl)
 		{
 			int oldflagv;
 
-			HCL_ASSERT (level > 0);
+			HCL_ASSERT (hcl, level > 0);
 
 			/* if so, append the element read into the quote list */
 			if (chain_to_list (hcl, obj) == HCL_NULL) return -1;
@@ -1741,8 +1741,8 @@ static int read_object (hcl_t* hcl)
 	}
 
 	/* upon exit, we must be at the top level */
-	HCL_ASSERT (level == 0);
-	HCL_ASSERT (array_level == 0);
+	HCL_ASSERT (hcl, level == 0);
+	HCL_ASSERT (hcl, array_level == 0);
 
 	hcl->c->r.e = obj; 
 	return 0;
@@ -1750,10 +1750,10 @@ static int read_object (hcl_t* hcl)
 
 static HCL_INLINE int __read (hcl_t* hcl)
 {
-	if (get_token (hcl) <= -1) return -1;
+	if (get_token(hcl) <= -1) return -1;
 	if (TOKEN_TYPE(hcl) == HCL_IOTOK_EOF)
 	{
-		hcl->errnum = HCL_EFINIS;
+		hcl_seterrnum (hcl, HCL_EFINIS);
 		return -1;
 	}
 	return read_object (hcl);
@@ -1761,7 +1761,7 @@ static HCL_INLINE int __read (hcl_t* hcl)
 
 hcl_oop_t hcl_read (hcl_t* hcl)
 {
-	HCL_ASSERT (hcl->c && hcl->c->reader); 
+	HCL_ASSERT (hcl, hcl->c && hcl->c->reader); 
 	if (__read(hcl) <= -1) return HCL_NULL;
 	return hcl->c->r.e;
 }
@@ -1858,7 +1858,7 @@ int hcl_attachio (hcl_t* hcl, hcl_ioimpl_t reader, hcl_ioimpl_t printer)
 
 	if (!reader || !printer)
 	{
-		hcl->errnum = HCL_EINVAL;
+		hcl_seterrnum (hcl, HCL_EINVAL);
 		return -1;
 	}
 
@@ -1890,7 +1890,7 @@ int hcl_attachio (hcl_t* hcl, hcl_ioimpl_t reader, hcl_ioimpl_t printer)
 	}
 	else if (hcl->c->reader || hcl->c->printer)
 	{
-		hcl->errnum = HCL_EPERM; /* TODO: change this error code */
+		hcl_seterrnum (hcl, HCL_EPERM); /* TODO: change this error code */
 		return -1;
 	}
 
@@ -1960,7 +1960,7 @@ void hcl_detachio (hcl_t* hcl)
 				hcl->c->reader (hcl, HCL_IO_CLOSE, hcl->c->curinp);
 
 				prev = hcl->c->curinp->includer;
-				HCL_ASSERT (hcl->c->curinp->name != HCL_NULL);
+				HCL_ASSERT (hcl, hcl->c->curinp->name != HCL_NULL);
 				HCL_MMGR_FREE (hcl->mmgr, hcl->c->curinp);
 				hcl->c->curinp = prev;
 			}

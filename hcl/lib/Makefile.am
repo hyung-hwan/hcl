@@ -34,12 +34,15 @@ libhcl_la_SOURCES = \
 	debug.c \
 	decode.c \
 	dic.c \
+	err.c \
 	exec.c \
 	gc.c \
 	hcl.c \
 	heap.c \
 	logfmt.c \
 	obj.c \
+	opt-imp.h \
+	opt.c \
 	prim.c \
 	print.c \
 	rbt.c \

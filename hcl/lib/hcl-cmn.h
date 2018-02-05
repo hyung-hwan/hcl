@@ -1,7 +1,7 @@
 /*
  * $Id$
  *
-    Copyright (c) 2014-2016 Chung, Hyung-Hwan. All rights reserved.
+    Copyright (c) 2014-2017 Chung, Hyung-Hwan. All rights reserved.
 
     Redistribution and use in source and binary forms, with or without
     modification, are permitted provided that the following conditions
@@ -37,7 +37,7 @@
 #	include "hcl-msw.h"
 #elif defined(__OS2__)
 #	include "hcl-os2.h"
-#elif defined(__MSDOS__)
+#elif defined(__DOS__)
 #	include "hcl-dos.h"
 #elif defined(macintosh)
 #	include "hcl-mac.h" /* class mac os */
@@ -56,7 +56,6 @@
 #		define HCL_SIZEOF_LONG HCL_SIZEOF_INT
 #	endif
 #endif
-
 
 /* =========================================================================
  * PRIMITIVE TYPE DEFINTIONS
@@ -119,8 +118,8 @@
 #elif defined(HCL_SIZEOF_LONG) && (HCL_SIZEOF_LONG == 4)
 #	define HCL_HAVE_UINT32_T
 #	define HCL_HAVE_INT32_T
-	typedef unsigned long       hcl_uint32_t;
-	typedef signed long         hcl_int32_t;
+	typedef unsigned long int   hcl_uint32_t;
+	typedef signed long int     hcl_int32_t;
 #elif defined(HCL_SIZEOF___INT32) && (HCL_SIZEOF___INT32 == 4)
 #	define HCL_HAVE_UINT32_T
 #	define HCL_HAVE_INT32_T
@@ -131,7 +130,7 @@
 #	define HCL_HAVE_INT32_T
 	typedef unsigned __int32_t  hcl_uint32_t;
 	typedef signed __int32_t    hcl_int32_t;
-#elif defined(__MSDOS__)
+#elif defined(__DOS__)
 #	define HCL_HAVE_UINT32_T
 #	define HCL_HAVE_INT32_T
 	typedef unsigned long int   hcl_uint32_t;
@@ -152,13 +151,13 @@
 #elif defined(HCL_SIZEOF_LONG) && (HCL_SIZEOF_LONG == 8)
 #	define HCL_HAVE_UINT64_T
 #	define HCL_HAVE_INT64_T
-	typedef unsigned long       hcl_uint64_t;
-	typedef signed long         hcl_int64_t;
+	typedef unsigned long int  hcl_uint64_t;
+	typedef signed long int    hcl_int64_t;
 #elif defined(HCL_SIZEOF_LONG_LONG) && (HCL_SIZEOF_LONG_LONG == 8)
 #	define HCL_HAVE_UINT64_T
 #	define HCL_HAVE_INT64_T
-	typedef unsigned long long  hcl_uint64_t;
-	typedef signed long long    hcl_int64_t;
+	typedef unsigned long long int  hcl_uint64_t;
+	typedef signed long long int    hcl_int64_t;
 #elif defined(HCL_SIZEOF___INT64) && (HCL_SIZEOF___INT64 == 8)
 #	define HCL_HAVE_UINT64_T
 #	define HCL_HAVE_INT64_T
@@ -182,13 +181,13 @@
 #elif defined(HCL_SIZEOF_LONG) && (HCL_SIZEOF_LONG == 16)
 #	define HCL_HAVE_UINT128_T
 #	define HCL_HAVE_INT128_T
-	typedef unsigned long       hcl_uint128_t;
-	typedef signed long         hcl_int128_t;
+	typedef unsigned long int   hcl_uint128_t;
+	typedef signed long int     hcl_int128_t;
 #elif defined(HCL_SIZEOF_LONG_LONG) && (HCL_SIZEOF_LONG_LONG == 16)
 #	define HCL_HAVE_UINT128_T
 #	define HCL_HAVE_INT128_T
-	typedef unsigned long long  hcl_uint128_t;
-	typedef signed long long    hcl_int128_t;
+	typedef unsigned long long int hcl_uint128_t;
+	typedef signed long long int   hcl_int128_t;
 #elif defined(HCL_SIZEOF___INT128) && (HCL_SIZEOF___INT128 == 16)
 #	define HCL_HAVE_UINT128_T
 #	define HCL_HAVE_INT128_T
@@ -275,11 +274,22 @@
  * BASIC HCL TYPES
  * =========================================================================*/
 
-typedef char                     hcl_bch_t;
-typedef int                      hcl_bci_t;
+typedef char                    hcl_bch_t;
+typedef int                     hcl_bci_t;
+typedef unsigned char           hcl_bchu_t; /* unsigned version of hcl_bch_t for inner working */
+#define HCL_SIZEOF_BCH_T HCL_SIZEOF_CHAR
+#define HCL_SIZEOF_BCI_T HCL_SIZEOF_INT
 
-typedef hcl_uint16_t            hcl_uch_t; /* TODO ... wchar_t??? */
+#if defined(__GNUC__) && defined(__CHAR16_TYPE__)
+/* TODO ... wchar_t???, char16_t? char32_t? */
+typedef __CHAR16_TYPE__         hcl_uch_t; 
+#else
+typedef hcl_uint16_t            hcl_uch_t;
+#endif
 typedef hcl_int32_t             hcl_uci_t;
+typedef hcl_uint16_t            hcl_uchu_t; /* same as hcl_uch_t as it is already unsigned */
+#define HCL_SIZEOF_UCH_T 2
+#define HCL_SIZEOF_UCI_T 4
 
 typedef hcl_uint8_t             hcl_oob_t;
 
@@ -308,11 +318,18 @@ struct hcl_bcs_t
 };
 typedef struct hcl_bcs_t hcl_bcs_t;
 
-typedef hcl_uch_t               hcl_ooch_t;
-typedef hcl_uci_t               hcl_ooci_t;
-typedef hcl_ucs_t               hcl_oocs_t;
-#define HCL_OOCH_IS_UCH
 
+#if 0
+	typedef hcl_bch_t               hcl_ooch_t;
+	typedef hcl_bci_t               hcl_ooci_t;
+	typedef hcl_bcs_t               hcl_oocs_t;
+#	define HCL_OOCH_IS_BCH
+#else
+	typedef hcl_uch_t               hcl_ooch_t;
+	typedef hcl_uci_t               hcl_ooci_t;
+	typedef hcl_ucs_t               hcl_oocs_t;
+#	define HCL_OOCH_IS_UCH
+#endif
 
 
 /* =========================================================================
@@ -397,11 +414,12 @@ struct hcl_ntime_t
 /* =========================================================================
  * PRIMITIVE MACROS
  * ========================================================================= */
-#define HCL_UCI_EOF ((hcl_ooci_t)-1)
-#define HCL_UCI_NL  ((hcl_ooci_t)'\n')
+#define HCL_UCI_EOF ((hcl_uci_t)-1)
+#define HCL_BCI_EOF ((hcl_bci_t)-1)
+#define HCL_OOCI_EOF ((hcl_ooci_t)-1)
 
 #define HCL_SIZEOF(x) (sizeof(x))
-#define HCL_COUNTOF(x) (sizeof(x) / sizeof(x[0]))
+#define HCL_COUNTOF(x) (sizeof(x) / sizeof((x)[0]))
 
 /**
  * The HCL_OFFSETOF() macro returns the offset of a field from the beginning
@@ -449,6 +467,7 @@ struct hcl_ntime_t
 
 #define HCL_ORBITS(type,value,offset,length,bits) \
 	(value = (((type)(value)) | (((bits) & HCL_LBMASK(type,length)) << (offset))))
+
 
 /** 
  * The HCL_BITS_MAX() macros calculates the maximum value that the 'nbits'
@@ -549,6 +568,11 @@ struct hcl_cmgr_t
 };
 
 /* =========================================================================
+ * FORWARD DECLARATION FOR MAIN HCL STRUCTURE
+ * =========================================================================*/
+typedef struct hcl_t hcl_t;
+
+/* =========================================================================
  * MACROS THAT CHANGES THE BEHAVIORS OF THE C COMPILER/LINKER
  * =========================================================================*/
 
@@ -556,11 +580,11 @@ struct hcl_cmgr_t
 #	define HCL_IMPORT
 #	define HCL_EXPORT
 #	define HCL_PRIVATE
-#elif defined(_WIN32) || (defined(__WATCOMC__) && !defined(__WINDOWS_386__))
+#elif defined(_WIN32) || (defined(__WATCOMC__) && (__WATCOMC__ >= 1000) && !defined(__WINDOWS_386__))
 #	define HCL_IMPORT __declspec(dllimport)
 #	define HCL_EXPORT __declspec(dllexport)
 #	define HCL_PRIVATE 
-#elif defined(__GNUC__) && (__GNUC__>=4)
+#elif defined(__GNUC__) && ((__GNUC__>= 4) || (__GNUC__ == 3 && __GNUC_MINOR__ >= 3))
 #	define HCL_IMPORT __attribute__((visibility("default")))
 #	define HCL_EXPORT __attribute__((visibility("default")))
 #	define HCL_PRIVATE __attribute__((visibility("hidden")))
@@ -584,9 +608,6 @@ struct hcl_cmgr_t
 #	define HCL_INLINE 
 #	undef HCL_HAVE_INLINE
 #endif
-
-
-
 
 /**
  * The HCL_TYPE_IS_SIGNED() macro determines if a type is signed.
@@ -619,6 +640,15 @@ struct hcl_cmgr_t
 #define HCL_TYPE_MIN(type) \
 	((HCL_TYPE_IS_SIGNED(type)? HCL_TYPE_SIGNED_MIN(type): HCL_TYPE_UNSIGNED_MIN(type)))
 
+/* round up a positive integer x to the nearst multiple of y */
+#define HCL_ALIGN(x,y) ((((x) + (y) - 1) / (y)) * (y))
+
+/* round up a positive integer x to the nearst multiple of y where
+ * y must be a multiple of a power of 2*/
+#define HCL_ALIGN_POW2(x,y) ((((x) + (y) - 1)) & ~((y) - 1))
+
+#define HCL_IS_UNALIGNED_POW2(x,y) ((x) & ((y) - 1))
+#define HCL_IS_ALIGNED_POW2(x,y) (!HCL_IS_UNALIGNED_POW2(x,y))
 
 /* =========================================================================
  * COMPILER FEATURE TEST MACROS
@@ -642,6 +672,12 @@ struct hcl_cmgr_t
 #if defined(__has_builtin) 
 	#if __has_builtin(__builtin_ctz)
 		#define HCL_HAVE_BUILTIN_CTZ
+	#endif
+	#if __has_builtin(__builtin_ctzl)
+		#define HCL_HAVE_BUILTIN_CTZL
+	#endif
+	#if __has_builtin(__builtin_ctzll)
+		#define HCL_HAVE_BUILTIN_CTZLL
 	#endif
 
 	#if __has_builtin(__builtin_uadd_overflow)
@@ -685,7 +721,35 @@ struct hcl_cmgr_t
 	#if __has_builtin(__builtin_expect)
 		#define HCL_HAVE_BUILTIN_EXPECT
 	#endif
+
+
+	#if __has_builtin(__sync_lock_test_and_set)
+		#define HCL_HAVE_SYNC_LOCK_TEST_AND_SET
+	#endif
+	#if __has_builtin(__sync_lock_release)
+		#define HCL_HAVE_SYNC_LOCK_RELEASE
+	#endif
+
+	#if __has_builtin(__sync_synchronize)
+		#define HCL_HAVE_SYNC_SYNCHRONIZE
+	#endif
+	#if __has_builtin(__sync_bool_compare_and_swap)
+		#define HCL_HAVE_SYNC_BOOL_COMPARE_AND_SWAP
+	#endif
+	#if __has_builtin(__sync_val_compare_and_swap)
+		#define HCL_HAVE_SYNC_VAL_COMPARE_AND_SWAP
+	#endif
+
 #elif defined(__GNUC__) && defined(__GNUC_MINOR__)
+
+	#if (__GNUC__ >= 4) 
+		#define HCL_HAVE_SYNC_LOCK_TEST_AND_SET
+		#define HCL_HAVE_SYNC_LOCK_RELEASE
+
+		#define HCL_HAVE_SYNC_SYNCHRONIZE
+		#define HCL_HAVE_SYNC_BOOL_COMPARE_AND_SWAP
+		#define HCL_HAVE_SYNC_VAL_COMPARE_AND_SWAP
+	#endif
 
 	#if (__GNUC__ >= 4) || (__GNUC__ == 3 && __GNUC_MINOR__ >= 4)
 		#define HCL_HAVE_BUILTIN_CTZ
@@ -710,13 +774,13 @@ struct hcl_cmgr_t
 
 #endif
 
-
 #if defined(HCL_HAVE_BUILTIN_EXPECT)
-#	define HCL_LIKELY(x) (__builtin_expect(!!x,1))
-#	define HCL_UNLIKELY(x) (__builtin_expect(!!x,0))
+#	define HCL_LIKELY(x) (__builtin_expect(!!(x),1))
+#	define HCL_UNLIKELY(x) (__builtin_expect(!!(x),0))
 #else
 #	define HCL_LIKELY(x) (x)
 #	define HCL_UNLIKELY(x) (x)
 #endif
+
 
 #endif

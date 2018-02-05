@@ -1,7 +1,7 @@
-/*
+/*/*
  * $Id$
  *
-    Copyright (c) 2014-2016 Chung, Hyung-Hwan. All rights reserved.
+    Copyright (c) 2014-2017 Chung, Hyung-Hwan. All rights reserved.
 
     Redistribution and use in source and binary forms, with or without
     modification, are permitted provided that the following conditions
@@ -85,7 +85,7 @@
 	data->count += len; \
 } while (0)
 
-int logfmtv (hcl_t* hcl, const fmtchar_t* fmt, hcl_fmtout_t* data, va_list ap)
+static int logfmtv (hcl_t* hcl, const fmtchar_t* fmt, hcl_fmtout_t* data, va_list ap, outbfmt_t outbfmt)
 {
 	const fmtchar_t* percent;
 #if defined(FMTCHAR_IS_OOCH)
@@ -100,9 +100,25 @@ int logfmtv (hcl_t* hcl, const fmtchar_t* fmt, hcl_fmtout_t* data, va_list ap)
 	hcl_uintmax_t num = 0;
 	int stop = 0;
 
+#if 0
+	hcl_bchbuf_t* fltfmt;
+	hcl_oochbuf_t* fltout;
+#endif
 	hcl_bch_t* (*sprintn) (hcl_bch_t* nbuf, hcl_uintmax_t num, int base, hcl_ooi_t* lenp);
 
 	data->count = 0;
+
+#if 0
+	fltfmt = &hcl->d->fltfmt;
+	fltout = &hcl->d->fltout;
+
+	fltfmt->ptr  = fltfmt->buf;
+	fltfmt->capa = HCL_COUNTOF(fltfmt->buf) - 1;
+
+	fltout->ptr  = fltout->buf;
+	fltout->capa = HCL_COUNTOF(fltout->buf) - 1;
+#endif
+
 
 	while (1)
 	{
@@ -225,6 +241,7 @@ reswitch:
 
 		case '1': case '2': case '3': case '4':
 		case '5': case '6': case '7': case '8': case '9':
+			if (flagc & FLAGC_LENMOD) goto invalid_format;
 			for (n = 0;; ++fmt) 
 			{
 				n = n * 10 + ch - '0';
@@ -303,7 +320,7 @@ reswitch:
 			goto reswitch;
 		/* end of length modifiers */
 
-		case 'n':
+		case 'n': /* number of characters printed so far */
 			if (lm_flag & LF_J) /* j */
 				*(va_arg(ap, hcl_intmax_t*)) = data->count;
 			else if (lm_flag & LF_Z) /* z */
@@ -318,11 +335,8 @@ reswitch:
 				*(va_arg(ap, short int*)) = data->count;
 			else if (lm_flag & LF_C) /* hh */
 				*(va_arg(ap, char*)) = data->count;
-			else if (flagc & FLAGC_LENMOD)
-			{
-				hcl->errnum = HCL_EINVAL;
-				goto oops;
-			}
+			else if (flagc & FLAGC_LENMOD) 
+				goto invalid_format;
 			else
 				*(va_arg(ap, int*)) = data->count;
 			break;
@@ -347,6 +361,9 @@ reswitch:
 		case 'x':
 			base = 16;
 			goto handle_nosign;
+		case 'b':
+			base = 2;
+			goto handle_nosign;
 		/* end of unsigned integer conversions */
 
 		case 'p': /* pointer */
@@ -363,7 +380,9 @@ reswitch:
 			/* zeropad must not take effect for 'c' */
 			if (flagc & FLAGC_ZEROPAD) padc = ' '; 
 			if (lm_flag & LF_L) goto uppercase_c;
-
+		#if defined(HCL_OOCH_IS_UCH)
+			if (lm_flag & LF_J) goto uppercase_c;
+		#endif
 		lowercase_c:
 			bch = HCL_SIZEOF(hcl_bch_t) < HCL_SIZEOF(int)? va_arg(ap, int): va_arg(ap, hcl_bch_t);
 
@@ -378,13 +397,16 @@ reswitch:
 
 		case 'C':
 		{
-			hcl_ooch_t ooch;
+			hcl_uch_t ooch;
 
 			/* zeropad must not take effect for 'C' */
 			if (flagc & FLAGC_ZEROPAD) padc = ' ';
 			if (lm_flag & LF_H) goto lowercase_c;
+		#if defined(HCL_OOCH_IS_BCH)
+			if (lm_flag & LF_J) goto lowercase_c;
+		#endif
 		uppercase_c:
-			ooch = HCL_SIZEOF(hcl_ooch_t) < HCL_SIZEOF(int)? va_arg(ap, int): va_arg(ap, hcl_ooch_t);
+			ooch = HCL_SIZEOF(hcl_uch_t) < HCL_SIZEOF(int)? va_arg(ap, int): va_arg(ap, hcl_uch_t);
 
 			/* precision 0 doesn't kill the letter */
 			width--;
@@ -402,20 +424,19 @@ reswitch:
 			/* zeropad must not take effect for 'S' */
 			if (flagc & FLAGC_ZEROPAD) padc = ' ';
 			if (lm_flag & LF_L) goto uppercase_s;
+		#if defined(HCL_OOCH_IS_UCH)
+			if (lm_flag & LF_J) goto uppercase_s;
+		#endif
 		lowercase_s:
 
 			bsp = va_arg (ap, hcl_bch_t*);
 			if (bsp == HCL_NULL) bsp = bch_nullstr;
 
+		#if defined(HCL_OOCH_IS_UCH)
 			/* get the length */
 			for (bslen = 0; bsp[bslen]; bslen++);
 
-			if (hcl_utf8toucs (bsp, &bslen, HCL_NULL, &slen) <= -1)
-			{ 
-				/* conversion error */
-				hcl->errnum = HCL_EECERR;
-				goto oops;
-			}
+			if (hcl_convbtooochars (hcl, bsp, &bslen, HCL_NULL, &slen) <= -1) goto oops;
 
 			/* slen holds the length after conversion */
 			n = slen;
@@ -429,13 +450,13 @@ reswitch:
 				hcl_oow_t conv_len, src_len, tot_len = 0;
 				while (n > 0)
 				{
-					HCL_ASSERT (bslen > tot_len);
+					HCL_ASSERT (hcl, bslen > tot_len);
 
 					src_len = bslen - tot_len;
 					conv_len = HCL_COUNTOF(conv_buf);
 
 					/* this must not fail since the dry-run above was successful */
-					hcl_utf8toucs (&bsp[tot_len], &src_len, conv_buf, &conv_len);
+					hcl_convbtooochars (hcl, &bsp[tot_len], &src_len, conv_buf, &conv_len);
 					tot_len += src_len;
 
 					if (conv_len > n) conv_len = n;
@@ -446,39 +467,94 @@ reswitch:
 			}
 			
 			if ((flagc & FLAGC_LEFTADJ) && width > 0) PUT_OOCH (padc, width);
-			break;
-		}
-
-		case 'S':
-		{
-			const hcl_ooch_t* sp;
-
-			/* zeropad must not take effect for 's' */
-			if (flagc & FLAGC_ZEROPAD) padc = ' ';
-			if (lm_flag & LF_H) goto lowercase_s;
-		uppercase_s:
-			sp = va_arg (ap, hcl_ooch_t*);
-			if (sp == HCL_NULL) sp = ooch_nullstr;
-
+		#else
 			if (flagc & FLAGC_DOT)
 			{
-				for (n = 0; n < precision && sp[n]; n++);
+				for (n = 0; n < precision && bsp[n]; n++);
 			}
 			else
 			{
-				for (n = 0; sp[n]; n++);
+				for (n = 0; bsp[n]; n++);
 			}
 
 			width -= n;
 
 			if (!(flagc & FLAGC_LEFTADJ) && width > 0) PUT_OOCH (padc, width);
-			PUT_OOCS (sp, n);
+			PUT_OOCS (bsp, n);
 			if ((flagc & FLAGC_LEFTADJ) && width > 0) PUT_OOCH (padc, width);
+		#endif
+			break;
+		}
+
+		case 'S':
+		{
+			const hcl_uch_t* usp;
+			hcl_oow_t uslen, slen;
+
+			/* zeropad must not take effect for 's' */
+			if (flagc & FLAGC_ZEROPAD) padc = ' ';
+			if (lm_flag & LF_H) goto lowercase_s;
+		#if defined(HCL_OOCH_IS_UCH)
+			if (lm_flag & LF_J) goto lowercase_s;
+		#endif
+		uppercase_s:
+			usp = va_arg (ap, hcl_uch_t*);
+			if (usp == HCL_NULL) usp = uch_nullstr;
+
+		#if defined(HCL_OOCH_IS_BCH)
+			/* get the length */
+			for (uslen = 0; usp[uslen]; uslen++);
+
+			if (hcl_convutooochars (hcl, usp, &uslen, HCL_NULL, &slen) <= -1) goto oops;
+
+			/* slen holds the length after conversion */
+			n = slen;
+			if ((flagc & FLAGC_DOT) && precision < slen) n = precision;
+			width -= n;
+
+			if (!(flagc & FLAGC_LEFTADJ) && width > 0) PUT_OOCH (padc, width);
+			{
+				hcl_ooch_t conv_buf[32]; 
+				hcl_oow_t conv_len, src_len, tot_len = 0;
+				while (n > 0)
+				{
+					HCL_ASSERT (hcl, uslen > tot_len);
+
+					src_len = uslen - tot_len;
+					conv_len = HCL_COUNTOF(conv_buf);
+
+					/* this must not fail since the dry-run above was successful */
+					hcl_convutooochars (hcl, &usp[tot_len], &src_len, conv_buf, &conv_len);
+					tot_len += src_len;
+
+					if (conv_len > n) conv_len = n;
+					PUT_OOCS (conv_buf, conv_len);
+
+					n -= conv_len;
+				}
+			}
+			if ((flagc & FLAGC_LEFTADJ) && width > 0) PUT_OOCH (padc, width);
+		#else
+			if (flagc & FLAGC_DOT)
+			{
+				for (n = 0; n < precision && usp[n]; n++);
+			}
+			else
+			{
+				for (n = 0; usp[n]; n++);
+			}
+
+			width -= n;
+
+			if (!(flagc & FLAGC_LEFTADJ) && width > 0) PUT_OOCH (padc, width);
+			PUT_OOCS (usp, n);
+			if ((flagc & FLAGC_LEFTADJ) && width > 0) PUT_OOCH (padc, width);
+		#endif
 			break;
 		}
 
 		case 'O': /* object - ignore precision, width, adjustment */
- 			if (print_object (hcl, data->mask, va_arg (ap, hcl_oop_t)) <= -1) goto oops;
+			//print_object (hcl, data->mask, va_arg(ap, hcl_oop_t), outbfmt);
 			break;
 
 #if 0
@@ -549,8 +625,7 @@ reswitch:
 		#endif
 			else if (flagc & FLAGC_LENMOD)
 			{
-				hcl->errnum = HCL_EINVAL;
-				goto oops;
+				goto invalid_format;
 			}
 			else
 			{
@@ -560,7 +635,7 @@ reswitch:
 			fmtlen = fmt - percent;
 			if (fmtlen > fltfmt->capa)
 			{
-				if (fltfmt->ptr == fltfmt->sbuf)
+				if (fltfmt->ptr == fltfmt->buf)
 				{
 					fltfmt->ptr = HCL_MMGR_ALLOC (HCL_MMGR_GETDFL(), HCL_SIZEOF(*fltfmt->ptr) * (fmtlen + 1));
 					if (fltfmt->ptr == HCL_NULL) goto oops;
@@ -620,7 +695,7 @@ reswitch:
 			newcapa = precision + width + 32;
 			if (fltout->capa < newcapa)
 			{
-				HCL_ASSERT (fltout->ptr == fltout->sbuf);
+				HCL_ASSERT (hcl, fltout->ptr == fltout->buf);
 
 				fltout->ptr = HCL_MMGR_ALLOC (HCL_MMGR_GETDFL(), HCL_SIZEOF(char_t) * (newcapa + 1));
 				if (fltout->ptr == HCL_NULL) goto oops;
@@ -706,7 +781,7 @@ handle_nosign:
 				 * This is just a work-around for it */
 				int i;
 				for (i = 0, num = 0; i < HCL_SIZEOF(hcl_uintmax_t) / HCL_SIZEOF(hcl_oow_t); i++)
-				{	
+				{
 				#if defined(HCL_ENDIAN_BIG)
 					num = num << (8 * HCL_SIZEOF(hcl_oow_t)) | (va_arg (ap, hcl_oow_t));
 				#else
@@ -819,6 +894,11 @@ number:
 
 			if ((flagc & FLAGC_SHARP) && num != 0) 
 			{
+				if (base == 2) 
+				{
+					PUT_OOCH ('0', 1);
+					PUT_OOCH ('b', 1);
+				}
 				if (base == 8) 
 				{
 					PUT_OOCH ('0', 1);

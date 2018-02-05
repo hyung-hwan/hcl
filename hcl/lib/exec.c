@@ -269,7 +269,7 @@ static void vm_cleanup (hcl_t* hcl)
 
 static HCL_INLINE hcl_oop_t make_context (hcl_t* hcl, hcl_ooi_t ntmprs)
 {
-	HCL_ASSERT (ntmprs >= 0);
+	HCL_ASSERT (hcl, ntmprs >= 0);
 	return hcl_allocoopobj (hcl, HCL_BRAND_CONTEXT, HCL_CONTEXT_NAMED_INSTVARS + (hcl_oow_t)ntmprs);
 }
 
@@ -292,7 +292,7 @@ static hcl_oop_process_t make_process (hcl_t* hcl, hcl_oop_context_t c)
 	proc->current_context = c;
 	proc->sp = HCL_SMOOI_TO_OOP(-1);
 
-	HCL_ASSERT ((hcl_oop_t)c->sender == hcl->_nil);
+	HCL_ASSERT (hcl, (hcl_oop_t)c->sender == hcl->_nil);
 
 #if defined(HCL_DEBUG_VM_PROCESSOR)
 	HCL_LOG2 (hcl, HCL_LOG_IC | HCL_LOG_DEBUG, "Processor - made process %O of size %zu\n", proc, HCL_OBJ_GET_SIZE(proc));
@@ -310,7 +310,7 @@ static HCL_INLINE void sleep_active_process (hcl_t* hcl, int state)
 
 	/* store the current active context to the current process.
 	 * it is the suspended context of the process to be suspended */
-	HCL_ASSERT (hcl->processor->active != hcl->nil_process);
+	HCL_ASSERT (hcl, hcl->processor->active != hcl->nil_process);
 	hcl->processor->active->current_context = hcl->active_context;
 	hcl->processor->active->state = HCL_SMOOI_TO_OOP(state);
 }
@@ -334,10 +334,10 @@ static HCL_INLINE void wake_new_process (hcl_t* hcl, hcl_oop_process_t proc)
 static void switch_to_process (hcl_t* hcl, hcl_oop_process_t proc, int new_state_for_old_active)
 {
 	/* the new process must not be the currently active process */
-	HCL_ASSERT (hcl->processor->active != proc);
+	HCL_ASSERT (hcl, hcl->processor->active != proc);
 
 	/* the new process must be in the runnable state */
-	HCL_ASSERT (proc->state == HCL_SMOOI_TO_OOP(PROC_STATE_RUNNABLE) ||
+	HCL_ASSERT (hcl, proc->state == HCL_SMOOI_TO_OOP(PROC_STATE_RUNNABLE) ||
 	            proc->state == HCL_SMOOI_TO_OOP(PROC_STATE_WAITING));
 
 	sleep_active_process (hcl, new_state_for_old_active);
@@ -350,7 +350,7 @@ static HCL_INLINE hcl_oop_process_t find_next_runnable_process (hcl_t* hcl)
 {
 	hcl_oop_process_t npr;
 
-	HCL_ASSERT (hcl->processor->active->state == HCL_SMOOI_TO_OOP(PROC_STATE_RUNNING));
+	HCL_ASSERT (hcl, hcl->processor->active->state == HCL_SMOOI_TO_OOP(PROC_STATE_RUNNING));
 	npr = hcl->processor->active->next;
 	if ((hcl_oop_t)npr == hcl->_nil) npr = hcl->processor->runnable_head;
 	return npr;
@@ -370,20 +370,20 @@ static HCL_INLINE int chain_into_processor (hcl_t* hcl, hcl_oop_process_t proc)
 	 * link it to the processor's process list. */
 	hcl_ooi_t tally;
 
-	HCL_ASSERT ((hcl_oop_t)proc->prev == hcl->_nil);
-	HCL_ASSERT ((hcl_oop_t)proc->next == hcl->_nil);
+	HCL_ASSERT (hcl, (hcl_oop_t)proc->prev == hcl->_nil);
+	HCL_ASSERT (hcl, (hcl_oop_t)proc->next == hcl->_nil);
 
-	HCL_ASSERT (proc->state == HCL_SMOOI_TO_OOP(PROC_STATE_SUSPENDED));
+	HCL_ASSERT (hcl, proc->state == HCL_SMOOI_TO_OOP(PROC_STATE_SUSPENDED));
 
 	tally = HCL_OOP_TO_SMOOI(hcl->processor->tally);
 
-	HCL_ASSERT (tally >= 0);
+	HCL_ASSERT (hcl, tally >= 0);
 	if (tally >= HCL_SMOOI_MAX)
 	{
 #if defined(HCL_DEBUG_VM_PROCESSOR)
 		HCL_LOG0 (hcl, HCL_LOG_IC | HCL_LOG_FATAL, "Processor - too many process\n");
 #endif
-		hcl->errnum = HCL_EPFULL;
+		hcl_seterrnum (hcl, HCL_EPFULL);
 		return -1;
 	}
 
@@ -411,11 +411,11 @@ static HCL_INLINE void unchain_from_processor (hcl_t* hcl, hcl_oop_process_t pro
 
 	/* the processor's process chain must be composed of running/runnable
 	 * processes only */
-	HCL_ASSERT (proc->state == HCL_SMOOI_TO_OOP(PROC_STATE_RUNNING) ||
+	HCL_ASSERT (hcl, proc->state == HCL_SMOOI_TO_OOP(PROC_STATE_RUNNING) ||
 	             proc->state == HCL_SMOOI_TO_OOP(PROC_STATE_RUNNABLE));
 
 	tally = HCL_OOP_TO_SMOOI(hcl->processor->tally);
-	HCL_ASSERT (tally > 0);
+	HCL_ASSERT (hcl, tally > 0);
 
 	if ((hcl_oop_t)proc->prev != hcl->_nil) proc->prev->next = proc->next;
 	else hcl->processor->runnable_head = proc->next;
@@ -435,13 +435,13 @@ static HCL_INLINE void chain_into_semaphore (hcl_t* hcl, hcl_oop_process_t proc,
 {
 	/* append a process to the process list of a semaphore*/
 
-	HCL_ASSERT ((hcl_oop_t)proc->sem == hcl->_nil);
-	HCL_ASSERT ((hcl_oop_t)proc->prev == hcl->_nil);
-	HCL_ASSERT ((hcl_oop_t)proc->next == hcl->_nil);
+	HCL_ASSERT (hcl, (hcl_oop_t)proc->sem == hcl->_nil);
+	HCL_ASSERT (hcl, (hcl_oop_t)proc->prev == hcl->_nil);
+	HCL_ASSERT (hcl, (hcl_oop_t)proc->next == hcl->_nil);
 
 	if ((hcl_oop_t)sem->waiting_head == hcl->_nil)
 	{
-		HCL_ASSERT ((hcl_oop_t)sem->waiting_tail == hcl->_nil);
+		HCL_ASSERT (hcl, (hcl_oop_t)sem->waiting_tail == hcl->_nil);
 		sem->waiting_head = proc;
 	}
 	else
@@ -458,7 +458,7 @@ static HCL_INLINE void unchain_from_semaphore (hcl_t* hcl, hcl_oop_process_t pro
 {
 	hcl_oop_semaphore_t sem;
 
-	HCL_ASSERT ((hcl_oop_t)proc->sem != hcl->_nil);
+	HCL_ASSERT (hcl, (hcl_oop_t)proc->sem != hcl->_nil);
 
 	sem = proc->sem;
 	if ((hcl_oop_t)proc->prev != hcl->_nil) proc->prev->next = proc->next;
@@ -495,12 +495,12 @@ static void terminate_process (hcl_t* hcl, hcl_oop_process_t proc)
 
 			/* a runnable or running process must not be chanined to the
 			 * process list of a semaphore */
-			HCL_ASSERT ((hcl_oop_t)proc->sem == hcl->_nil);
+			HCL_ASSERT (hcl, (hcl_oop_t)proc->sem == hcl->_nil);
 
 			if (nrp == proc)
 			{
 				/* no runnable process after termination */
-				HCL_ASSERT (hcl->processor->active == hcl->nil_process);
+				HCL_ASSERT (hcl, hcl->processor->active == hcl->nil_process);
 				HCL_LOG0 (hcl, HCL_LOG_IC | HCL_LOG_DEBUG, "No runnable process after process termination\n");
 			}
 			else
@@ -541,8 +541,8 @@ static void resume_process (hcl_t* hcl, hcl_oop_process_t proc)
 	if (proc->state == HCL_SMOOI_TO_OOP(PROC_STATE_SUSPENDED))
 	{
 		/* SUSPENED ---> RUNNING */
-		HCL_ASSERT ((hcl_oop_t)proc->prev == hcl->_nil);
-		HCL_ASSERT ((hcl_oop_t)proc->next == hcl->_nil);
+		HCL_ASSERT (hcl, (hcl_oop_t)proc->prev == hcl->_nil);
+		HCL_ASSERT (hcl, (hcl_oop_t)proc->next == hcl->_nil);
 
 	#if defined(HCL_DEBUG_VM_PROCESSOR)
 		HCL_LOG1 (hcl, HCL_LOG_IC | HCL_LOG_DEBUG, "Processor - process %O SUSPENDED->RUNNING\n", proc);
@@ -560,7 +560,7 @@ static void resume_process (hcl_t* hcl, hcl_oop_process_t proc)
 	{
 		/* RUNNABLE ---> RUNNING */
 		/* TODO: should i allow this? */
-		HCL_ASSERT (hcl->processor->active != proc);
+		HCL_ASSERT (hcl, hcl->processor->active != proc);
 		switch_to_process (hcl, proc, PROC_STATE_RUNNABLE);
 	}
 #endif
@@ -592,7 +592,7 @@ static void suspend_process (hcl_t* hcl, hcl_oop_process_t proc)
 				/* the last running/runnable process has been unchained 
 				 * from the processor and set to SUSPENDED. the active
 				 * process must be the nil process */
-				HCL_ASSERT (hcl->processor->active == hcl->nil_process);
+				HCL_ASSERT (hcl, hcl->processor->active == hcl->nil_process);
 			}
 			else
 			{
@@ -603,7 +603,7 @@ static void suspend_process (hcl_t* hcl, hcl_oop_process_t proc)
 				 * untouched unless the unchained process is the last
 				 * running/runnable process. so calling switch_to_process()
 				 * which expects the active process to be valid is safe */
-				HCL_ASSERT (hcl->processor->active != hcl->nil_process);
+				HCL_ASSERT (hcl, hcl->processor->active != hcl->nil_process);
 				switch_to_process (hcl, nrp, PROC_STATE_SUSPENDED);
 			}
 		}
@@ -622,7 +622,7 @@ static void yield_process (hcl_t* hcl, hcl_oop_process_t proc)
 
 		hcl_oop_process_t nrp;
 
-		HCL_ASSERT (proc == hcl->processor->active);
+		HCL_ASSERT (hcl, proc == hcl->processor->active);
 
 		nrp = find_next_runnable_process (hcl); 
 		/* if there are more than 1 runnable processes, the next
@@ -639,9 +639,10 @@ static void yield_process (hcl_t* hcl, hcl_oop_process_t proc)
 
 static int async_signal_semaphore (hcl_t* hcl, hcl_oop_semaphore_t sem)
 {
+#if 0
 	if (hcl->sem_list_count >= SEM_LIST_MAX)
 	{
-		hcl->errnum = HCL_ESLFULL;
+		hcl_seterrnum (hcl, HCL_ESLFULL);
 		return -1;
 	}
 
@@ -660,6 +661,7 @@ static int async_signal_semaphore (hcl_t* hcl, hcl_oop_semaphore_t sem)
 
 	hcl->sem_list[hcl->sem_list_count] = sem;
 	hcl->sem_list_count++;
+#endif
 	return 0;
 }
 
@@ -715,9 +717,9 @@ static void await_semaphore (hcl_t* hcl, hcl_oop_semaphore_t sem)
 		/* link the suspended process to the semaphore's process list */
 		chain_into_semaphore (hcl, proc, sem); 
 
-		HCL_ASSERT (sem->waiting_tail == proc);
+		HCL_ASSERT (hcl, sem->waiting_tail == proc);
 
-		HCL_ASSERT (hcl->processor->active != proc);
+		HCL_ASSERT (hcl, hcl->processor->active != proc);
 	}
 }
 
@@ -797,9 +799,10 @@ static int add_to_sem_heap (hcl_t* hcl, hcl_oop_semaphore_t sem)
 {
 	hcl_ooi_t index;
 
+#if 0
 	if (hcl->sem_heap_count >= SEM_HEAP_MAX)
 	{
-		hcl->errnum = HCL_ESHFULL;
+		hcl_seterrnum (hcl, HCL_ESHFULL);
 		return -1;
 	}
 
@@ -818,7 +821,7 @@ static int add_to_sem_heap (hcl_t* hcl, hcl_oop_semaphore_t sem)
 		hcl->sem_heap_capa = new_capa;
 	}
 
-	HCL_ASSERT (hcl->sem_heap_count <= HCL_SMOOI_MAX);
+	HCL_ASSERT (hcl, hcl->sem_heap_count <= HCL_SMOOI_MAX);
 
 	index = hcl->sem_heap_count;
 	hcl->sem_heap[index] = sem;
@@ -826,6 +829,7 @@ static int add_to_sem_heap (hcl_t* hcl, hcl_oop_semaphore_t sem)
 	hcl->sem_heap_count++;
 
 	sift_up_sem_heap (hcl, index);
+#endif
 	return 0;
 }
 
@@ -889,27 +893,27 @@ static int __activate_context (hcl_t* hcl, hcl_oop_context_t rcv_blkctx, hcl_ooi
 	 */
 
 	/* the receiver must be a block context */
-	HCL_ASSERT (HCL_IS_CONTEXT (hcl, rcv_blkctx));
+	HCL_ASSERT (hcl, HCL_IS_CONTEXT (hcl, rcv_blkctx));
 	if (rcv_blkctx->receiver_or_source != hcl->_nil)
 	{
 		/* the 'source' field is not nil.
 		 * this block context has already been activated once.
 		 * you can't send 'value' again to reactivate it.
 		 * For example, [thisContext value] value. */
-		HCL_ASSERT (HCL_OBJ_GET_SIZE(rcv_blkctx) > HCL_CONTEXT_NAMED_INSTVARS);
+		HCL_ASSERT (hcl, HCL_OBJ_GET_SIZE(rcv_blkctx) > HCL_CONTEXT_NAMED_INSTVARS);
 		HCL_LOG1 (hcl, HCL_LOG_IC | HCL_LOG_ERROR, 
 			"Error - re-valuing of a block context - %O\n", rcv_blkctx);
-		hcl->errnum = HCL_ERECALL;
+		hcl_seterrnum (hcl, HCL_ERECALL);
 		return -1;
 	}
-	HCL_ASSERT (HCL_OBJ_GET_SIZE(rcv_blkctx) == HCL_CONTEXT_NAMED_INSTVARS);
+	HCL_ASSERT (hcl, HCL_OBJ_GET_SIZE(rcv_blkctx) == HCL_CONTEXT_NAMED_INSTVARS);
 
 	if (HCL_OOP_TO_SMOOI(rcv_blkctx->method_or_nargs) != nargs)
 	{
 		HCL_LOG3 (hcl, HCL_LOG_IC | HCL_LOG_ERROR, 
 			"Error - wrong number of arguments to a block context %O - expecting %zd, got %zd\n",
 			rcv_blkctx, HCL_OOP_TO_SMOOI(rcv_blkctx->method_or_nargs), nargs);
-		hcl->errnum = HCL_ECALLARG;
+		hcl_seterrnum (hcl, HCL_ECALLARG);
 		return -1;
 	}
 
@@ -918,7 +922,7 @@ static int __activate_context (hcl_t* hcl, hcl_oop_context_t rcv_blkctx, hcl_ooi
 	 * simple calculation is needed to find the number of local temporaries */
 	local_ntmprs = HCL_OOP_TO_SMOOI(rcv_blkctx->ntmprs) -
 	               HCL_OOP_TO_SMOOI(((hcl_oop_context_t)rcv_blkctx->home)->ntmprs);
-	HCL_ASSERT (local_ntmprs >= nargs);
+	HCL_ASSERT (hcl, local_ntmprs >= nargs);
 
 	/* create a new block context to clone rcv_blkctx */
 	hcl_pushtmp (hcl, (hcl_oop_t*)&rcv_blkctx);
@@ -950,7 +954,7 @@ static int __activate_context (hcl_t* hcl, hcl_oop_context_t rcv_blkctx, hcl_ooi
 
 	HCL_STACK_POPS (hcl, nargs + 1); /* pop arguments and receiver */
 
-	HCL_ASSERT (blkctx->home != hcl->_nil);
+	HCL_ASSERT (hcl, blkctx->home != hcl->_nil);
 	blkctx->sp = HCL_SMOOI_TO_OOP(-1); /* not important at all */
 	blkctx->sender = hcl->active_context;
 
@@ -964,7 +968,7 @@ static HCL_INLINE int activate_context (hcl_t* hcl, hcl_ooi_t nargs)
 	hcl_oop_context_t rcv, blkctx;
 
 	rcv = (hcl_oop_context_t)HCL_STACK_GETRCV(hcl, nargs);
-	HCL_ASSERT (HCL_IS_CONTEXT (hcl, rcv));
+	HCL_ASSERT (hcl, HCL_IS_CONTEXT (hcl, rcv));
 
 	x = __activate_context (hcl, rcv, nargs, &blkctx);
 	if (x <= -1) return -1;
@@ -979,7 +983,7 @@ static HCL_INLINE int call_primitive (hcl_t* hcl, hcl_ooi_t nargs)
 	hcl_oop_word_t rcv;
 
 	rcv = (hcl_oop_word_t)HCL_STACK_GETRCV(hcl, nargs);
-	HCL_ASSERT (HCL_IS_PRIM (hcl, rcv));
+	HCL_ASSERT (hcl, HCL_IS_PRIM (hcl, rcv));
 
 	if (nargs < rcv->slot[1] && nargs > rcv->slot[2])
 	{
@@ -987,7 +991,7 @@ static HCL_INLINE int call_primitive (hcl_t* hcl, hcl_ooi_t nargs)
 		HCL_LOG3 (hcl, HCL_LOG_IC | HCL_LOG_ERROR, 
 			"Error - wrong number of arguments to a primitive - expecting %zd-%zd, got %zd\n",
 			rcv->slot[1], rcv->slot[2], nargs);
-		hcl->errnum = HCL_ECALLARG;
+		hcl_seterrnum (hcl, HCL_ECALLARG);
 		return -1;
 	}
 
@@ -1000,8 +1004,8 @@ static hcl_oop_process_t start_initial_process (hcl_t* hcl, hcl_oop_context_t ct
 	hcl_oop_process_t proc;
 
 	/* there must be no active process when this function is called */
-	HCL_ASSERT (hcl->processor->tally == HCL_SMOOI_TO_OOP(0));
-	HCL_ASSERT (hcl->processor->active == hcl->nil_process);
+	HCL_ASSERT (hcl, hcl->processor->tally == HCL_SMOOI_TO_OOP(0));
+	HCL_ASSERT (hcl, hcl->processor->active == hcl->nil_process);
 
 	proc = make_process (hcl, ctx);
 	if (!proc) return HCL_NULL;
@@ -1011,8 +1015,8 @@ static hcl_oop_process_t start_initial_process (hcl_t* hcl, hcl_oop_context_t ct
 	hcl->processor->active = proc;
 
 	/* do something that resume_process() would do with less overhead */
-	HCL_ASSERT ((hcl_oop_t)proc->current_context != hcl->_nil);
-	HCL_ASSERT (proc->current_context == proc->initial_context);
+	HCL_ASSERT (hcl, (hcl_oop_t)proc->current_context != hcl->_nil);
+	HCL_ASSERT (hcl, proc->current_context == proc->initial_context);
 	SWITCH_ACTIVE_CONTEXT (hcl, proc->current_context);
 
 	return proc;
@@ -1049,13 +1053,13 @@ static int start_initial_process_and_context (hcl_t* hcl)
 	 *  especially, the fact that the sender field is nil is used by 
 	 *  the main execution loop for breaking out of the loop */
 
-	HCL_ASSERT (hcl->active_context == HCL_NULL);
+	HCL_ASSERT (hcl, hcl->active_context == HCL_NULL);
 
 	/* hcl_gc() uses hcl->processor when hcl->active_context
 	 * is not NULL. at this poinst, hcl->processor should point to
 	 * an instance of ProcessScheduler. */
-	HCL_ASSERT ((hcl_oop_t)hcl->processor != hcl->_nil);
-	HCL_ASSERT (hcl->processor->tally == HCL_SMOOI_TO_OOP(0));
+	HCL_ASSERT (hcl, (hcl_oop_t)hcl->processor != hcl->_nil);
+	HCL_ASSERT (hcl, hcl->processor->tally == HCL_SMOOI_TO_OOP(0));
 
 	/* start_initial_process() calls the SWITCH_ACTIVE_CONTEXT() macro.
 	 * the macro assumes a non-null value in hcl->active_context.
@@ -1092,7 +1096,7 @@ static int execute (hcl_t* hcl)
 	hcl_ooi_t fetched_instruction_pointer;
 #endif
 
-	HCL_ASSERT (hcl->active_context != HCL_NULL);
+	HCL_ASSERT (hcl, hcl->active_context != HCL_NULL);
 
 	vm_startup (hcl);
 	hcl->proc_switched = 0;
@@ -1106,8 +1110,8 @@ static int execute (hcl_t* hcl)
 
 			do
 			{
-				HCL_ASSERT (HCL_OOP_IS_SMOOI(hcl->sem_heap[0]->heap_ftime_sec));
-				HCL_ASSERT (HCL_OOP_IS_SMOOI(hcl->sem_heap[0]->heap_ftime_nsec));
+				HCL_ASSERT (hcl, HCL_OOP_IS_SMOOI(hcl->sem_heap[0]->heap_ftime_sec));
+				HCL_ASSERT (hcl, HCL_OOP_IS_SMOOI(hcl->sem_heap[0]->heap_ftime_nsec));
 
 				HCL_INITNTIME (&ft,
 					HCL_OOP_TO_SMOOI(hcl->sem_heap[0]->heap_ftime_sec),
@@ -1136,8 +1140,8 @@ static int execute (hcl_t* hcl)
 						 * it uses wake_new_process() instead of
 						 * switch_to_process() as there is no running 
 						 * process at this moment */
-						HCL_ASSERT (proc->state == HCL_SMOOI_TO_OOP(PROC_STATE_RUNNABLE));
-						HCL_ASSERT (proc == hcl->processor->runnable_head);
+						HCL_ASSERT (hcl, proc->state == HCL_SMOOI_TO_OOP(PROC_STATE_RUNNABLE));
+						HCL_ASSERT (hcl, proc == hcl->processor->runnable_head);
 
 						wake_new_process (hcl, proc);
 						hcl->proc_switched = 1;
@@ -1160,7 +1164,7 @@ static int execute (hcl_t* hcl)
 		if (hcl->processor->active == hcl->nil_process) 
 		{
 			/* no more waiting semaphore and no more process */
-			HCL_ASSERT (hcl->processor->tally = HCL_SMOOI_TO_OOP(0));
+			HCL_ASSERT (hcl, hcl->processor->tally = HCL_SMOOI_TO_OOP(0));
 			HCL_LOG0 (hcl, HCL_LOG_IC | HCL_LOG_DEBUG, "No more runnable process\n");
 
 			#if 0
@@ -1230,7 +1234,7 @@ static int execute (hcl_t* hcl)
 				b1 = bcode & 0x7; /* low 3 bits */
 			push_instvar:
 				LOG_INST_1 (hcl, "push_instvar %zu", b1);
-				HCL_ASSERT (HCL_OBJ_GET_FLAGS_TYPE(hcl->active_context->origin->receiver_or_source) == HCL_OBJ_TYPE_OOP);
+				HCL_ASSERT (hcl, HCL_OBJ_GET_FLAGS_TYPE(hcl->active_context->origin->receiver_or_source) == HCL_OBJ_TYPE_OOP);
 				HCL_STACK_PUSH (hcl, ((hcl_oop_oop_t)hcl->active_context->origin->receiver_or_source)->slot[b1]);
 				break;
 
@@ -1250,7 +1254,7 @@ static int execute (hcl_t* hcl)
 				b1 = bcode & 0x7; /* low 3 bits */
 			store_instvar:
 				LOG_INST_1 (hcl, "store_into_instvar %zu", b1);
-				HCL_ASSERT (HCL_OBJ_GET_FLAGS_TYPE(hcl->active_context->receiver_or_source) == HCL_OBJ_TYPE_OOP);
+				HCL_ASSERT (hcl, HCL_OBJ_GET_FLAGS_TYPE(hcl->active_context->receiver_or_source) == HCL_OBJ_TYPE_OOP);
 				((hcl_oop_oop_t)hcl->active_context->origin->receiver_or_source)->slot[b1] = HCL_STACK_GETTOP(hcl);
 				break;
 
@@ -1269,7 +1273,7 @@ static int execute (hcl_t* hcl)
 				b1 = bcode & 0x7; /* low 3 bits */
 			pop_into_instvar:
 				LOG_INST_1 (hcl, "pop_into_instvar %zu", b1);
-				HCL_ASSERT (HCL_OBJ_GET_FLAGS_TYPE(hcl->active_context->receiver_or_source) == HCL_OBJ_TYPE_OOP);
+				HCL_ASSERT (hcl, HCL_OBJ_GET_FLAGS_TYPE(hcl->active_context->receiver_or_source) == HCL_OBJ_TYPE_OOP);
 				((hcl_oop_oop_t)hcl->active_context->origin->receiver_or_source)->slot[b1] = HCL_STACK_GETTOP(hcl);
 				HCL_STACK_POP (hcl);
 				break;
@@ -1321,7 +1325,7 @@ static int execute (hcl_t* hcl)
 				 * in the relevant method context */
 				ctx = hcl->active_context->origin;
 				bx = b1;
-				HCL_ASSERT (HCL_IS_CONTEXT(hcl, ctx));
+				HCL_ASSERT (hcl, HCL_IS_CONTEXT(hcl, ctx));
 			#else
 				/* otherwise, the index may point to a temporaries
 				 * declared inside a block */
@@ -1445,7 +1449,7 @@ static int execute (hcl_t* hcl)
 				b1 = bcode & 0x3; /* low 2 bits */
 			handle_object:
 				ass = (hcl_oop_cons_t)hcl->code.lit.arr->slot[b1];
-				HCL_ASSERT (HCL_IS_CONS(hcl, ass));
+				HCL_ASSERT (hcl, HCL_IS_CONS(hcl, ass));
 
 				if ((bcode >> 3) & 1)
 				{
@@ -1575,8 +1579,7 @@ static int execute (hcl_t* hcl)
 				{
 				cannot_call:
 					/* run time error */
-					HCL_LOG1 (hcl, HCL_LOG_IC | HCL_LOG_ERROR, "Error - cannot call %O\n", rcv);
-					hcl->errnum = HCL_ECALL;
+					hcl_seterrbfmt (hcl, HCL_ECALL, "cannot call %O", rcv);
 					return -1;
 				}
 				break;
@@ -1612,7 +1615,7 @@ static int execute (hcl_t* hcl)
 			handle_ctxtempvar:
 
 				ctx = hcl->active_context;
-				HCL_ASSERT ((hcl_oop_t)ctx != hcl->_nil);
+				HCL_ASSERT (hcl, (hcl_oop_t)ctx != hcl->_nil);
 				for (i = 0; i < b1; i++)
 				{
 					ctx = (hcl_oop_context_t)ctx->home;
@@ -1674,8 +1677,8 @@ static int execute (hcl_t* hcl)
 
 			handle_objvar:
 				t = (hcl_oop_oop_t)hcl->code.lit.arr->slot[b2];
-				HCL_ASSERT (HCL_OBJ_GET_FLAGS_TYPE(t) == HCL_OBJ_TYPE_OOP);
-				HCL_ASSERT (b1 < HCL_OBJ_GET_SIZE(t));
+				HCL_ASSERT (hcl, HCL_OBJ_GET_FLAGS_TYPE(t) == HCL_OBJ_TYPE_OOP);
+				HCL_ASSERT (hcl, b1 < HCL_OBJ_GET_SIZE(t));
 
 				if ((bcode >> 3) & 1)
 				{
@@ -1816,7 +1819,7 @@ static int execute (hcl_t* hcl)
 			{
 				hcl_oop_t t;
 				LOG_INST_0 (hcl, "dup_stacktop");
-				HCL_ASSERT (!HCL_STACK_ISEMPTY(hcl));
+				HCL_ASSERT (hcl, !HCL_STACK_ISEMPTY(hcl));
 				t = HCL_STACK_GETTOP(hcl);
 				HCL_STACK_PUSH (hcl, t);
 				break;
@@ -1824,7 +1827,7 @@ static int execute (hcl_t* hcl)
 
 			case HCL_CODE_POP_STACKTOP:
 				LOG_INST_0 (hcl, "pop_stacktop");
-				HCL_ASSERT (!HCL_STACK_ISEMPTY(hcl));
+				HCL_ASSERT (hcl, !HCL_STACK_ISEMPTY(hcl));
 				HCL_STACK_POP (hcl);
 				break;
 
@@ -1867,8 +1870,8 @@ static int execute (hcl_t* hcl)
 					 */
 
 /*
-//					HCL_ASSERT (HCL_CLASSOF(hcl, hcl->active_context) == hcl->_block_context);
-//					HCL_ASSERT (HCL_CLASSOF(hcl, hcl->processor->active->initial_context) == hcl->_block_context);
+//					HCL_ASSERT (hcl, HCL_CLASSOF(hcl, hcl->active_context) == hcl->_block_context);
+//					HCL_ASSERT (hcl, HCL_CLASSOF(hcl, hcl->processor->active->initial_context) == hcl->_block_context);
 */
 					/* decrement the instruction pointer back to the return instruction.
 					 * even if the context is reentered, it will just return.
@@ -1887,7 +1890,7 @@ static int execute (hcl_t* hcl)
 					{
 						/* returning from a method */
 /*
-//						HCL_ASSERT (HCL_CLASSOF(hcl, hcl->active_context) == hcl->_method_context);
+//						HCL_ASSERT (hcl, HCL_CLASSOF(hcl, hcl->active_context) == hcl->_method_context);
 */
 						hcl->ip = -1;
 					}
@@ -1897,7 +1900,7 @@ static int execute (hcl_t* hcl)
 
 						/* method return from within a block(including a non-local return) */
 /*
-//						HCL_ASSERT (HCL_CLASSOF(hcl, hcl->active_context) == hcl->_block_context);
+//						HCL_ASSERT (hcl, HCL_CLASSOF(hcl, hcl->active_context) == hcl->_block_context);
 */
 						ctx = hcl->active_context;
 						while ((hcl_oop_t)ctx != hcl->_nil)
@@ -1925,12 +1928,12 @@ static int execute (hcl_t* hcl)
 
 						/* cannot return from a method that has returned already */
 /*
-//						HCL_ASSERT (HCL_CLASSOF(hcl, hcl->active_context->origin) == hcl->_method_context);
+//						HCL_ASSERT (hcl, HCL_CLASSOF(hcl, hcl->active_context->origin) == hcl->_method_context);
 */
-						HCL_ASSERT (hcl->active_context->origin->ip == HCL_SMOOI_TO_OOP(-1));
+						HCL_ASSERT (hcl, hcl->active_context->origin->ip == HCL_SMOOI_TO_OOP(-1));
 
 						HCL_LOG0 (hcl, HCL_LOG_IC | HCL_LOG_ERROR, "Error - cannot return from dead context\n");
-						hcl->errnum = HCL_EINTERN; /* TODO: can i make this error catchable at the hcl level? */
+						hcl_seterrnum (hcl, HCL_EINTERN); /* TODO: can i make this error catchable at the hcl level? */
 						return -1;
 
 					non_local_return_ok:
@@ -1939,7 +1942,7 @@ static int execute (hcl_t* hcl)
 					}
 
 /*
-//					HCL_ASSERT (HCL_CLASSOF(hcl, hcl->active_context->origin) == hcl->_method_context);
+//					HCL_ASSERT (hcl, HCL_CLASSOF(hcl, hcl->active_context->origin) == hcl->_method_context);
 */
 					/* restore the stack pointer */
 					hcl->sp = HCL_OOP_TO_SMOOI(hcl->active_context->origin->sp);
@@ -1970,14 +1973,14 @@ XXXXX
 						{
 							/* the new active context is the fake initial context.
 							 * this context can't get executed further. */
-							HCL_ASSERT ((hcl_oop_t)hcl->active_context->sender == hcl->_nil);
+							HCL_ASSERT (hcl, (hcl_oop_t)hcl->active_context->sender == hcl->_nil);
 /*
-//							HCL_ASSERT (HCL_CLASSOF(hcl, hcl->active_context) == hcl->_method_context);
+//							HCL_ASSERT (hcl, HCL_CLASSOF(hcl, hcl->active_context) == hcl->_method_context);
 */
-							HCL_ASSERT (hcl->active_context->receiver_or_source == hcl->_nil);
-							HCL_ASSERT (hcl->active_context == hcl->processor->active->initial_context);
-							HCL_ASSERT (hcl->active_context->origin == hcl->processor->active->initial_context->origin);
-							HCL_ASSERT (hcl->active_context->origin == hcl->active_context);
+							HCL_ASSERT (hcl, hcl->active_context->receiver_or_source == hcl->_nil);
+							HCL_ASSERT (hcl, hcl->active_context == hcl->processor->active->initial_context);
+							HCL_ASSERT (hcl, hcl->active_context->origin == hcl->processor->active->initial_context->origin);
+							HCL_ASSERT (hcl, hcl->active_context->origin == hcl->active_context);
 
 							/* NOTE: this condition is true for the processified block context also.
 							 *   hcl->active_context->origin == hcl->processor->active->initial_context->origin
@@ -1985,7 +1988,7 @@ XXXXX
 							 *   processified block check has been done against the context before switching */
 
 							/* the stack contains the final return value so the stack pointer must be 0. */
-							HCL_ASSERT (hcl->sp == 0); 
+							HCL_ASSERT (hcl, hcl->sp == 0); 
 
 							if (hcl->option.trait & HCL_AWAIT_PROCS)
 								terminate_process (hcl, hcl->processor->active);
@@ -2015,7 +2018,7 @@ XXXXX
 					 * over a block using the newProcess method. let's terminate
 					 * the process. */
 
-					HCL_ASSERT ((hcl_oop_t)hcl->active_context->sender == hcl->_nil);
+					HCL_ASSERT (hcl, (hcl_oop_t)hcl->active_context->sender == hcl->_nil);
 					terminate_process (hcl, hcl->processor->active);
 				}
 				else
@@ -2051,8 +2054,8 @@ XXXXX
 
 				LOG_INST_2 (hcl, "make_block %zu %zu", b1, b2);
 
-				HCL_ASSERT (b1 >= 0);
-				HCL_ASSERT (b2 >= b1);
+				HCL_ASSERT (hcl, b1 >= 0);
+				HCL_ASSERT (hcl, b2 >= b1);
 
 				/* the block context object created here is used as a base
 				 * object for block context activation. activate_context()
@@ -2097,18 +2100,18 @@ XXXXX
 				LOG_INST_0 (hcl, "send_block_copy");
 
 				/* it emulates thisContext blockCopy: nargs ofTmprCount: ntmprs */
-				HCL_ASSERT (hcl->sp >= 2);
+				HCL_ASSERT (hcl, hcl->sp >= 2);
 
-				HCL_ASSERT (HCL_CLASSOF(hcl, HCL_STACK_GETTOP(hcl)) == hcl->_small_integer);
+				HCL_ASSERT (hcl, HCL_CLASSOF(hcl, HCL_STACK_GETTOP(hcl)) == hcl->_small_integer);
 				ntmprs = HCL_OOP_TO_SMOOI(HCL_STACK_GETTOP(hcl));
 				HCL_STACK_POP (hcl);
 
-				HCL_ASSERT (HCL_CLASSOF(hcl, HCL_STACK_GETTOP(hcl)) == hcl->_small_integer);
+				HCL_ASSERT (hcl, HCL_CLASSOF(hcl, HCL_STACK_GETTOP(hcl)) == hcl->_small_integer);
 				nargs = HCL_OOP_TO_SMOOI(HCL_STACK_GETTOP(hcl));
 				HCL_STACK_POP (hcl);
 
-				HCL_ASSERT (nargs >= 0);
-				HCL_ASSERT (ntmprs >= nargs);
+				HCL_ASSERT (hcl, nargs >= 0);
+				HCL_ASSERT (hcl, ntmprs >= nargs);
 
 				/* the block context object created here is used
 				 * as a base object for block context activation.
@@ -2122,7 +2125,7 @@ XXXXX
 				/* get the receiver to the block copy message after block context instantiation
 				 * not to get affected by potential GC */
 				rctx = (hcl_oop_context_t)HCL_STACK_GETTOP(hcl);
-				HCL_ASSERT (rctx == hcl->active_context);
+				HCL_ASSERT (hcl, rctx == hcl->active_context);
 
 				/* [NOTE]
 				 *  blkctx->sender is left to nil. it is set to the 
@@ -2175,7 +2178,7 @@ XXXXX
 
 			default:
 				HCL_LOG1 (hcl, HCL_LOG_IC | HCL_LOG_FATAL, "Fatal error - unknown byte code 0x%zx\n", bcode);
-				hcl->errnum = HCL_EINTERN;
+				hcl_seterrnum (hcl, HCL_EINTERN);
 				goto oops;
 		}
 	}
@@ -2196,8 +2199,8 @@ int hcl_execute (hcl_t* hcl)
 {
 	int n;
 
-	HCL_ASSERT (hcl->initial_context == HCL_NULL);
-	HCL_ASSERT (hcl->active_context == HCL_NULL);
+	HCL_ASSERT (hcl, hcl->initial_context == HCL_NULL);
+	HCL_ASSERT (hcl, hcl->active_context == HCL_NULL);
 
 	if (start_initial_process_and_context (hcl) <= -1) return -1;
 	hcl->initial_context = hcl->processor->active->initial_context;

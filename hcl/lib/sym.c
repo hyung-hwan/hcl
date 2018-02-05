@@ -53,7 +53,7 @@ static hcl_oop_oop_t expand_bucket (hcl_t* hcl, hcl_oop_oop_t oldbuc)
 			if (inc_max > 0) inc = inc_max;
 			else
 			{
-				hcl->errnum = HCL_EOOMEM;
+				hcl_seterrnum (hcl, HCL_EOOMEM);
 				return HCL_NULL;
 			}
 		}
@@ -70,10 +70,10 @@ static hcl_oop_oop_t expand_bucket (hcl_t* hcl, hcl_oop_oop_t oldbuc)
 		symbol = (hcl_oop_char_t)oldbuc->slot[--oldsz];
 		if ((hcl_oop_t)symbol != hcl->_nil)
 		{
-			HCL_ASSERT (HCL_BRANDOF(hcl,symbol) == HCL_BRAND_SYMBOL);
-			/*HCL_ASSERT (sym->size > 0);*/
+			HCL_ASSERT (hcl, HCL_BRANDOF(hcl,symbol) == HCL_BRAND_SYMBOL);
+			/*HCL_ASSERT (hcl, sym->size > 0);*/
 
-			index = hcl_hashchars(symbol->slot, HCL_OBJ_GET_SIZE(symbol)) % newsz;
+			index = hcl_hashoochars(symbol->slot, HCL_OBJ_GET_SIZE(symbol)) % newsz;
 			while (newbuc->slot[index] != hcl->_nil) index = (index + 1) % newsz;
 			newbuc->slot[index] = (hcl_oop_t)symbol;
 		}
@@ -88,25 +88,25 @@ static hcl_oop_t find_or_make_symbol (hcl_t* hcl, const hcl_ooch_t* ptr, hcl_oow
 	hcl_oow_t index;
 	hcl_oop_char_t symbol;
 
-	HCL_ASSERT (len > 0);
+	HCL_ASSERT (hcl, len > 0);
 	if (len <= 0) 
 	{
 		/* i don't allow an empty symbol name */
-		hcl->errnum = HCL_EINVAL;
+		hcl_seterrnum (hcl, HCL_EINVAL);
 		return HCL_NULL;
 	}
 
-	HCL_ASSERT (HCL_BRANDOF(hcl,hcl->symtab->bucket) == HCL_BRAND_ARRAY);
-	index = hcl_hashchars(ptr, len) % HCL_OBJ_GET_SIZE(hcl->symtab->bucket);
+	HCL_ASSERT (hcl, HCL_BRANDOF(hcl,hcl->symtab->bucket) == HCL_BRAND_ARRAY);
+	index = hcl_hashoochars(ptr, len) % HCL_OBJ_GET_SIZE(hcl->symtab->bucket);
 
 	/* find a matching symbol in the open-addressed symbol table */
 	while (hcl->symtab->bucket->slot[index] != hcl->_nil) 
 	{
 		symbol = (hcl_oop_char_t)hcl->symtab->bucket->slot[index];
-		HCL_ASSERT (HCL_BRANDOF(hcl,symbol) == HCL_BRAND_SYMBOL);
+		HCL_ASSERT (hcl, HCL_BRANDOF(hcl,symbol) == HCL_BRAND_SYMBOL);
 
 		if (len == HCL_OBJ_GET_SIZE(symbol) &&
-		    hcl_equalchars (ptr, symbol->slot, len))
+		    hcl_equaloochars (ptr, symbol->slot, len))
 		{
 			return (hcl_oop_t)symbol;
 		}
@@ -116,18 +116,18 @@ static hcl_oop_t find_or_make_symbol (hcl_t* hcl, const hcl_ooch_t* ptr, hcl_oow
 
 	if (!create) 
 	{
-		hcl->errnum = HCL_ENOENT;
+		hcl_seterrnum (hcl, HCL_ENOENT);
 		return HCL_NULL;
 	}
 
 	/* make a new symbol and insert it */
-	HCL_ASSERT (HCL_OOP_IS_SMOOI(hcl->symtab->tally));
+	HCL_ASSERT (hcl, HCL_OOP_IS_SMOOI(hcl->symtab->tally));
 	tally = HCL_OOP_TO_SMOOI(hcl->symtab->tally);
 	if (tally >= HCL_SMOOI_MAX)
 	{
 		/* this built-in table is not allowed to hold more than 
 		 * HCL_SMOOI_MAX items for efficiency sake */
-		hcl->errnum = HCL_EDFULL;
+		hcl_seterrnum (hcl, HCL_EDFULL);
 		return HCL_NULL;
 	}
 
@@ -153,7 +153,7 @@ static hcl_oop_t find_or_make_symbol (hcl_t* hcl, const hcl_ooch_t* ptr, hcl_oow
 		hcl->symtab->bucket = bucket;
 
 		/* recalculate the index for the expanded bucket */
-		index = hcl_hashchars(ptr, len) % HCL_OBJ_GET_SIZE(hcl->symtab->bucket);
+		index = hcl_hashoochars(ptr, len) % HCL_OBJ_GET_SIZE(hcl->symtab->bucket);
 
 		while (hcl->symtab->bucket->slot[index] != hcl->_nil) 
 			index = (index + 1) % HCL_OBJ_GET_SIZE(hcl->symtab->bucket);
@@ -163,7 +163,7 @@ static hcl_oop_t find_or_make_symbol (hcl_t* hcl, const hcl_ooch_t* ptr, hcl_oow
 	symbol = (hcl_oop_char_t)hcl_alloccharobj (hcl, HCL_BRAND_SYMBOL, ptr, len);
 	if (symbol)
 	{
-		HCL_ASSERT (tally < HCL_SMOOI_MAX);
+		HCL_ASSERT (hcl, tally < HCL_SMOOI_MAX);
 		hcl->symtab->tally = HCL_SMOOI_TO_OOP(tally + 1);
 		hcl->symtab->bucket->slot[index] = (hcl_oop_t)symbol;
 	}

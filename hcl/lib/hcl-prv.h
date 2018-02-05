@@ -29,6 +29,7 @@
 
 #include "hcl.h"
 #include "hcl-utl.h"
+#include <stdarg.h>
 
 /* you can define this to either 1 or 2 */
 #define HCL_BCODE_LONG_PARAM_SIZE 2
@@ -44,6 +45,12 @@
  * PUSH_CONTEXT, PUSH_INTLIT, PUSH_INTLIT, SEND_BLOCK_COPY */
 #define HCL_USE_MAKE_BLOCK
 
+
+/* define this to enable karatsuba multiplication in bigint */
+#define HCL_ENABLE_KARATSUBA
+#define HCL_KARATSUBA_CUTOFF 32
+#define HCL_KARATSUBA_CUTOFF_DEBUG 3
+
 /* define this to allow an pointer(OOP) object to have trailing bytes 
  * this is used to embed bytes codes into the back of a compile method
  * object instead of putting in in a separate byte array. */
@@ -51,7 +58,6 @@
 
 /* this is for gc debugging */
 /*#define HCL_DEBUG_PROCESSOR*/
-#define HCL_DEBUG_GC
 #define HCL_DEBUG_VM_EXEC
 
 /* allow the caller to drive process switching by calling
@@ -104,8 +110,6 @@
 #	define HCL_MEMMOVE(dst,src,size) memmove(dst,src,size)
 #	define HCL_MEMCMP(dst,src,size)  memcmp(dst,src,size)
 #endif
-
-#define HCL_ASSERT(x)             assert(x)
 
 #define HCL_ALIGN(x,y) ((((x) + (y) - 1) / (y)) * (y))
 
