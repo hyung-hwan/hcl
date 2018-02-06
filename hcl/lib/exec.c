@@ -1815,6 +1815,66 @@ static int execute (hcl_t* hcl)
 				break;
 			/* -------------------------------------------------------- */
 
+			case HCL_CODE_MAKE_ARRAY:
+			{
+				hcl_oop_t t;
+
+				FETCH_PARAM_CODE_TO (hcl, b1);
+				LOG_INST_1 (hcl, "make_array %zu", b1);
+
+				/* create an empty array */
+				t = hcl_makearray (hcl, b1);
+				if (!t) return -1;
+
+				HCL_STACK_PUSH (hcl, t); /* push the array created */
+				break;
+			}
+
+			case HCL_CODE_POP_INTO_ARRAY:
+			{
+				hcl_oop_t t1, t2;
+				FETCH_PARAM_CODE_TO (hcl, b1);
+				LOG_INST_1 (hcl, "pop_into_array %zu", b1);
+				t1 = HCL_STACK_GETTOP(hcl); /* value to store */
+				HCL_STACK_POP (hcl);
+				t2 = HCL_STACK_GETTOP(hcl); /* array */
+				((hcl_oop_oop_t)t2)->slot[b1] = t1;
+				break;
+			}
+
+			case HCL_CODE_MAKE_DICTIONARY:
+			{
+				hcl_oop_t t;
+
+				FETCH_PARAM_CODE_TO (hcl, b1);
+				LOG_INST_1 (hcl, "make_dictionary %zu", b1);
+				t = (hcl_oop_t)hcl_makedic (hcl, b1 + 10);
+				if (!t) return -1;
+				HCL_STACK_PUSH (hcl, t);
+				break;
+			}
+
+			case HCL_CODE_POP_INTO_DICTIONARY:
+			{
+				hcl_oop_t t1, t2, t3;
+
+				LOG_INST_0 (hcl, "pop_into_dictionary");
+				t1 = HCL_STACK_GETTOP(hcl); /* value */
+				HCL_STACK_POP (hcl);
+				t2 = HCL_STACK_GETTOP(hcl); /* key */
+				HCL_STACK_POP (hcl);
+				t3 = HCL_STACK_GETTOP(hcl); /* dictionary */
+/* TODO: generic dictioanry??? */
+				if (!hcl_putatdic (hcl, (hcl_oop_set_t)t3, t2, t1)) return -1;
+				break;
+			}
+
+/* TODO: 
+			case HCL_CODE_MAKE_BYTEARRAY:
+			case HCL_CODE_POP_INTO_BYTEARRAY:
+*/
+			/* -------------------------------------------------------- */
+
 			case BCODE_DUP_STACKTOP:
 			{
 				hcl_oop_t t;

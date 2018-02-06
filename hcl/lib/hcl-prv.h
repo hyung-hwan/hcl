@@ -583,6 +583,18 @@ enum hcl_bcode_t
 	HCL_CODE_JUMP_BACKWARD_2          = 0x4A, /* 74 */
 	HCL_CODE_JUMP_BACKWARD_3          = 0x4B, /* 75 */
 
+#if 0
+	BCODE_JUMP_BACKWARD_IF_FALSE_0 = 0x4C, /* 76 */
+	BCODE_JUMP_BACKWARD_IF_FALSE_1 = 0x4D, /* 77 */
+	BCODE_JUMP_BACKWARD_IF_FALSE_2 = 0x4E, /* 78 */
+	BCODE_JUMP_BACKWARD_IF_FALSE_3 = 0x4F, /* 79 */
+
+	BCODE_JUMP_BACKWARD_IF_TRUE_0  = 0x50, /* 80 */
+	BCODE_JUMP_BACKWARD_IF_TRUE_1  = 0x51, /* 81 */
+	BCODE_JUMP_BACKWARD_IF_TRUE_2  = 0x52, /* 82 */
+	BCODE_JUMP_BACKWARD_IF_TRUE_3  = 0x53, /* 83 */
+#endif
+
 	HCL_CODE_CALL_0                   = 0x54, /* 84 */
 	HCL_CODE_CALL_1                   = 0x55, /* 85 */
 	HCL_CODE_CALL_2                   = 0x56, /* 86 */
@@ -631,46 +643,7 @@ enum hcl_bcode_t
 	/* UNUSED 0x78 - 0x7F */
 
 	BCODE_STORE_INTO_INSTVAR_X        = 0x80, /* 128 */
-	BCODE_POP_INTO_INSTVAR_X          = 0x88, /* 136 */
-	BCODE_PUSH_INSTVAR_X              = 0x90, /* 144 */
 
-	HCL_CODE_PUSH_TEMPVAR_X           = 0x98, /* 152 */
-	HCL_CODE_STORE_INTO_TEMPVAR_X     = 0xA0, /* 160 */
-	BCODE_POP_INTO_TEMPVAR_X          = 0xA8, /* 168 */
-
-	HCL_CODE_PUSH_LITERAL_X           = 0xB0, /* 176 */
-	HCL_CODE_PUSH_LITERAL_X2          = 0xB1, /* 177 */
-
-	/* SEE FURTHER DOWN FOR SPECIAL CODES - 0xB2 - 0xB7  */
-
-	HCL_CODE_STORE_INTO_OBJECT_X      = 0xB8, /* 184 */
-	BCODE_POP_INTO_OBJECT_X           = 0xBC, /* 188 */
-	HCL_CODE_PUSH_OBJECT_X            = 0xC0, /* 192 */
-
-	HCL_CODE_JUMP_FORWARD_X           = 0xC4, /* 196 */
-	HCL_CODE_JUMP_BACKWARD_X          = 0xC8, /* 200 */
-
-	HCL_CODE_CALL_X                   = 0xD4, /* 212 */
-
-	HCL_CODE_STORE_INTO_CTXTEMPVAR_X  = 0xD8, /* 216 */
-	BCODE_POP_INTO_CTXTEMPVAR_X       = 0xDC, /* 220 */
-	HCL_CODE_PUSH_CTXTEMPVAR_X        = 0xE0, /* 224 */
-
-	BCODE_PUSH_OBJVAR_X               = 0xE4, /* 228 */
-	BCODE_STORE_INTO_OBJVAR_X         = 0xE8, /* 232 */
-	BCODE_POP_INTO_OBJVAR_X           = 0xEC, /* 236 */
-
-	BCODE_SEND_MESSAGE_X              = 0xF0, /* 240 */
-	BCODE_SEND_MESSAGE_TO_SUPER_X     = 0xF4, /* 244 */
-
-	/* -------------------------------------- */
-
-	HCL_CODE_JUMP2_FORWARD            = 0xC5, /* 197 */
-	HCL_CODE_JUMP2_BACKWARD           = 0xC9, /* 201 */
-	HCL_CODE_JUMP_FORWARD_IF_TRUE     = 0xCC, /* 204 */
-	HCL_CODE_JUMP2_FORWARD_IF_TRUE    = 0xCD, /* 205 */
-	HCL_CODE_JUMP_FORWARD_IF_FALSE    = 0xD0, /* 208 */
-	HCL_CODE_JUMP2_FORWARD_IF_FALSE   = 0xD1, /* 209 */
 
 	BCODE_PUSH_RECEIVER               = 0x81, /* 129 */
 	HCL_CODE_PUSH_NIL                 = 0x82, /* 130 */
@@ -678,25 +651,72 @@ enum hcl_bcode_t
 	HCL_CODE_PUSH_FALSE               = 0x84, /* 132 */
 	BCODE_PUSH_CONTEXT                = 0x85, /* 133 */
 	BCODE_PUSH_PROCESS                = 0x86, /* 134 */
-	HCL_CODE_PUSH_NEGONE              = 0x87, /* 135 */
-	HCL_CODE_PUSH_ZERO                = 0x89, /* 137 */
-	HCL_CODE_PUSH_ONE                 = 0x8A, /* 138 */
-	HCL_CODE_PUSH_TWO                 = 0x8B, /* 139 */
+	/* UNUSED135 */
+
+	BCODE_POP_INTO_INSTVAR_X          = 0x88, /* 136 ## */
+
+	HCL_CODE_PUSH_NEGONE              = 0x89, /* 137 */
+	HCL_CODE_PUSH_ZERO                = 0x8A, /* 138 */
+	HCL_CODE_PUSH_ONE                 = 0x8B, /* 139 */
+	HCL_CODE_PUSH_TWO                 = 0x8C, /* 140 */
+
+	BCODE_PUSH_INSTVAR_X              = 0x90, /* 144 ## */
+	HCL_CODE_PUSH_TEMPVAR_X           = 0x98, /* 152 ## */
+	HCL_CODE_STORE_INTO_TEMPVAR_X     = 0xA0, /* 160 ## */
+	BCODE_POP_INTO_TEMPVAR_X          = 0xA8, /* 168 ## */
+
+	HCL_CODE_PUSH_LITERAL_X           = 0xB0, /* 176 ## */
+	HCL_CODE_PUSH_LITERAL_X2          = 0xB1, /* 177 */
 
 	HCL_CODE_PUSH_INTLIT              = 0xB2, /* 178 */
 	HCL_CODE_PUSH_NEGINTLIT           = 0xB3, /* 179 */
 	HCL_CODE_PUSH_CHARLIT             = 0xB4, /* 180 */
 
-	/* UNUSED 0xE8 - 0xF7 */
+	HCL_CODE_STORE_INTO_OBJECT_X      = 0xB8, /* 184 ## */
+	BCODE_POP_INTO_OBJECT_X           = 0xBC, /* 188 ## */
+	HCL_CODE_PUSH_OBJECT_X            = 0xC0, /* 192 ## */
 
-	BCODE_DUP_STACKTOP                = 0xF8,
-	HCL_CODE_POP_STACKTOP             = 0xF9,
-	BCODE_RETURN_STACKTOP             = 0xFA, /* ^something */
-	BCODE_RETURN_RECEIVER             = 0xFB, /* ^self */
-	HCL_CODE_RETURN_FROM_BLOCK        = 0xFC, /* return the stack top from a block */
-	HCL_CODE_MAKE_BLOCK               = 0xFD,
-	BCODE_SEND_BLOCK_COPY             = 0xFE,
-	HCL_CODE_NOOP                     = 0xFF
+	HCL_CODE_JUMP_FORWARD_X           = 0xC4, /* 196 ## */
+	HCL_CODE_JUMP2_FORWARD            = 0xC5, /* 197 */
+
+	HCL_CODE_JUMP_BACKWARD_X          = 0xC8, /* 200 ## */
+	HCL_CODE_JUMP2_BACKWARD           = 0xC9, /* 201 */
+
+	HCL_CODE_JUMP_FORWARD_IF_TRUE     = 0xCC, /* 204 ## */
+	HCL_CODE_JUMP2_FORWARD_IF_TRUE    = 0xCD, /* 205 */
+	HCL_CODE_JUMP_FORWARD_IF_FALSE    = 0xD0, /* 208 ## */
+	HCL_CODE_JUMP2_FORWARD_IF_FALSE   = 0xD1, /* 209 */
+
+	HCL_CODE_CALL_X                   = 0xD4, /* 212 */
+
+	HCL_CODE_STORE_INTO_CTXTEMPVAR_X  = 0xD8, /* 216 ## */
+	BCODE_POP_INTO_CTXTEMPVAR_X       = 0xDC, /* 220 ## */
+	HCL_CODE_PUSH_CTXTEMPVAR_X        = 0xE0, /* 224 ## */
+
+	BCODE_PUSH_OBJVAR_X               = 0xE4, /* 228 ## */
+	BCODE_STORE_INTO_OBJVAR_X         = 0xE8, /* 232 ## */
+	BCODE_POP_INTO_OBJVAR_X           = 0xEC, /* 236 ## */
+
+	BCODE_SEND_MESSAGE_X              = 0xF0, /* 240 ## */
+	/* UNUSED 241 */
+	HCL_CODE_MAKE_DICTIONARY          = 0xF2, /* 242 */
+	HCL_CODE_POP_INTO_DICTIONARY      = 0xF3, /* 243 */
+	BCODE_SEND_MESSAGE_TO_SUPER_X     = 0xF4, /* 244 ## */
+
+	/* -------------------------------------- */
+
+	HCL_CODE_MAKE_ARRAY               = 0xF5, /* 245 */
+	HCL_CODE_POP_INTO_ARRAY           = 0xF6, /* 246 */
+
+	BCODE_DUP_STACKTOP                = 0xF7,
+	HCL_CODE_POP_STACKTOP             = 0xF8,
+	BCODE_RETURN_STACKTOP             = 0xF9, /* ^something */
+	BCODE_RETURN_RECEIVER             = 0xFA, /* ^self */
+	HCL_CODE_RETURN_FROM_BLOCK        = 0xFB, /* return the stack top from a block */
+	/* UNUSED 252 */
+	HCL_CODE_MAKE_BLOCK               = 0xFD, /* 253 */
+	BCODE_SEND_BLOCK_COPY             = 0xFE, /* 254 */
+	HCL_CODE_NOOP                     = 0xFF  /* 255 */
 };
 
 #if defined(__cplusplus)
