@@ -155,7 +155,6 @@ libhcl_la_LINK = $(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) \
 PROGRAMS = $(bin_PROGRAMS)
 am_hcl_OBJECTS = hcl-main.$(OBJEXT)
 hcl_OBJECTS = $(am_hcl_OBJECTS)
-hcl_DEPENDENCIES = $(am__DEPENDENCIES_2)
 hcl_LINK = $(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) \
 	$(LIBTOOLFLAGS) --mode=link $(CCLD) $(AM_CFLAGS) $(CFLAGS) \
 	$(hcl_LDFLAGS) $(LDFLAGS) -o $@
@@ -423,6 +422,7 @@ hcl_SOURCES = main.c
 hcl_CPPFLAGS = $(CPPFLAGS_LIB_COMMON)
 hcl_LDFLAGS = $(LDFLAGS_LIB_COMMON)
 hcl_LDADD = $(LIBADD_LIB_COMMON) -lhcl #-ldyncall_s
+hcl_DEPENDENCIES = libhcl.la
 all: hcl-cfg.h
 	$(MAKE) $(AM_MAKEFLAGS) all-am
 

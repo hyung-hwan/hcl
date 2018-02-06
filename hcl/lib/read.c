@@ -89,11 +89,14 @@ typedef enum voca_id_t voca_id_t;
 
 enum list_flag_t
 {
-	QUOTED = (1 << 0),
-	DOTTED = (1 << 1),
-	CLOSED = (1 << 2),
-	ARRAY  = (1 << 3)
+	QUOTED     = (1 << 0),
+	DOTTED     = (1 << 1),
+	CLOSED     = (1 << 2)
 };
+
+#define LIST_FLAG_GET_CONCODE(x) (((x) >> 8) & 0xFF)
+#define LIST_FLAG_SET_CONCODE(x,type) ((x) = ((x) & ~0xFF00) | ((type) << 8))
+
 
 static int string_to_ooi (hcl_t* hcl, hcl_oocs_t* str, int radixed, hcl_ooi_t* num)
 {
@@ -219,7 +222,7 @@ static HCL_INLINE int is_alnumchar (hcl_ooci_t c)
 
 static HCL_INLINE int is_delimiter (hcl_ooci_t c)
 {
-	return c == '(' || c == ')' || c == '[' || c == ']' || c == '\"' || c == '#' || c == ';' || c == '|' || is_spacechar(c) || c == HCL_UCI_EOF;
+	return c == '(' || c == ')' || c == '[' || c == ']' || c == '{' || c == '}' || c == '\"' || c == '#' || c == ';' || c == '|' || is_spacechar(c) || c == HCL_UCI_EOF;
 }
 
 
@@ -651,6 +654,29 @@ HCL_DEBUG2 (hcl, "INVALID DIGIT IN RADIXED NUMBER IN [%.*S] \n", (hcl_ooi_t)hcl-
 	return 0;
 }
 
+static int get_quote_token (hcl_t* hcl)
+{
+	hcl_ooci_t c;
+	int radix;
+
+	HCL_ASSERT (hcl, hcl->c->lxc.c == '\'');
+
+	GET_CHAR_TO (hcl, c);
+
+	switch (c)
+	{
+		case '(':
+			ADD_TOKEN_CHAR (hcl, '\'');
+			ADD_TOKEN_CHAR(hcl, c);
+			SET_TOKEN_TYPE (hcl, HCL_IOTOK_QPAREN);
+
+		//default:
+			
+	}
+
+	return 0;
+}
+
 static int get_sharp_token (hcl_t* hcl)
 {
 	hcl_ooci_t c;
@@ -673,8 +699,8 @@ static int get_sharp_token (hcl_t* hcl)
 	 * #\xHHHH  * unicode
 	 * #\uHHHH
 	 * #( )  * vector
-	 * #[ ]  * list
-	 * #{ }  * hash table
+	 * #[ ]  * byte array
+	 * #{ }  * dictionary
 	 * #< > -- xxx
 	 */
 
@@ -813,13 +839,19 @@ HCL_DEBUG2 (hcl, "INVALID CHARACTER LITERAL [%.*S]\n", (hcl_ooi_t)hcl->c->tok.na
 		case '(': /* #( - array literal */
 			ADD_TOKEN_CHAR (hcl, '#');
 			ADD_TOKEN_CHAR(hcl, c);
-			SET_TOKEN_TYPE (hcl, HCL_IOTOK_ARPAREN);
+			SET_TOKEN_TYPE (hcl, HCL_IOTOK_APAREN);
 			break;
 
 		case '[': /* #[ - byte array literal */
 			ADD_TOKEN_CHAR (hcl, '#');
 			ADD_TOKEN_CHAR(hcl, c);
 			SET_TOKEN_TYPE (hcl, HCL_IOTOK_BAPAREN);
+			break;
+
+		case '{':
+			ADD_TOKEN_CHAR (hcl, '#');
+			ADD_TOKEN_CHAR(hcl, c);
+			SET_TOKEN_TYPE (hcl, HCL_IOTOK_DPAREN);
 			break;
 
 		default:
@@ -857,7 +889,7 @@ HCL_DEBUG2 (hcl, "INVALID CHARACTER LITERAL [%.*S]\n", (hcl_ooi_t)hcl->c->tok.na
 			}
 			else
 			{
-HCL_DEBUG2 (hcl, "INVALID HASH NAME [%.*S]\n", (hcl_ooi_t)hcl->c->tok.name.len, hcl->c->tok.name.ptr);
+HCL_DEBUG2 (hcl, "INVALID HASHED LITERAL NAME [%.*S]\n", (hcl_ooi_t)hcl->c->tok.name.len, hcl->c->tok.name.ptr);
 				hcl_setsynerr (hcl, HCL_SYNERR_HASHLIT, TOKEN_LOC(hcl), TOKEN_NAME(hcl));
 				return -1;
 			}
@@ -928,6 +960,16 @@ retry:
 			SET_TOKEN_TYPE (hcl, HCL_IOTOK_RBRACK);
 			break;
 
+		case '{':
+			ADD_TOKEN_CHAR(hcl, c);
+			SET_TOKEN_TYPE (hcl, HCL_IOTOK_LBRACE);
+			break;
+
+		case '}':
+			ADD_TOKEN_CHAR(hcl, c);
+			SET_TOKEN_TYPE (hcl, HCL_IOTOK_RBRACE);
+			break;
+
 		case '|': 
 			ADD_TOKEN_CHAR (hcl, c);
 			SET_TOKEN_TYPE(hcl, HCL_IOTOK_VBAR);
@@ -938,17 +980,18 @@ retry:
 			ADD_TOKEN_CHAR(hcl, c);
 			break;
 
-		case '\'':
-			SET_TOKEN_TYPE (hcl, HCL_IOTOK_QUOTE);
-			ADD_TOKEN_CHAR(hcl, c);
-			break;
+		
 
 		case '\"':
-			if (get_string (hcl, '\"', '\\', 0, 0) <= -1) return -1;
+			if (get_string(hcl, '\"', '\\', 0, 0) <= -1) return -1;
+			break;
+
+		case '\'':
+			if (get_quote_token(hcl) <= -1) return -1;
 			break;
 
 		case '#':  
-			if (get_sharp_token (hcl) <= -1) return -1;
+			if (get_sharp_token(hcl) <= -1) return -1;
 			break;
 
 		case '+':
@@ -1211,10 +1254,10 @@ static HCL_INLINE hcl_oop_t enter_list (hcl_t* hcl, int flagv)
 	 * both to be updated in chain_to_list() as items are added.
 	 */
 
-/* TODO: change to push array of  3 cells instead? or don't use the object memory for stack. use compiler's own memory... */
-	return (push (hcl, HCL_SMOOI_TO_OOP(flagv)) == HCL_NULL ||
-	        push (hcl, hcl->_nil) == HCL_NULL ||
-	        push (hcl, hcl->_nil) == HCL_NULL)? HCL_NULL: hcl->c->r.s;
+/* TODO: change to push array of 3 cells instead? or don't use the object memory for stack. use compiler's own memory... */
+	return (push(hcl, HCL_SMOOI_TO_OOP(flagv)) == HCL_NULL ||
+	        push(hcl, hcl->_nil) == HCL_NULL ||
+	        push(hcl, hcl->_nil) == HCL_NULL)? HCL_NULL: hcl->c->r.s;
 }
 
 static HCL_INLINE hcl_oop_t leave_list (hcl_t* hcl, int* flagv, int* oldflagv)
@@ -1236,6 +1279,7 @@ static HCL_INLINE hcl_oop_t leave_list (hcl_t* hcl, int* flagv, int* oldflagv)
 	fv = HCL_OOP_TO_SMOOI(HCL_CONS_CAR(hcl->c->r.s));
 	pop (hcl);
 
+#if 0
 	if (fv & ARRAY)
 	{
 		/* convert a list to an array */
@@ -1253,7 +1297,7 @@ static HCL_INLINE hcl_oop_t leave_list (hcl_t* hcl, int* flagv, int* oldflagv)
 		}
 
 		hcl_pushtmp (hcl, &head);
-		arr = (hcl_oop_oop_t)hcl_makearray (hcl, count);
+		arr = (hcl_oop_oop_t)hcl_makearray(hcl, count);
 		hcl_poptmp (hcl);
 		if (!arr) return HCL_NULL;
 
@@ -1267,6 +1311,7 @@ static HCL_INLINE hcl_oop_t leave_list (hcl_t* hcl, int* flagv, int* oldflagv)
 
 		head = (hcl_oop_t)arr;
 	}
+#endif
 
 	*oldflagv = fv;
 	if (HCL_IS_NIL(hcl,hcl->c->r.s))
@@ -1285,10 +1330,11 @@ static HCL_INLINE hcl_oop_t leave_list (hcl_t* hcl, int* flagv, int* oldflagv)
 	}
 
 	/* return the head of the list being left */
+	HCL_OBJ_SET_FLAGS_SYNCODE(head, LIST_FLAG_GET_CONCODE(fv));
 	return head;
 }
 
-static HCL_INLINE int dot_list (hcl_t* hcl)
+static HCL_INLINE int can_dot_list (hcl_t* hcl)
 {
 	hcl_oop_t cons;
 	int flagv;
@@ -1299,11 +1345,11 @@ static HCL_INLINE int dot_list (hcl_t* hcl)
 	cons = HCL_CONS_CDR(HCL_CONS_CDR(hcl->c->r.s));
 	flagv = HCL_OOP_TO_SMOOI(HCL_CONS_CAR(cons));
 
-	if (flagv & ARRAY) return -1;
+	if (LIST_FLAG_GET_CONCODE(flagv) != HCL_CONCODE_QLIST) return 0;
 
 	flagv |= DOTTED;
 	HCL_CONS_CAR(cons) = HCL_SMOOI_TO_OOP(flagv);
-	return 0;
+	return 1;
 }
 
 static hcl_oop_t chain_to_list (hcl_t* hcl, hcl_oop_t obj)
@@ -1540,6 +1586,7 @@ static int read_object (hcl_t* hcl)
 		switch (TOKEN_TYPE(hcl)) 
 		{
 			default:
+				HCL_DEBUG3 (hcl, "invalid token type encountered %d - %.*js\n", TOKEN_TYPE(hcl), TOKEN_NAME_LEN(hcl), TOKEN_NAME_PTR(hcl));
 				HCL_ASSERT (hcl, !"should never happen - invalid token type");
 				hcl_seterrnum (hcl, HCL_EINTERN);
 				return -1;
@@ -1560,6 +1607,7 @@ static int read_object (hcl_t* hcl)
 				if (begin_include(hcl) <= -1) return -1;
 				goto redo;
 
+#if 0
 			case HCL_IOTOK_QUOTE:
 				if (level >= HCL_TYPE_MAX(int))
 				{
@@ -1579,12 +1627,27 @@ static int read_object (hcl_t* hcl)
 				/* read the next token */
 				GET_TOKEN (hcl);
 				goto redo;
+#endif
 
-			case HCL_IOTOK_ARPAREN:
-				flagv = ARRAY;
+			case HCL_IOTOK_APAREN:
+				flagv = 0;
+				LIST_FLAG_SET_CONCODE (flagv, HCL_CONCODE_ARRAY);
+				goto start_list;
+			case HCL_IOTOK_BAPAREN:
+				flagv = 0;
+				LIST_FLAG_SET_CONCODE (flagv, HCL_CONCODE_BYTEARRAY);
+				goto start_list;
+			case HCL_IOTOK_QPAREN:
+				flagv = 0;
+				LIST_FLAG_SET_CONCODE (flagv, HCL_CONCODE_QLIST);
+				goto start_list;
+			case HCL_IOTOK_DPAREN:
+				flagv = 0;
+				LIST_FLAG_SET_CONCODE (flagv, HCL_CONCODE_DICTIONARY);
 				goto start_list;
 			case HCL_IOTOK_LPAREN:
 				flagv = 0;
+				LIST_FLAG_SET_CONCODE (flagv, HCL_CONCODE_XLIST);
 			start_list:
 				if (level >= HCL_TYPE_MAX(int))
 				{
@@ -1595,16 +1658,16 @@ static int read_object (hcl_t* hcl)
 
 				/* push some data to simulate recursion into 
 				 * a list literal or an array literal */
-				if (enter_list (hcl, flagv) == HCL_NULL) return -1;
+				if (enter_list(hcl, flagv) == HCL_NULL) return -1;
 				level++;
-				if (flagv & ARRAY) array_level++;
+				if (LIST_FLAG_GET_CONCODE(flagv) == HCL_CONCODE_ARRAY) array_level++;
 
 				/* read the next token */
 				GET_TOKEN (hcl);
 				goto redo;
 
 			case HCL_IOTOK_DOT:
-				if (level <= 0 || is_list_empty (hcl) || dot_list(hcl) <= -1)
+				if (level <= 0 || is_list_empty(hcl) || !can_dot_list(hcl))
 				{
 					/* cannot have a period:
 					 *   1. at the top level - not inside ()
@@ -1617,9 +1680,35 @@ static int read_object (hcl_t* hcl)
 				GET_TOKEN (hcl);
 				goto redo;
 
-			case HCL_IOTOK_RPAREN:
+			case HCL_IOTOK_RPAREN: /* xlist (), array #(), qlist '() */
+			case HCL_IOTOK_RBRACK: /* byte array #[] */
+			case HCL_IOTOK_RBRACE: /* dictionary #{} */
 			{
+				static struct 
+				{
+					int closer;
+					int synerr;
+				} req[] =
+				{
+					{ HCL_IOTOK_RPAREN, HCL_SYNERR_RPAREN }, /* XLIST */
+					{ HCL_IOTOK_RPAREN, HCL_SYNERR_RPAREN }, /* ARRAY */
+					{ HCL_IOTOK_RBRACK, HCL_SYNERR_RBRACK }, /* BYTEARRAY */
+					{ HCL_IOTOK_RBRACE, HCL_SYNERR_RBRACE }, /* DICTIONARY */
+					{ HCL_IOTOK_RPAREN, HCL_SYNERR_RPAREN }  /* QLIST */
+				};
+
 				int oldflagv;
+				int concode;
+
+				concode = LIST_FLAG_GET_CONCODE(flagv);
+
+				if (req[concode].closer != TOKEN_TYPE(hcl))
+				{
+					hcl_setsynerr (hcl, req[concode].synerr, TOKEN_LOC(hcl), TOKEN_NAME(hcl));
+					return -1;
+				}
+
+#if 0
 				if ((flagv & QUOTED) || level <= 0)
 				{
 					/* the right parenthesis can never appear while 
@@ -1642,20 +1731,27 @@ static int read_object (hcl_t* hcl)
 					hcl_setsynerr (hcl, HCL_SYNERR_LPAREN, TOKEN_LOC(hcl), TOKEN_NAME(hcl));
 					return -1;
 				}
+#endif
 
 				obj = leave_list (hcl, &flagv, &oldflagv);
 
 				level--;
-				if (oldflagv & ARRAY) array_level--;
+				if (LIST_FLAG_GET_CONCODE(oldflagv) == HCL_CONCODE_ARRAY) array_level--;
 				break;
 			}
 
+			
+
+#if 0
 			case HCL_IOTOK_BAPAREN:
 				if (get_byte_array_literal(hcl, &obj) <= -1) return -1;
 				break;
+#endif
 
 			case HCL_IOTOK_VBAR:
 /* TODO: think wheter to allow | | inside a quoted list... */
+
+/* TODO: revise this part ... */
 				if (array_level > 0)
 				{
 					hcl_setsynerr (hcl, HCL_SYNERR_VBARBANNED, TOKEN_LOC(hcl), TOKEN_NAME(hcl));
@@ -1710,6 +1806,7 @@ static int read_object (hcl_t* hcl)
 
 		if (!obj) return -1;
 
+#if 0
 		/* check if the element is read for a quoted list */
 		while (flagv & QUOTED)
 		{
@@ -1726,15 +1823,17 @@ static int read_object (hcl_t* hcl)
 
 			/* one level up toward the top */
 			level--;
-			if (oldflagv & ARRAY) array_level--;
+
+			if (LIST_FLAG_GET_CONCODE(oldflagv) == HCL_CONCODE_ARRAY) array_level--;
 		}
+#endif
 
 		/* check if we are at the top level */
 		if (level <= 0) break; /* yes */
 
 		/* if not, append the element read into the current list.
 		 * if we are not at the top level, we must be in a list */
-		if (chain_to_list (hcl, obj) == HCL_NULL) return -1;
+		if (chain_to_list(hcl, obj) == HCL_NULL) return -1;
 
 		/* read the next token */
 		GET_TOKEN (hcl);

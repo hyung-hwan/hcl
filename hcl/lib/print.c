@@ -257,7 +257,28 @@ next:
 
 		case HCL_BRAND_CONS:
 		{
-			if (outbfmt(hcl, mask, "(") <= -1) return -1;
+			static hcl_bch_t *opening_paren[] =
+			{
+				"(",   /*HCL_CONCODE_XLIST */
+				"#(",  /*HCL_CONCODE_ARRAY */
+				"#[",  /*HCL_CONCODE_BYTEARRAY */
+				"#{",  /*HCL_CONCODE_DICTIONARY */
+				"'("   /*HCL_CONCODE_QLIST */
+			};
+
+			static hcl_bch_t *closing_paren[] =
+			{
+				")",   /*HCL_CONCODE_XLIST */
+				")",   /*HCL_CONCODE_ARRAY */
+				"]",   /*HCL_CONCODE_BYTEARRAY */
+				"}",   /*HCL_CONCODE_DICTIONARY */
+				")"    /*HCL_CONCODE_QLIST */
+			};
+
+			int concode;
+
+			concode = HCL_OBJ_GET_FLAGS_SYNCODE(obj);
+			if (outbfmt(hcl, mask, opening_paren[concode]) <= -1) return -1;
 			cur = obj;
 
 			do
@@ -310,7 +331,8 @@ next:
 				if (outbfmt(hcl, mask, " ") <= -1) return -1;
 			}
 			while (1);
-			if (outbfmt(hcl, mask, ")") <= -1) return -1;
+
+			if (outbfmt(hcl, mask, closing_paren[concode]) <= -1) return -1;
 			break;
 		}
 

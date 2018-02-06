@@ -806,6 +806,7 @@ static char* syntax_error_msg[] =
 	"( expected",
 	") expected",
 	"] expected",
+	"} expected",
 	"| expected",
 
 	"string expected",
@@ -834,7 +835,9 @@ static char* syntax_error_msg[] =
 
 	"elif without if",
 	"else without if",
-	"break outside loop"
+	"break outside loop",
+
+	"invalid callable"
 };
 
 static void print_synerr (hcl_t* hcl)
@@ -855,24 +858,23 @@ static void print_synerr (hcl_t* hcl)
 		hcl_logbfmt (hcl, HCL_LOG_STDERR, "%s", xtn->read_path);
 	}
 
-	hcl_logbfmt (hcl, HCL_LOG_STDERR, "syntax error at line %lu column %lu - %hs", 
-		(unsigned long int)synerr.loc.line, (unsigned long int)synerr.loc.colm,
-		syntax_error_msg[synerr.num]);
+	hcl_logbfmt (hcl, HCL_LOG_STDERR, "[%zu,%zu] syntax error - %hs", 
+		synerr.loc.line, synerr.loc.colm, syntax_error_msg[synerr.num]);
 
 	if (synerr.tgt.len > 0)
 	{
 		hcl_logbfmt (hcl, HCL_LOG_STDERR, " - %.*js", synerr.tgt.len, synerr.tgt.ptr);
 	}
 
+	if (hcl_geterrmsg(hcl) != hcl_geterrstr(hcl))
+	{
+		hcl_logbfmt (hcl, HCL_LOG_STDERR, " - %js", hcl_geterrmsg(hcl));
+	}
+
 	hcl_logbfmt (hcl, HCL_LOG_STDERR, "\n");
 }
 
-hcl_ooch_t str_hcl[] = { 'S', 't', 'i', 'x' };
-hcl_ooch_t str_my_object[] = { 'M', 'y', 'O', 'b','j','e','c','t' };
-hcl_ooch_t str_main[] = { 'm', 'a', 'i', 'n' };
-
-
-#define MIN_MEMSIZE 2048000ul
+#define MIN_MEMSIZE 512000ul
  
 int main (int argc, char* argv[])
 {

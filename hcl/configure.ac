@@ -135,6 +135,8 @@ AC_CHECK_FUNCS([gettimeofday settimeofday clock_gettime clock_settime getitimer 
 AC_CHECK_FUNCS([backtrace backtrace_symbols])
 AC_CHECK_FUNCS([makecontext swapcontext getcontext setcontext])
 AC_CHECK_FUNCS([snprintf _vsnprintf _vsnwprintf])
+AC_CHECK_FUNCS([isatty])
+
 
 dnl check is the import library for unicows.dll exists
 dnl this check doesn't look for a particular symbol
@@ -171,6 +173,34 @@ AC_TRY_LINK(
 		AC_DEFINE([HAVE___VA_COPY], [1], [__va_copy is available])
 	],
 	[AC_MSG_RESULT(no)]
+)
+
+AC_MSG_CHECKING([for strftime %z])
+AC_TRY_RUN(
+	[#include <string.h>
+	 #if defined(HAVE_SYS_TIME_H)
+	 #include <sys/time.h>
+	 #endif
+	 #if defined(HAVE_TIME_H)
+	 #include <time.h>
+	 #endif
+	int main ()
+	{
+		char buf[100];
+		time_t t = 0;
+		strftime (buf, sizeof(buf), "%z", gmtime(&t));
+		return strcmp(buf, "%z") == 0? 1: 0;
+	}],
+	[
+	 	AC_MSG_RESULT(yes)
+		AC_DEFINE([HAVE_STRFTIME_SMALL_Z], [1], [strftime supports %z])
+	],
+	[AC_MSG_RESULT(no)],
+	[
+	 	dnl cross-compiling, assume yes
+	 	AC_MSG_RESULT(unknown)
+		AC_DEFINE([HAVE_STRFTIME_SMALL_Z], [1], [strftime supports %z])
+	]
 )
 
 dnl check the size of primitive data types

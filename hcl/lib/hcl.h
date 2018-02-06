@@ -117,6 +117,7 @@ enum hcl_synerrnum_t
 	HCL_SYNERR_LPAREN,        /* ( expected */
 	HCL_SYNERR_RPAREN,        /* ) expected */
 	HCL_SYNERR_RBRACK,        /* ] expected */
+	HCL_SYNERR_RBRACE,        /* } expected */
 	HCL_SYNERR_VBAR,          /* | expected */
 
 	HCL_SYNERR_STRING,        /* string expected */
@@ -146,7 +147,9 @@ enum hcl_synerrnum_t
 
 	HCL_SYNERR_ELIF,          /* elif without if */
 	HCL_SYNERR_ELSE,          /* else without if */
-	HCL_SYNERR_BREAK          /* break outside loop */
+	HCL_SYNERR_BREAK,         /* break outside loop */
+
+	HCL_SYNERR_CALLABLE       /* invalid callable */
 };
 typedef enum hcl_synerrnum_t hcl_synerrnum_t;
 
@@ -928,9 +931,9 @@ struct hcl_t
 	hcl_oop_t _true;
 	hcl_oop_t _false;
 
-	hcl_oop_t _begin;  /* symbol */
 	hcl_oop_t _break;  /* symbol */
 	hcl_oop_t _defun;  /* symbol */
+	hcl_oop_t _do;  /* symbol */
 	hcl_oop_t _elif;   /* symbol */
 	hcl_oop_t _else;   /* symbol */
 	hcl_oop_t _if;     /* symbol */
@@ -1319,18 +1322,28 @@ enum
 enum
 {
 	/* SYNCODE 0 means it's not a syncode object. so it begins with 1 */
-	HCL_SYNCODE_BEGIN = 1,
-	HCL_SYNCODE_BREAK,
+	HCL_SYNCODE_BREAK = 1,
 	HCL_SYNCODE_DEFUN,
+	HCL_SYNCODE_DO,
 	HCL_SYNCODE_ELIF,
 	HCL_SYNCODE_ELSE,
 	HCL_SYNCODE_IF,
 	HCL_SYNCODE_LAMBDA,
-	HCL_SYNCODE_QUOTE,
 	HCL_SYNCODE_RETURN,
 	HCL_SYNCODE_SET,
 	HCL_SYNCODE_UNTIL,
 	HCL_SYNCODE_WHILE
+};
+
+
+enum
+{
+	/* these can be set in the SYNCODE flags for cons cells */
+	HCL_CONCODE_XLIST = 0,  /* () - executable list */
+	HCL_CONCODE_ARRAY,      /* #() */
+	HCL_CONCODE_BYTEARRAY,  /* #[] */
+	HCL_CONCODE_DICTIONARY, /* #{} */
+	HCL_CONCODE_QLIST       /* '() - quoted list, data list */
 };
 
 struct hcl_cons_t
@@ -1343,6 +1356,8 @@ typedef struct hcl_cons_t hcl_cons_t;
 typedef struct hcl_cons_t* hcl_oop_cons_t;
 
 #define HCL_IS_NIL(hcl,v) (v == (hcl)->_nil)
+#define HCL_IS_TRUE(hcl,v) (v == (hcl)->_true)
+#define HCL_IS_FALSE(hcl,v) (v == (hcl)->_false)
 #define HCL_IS_INTEGER(hcl,v) (HCL_OOP_IS_POINTER(v) && HCL_OBJ_GET_FLAGS_BRAND(v) == HCL_BRAND_INTEGER)
 #define HCL_IS_SYMBOL(hcl,v) (HCL_OOP_IS_POINTER(v) && HCL_OBJ_GET_FLAGS_BRAND(v) == HCL_BRAND_SYMBOL)
 #define HCL_IS_SYMBOL_ARRAY(hcl,v) (HCL_OOP_IS_POINTER(v) && HCL_OBJ_GET_FLAGS_BRAND(v) == HCL_BRAND_SYMBOL_ARRAY)
@@ -1584,12 +1599,33 @@ HCL_EXPORT void hcl_getsynerr (
 	hcl_synerr_t*      synerr
 );
 
-HCL_EXPORT void hcl_setsynerr (
-	hcl_t*             hcl,
-	hcl_synerrnum_t    num,
-	const hcl_ioloc_t* loc,
-	const hcl_oocs_t*  tgt
+
+HCL_EXPORT void hcl_setsynerrbfmt (
+	hcl_t*              hcl,
+	hcl_synerrnum_t     num,
+	const hcl_ioloc_t*  loc,
+	const hcl_oocs_t*   tgt,
+	const hcl_bch_t*    msgfmt,
+	...
 );
+
+HCL_EXPORT void hcl_setsynerrufmt (
+	hcl_t*              hcl,
+	hcl_synerrnum_t     num,
+	const hcl_ioloc_t*  loc,
+	const hcl_oocs_t*   tgt,
+	const hcl_uch_t*    msgfmt,
+	...
+);
+
+#if defined(HCL_HAVE_INLINE)
+	static HCL_INLINE void hcl_setsynerr (hcl_t* hcl,	hcl_synerrnum_t num, const hcl_ioloc_t* loc,	const hcl_oocs_t* tgt)
+	{
+		hcl_setsynerrbfmt (hcl, num, loc, tgt, HCL_NULL);
+	}
+#else
+#	define hcl_setsynerr(hcl,num,loc,tgt) hcl_setsynerrbfmt(hcl,num,loc,tgt,HCL_NULL)
+#endif
 
 /* Memory allocation/deallocation functions using hcl's MMGR */
 HCL_EXPORT void* hcl_allocmem (

@@ -1095,6 +1095,14 @@ static int compile_cons_expression (hcl_t* hcl, hcl_oop_t obj)
 	hcl_oop_t car;
 	int syncode;
 
+	/* a valid function call
+	 * (function-name argument-list)
+	 *   function-name can be:
+	 *     a symbol.
+	 *     another function call.
+	 * if the name is another function call, i can't know if the 
+	 * function name will be valid at the compile time.
+	 */
 	HCL_ASSERT (hcl, HCL_IS_CONS(hcl, obj));
 
 	car = HCL_CONS_CAR(obj);
@@ -1102,11 +1110,6 @@ static int compile_cons_expression (hcl_t* hcl, hcl_oop_t obj)
 	{
 		switch (syncode)
 		{
-			case HCL_SYNCODE_BEGIN:
-HCL_DEBUG0 (hcl, "BEGIN NOT IMPLEMENTED...\n");
-/* TODO: not implemented yet */
-				break;
-
 			case HCL_SYNCODE_BREAK:
 				/* break */
 				if (compile_break (hcl, obj) <= -1) return -1;
@@ -1117,42 +1120,45 @@ HCL_DEBUG0 (hcl, "DEFUN NOT IMPLEMENTED...\n");
 /* TODO: not implemented yet */
 				break;
 
+			case HCL_SYNCODE_DO:
+HCL_DEBUG0 (hcl, "DO	 NOT IMPLEMENTED...\n");
+/* TODO: not implemented yet */
+				break;
+
 			case HCL_SYNCODE_ELSE:
-				HCL_DEBUG1 (hcl, "Syntax error - else without if - %O\n", obj);
-				hcl_setsynerr (hcl, HCL_SYNERR_ELSE, HCL_NULL, HCL_NULL); /* error location */
+				hcl_setsynerrbfmt (hcl, HCL_SYNERR_ELSE, HCL_NULL, HCL_NULL, "else without if - %O", obj); /* error location */
 				return -1;
 			case HCL_SYNCODE_ELIF:
-				HCL_DEBUG1 (hcl, "Syntax error - elif without if - %O\n", obj);
-				hcl_setsynerr (hcl, HCL_SYNERR_ELIF, HCL_NULL, HCL_NULL); /* error location */
+				hcl_setsynerrbfmt(hcl, HCL_SYNERR_ELIF, HCL_NULL, HCL_NULL, "elif without if - %O", obj); /* error location */
 				return -1;
 
 			case HCL_SYNCODE_IF:
-				if (compile_if (hcl, obj) <= -1) return -1;
+				if (compile_if(hcl, obj) <= -1) return -1;
 				break;
 
 			case HCL_SYNCODE_LAMBDA:
 				/* (lambda (x y) (+ x y)) */
-				if (compile_lambda (hcl, obj) <= -1) return -1;
+				if (compile_lambda(hcl, obj) <= -1) return -1;
 				break;
 
 			case HCL_SYNCODE_SET:
 				/* (set x 10) 
 				 * (set x (lambda (x y) (+ x y)) */
-				if (compile_set (hcl, obj) <= -1) return -1;
+				if (compile_set(hcl, obj) <= -1) return -1;
 				break;
 
 			case HCL_SYNCODE_RETURN:
 				/* (return 10)
 				 * (return (+ 10 20)) */
-				if (compile_return (hcl, obj) <= -1) return -1;
+				if (compile_return(hcl, obj) <= -1) return -1;
 				break;
 
 			case HCL_SYNCODE_UNTIL:
-				if (compile_while (hcl, obj, COP_POST_UNTIL_COND) <= -1) return -1;
+				if (compile_while(hcl, obj, COP_POST_UNTIL_COND) <= -1) return -1;
 				break;
 
 			case HCL_SYNCODE_WHILE:
-				if (compile_while (hcl, obj, COP_POST_WHILE_COND) <= -1) return -1;
+				if (compile_while(hcl, obj, COP_POST_WHILE_COND) <= -1) return -1;
 				break;
 
 			default:
@@ -1161,7 +1167,7 @@ HCL_DEBUG0 (hcl, "DEFUN NOT IMPLEMENTED...\n");
 				return -1;
 		}
 	}
-	else
+	else if (HCL_IS_SYMBOL(hcl,car) || HCL_IS_CONS(hcl,car))
 	{
 		/* normal function call 
 		 *  (<operator> <operand1> ...) */
@@ -1197,15 +1203,16 @@ HCL_DEBUG0 (hcl, "DEFUN NOT IMPLEMENTED...\n");
 		{
 			if (HCL_BRANDOF(hcl, cdr) != HCL_BRAND_CONS)
 			{
-				HCL_DEBUG1 (hcl, "Syntax error - redundant cdr in function call - %O\n", obj);
-				hcl_setsynerr (hcl, HCL_SYNERR_DOTBANNED, HCL_NULL, HCL_NULL); /* TODO: error location */
+				/* (funname . 10) */
+				hcl_setsynerrbfmt (hcl, HCL_SYNERR_DOTBANNED, HCL_NULL, HCL_NULL, "redundant cdr in function call - %O", obj); /* TODO: error location */
 				return -1;
 			}
 
-			nargs = hcl_countcons (hcl, cdr);
+			nargs = hcl_countcons(hcl, cdr);
 			if (nargs > MAX_CODE_PARAM) 
 			{
-				hcl_seterrnum (hcl, HCL_ERANGE); 
+				/* TODO: change to syntax error */
+				hcl_setsynerrbfmt (hcl, HCL_SYNERR_ARGFLOOD, HCL_NULL, HCL_NULL, "too many(%zd) parameters in function call - %O", nargs, obj); 
 				return -1;
 			}
 		}
@@ -1216,6 +1223,11 @@ HCL_DEBUG0 (hcl, "DEFUN NOT IMPLEMENTED...\n");
 		cf = GET_CFRAME(hcl, oldtop);
 		HCL_ASSERT (hcl, cf->opcode == COP_EMIT_CALL);
 		cf->operand = HCL_SMOOI_TO_OOP(nargs);
+	}
+	else
+	{
+		hcl_setsynerrbfmt (hcl, HCL_SYNERR_CALLABLE, HCL_NULL, HCL_NULL, "invalid callable %O in function call - %O", car, obj); /* error location */
+		return -1;
 	}
 
 	return 0;
@@ -1325,8 +1337,7 @@ static int compile_object (hcl_t* hcl)
 			break;
 
 		case HCL_BRAND_SYMBOL_ARRAY:
-			HCL_DEBUG1 (hcl, "Syntax error - variable declaration disallowed - %O\n", cf->operand);
-			hcl_setsynerr (hcl, HCL_SYNERR_VARDCLBANNED, HCL_NULL, HCL_NULL); /* TODO: error location */
+			hcl_setsynerrbfmt (hcl, HCL_SYNERR_VARDCLBANNED, HCL_NULL, HCL_NULL, "variable declaration disallowed - %O", cf->operand); /* TODO: error location */
 			return -1;
 
 		default:
@@ -1351,10 +1362,10 @@ static int compile_object_list (hcl_t* hcl)
 
 	cf = GET_TOP_CFRAME(hcl);
 	HCL_ASSERT (hcl, cf->opcode == COP_COMPILE_OBJECT_LIST ||
-	            cf->opcode == COP_COMPILE_IF_OBJECT_LIST ||
-	            cf->opcode == COP_COMPILE_ARGUMENT_LIST ||
-	            cf->opcode == COP_COMPILE_IF_OBJECT_LIST_TAIL ||
-	            cf->opcode == COP_COMPILE_OBJECT_LIST_TAIL);
+	                 cf->opcode == COP_COMPILE_IF_OBJECT_LIST ||
+	                 cf->opcode == COP_COMPILE_ARGUMENT_LIST ||
+	                 cf->opcode == COP_COMPILE_IF_OBJECT_LIST_TAIL ||
+	                 cf->opcode == COP_COMPILE_OBJECT_LIST_TAIL);
 
 	cop = cf->opcode;
 	coperand = cf->operand;

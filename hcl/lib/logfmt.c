@@ -476,19 +476,33 @@ hcl_ooi_t hcl_logufmt (hcl_t* hcl, hcl_oow_t mask, const hcl_uch_t* fmt, ...)
 
 static int put_prch (hcl_t* hcl, hcl_oow_t mask, hcl_ooch_t ch, hcl_oow_t len)
 {
-/* TODO: error handling, buffering */
+/* TODO: better error handling, buffering.
+ * buffer should be done by the printer callback? */
+	hcl_ooi_t n;
+
 	hcl->c->outarg.ptr = &ch;
 	hcl->c->outarg.len = 1;
-	hcl->c->printer (hcl, HCL_IO_WRITE, &hcl->c->outarg);
+
+	n = hcl->c->printer(hcl, HCL_IO_WRITE, &hcl->c->outarg);
+
+	if (n <= -1) return -1;
+	if (n == 0) return 0;
 	return 1; /* success */
 }
 
 static int put_prcs (hcl_t* hcl, hcl_oow_t mask, const hcl_ooch_t* ptr, hcl_oow_t len)
 {
-	/* TODO: error handling, buffering */
+/* TODO: better error handling, buffering 
+ * buffer should be done by the printer callback? */
+	hcl_ooi_t n;
+
 	hcl->c->outarg.ptr = (hcl_ooch_t*)ptr;
 	hcl->c->outarg.len = len;
-	hcl->c->printer (hcl, HCL_IO_WRITE, &hcl->c->outarg);
+
+	n = hcl->c->printer(hcl, HCL_IO_WRITE, &hcl->c->outarg);
+
+	if (n <= -1) return -1;
+	if (n == 0) return 0;
 	return 1; /* success */
 }
 

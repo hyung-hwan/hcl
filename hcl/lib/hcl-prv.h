@@ -257,13 +257,16 @@ struct hcl_iotok_t
 
 		HCL_IOTOK_IDENT,
 		HCL_IOTOK_DOT,
-		HCL_IOTOK_QUOTE,
 		HCL_IOTOK_LPAREN,
 		HCL_IOTOK_RPAREN,
-		HCL_IOTOK_ARPAREN,
-		HCL_IOTOK_BAPAREN,
-		HCL_IOTOK_LBRACK,
+		HCL_IOTOK_APAREN,  /* #( */
+		HCL_IOTOK_BAPAREN,  /* #[ */
+		HCL_IOTOK_QPAREN,   /* '( */
+		HCL_IOTOK_DPAREN,   /* #{ */
+		HCL_IOTOK_LBRACK, 
 		HCL_IOTOK_RBRACK,
+		HCL_IOTOK_LBRACE,
+		HCL_IOTOK_RBRACE,
 		HCL_IOTOK_VBAR,
 
 		HCL_IOTOK_INCLUDE
@@ -699,6 +702,24 @@ enum hcl_bcode_t
 #if defined(__cplusplus)
 extern "C" {
 #endif
+
+/* ========================================================================= */
+/* err.c                                                                    */
+/* ========================================================================= */
+
+void hcl_seterrbfmtv (
+	hcl_t*           hcl,
+	hcl_errnum_t     errnum,
+	const hcl_bch_t* fmt,
+	va_list          ap
+);
+
+void hcl_seterrufmtv (
+	hcl_t*           hcl,
+	hcl_errnum_t     errnum,
+	const hcl_uch_t* fmt,
+	va_list          ap
+);
 
 
 /* ========================================================================= */
