@@ -30,16 +30,23 @@
 #define PRINT_STACK_ALIGN 128
 
 
-#define PRINT_STACK_ARRAY_END    0
-#define PRINT_STACK_CONS         1
-#define PRINT_STACK_ARRAY        2
+enum
+{
+	PRINT_STACK_CONS,
+	PRINT_STACK_ARRAY,
+	PRINT_STACK_ARRAY_END,
+	PRINT_STACK_DIC,
+	PRINT_STACK_DIC_END
+};
 
 typedef struct print_stack_t print_stack_t;
 struct print_stack_t
 {
 	int type;
 	hcl_oop_t obj;
+	hcl_oop_t obj2;
 	hcl_oow_t idx;
+	hcl_oow_t idx2;
 };
 
 static HCL_INLINE int push (hcl_t* hcl, print_stack_t* info)
@@ -262,7 +269,7 @@ next:
 				"(",   /*HCL_CONCODE_XLIST */
 				"#(",  /*HCL_CONCODE_ARRAY */
 				"#[",  /*HCL_CONCODE_BYTEARRAY */
-				"#{",  /*HCL_CONCODE_DICTIONARY */
+				"#{",  /*HCL_CONCODE_DIC */
 				"'("   /*HCL_CONCODE_QLIST */
 			};
 
@@ -271,7 +278,7 @@ next:
 				")",   /*HCL_CONCODE_XLIST */
 				")",   /*HCL_CONCODE_ARRAY */
 				"]",   /*HCL_CONCODE_BYTEARRAY */
-				"}",   /*HCL_CONCODE_DICTIONARY */
+				"}",   /*HCL_CONCODE_DIC */
 				")"    /*HCL_CONCODE_QLIST */
 			};
 
@@ -340,25 +347,11 @@ next:
 		{
 			hcl_oow_t arridx;
 
-			if (brand == HCL_BRAND_ARRAY)
-			{
-				if (outbfmt(hcl, mask, "#(") <= -1) return -1;
-			}
-			else
-			{
-				if (outbfmt(hcl, mask, "|") <= -1) return -1;
-			}
+			if (outbfmt(hcl, mask, "#(") <= -1) return -1;
 
 			if (HCL_OBJ_GET_SIZE(obj) <= 0) 
 			{
-				if (brand == HCL_BRAND_ARRAY)
-				{
-					if (outbfmt(hcl, mask, ")") <= -1) return -1;
-				}
-				else
-				{
-					if (outbfmt(hcl, mask, "|") <= -1) return -1;
-				}
+				if (outbfmt(hcl, mask, ")") <= -1) return -1;
 				break;
 			}
 			arridx = 0;
@@ -417,6 +410,106 @@ next:
 			break;
 		}
 
+		case HCL_BRAND_DIC:
+		{
+			hcl_oow_t bucidx, bucsize, buctally;
+			hcl_oop_dic_t dic;
+
+			if (outbfmt(hcl, mask, "#{") <= -1) return -1;
+
+			dic = (hcl_oop_dic_t)obj;
+			HCL_ASSERT (hcl, HCL_OOP_IS_SMOOI(dic->tally));
+			if (HCL_OOP_TO_SMOOI(dic->tally) <= 0) 
+			{
+				if (outbfmt(hcl, mask, "}") <= -1) return -1;
+				break;
+			}
+			bucidx = 0;
+			bucsize = HCL_OBJ_GET_SIZE(dic->bucket);
+			buctally = 0;
+			ps.type = PRINT_STACK_DIC;
+			ps.obj2 = (hcl_oop_t)dic;
+
+			do
+			{
+				int x;
+
+				if ((buctally & 1) == 0)
+				{
+					while (bucidx < bucsize)
+					{
+						/* skip an unoccupied slot in the bucket array */
+						obj = dic->bucket->slot[bucidx];
+						if (!HCL_IS_NIL(hcl,obj)) break;
+						bucidx++;
+					}
+
+					if (bucidx >= bucsize)
+					{
+						/* done. scanned the entire bucket */
+						if (outbfmt(hcl, mask, "}") <= -1) return -1;
+						break;
+					}
+
+					ps.idx = bucidx; /* no increment yet */
+					HCL_ASSERT (hcl, ps.idx < bucsize);
+					HCL_ASSERT (hcl, ps.type == PRINT_STACK_DIC);
+
+					ps.obj = dic->bucket->slot[ps.idx];
+					ps.idx2 = buctally + 1;
+
+					x = push (hcl, &ps);
+					if (x <= -1) return -1;
+
+					HCL_ASSERT (hcl, HCL_IS_CONS(hcl,obj));
+					obj = HCL_CONS_CAR(obj);
+				}
+				else
+				{
+					/* Push what to print next on to the stack */
+					ps.idx = bucidx + 1;
+					if (ps.idx >= bucsize) 
+					{
+						ps.type = PRINT_STACK_DIC_END;
+					}
+					else
+					{
+						HCL_ASSERT (hcl, ps.type == PRINT_STACK_DIC);
+						ps.obj = dic->bucket->slot[ps.idx];
+					}
+					ps.idx2 = buctally + 1;
+
+					x = push (hcl, &ps);
+					if (x <= -1) return -1;
+
+					HCL_ASSERT (hcl, HCL_IS_CONS(hcl,obj));
+					obj = HCL_CONS_CDR(obj);
+				}
+
+				if (buctally > 0) 
+				{
+					if (outbfmt(hcl, mask, " ") <= -1) return -1;
+				}
+				
+				/* Jump to the 'next' label so that the object 
+				 * pointed to by 'obj' is printed. Once it 
+				 * ends, a jump back to the 'resume' label
+				 * is made at the end of this function. */
+				goto next; 
+
+			resume_dic:
+				HCL_ASSERT (hcl, ps.type == PRINT_STACK_DIC);
+				bucidx = ps.idx;
+				buctally = ps.idx2;
+				obj = ps.obj;
+				dic = (hcl_oop_dic_t)ps.obj2;
+				bucsize = HCL_OBJ_GET_SIZE(dic->bucket);
+			} 
+			while (1);
+
+			break;
+		}
+
 		case HCL_BRAND_SYMBOL_ARRAY:
 		{
 			hcl_oow_t i;
@@ -432,10 +525,6 @@ next:
 			if (outbfmt(hcl, mask, " |") <= -1) return -1;
 			break;
 		}
-
-		case HCL_BRAND_SET:
-			word_index = WORD_SET;
-			goto print_word;
 
 		case HCL_BRAND_CFRAME:
 			word_index = WORD_CFRAME;
@@ -488,6 +577,13 @@ done:
 
 			case PRINT_STACK_ARRAY_END:
 				if (outbfmt(hcl, mask, ")") <= -1) return -1;
+				break;
+
+			case PRINT_STACK_DIC:
+				goto resume_dic;
+
+			case PRINT_STACK_DIC_END:
+				if (outbfmt(hcl, mask, "}") <= -1) return -1;
 				break;
 
 			default:

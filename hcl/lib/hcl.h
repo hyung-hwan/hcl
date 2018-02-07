@@ -493,7 +493,7 @@ struct hcl_trailer_t
 
 #define HCL_SET_NAMED_INSTVARS 2
 typedef struct hcl_set_t hcl_set_t;
-typedef struct hcl_set_t* hcl_oop_set_t;
+typedef struct hcl_set_t* hcl_oop_dic_t;
 struct hcl_set_t
 {
 	HCL_OBJ_HEADER;
@@ -526,7 +526,7 @@ struct hcl_class_t
 
 	/* [0] - instance methods, MethodDictionary
 	 * [1] - class methods, MethodDictionary */
-	hcl_oop_set_t  mthdic[2];      
+	hcl_oop_dic_t  mthdic[2];      
 
 	/* indexed part afterwards */
 	hcl_oop_t      slot[1];   /* class instance variables and class variables. */
@@ -954,8 +954,8 @@ struct hcl_t
 	hcl_oop_t _large_negative_integer; /* LargeNegativeInteger */
 	/* == NEVER CHANGE THE ORDER OF FIELDS ABOVE == */
 
-	hcl_oop_set_t symtab; /* system-wide symbol table. */
-	hcl_oop_set_t sysdic; /* system dictionary. */
+	hcl_oop_dic_t symtab; /* system-wide symbol table. */
+	hcl_oop_dic_t sysdic; /* system dictionary. */
 	hcl_oop_process_scheduler_t processor; /* instance of ProcessScheduler */
 	hcl_oop_process_t nil_process; /* instance of Process */
 
@@ -1309,7 +1309,7 @@ enum
 	HCL_BRAND_SYMBOL_ARRAY, /* special. internal use only */
 	HCL_BRAND_SYMBOL,
 	HCL_BRAND_STRING,
-	HCL_BRAND_SET,
+	HCL_BRAND_DIC,
 
 	HCL_BRAND_CFRAME,/* compiler frame */
 	HCL_BRAND_PRIM,
@@ -1343,7 +1343,7 @@ enum
 	HCL_CONCODE_XLIST = 0,  /* () - executable list */
 	HCL_CONCODE_ARRAY,      /* #() */
 	HCL_CONCODE_BYTEARRAY,  /* #[] */
-	HCL_CONCODE_DICTIONARY, /* #{} */
+	HCL_CONCODE_DIC,        /* #{} */
 	HCL_CONCODE_QLIST       /* '() - quoted list, data list */
 };
 
@@ -1706,7 +1706,7 @@ HCL_EXPORT hcl_oop_t hcl_makestring (
 	hcl_oow_t         len
 );
 
-HCL_EXPORT hcl_oop_t hcl_makeset (
+HCL_EXPORT hcl_oop_t hcl_makedic (
 	hcl_t*            hcl, 
 	hcl_oow_t         inisize /* initial bucket size */
 );

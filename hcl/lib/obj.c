@@ -411,27 +411,7 @@ hcl_oop_t hcl_makestring (hcl_t* hcl, const hcl_ooch_t* ptr, hcl_oow_t len)
 	return hcl_alloccharobj (hcl, HCL_BRAND_STRING, ptr, len);
 }
 
-hcl_oop_t hcl_makeset (hcl_t* hcl, hcl_oow_t inisize)
-{
-	hcl_oop_set_t obj;
 
-	obj = (hcl_oop_set_t)hcl_allocoopobj (hcl, HCL_BRAND_SET, 2);
-	if (obj)
-	{
-		hcl_oop_oop_t bucket;
-
-		obj->tally = HCL_SMOOI_TO_OOP(0);
-
-		hcl_pushtmp (hcl, (hcl_oop_t*)&obj);
-		bucket = (hcl_oop_oop_t)hcl_makearray (hcl, inisize);
-		hcl_poptmp (hcl);
-
-		if (!bucket) obj = HCL_NULL;
-		else obj->bucket = bucket;
-	}
-
-	return (hcl_oop_t)obj;
-}
 
 
 

@@ -503,13 +503,13 @@ int hcl_decode (hcl_t* hcl, hcl_ooi_t start, hcl_ooi_t end)
 				LOG_INST_1 (hcl, "pop_into_array %zu", b1);
 				break;
 
-			case HCL_CODE_MAKE_DICTIONARY:
+			case HCL_CODE_MAKE_DIC:
 				FETCH_PARAM_CODE_TO (hcl, b1);
-				LOG_INST_1 (hcl, "make_dictionary %zu", b1);
+				LOG_INST_1 (hcl, "make_dic %zu", b1);
 				break;
 
-			case HCL_CODE_POP_INTO_DICTIONARY:
-				LOG_INST_0 (hcl, "pop_into_dictionary");
+			case HCL_CODE_POP_INTO_DIC:
+				LOG_INST_0 (hcl, "pop_into_dic");
 				break;
 
 			/* -------------------------------------------------------- */

@@ -327,7 +327,7 @@ void hcl_gc (hcl_t* hcl)
 	hcl->_large_positive_integer = hcl_moveoop (hcl, hcl->_large_positive_integer);
 	hcl->_large_negative_integer = hcl_moveoop (hcl, hcl->_large_negative_integer);
 
-	hcl->sysdic = (hcl_oop_set_t) hcl_moveoop (hcl, (hcl_oop_t)hcl->sysdic);
+	hcl->sysdic = (hcl_oop_dic_t) hcl_moveoop (hcl, (hcl_oop_t)hcl->sysdic);
 	hcl->processor = (hcl_oop_process_scheduler_t) hcl_moveoop (hcl, (hcl_oop_t)hcl->processor);
 	hcl->nil_process = (hcl_oop_process_t) hcl_moveoop (hcl, (hcl_oop_t)hcl->nil_process);
 
@@ -377,7 +377,7 @@ void hcl_gc (hcl_t* hcl)
 	compact_symbol_table (hcl, old_nil);
 
 	/* move the symbol table itself */
-	hcl->symtab = (hcl_oop_set_t)hcl_moveoop (hcl, (hcl_oop_t)hcl->symtab);
+	hcl->symtab = (hcl_oop_dic_t)hcl_moveoop (hcl, (hcl_oop_t)hcl->symtab);
 
 	/* scan the new heap again from the end position of
 	 * the previous scan to move referenced objects by 
@@ -488,13 +488,13 @@ int hcl_ignite (hcl_t* hcl)
 
 	if (!hcl->symtab) 
 	{
-		hcl->symtab = (hcl_oop_set_t)hcl_makeset (hcl, hcl->option.dfl_symtab_size);
+		hcl->symtab = (hcl_oop_dic_t)hcl_makedic (hcl, hcl->option.dfl_symtab_size);
 		if (!hcl->symtab) return -1;
 	}
 
 	if (!hcl->sysdic)
 	{
-		hcl->sysdic = (hcl_oop_set_t)hcl_makeset (hcl, hcl->option.dfl_sysdic_size);
+		hcl->sysdic = (hcl_oop_dic_t)hcl_makedic (hcl, hcl->option.dfl_sysdic_size);
 		if (!hcl->sysdic) return -1;
 	}
 

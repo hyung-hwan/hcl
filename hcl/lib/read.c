@@ -1348,7 +1348,7 @@ done:
 				return (hcl_oop_t)hcl_makearray(hcl, 0);
 			case HCL_CONCODE_BYTEARRAY:
 				return (hcl_oop_t)hcl_makebytearray(hcl, HCL_NULL, 0); 
-			case HCL_CONCODE_DICTIONARY:
+			case HCL_CONCODE_DIC:
 				return (hcl_oop_t)hcl_makedic(hcl, 100); /* TODO: default dictionary size for empty definition? */
 		}
 	}
@@ -1662,7 +1662,7 @@ static int read_object (hcl_t* hcl)
 				goto start_list;
 			case HCL_IOTOK_DPAREN:
 				flagv = 0;
-				LIST_FLAG_SET_CONCODE (flagv, HCL_CONCODE_DICTIONARY);
+				LIST_FLAG_SET_CONCODE (flagv, HCL_CONCODE_DIC);
 				goto start_list;
 			case HCL_IOTOK_QPAREN:
 				flagv = 0;
@@ -1716,7 +1716,7 @@ static int read_object (hcl_t* hcl)
 					{ HCL_IOTOK_RPAREN, HCL_SYNERR_RPAREN }, /* XLIST */
 					{ HCL_IOTOK_RPAREN, HCL_SYNERR_RPAREN }, /* ARRAY */
 					{ HCL_IOTOK_RBRACK, HCL_SYNERR_RBRACK }, /* BYTEARRAY */
-					{ HCL_IOTOK_RBRACE, HCL_SYNERR_RBRACE }, /* DICTIONARY */
+					{ HCL_IOTOK_RBRACE, HCL_SYNERR_RBRACE }, /* DIC */
 					{ HCL_IOTOK_RPAREN, HCL_SYNERR_RPAREN }  /* QLIST */
 				};
 

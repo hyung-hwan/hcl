@@ -47,7 +47,7 @@ void hcl_dumpsymtab (hcl_t* hcl)
 	HCL_DEBUG0 (hcl, "--------------------------------------------\n");
 }
 
-void hcl_dumpdic (hcl_t* hcl, hcl_oop_set_t dic, const hcl_bch_t* title)
+void hcl_dumpdic (hcl_t* hcl, hcl_oop_dic_t dic, const hcl_bch_t* title)
 {
 	hcl_oow_t i;
 	hcl_oop_cons_t ass;

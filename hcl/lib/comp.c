@@ -263,7 +263,7 @@ static int emit_single_param_instruction (hcl_t* hcl, int cmd, hcl_oow_t param_1
 		case HCL_CODE_PUSH_NEGINTLIT:
 		case HCL_CODE_PUSH_CHARLIT:
 
-		case HCL_CODE_MAKE_DICTIONARY: /* TODO: don't these need write_long2? */
+		case HCL_CODE_MAKE_DIC: /* TODO: don't these need write_long2? */
 		case HCL_CODE_MAKE_ARRAY:
 		case HCL_CODE_POP_INTO_ARRAY:
 			bc = cmd;
@@ -616,7 +616,7 @@ enum
 	COP_COMPILE_IF_OBJECT_LIST_TAIL,
 
 	COP_COMPILE_ARRAY_LIST,
-	COP_COMPILE_DICTIONARY_LIST,
+	COP_COMPILE_DIC_LIST,
 
 	COP_SUBCOMPILE_ELIF,
 	COP_SUBCOMPILE_ELSE,
@@ -624,9 +624,9 @@ enum
 	COP_EMIT_CALL,
 
 	COP_EMIT_MAKE_ARRAY,
-	COP_EMIT_MAKE_DICTIONARY,
+	COP_EMIT_MAKE_DIC,
 	COP_EMIT_POP_INTO_ARRAY,
-	COP_EMIT_POP_INTO_DICTIONARY,
+	COP_EMIT_POP_INTO_DIC,
 
 	COP_EMIT_LAMBDA,
 	COP_EMIT_POP_STACKTOP,
@@ -1132,14 +1132,13 @@ static int compile_cons_array_expression (hcl_t* hcl, hcl_oop_t obj)
 	return 0;
 }
 
-static int compile_cons_dictionary_expression (hcl_t* hcl, hcl_oop_t obj)
+static int compile_cons_dic_expression (hcl_t* hcl, hcl_oop_t obj)
 {
 	/* #{ } */
 	hcl_ooi_t nargs;
 	hcl_cframe_t* cf;
 
-printf ("XXXXXXXXXXXXXx\n");
-	SWITCH_TOP_CFRAME (hcl, COP_EMIT_MAKE_DICTIONARY, HCL_SMOOI_TO_OOP(0));
+	SWITCH_TOP_CFRAME (hcl, COP_EMIT_MAKE_DIC, HCL_SMOOI_TO_OOP(0));
 
 	nargs = hcl_countcons(hcl, obj);
 	if (nargs > MAX_CODE_PARAM) 
@@ -1150,11 +1149,11 @@ printf ("XXXXXXXXXXXXXx\n");
 	}
 
 	/* redundant cdr check is performed inside compile_object_list() */
-	PUSH_SUBCFRAME (hcl, COP_COMPILE_DICTIONARY_LIST, obj);
+	PUSH_SUBCFRAME (hcl, COP_COMPILE_DIC_LIST, obj);
 
-	/* patch the argument count in the operand field of the COP_MAKE_DICTIONARY frame */
+	/* patch the argument count in the operand field of the COP_MAKE_DIC frame */
 	cf = GET_TOP_CFRAME(hcl);
-	HCL_ASSERT (hcl, cf->opcode == COP_EMIT_MAKE_DICTIONARY);
+	HCL_ASSERT (hcl, cf->opcode == COP_EMIT_MAKE_DIC);
 	cf->operand = HCL_SMOOI_TO_OOP(nargs);
 
 	return 0;
@@ -1412,8 +1411,8 @@ static int compile_object (hcl_t* hcl)
 					if (compile_cons_bytearray_expression (hcl, cf->operand) <= -1) return -1;
 					break;
 */
-				case HCL_CONCODE_DICTIONARY:
-					if (compile_cons_dictionary_expression(hcl, cf->operand) <= -1) return -1;
+				case HCL_CONCODE_DIC:
+					if (compile_cons_dic_expression(hcl, cf->operand) <= -1) return -1;
 					break;
 
 				/* TODO: QLIST? */
@@ -1598,13 +1597,13 @@ static int compile_array_list (hcl_t* hcl)
 	return 0;
 }
 
-static int compile_dictionary_list (hcl_t* hcl)
+static int compile_dic_list (hcl_t* hcl)
 {
 	hcl_cframe_t* cf;
 	hcl_oop_t coperand;
 
 	cf = GET_TOP_CFRAME(hcl);
-	HCL_ASSERT (hcl, cf->opcode == COP_COMPILE_DICTIONARY_LIST);
+	HCL_ASSERT (hcl, cf->opcode == COP_COMPILE_DIC_LIST);
 
 	coperand = cf->operand;
 
@@ -1641,10 +1640,10 @@ static int compile_dictionary_list (hcl_t* hcl)
 
 		if (!HCL_IS_NIL(hcl, cddr))
 		{
-			PUSH_SUBCFRAME (hcl, COP_COMPILE_DICTIONARY_LIST, cddr);
+			PUSH_SUBCFRAME (hcl, COP_COMPILE_DIC_LIST, cddr);
 		}
 
-		PUSH_SUBCFRAME (hcl, COP_EMIT_POP_INTO_DICTIONARY, HCL_SMOOI_TO_OOP(0));
+		PUSH_SUBCFRAME (hcl, COP_EMIT_POP_INTO_DIC, HCL_SMOOI_TO_OOP(0));
 		PUSH_SUBCFRAME(hcl, COP_COMPILE_OBJECT, cadr);
 	}
 
@@ -1978,16 +1977,16 @@ static HCL_INLINE int emit_make_array (hcl_t* hcl)
 }
 
 
-static HCL_INLINE int emit_make_dictionary (hcl_t* hcl)
+static HCL_INLINE int emit_make_dic (hcl_t* hcl)
 {
 	hcl_cframe_t* cf;
 	int n;
 
 	cf = GET_TOP_CFRAME(hcl);
-	HCL_ASSERT (hcl, cf->opcode == COP_EMIT_MAKE_DICTIONARY);
+	HCL_ASSERT (hcl, cf->opcode == COP_EMIT_MAKE_DIC);
 	HCL_ASSERT (hcl, HCL_OOP_IS_SMOOI(cf->operand));
 
-	n = emit_single_param_instruction (hcl, HCL_CODE_MAKE_DICTIONARY, HCL_OOP_TO_SMOOI(cf->operand));
+	n = emit_single_param_instruction (hcl, HCL_CODE_MAKE_DIC, HCL_OOP_TO_SMOOI(cf->operand));
 
 	POP_CFRAME (hcl);
 	return n;
@@ -2008,15 +2007,15 @@ static HCL_INLINE int emit_pop_into_array (hcl_t* hcl)
 	return n;
 }
 
-static HCL_INLINE int emit_pop_into_dictionary (hcl_t* hcl)
+static HCL_INLINE int emit_pop_into_dic (hcl_t* hcl)
 {
 	hcl_cframe_t* cf;
 	int n;
 
 	cf = GET_TOP_CFRAME(hcl);
-	HCL_ASSERT (hcl, cf->opcode == COP_EMIT_POP_INTO_DICTIONARY);
+	HCL_ASSERT (hcl, cf->opcode == COP_EMIT_POP_INTO_DIC);
 
-	n = emit_byte_instruction (hcl, HCL_CODE_POP_INTO_DICTIONARY);
+	n = emit_byte_instruction (hcl, HCL_CODE_POP_INTO_DIC);
 
 	POP_CFRAME (hcl);
 	return n;
@@ -2178,8 +2177,8 @@ int hcl_compile (hcl_t* hcl, hcl_oop_t obj)
 				if (compile_array_list(hcl) <= -1) goto oops;
 				break;
 
-			case COP_COMPILE_DICTIONARY_LIST:
-				if (compile_dictionary_list(hcl) <= -1) goto oops;
+			case COP_COMPILE_DIC_LIST:
+				if (compile_dic_list(hcl) <= -1) goto oops;
 				break;
 
 			case COP_EMIT_CALL:
@@ -2190,16 +2189,16 @@ int hcl_compile (hcl_t* hcl, hcl_oop_t obj)
 				if (emit_make_array(hcl) <= -1) goto oops;
 				break;
 
-			case COP_EMIT_MAKE_DICTIONARY:
-				if (emit_make_dictionary(hcl) <= -1) goto oops;
+			case COP_EMIT_MAKE_DIC:
+				if (emit_make_dic(hcl) <= -1) goto oops;
 				break;
 
 			case COP_EMIT_POP_INTO_ARRAY:
 				if (emit_pop_into_array(hcl) <= -1) goto oops;
 				break;
 
-			case COP_EMIT_POP_INTO_DICTIONARY:
-				if (emit_pop_into_dictionary(hcl) <= -1) goto oops;
+			case COP_EMIT_POP_INTO_DIC:
+				if (emit_pop_into_dic(hcl) <= -1) goto oops;
 				break;
 
 			case COP_EMIT_LAMBDA:

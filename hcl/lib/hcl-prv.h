@@ -704,8 +704,8 @@ enum hcl_bcode_t
 
 	BCODE_SEND_MESSAGE_X              = 0xF0, /* 240 ## */
 	/* UNUSED 241 */
-	HCL_CODE_MAKE_DICTIONARY          = 0xF2, /* 242 */
-	HCL_CODE_POP_INTO_DICTIONARY      = 0xF3, /* 243 */
+	HCL_CODE_MAKE_DIC                 = 0xF2, /* 242 */
+	HCL_CODE_POP_INTO_DIC             = 0xF3, /* 243 */
 	BCODE_SEND_MESSAGE_TO_SUPER_X     = 0xF4, /* 244 ## */
 
 	/* -------------------------------------- */
@@ -885,33 +885,17 @@ hcl_oop_cons_t hcl_getatsysdic (
 	hcl_oop_t  key
 );
 
-hcl_oop_cons_t hcl_lookupsysdic (
-	hcl_t*            hcl,
-	const hcl_oocs_t* name
-);
-
 hcl_oop_cons_t hcl_putatdic (
 	hcl_t*        hcl,
-	hcl_oop_set_t dic,
+	hcl_oop_dic_t dic,
 	hcl_oop_t     key,
 	hcl_oop_t     value
 );
 
 hcl_oop_cons_t hcl_getatdic (
 	hcl_t*        hcl,
-	hcl_oop_set_t dic,
+	hcl_oop_dic_t dic,
 	hcl_oop_t     key
-);
-
-hcl_oop_cons_t hcl_lookupdic (
-	hcl_t*            hcl,
-	hcl_oop_set_t     dic,
-	const hcl_oocs_t* name
-);
-
-hcl_oop_set_t hcl_makedic (
-	hcl_t*    hcl,
-	hcl_oow_t size
 );
 
 /* ========================================================================= */
@@ -1169,7 +1153,7 @@ int hcl_outfmtobj (
 /* debug.c                                                                   */
 /* ========================================================================= */
 void dump_symbol_table (hcl_t* hcl);
-void dump_dictionary (hcl_t* hcl, hcl_oop_set_t dic, const char* title);
+void dump_dictionary (hcl_t* hcl, hcl_oop_dic_t dic, const char* title);
 
 #if defined(__cplusplus)
 }

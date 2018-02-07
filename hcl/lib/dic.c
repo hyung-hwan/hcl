@@ -26,6 +26,8 @@
 
 #include "hcl-prv.h"
 
+/*#define SYMBOL_ONLY_KEY */
+
 static hcl_oop_oop_t expand_bucket (hcl_t* hcl, hcl_oop_oop_t oldbuc)
 {
 	hcl_oop_oop_t newbuc;
@@ -71,12 +73,18 @@ static hcl_oop_oop_t expand_bucket (hcl_t* hcl, hcl_oop_oop_t oldbuc)
 		ass = (hcl_oop_cons_t)oldbuc->slot[--oldsz];
 		if ((hcl_oop_t)ass != hcl->_nil)
 		{
+		#if defined(SYMBOL_ONLY_KEY)
 			HCL_ASSERT (hcl, HCL_IS_CONS(hcl,ass));
-
 			key = (hcl_oop_char_t)ass->car;
 			HCL_ASSERT (hcl, HCL_IS_SYMBOL(hcl,key));
-
 			index = hcl_hashoochars(key->slot, HCL_OBJ_GET_SIZE(key)) % newsz;
+		#else
+			int n;
+			HCL_ASSERT (hcl, HCL_IS_CONS(hcl,ass));
+			n = hcl_hashobj(hcl, ass->car, &index);
+			HCL_ASSERT (hcl, n == 0); /* since it's expanding, the existing in the bucket should always be hashable */
+			index %= newsz;
+		#endif
 			while (newbuc->slot[index] != hcl->_nil) index = (index + 1) % newsz;
 			newbuc->slot[index] = (hcl_oop_t)ass;
 		}
@@ -85,7 +93,7 @@ static hcl_oop_oop_t expand_bucket (hcl_t* hcl, hcl_oop_oop_t oldbuc)
 	return newbuc;
 }
 
-static hcl_oop_cons_t find_or_upsert (hcl_t* hcl, hcl_oop_set_t dic, hcl_oop_char_t key, hcl_oop_t value)
+static hcl_oop_cons_t find_or_upsert (hcl_t* hcl, hcl_oop_dic_t dic, hcl_oop_char_t key, hcl_oop_t value)
 {
 	hcl_ooi_t tally;
 	hcl_oow_t index;
@@ -94,17 +102,24 @@ static hcl_oop_cons_t find_or_upsert (hcl_t* hcl, hcl_oop_set_t dic, hcl_oop_cha
 
 	/* the system dictionary is not a generic dictionary.
 	 * it accepts only a symbol as a key. */
+#if defined(SYMBOL_ONLY_KEY)
 	HCL_ASSERT (hcl, HCL_IS_SYMBOL(hcl,key));
+#endif
 	HCL_ASSERT (hcl, HCL_OOP_IS_SMOOI(dic->tally));
 	HCL_ASSERT (hcl, HCL_IS_ARRAY(hcl,dic->bucket));
 
+#if defined(SYMBOL_ONLY_KEY)
 	index = hcl_hashoochars(key->slot, HCL_OBJ_GET_SIZE(key)) % HCL_OBJ_GET_SIZE(dic->bucket);
+#else
+	if (hcl_hashobj(hcl, key, &index) <= -1) return HCL_NULL;
+	index %= HCL_OBJ_GET_SIZE(dic->bucket);
+#endif
 
 	/* find */
 	while (dic->bucket->slot[index] != hcl->_nil) 
 	{
+	#if defined(SYMBOL_ONLY_KEY)
 		ass = (hcl_oop_cons_t)dic->bucket->slot[index];
-
 		HCL_ASSERT (hcl, HCL_IS_CONS(hcl,ass));
 		HCL_ASSERT (hcl, HCL_IS_SYMBOL(hcl,ass->car));
 
@@ -115,6 +130,21 @@ static hcl_oop_cons_t find_or_upsert (hcl_t* hcl, hcl_oop_set_t dic, hcl_oop_cha
 			if (value) ass->cdr = value; /* update */
 			return ass;
 		}
+	#else
+		int n;
+
+		ass = (hcl_oop_cons_t)dic->bucket->slot[index];
+		HCL_ASSERT (hcl, HCL_IS_CONS(hcl,ass));
+
+		n = hcl_equalobjs(hcl, key, ass->car);
+		if (n <= -1) return HCL_NULL;
+		if (n >= 1)
+		{
+			/* the value of HCL_NULL indicates no insertion or update. */
+			if (value) ass->cdr = value; /* update */
+			return ass;
+		}
+	#endif
 
 		index = (index + 1) % HCL_OBJ_GET_SIZE(dic->bucket);
 	}
@@ -123,7 +153,7 @@ static hcl_oop_cons_t find_or_upsert (hcl_t* hcl, hcl_oop_set_t dic, hcl_oop_cha
 	{
 		/* when value is HCL_NULL, perform no insertion.
 		 * the value of HCL_NULL indicates no insertion or update. */
-		hcl_seterrnum (hcl, HCL_ENOENT);
+		hcl_seterrbfmt (hcl, HCL_ENOENT, "key not found - %O", key);
 		return HCL_NULL;
 	}
 
@@ -151,8 +181,8 @@ static hcl_oop_cons_t find_or_upsert (hcl_t* hcl, hcl_oop_set_t dic, hcl_oop_cha
 		hcl_oop_oop_t bucket;
 
 		/* TODO: make the growth policy configurable instead of growing
-			     it just before it gets full. The polcy can be grow it
-			     if it's 70% full */
+		         it just before it gets full. The polcy can be grow it
+		         if it's 70% full */
 
 		/* enlarge the bucket before it gets full to
 		 * make sure that it has at least one free slot left
@@ -163,8 +193,13 @@ static hcl_oop_cons_t find_or_upsert (hcl_t* hcl, hcl_oop_set_t dic, hcl_oop_cha
 
 		dic->bucket = bucket;
 
+	#if defined(SYMBOL_ONLY_KEY)
 		/* recalculate the index for the expanded bucket */
 		index = hcl_hashoochars(key->slot, HCL_OBJ_GET_SIZE(key)) % HCL_OBJ_GET_SIZE(dic->bucket);
+	#else
+		hcl_hashobj(hcl, key, &index); /* this must succeed as i know 'key' is hashable */
+		index %= HCL_OBJ_GET_SIZE(dic->bucket);
+	#endif
 
 		while (dic->bucket->slot[index] != hcl->_nil) 
 			index = (index + 1) % HCL_OBJ_GET_SIZE(dic->bucket);
@@ -189,75 +224,56 @@ oops:
 	return HCL_NULL;
 }
 
-static hcl_oop_cons_t lookup (hcl_t* hcl, hcl_oop_set_t dic, const hcl_oocs_t* name)
-{
-	/* this is special version of hcl_getatsysdic() that performs
-	 * lookup using a plain string specified */
-
-	hcl_oow_t index;
-	hcl_oop_cons_t ass;
-
-	HCL_ASSERT (hcl, HCL_OOP_IS_SMOOI(dic->tally));
-	HCL_ASSERT (hcl, HCL_IS_ARRAY(hcl,dic->bucket));
-
-	index = hcl_hashoochars(name->ptr, name->len) % HCL_OBJ_GET_SIZE(dic->bucket);
-
-	while (dic->bucket->slot[index] != hcl->_nil) 
-	{
-		ass = (hcl_oop_cons_t)dic->bucket->slot[index];
-
-		HCL_ASSERT (hcl, HCL_IS_CONS(hcl,ass));
-		HCL_ASSERT (hcl, HCL_IS_SYMBOL(hcl,ass->car));
-
-		if (name->len == HCL_OBJ_GET_SIZE(ass->car) &&
-		    hcl_equaloochars(name->ptr, ((hcl_oop_char_t)ass->car)->slot, name->len)) 
-		{
-			return ass;
-		}
-
-		index = (index + 1) % HCL_OBJ_GET_SIZE(dic->bucket);
-	}
-
-	/* when value is HCL_NULL, perform no insertion */
-	hcl_seterrnum (hcl, HCL_ENOENT);
-	return HCL_NULL;
-}
-
 hcl_oop_cons_t hcl_putatsysdic (hcl_t* hcl, hcl_oop_t key, hcl_oop_t value)
 {
+#if defined(SYMBOL_ONLY_KEY)
 	HCL_ASSERT (hcl, HCL_IS_SYMBOL(hcl,key));
+#endif
 	return find_or_upsert (hcl, hcl->sysdic, (hcl_oop_char_t)key, value);
 }
 
 hcl_oop_cons_t hcl_getatsysdic (hcl_t* hcl, hcl_oop_t key)
 {
+#if defined(SYMBOL_ONLY_KEY)
 	HCL_ASSERT (hcl, HCL_IS_SYMBOL(hcl,key));
+#endif
 	return find_or_upsert (hcl, hcl->sysdic, (hcl_oop_char_t)key, HCL_NULL);
 }
 
-hcl_oop_cons_t hcl_lookupsysdic (hcl_t* hcl, const hcl_oocs_t* name)
+hcl_oop_cons_t hcl_putatdic (hcl_t* hcl, hcl_oop_dic_t dic, hcl_oop_t key, hcl_oop_t value)
 {
-	return lookup (hcl, hcl->sysdic, name);
-}
-
-hcl_oop_cons_t hcl_putatdic (hcl_t* hcl, hcl_oop_set_t dic, hcl_oop_t key, hcl_oop_t value)
-{
+#if defined(SYMBOL_ONLY_KEY)
 	HCL_ASSERT (hcl, HCL_IS_SYMBOL(hcl,key));
+#endif
 	return find_or_upsert (hcl, dic, (hcl_oop_char_t)key, value);
 }
 
-hcl_oop_cons_t hcl_getatdic (hcl_t* hcl, hcl_oop_set_t dic, hcl_oop_t key)
+hcl_oop_cons_t hcl_getatdic (hcl_t* hcl, hcl_oop_dic_t dic, hcl_oop_t key)
 {
+#if defined(SYMBOL_ONLY_KEY)
 	HCL_ASSERT (hcl, HCL_IS_SYMBOL(hcl,key));
+#endif
 	return find_or_upsert (hcl, dic, (hcl_oop_char_t)key, HCL_NULL);
 }
 
-hcl_oop_cons_t hcl_lookupdic (hcl_t* hcl, hcl_oop_set_t dic, const hcl_oocs_t* name)
+hcl_oop_t hcl_makedic (hcl_t* hcl, hcl_oow_t inisize)
 {
-	return lookup (hcl, dic, name);
-}
+	hcl_oop_dic_t obj;
 
-hcl_oop_set_t hcl_makedic (hcl_t* hcl, hcl_oow_t size)
-{
-	return (hcl_oop_set_t)hcl_makeset (hcl, size);
+	obj = (hcl_oop_dic_t)hcl_allocoopobj (hcl, HCL_BRAND_DIC, 2);
+	if (obj)
+	{
+		hcl_oop_oop_t bucket;
+
+		obj->tally = HCL_SMOOI_TO_OOP(0);
+
+		hcl_pushtmp (hcl, (hcl_oop_t*)&obj);
+		bucket = (hcl_oop_oop_t)hcl_makearray (hcl, inisize);
+		hcl_poptmp (hcl);
+
+		if (!bucket) obj = HCL_NULL;
+		else obj->bucket = bucket;
+	}
+
+	return (hcl_oop_t)obj;
 }
