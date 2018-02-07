@@ -333,6 +333,8 @@ void hcl_gc (hcl_t* hcl)
 
 	for (i = 0; i < hcl->code.lit.len; i++)
 	{
+		/* the literal array ia a NGC object. but the literal objects 
+		 * pointed by the elements of this array must be gabage-collected. */
 		((hcl_oop_oop_t)hcl->code.lit.arr)->slot[i] =
 			hcl_moveoop (hcl, ((hcl_oop_oop_t)hcl->code.lit.arr)->slot[i]);
 	}

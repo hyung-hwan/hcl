@@ -149,7 +149,8 @@ enum hcl_synerrnum_t
 	HCL_SYNERR_ELSE,          /* else without if */
 	HCL_SYNERR_BREAK,         /* break outside loop */
 
-	HCL_SYNERR_CALLABLE       /* invalid callable */
+	HCL_SYNERR_CALLABLE,      /* invalid callable */
+	HCL_SYNERR_UNBALKV        /* unbalanced key/value pair */
 };
 typedef enum hcl_synerrnum_t hcl_synerrnum_t;
 
@@ -267,16 +268,16 @@ typedef struct hcl_obj_word_t*     hcl_oop_word_t;
  */
 
 #define HCL_OOP_TAG_BITS  2
-#define HCL_OOP_TAG_SMINT 1
+#define HCL_OOP_TAG_SMOOI 1
 #define HCL_OOP_TAG_CHAR  2
 
-#define HCL_OOP_IS_NUMERIC(oop) (((hcl_oow_t)oop) & (HCL_OOP_TAG_SMINT | HCL_OOP_TAG_CHAR))
+#define HCL_OOP_IS_NUMERIC(oop) (((hcl_oow_t)oop) & (HCL_OOP_TAG_SMOOI | HCL_OOP_TAG_CHAR))
 #define HCL_OOP_IS_POINTER(oop) (!HCL_OOP_IS_NUMERIC(oop))
 #define HCL_OOP_GET_TAG(oop) (((hcl_oow_t)oop) & HCL_LBMASK(hcl_oow_t, HCL_OOP_TAG_BITS))
 
-#define HCL_OOP_IS_SMOOI(oop) (((hcl_ooi_t)oop) & HCL_OOP_TAG_SMINT)
+#define HCL_OOP_IS_SMOOI(oop) (((hcl_ooi_t)oop) & HCL_OOP_TAG_SMOOI)
 #define HCL_OOP_IS_CHAR(oop) (((hcl_oow_t)oop) & HCL_OOP_TAG_CHAR)
-#define HCL_SMOOI_TO_OOP(num) ((hcl_oop_t)((((hcl_ooi_t)(num)) << HCL_OOP_TAG_BITS) | HCL_OOP_TAG_SMINT))
+#define HCL_SMOOI_TO_OOP(num) ((hcl_oop_t)((((hcl_ooi_t)(num)) << HCL_OOP_TAG_BITS) | HCL_OOP_TAG_SMOOI))
 #define HCL_OOP_TO_SMOOI(oop) (((hcl_ooi_t)oop) >> HCL_OOP_TAG_BITS)
 #define HCL_CHAR_TO_OOP(num) ((hcl_oop_t)((((hcl_oow_t)(num)) << HCL_OOP_TAG_BITS) | HCL_OOP_TAG_CHAR))
 #define HCL_OOP_TO_CHAR(oop) (((hcl_oow_t)oop) >> HCL_OOP_TAG_BITS)
@@ -1364,6 +1365,7 @@ typedef struct hcl_cons_t* hcl_oop_cons_t;
 #define HCL_IS_CONTEXT(hcl,v) (HCL_OOP_IS_POINTER(v) && HCL_OBJ_GET_FLAGS_BRAND(v) == HCL_BRAND_CONTEXT)
 #define HCL_IS_PROCESS(hcl,v) (HCL_OOP_IS_POINTER(v) && HCL_OBJ_GET_FLAGS_BRAND(v) == HCL_BRAND_PROCESS)
 #define HCL_IS_CONS(hcl,v) (HCL_OOP_IS_POINTER(v) && HCL_OBJ_GET_FLAGS_BRAND(v) == HCL_BRAND_CONS)
+#define HCL_IS_CONS_XLIST(hcl,v) (HCL_IS_CONS(hcl,v) && HCL_OBJ_GET_FLAGS_SYNCODE(v) == HCL_CONCODE_XLIST)
 #define HCL_IS_ARRAY(hcl,v) (HCL_OOP_IS_POINTER(v) && HCL_OBJ_GET_FLAGS_BRAND(v) == HCL_BRAND_ARRAY)
 
 #define HCL_IS_PRIM(hcl,v) (HCL_OOP_IS_POINTER(v) && HCL_OBJ_GET_FLAGS_BRAND(v) == HCL_BRAND_PRIM)
@@ -1773,6 +1775,17 @@ HCL_EXPORT hcl_oop_t hcl_makeprim (
 	hcl_oow_t       maxargs
 );
 
+HCL_EXPORT int hcl_hashobj (
+	hcl_t*     hcl, 
+	hcl_oop_t  obj, 
+	hcl_oow_t* xhv
+);
+
+HCL_EXPORT int hcl_equalobjs (
+	hcl_t*     hcl,
+	hcl_oop_t  rcv,
+	hcl_oop_t  arg
+);
 
 HCL_EXPORT void hcl_assertfailed (
 	hcl_t*           hcl,

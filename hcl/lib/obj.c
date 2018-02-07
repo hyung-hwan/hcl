@@ -558,3 +558,173 @@ hcl_oop_t hcl_reversecons (hcl_t* hcl, hcl_oop_t cons)
 
 	return ptr;
 }
+
+
+/* ------------------------------------------------------------------------ *
+ * OBJECT HASHING
+ * ------------------------------------------------------------------------ */
+int hcl_hashobj (hcl_t* hcl, hcl_oop_t obj, hcl_oow_t* xhv)
+{
+	hcl_oow_t hv;
+
+	switch (HCL_OOP_GET_TAG(obj))
+	{
+		case HCL_OOP_TAG_SMOOI:
+			hv = HCL_OOP_TO_SMOOI(obj);
+			break;
+
+/*
+		case HCL_OOP_TAG_SMPTR:
+			hv = (hcl_oow_t)HCL_OOP_TO_SMPTR(obj);
+			break;
+*/
+
+		case HCL_OOP_TAG_CHAR:
+			hv = HCL_OOP_TO_CHAR(obj);
+			break;
+
+/*
+		case HCL_OOP_TAG_ERROR:
+			hv = HCL_OOP_TO_ERROR(obj);
+			break;
+*/
+
+		default:
+		{
+			int type;
+
+			HCL_ASSERT (hcl, HCL_OOP_IS_POINTER(obj));
+			type = HCL_OBJ_GET_FLAGS_TYPE(obj);
+			switch (type)
+			{
+				case HCL_OBJ_TYPE_BYTE:
+					hv = hcl_hashbytes(((hcl_oop_byte_t)obj)->slot, HCL_OBJ_GET_SIZE(obj));
+					break;
+
+				case HCL_OBJ_TYPE_CHAR:
+					hv = hcl_hashoochars (((hcl_oop_char_t)obj)->slot, HCL_OBJ_GET_SIZE(obj));
+					break;
+
+				case HCL_OBJ_TYPE_HALFWORD:
+					hv = hcl_hashhalfwords(((hcl_oop_halfword_t)obj)->slot, HCL_OBJ_GET_SIZE(obj));
+					break;
+
+				case HCL_OBJ_TYPE_WORD:
+					hv = hcl_hashwords(((hcl_oop_word_t)obj)->slot, HCL_OBJ_GET_SIZE(obj));
+					break;
+
+				default:
+					/* HCL_OBJ_TYPE_OOP, ... */ 
+					hcl_seterrbfmt(hcl, HCL_ENOIMPL, "no builtin hash implemented for %O", obj); /* TODO: better error code? */
+					return -1;
+			}
+			break;
+		}
+	}
+
+	/* i assume that hcl_hashxxx() functions limits the return value to fall 
+	 * between 0 and HCL_SMOOI_MAX inclusive */
+	HCL_ASSERT (hcl, hv >= 0 && hv <= HCL_SMOOI_MAX);
+	*xhv = hv;
+	return 0;
+}
+
+/* ------------------------------------------------------------------------ *
+ * OBJECT EQUALITY
+ * ------------------------------------------------------------------------ */
+int hcl_equalobjs (hcl_t* hcl, hcl_oop_t rcv, hcl_oop_t arg)
+{
+	int rtag;
+
+	if (rcv == arg) return 1; /* identical. so equal */
+
+	rtag = HCL_OOP_GET_TAG(rcv);
+	if (rtag != HCL_OOP_GET_TAG(arg)) return 0;
+
+	switch (rtag)
+	{
+		case HCL_OOP_TAG_SMOOI:
+			return HCL_OOP_TO_SMOOI(rcv) == HCL_OOP_TO_SMOOI(arg)? 1: 0;
+
+#if 0
+		case HCL_OOP_TAG_SMPTR:
+			return HCL_OOP_TO_SMPTR(rcv) == HCL_OOP_TO_SMPTR(arg)? 1: 0;
+#endif
+
+		case HCL_OOP_TAG_CHAR:
+			return HCL_OOP_TO_CHAR(rcv) == HCL_OOP_TO_CHAR(arg)? 1: 0;
+
+#if 0
+		case HCL_OOP_TAG_ERROR:
+			return HCL_OOP_TO_ERROR(rcv) == HCL_OOP_TO_ERROR(arg)? 1: 0;
+#endif
+
+		default:
+		{
+			HCL_ASSERT (hcl, HCL_OOP_IS_POINTER(rcv));
+
+			if (HCL_OBJ_GET_CLASS(rcv) != HCL_OBJ_GET_CLASS(arg)) return 0; /* different class, not equal */
+			HCL_ASSERT (hcl, HCL_OBJ_GET_FLAGS_TYPE(rcv) == HCL_OBJ_GET_FLAGS_TYPE(arg));
+
+			if (HCL_OBJ_GET_CLASS(rcv) == hcl->_class && rcv != arg) 
+			{
+				/* a class object are supposed to be unique */
+				return 0;
+			}
+			if (HCL_OBJ_GET_SIZE(rcv) != HCL_OBJ_GET_SIZE(arg)) return 0; /* different size, not equal */
+
+			switch (HCL_OBJ_GET_FLAGS_TYPE(rcv))
+			{
+				case HCL_OBJ_TYPE_BYTE:
+				case HCL_OBJ_TYPE_CHAR:
+				case HCL_OBJ_TYPE_HALFWORD:
+				case HCL_OBJ_TYPE_WORD:
+					return (HCL_MEMCMP(HCL_OBJ_GET_BYTE_SLOT(rcv), HCL_OBJ_GET_BYTE_SLOT(arg), HCL_BYTESOF(hcl,rcv)) == 0)? 1: 0;
+
+				default:
+				{
+					hcl_oow_t i, size;
+
+					if (rcv == hcl->_nil) return arg == hcl->_nil? 1: 0;
+					if (rcv == hcl->_true) return arg == hcl->_true? 1: 0;
+					if (rcv == hcl->_false) return arg == hcl->_false? 1: 0;
+
+					/* HCL_OBJ_TYPE_OOP, ... */
+					HCL_ASSERT (hcl, HCL_OBJ_GET_FLAGS_TYPE(rcv) == HCL_OBJ_TYPE_OOP);
+
+				#if 0
+					hcl_seterrbfmt (hcl, HCL_ENOIMPL, "no builtin comparison implemented for %O and %O", rcv, arg); /* TODO: better error code */
+					return -1;
+				#else
+
+					if (HCL_IS_PROCESS(hcl,rcv))
+					{
+						/* the stack in a process object doesn't need to be 
+						 * scanned in full. the slots above the stack pointer 
+						 * are garbages. */
+						size = HCL_PROCESS_NAMED_INSTVARS +
+							  HCL_OOP_TO_SMOOI(((hcl_oop_process_t)rcv)->sp) + 1;
+						HCL_ASSERT (hcl, size <= HCL_OBJ_GET_SIZE(rcv));
+					}
+					else
+					{
+						size = HCL_OBJ_GET_SIZE(rcv);
+					}
+					for (i = 0; i < size; i++)
+					{
+						int n;
+						/* TODO: remove recursion */
+						/* NOTE: even if the object implements the equality method, 
+						 * this primitive method doesn't honor it. */
+						n = hcl_equalobjs(hcl, ((hcl_oop_oop_t)rcv)->slot[i], ((hcl_oop_oop_t)arg)->slot[i]);
+						if (n <= 0) return n;
+					}
+
+					/* the default implementation doesn't take the trailer space into account */
+					return 1;
+				#endif
+				}
+			}
+		}
+	}
+}

@@ -234,7 +234,6 @@ static int emit_single_param_instruction (hcl_t* hcl, int cmd, hcl_oow_t param_1
 				goto write_long2;
 			}
 
-
 		case HCL_CODE_PUSH_OBJECT_0:
 		case HCL_CODE_STORE_INTO_OBJECT_0:
 		case BCODE_POP_INTO_OBJECT_0:
@@ -263,6 +262,10 @@ static int emit_single_param_instruction (hcl_t* hcl, int cmd, hcl_oow_t param_1
 		case HCL_CODE_PUSH_INTLIT:
 		case HCL_CODE_PUSH_NEGINTLIT:
 		case HCL_CODE_PUSH_CHARLIT:
+
+		case HCL_CODE_MAKE_DICTIONARY: /* TODO: don't these need write_long2? */
+		case HCL_CODE_MAKE_ARRAY:
+		case HCL_CODE_POP_INTO_ARRAY:
 			bc = cmd;
 			goto write_long;
 	}
@@ -612,10 +615,19 @@ enum
 	COP_COMPILE_OBJECT_LIST_TAIL,
 	COP_COMPILE_IF_OBJECT_LIST_TAIL,
 
+	COP_COMPILE_ARRAY_LIST,
+	COP_COMPILE_DICTIONARY_LIST,
+
 	COP_SUBCOMPILE_ELIF,
 	COP_SUBCOMPILE_ELSE,
 
 	COP_EMIT_CALL,
+
+	COP_EMIT_MAKE_ARRAY,
+	COP_EMIT_MAKE_DICTIONARY,
+	COP_EMIT_POP_INTO_ARRAY,
+	COP_EMIT_POP_INTO_DICTIONARY,
+
 	COP_EMIT_LAMBDA,
 	COP_EMIT_POP_STACKTOP,
 	COP_EMIT_RETURN,
@@ -1089,11 +1101,69 @@ static int compile_while (hcl_t* hcl, hcl_oop_t src, int next_cop)
 }
 /* ========================================================================= */
 
+static int compile_cons_array_expression (hcl_t* hcl, hcl_oop_t obj)
+{
+	/* #[ ] */
+	hcl_ooi_t nargs;
+	hcl_cframe_t* cf;
 
-static int compile_cons_expression (hcl_t* hcl, hcl_oop_t obj)
+	/* NOTE: cframe management functions don't use the object memory.
+	 *       many operations can be performed without taking GC into account */
+	SWITCH_TOP_CFRAME (hcl, COP_EMIT_MAKE_ARRAY, HCL_SMOOI_TO_OOP(0));
+
+	nargs = hcl_countcons(hcl, obj);
+	if (nargs > MAX_CODE_PARAM) 
+	{
+		/* TODO: change to syntax error */
+		hcl_setsynerrbfmt (hcl, HCL_SYNERR_ARGFLOOD, HCL_NULL, HCL_NULL, "too many(%zd) elements into array - %O", nargs, obj); 
+		return -1;
+	}
+
+	/* redundant cdr check is performed inside compile_object_list() */
+	PUSH_SUBCFRAME (hcl, COP_COMPILE_ARRAY_LIST, obj);
+	cf = GET_SUBCFRAME(hcl);
+	cf->u.array_list.index = 0;
+
+	/* patch the argument count in the operand field of the COP_MAKE_ARRAY frame */
+	cf = GET_TOP_CFRAME(hcl);
+	HCL_ASSERT (hcl, cf->opcode == COP_EMIT_MAKE_ARRAY);
+	cf->operand = HCL_SMOOI_TO_OOP(nargs);
+
+	return 0;
+}
+
+static int compile_cons_dictionary_expression (hcl_t* hcl, hcl_oop_t obj)
+{
+	/* #{ } */
+	hcl_ooi_t nargs;
+	hcl_cframe_t* cf;
+
+printf ("XXXXXXXXXXXXXx\n");
+	SWITCH_TOP_CFRAME (hcl, COP_EMIT_MAKE_DICTIONARY, HCL_SMOOI_TO_OOP(0));
+
+	nargs = hcl_countcons(hcl, obj);
+	if (nargs > MAX_CODE_PARAM) 
+	{
+		/* TODO: change to syntax error */
+		hcl_setsynerrbfmt (hcl, HCL_SYNERR_ARGFLOOD, HCL_NULL, HCL_NULL, "too many(%zd) elements into dictionary - %O", nargs, obj); 
+		return -1;
+	}
+
+	/* redundant cdr check is performed inside compile_object_list() */
+	PUSH_SUBCFRAME (hcl, COP_COMPILE_DICTIONARY_LIST, obj);
+
+	/* patch the argument count in the operand field of the COP_MAKE_DICTIONARY frame */
+	cf = GET_TOP_CFRAME(hcl);
+	HCL_ASSERT (hcl, cf->opcode == COP_EMIT_MAKE_DICTIONARY);
+	cf->operand = HCL_SMOOI_TO_OOP(nargs);
+
+	return 0;
+}
+
+static int compile_cons_xlist_expression (hcl_t* hcl, hcl_oop_t obj)
 {
 	hcl_oop_t car;
-	int syncode;
+	int syncode; /* syntax code of the first element */
 
 	/* a valid function call
 	 * (function-name argument-list)
@@ -1103,7 +1173,7 @@ static int compile_cons_expression (hcl_t* hcl, hcl_oop_t obj)
 	 * if the name is another function call, i can't know if the 
 	 * function name will be valid at the compile time.
 	 */
-	HCL_ASSERT (hcl, HCL_IS_CONS(hcl, obj));
+	HCL_ASSERT (hcl, HCL_IS_CONS_XLIST(hcl, obj));
 
 	car = HCL_CONS_CAR(obj);
 	if (HCL_IS_SYMBOL(hcl,car) && (syncode = HCL_OBJ_GET_FLAGS_SYNCODE(car)))
@@ -1112,7 +1182,7 @@ static int compile_cons_expression (hcl_t* hcl, hcl_oop_t obj)
 		{
 			case HCL_SYNCODE_BREAK:
 				/* break */
-				if (compile_break (hcl, obj) <= -1) return -1;
+				if (compile_break(hcl, obj) <= -1) return -1;
 				break;
 
 			case HCL_SYNCODE_DEFUN:
@@ -1121,15 +1191,16 @@ HCL_DEBUG0 (hcl, "DEFUN NOT IMPLEMENTED...\n");
 				break;
 
 			case HCL_SYNCODE_DO:
-HCL_DEBUG0 (hcl, "DO	 NOT IMPLEMENTED...\n");
+HCL_DEBUG0 (hcl, "DO NOT IMPLEMENTED...\n");
 /* TODO: not implemented yet */
 				break;
 
 			case HCL_SYNCODE_ELSE:
 				hcl_setsynerrbfmt (hcl, HCL_SYNERR_ELSE, HCL_NULL, HCL_NULL, "else without if - %O", obj); /* error location */
 				return -1;
+
 			case HCL_SYNCODE_ELIF:
-				hcl_setsynerrbfmt(hcl, HCL_SYNERR_ELIF, HCL_NULL, HCL_NULL, "elif without if - %O", obj); /* error location */
+				hcl_setsynerrbfmt (hcl, HCL_SYNERR_ELIF, HCL_NULL, HCL_NULL, "elif without if - %O", obj); /* error location */
 				return -1;
 
 			case HCL_SYNCODE_IF:
@@ -1167,7 +1238,7 @@ HCL_DEBUG0 (hcl, "DO	 NOT IMPLEMENTED...\n");
 				return -1;
 		}
 	}
-	else if (HCL_IS_SYMBOL(hcl,car) || HCL_IS_CONS(hcl,car))
+	else if (HCL_IS_SYMBOL(hcl,car) || HCL_IS_CONS_XLIST(hcl,car))
 	{
 		/* normal function call 
 		 *  (<operator> <operand1> ...) */
@@ -1179,19 +1250,16 @@ HCL_DEBUG0 (hcl, "DO	 NOT IMPLEMENTED...\n");
 		/* NOTE: cframe management functions don't use the object memory.
 		 *       many operations can be performed without taking GC into account */
 
-		oldtop = GET_TOP_CFRAME_INDEX(hcl);
+		/* store the position of COP_EMIT_CALL to be produced with
+		 * SWITCH_TOP_CFRAM() in oldtop for argument count patching 
+		 * further down */
+		oldtop = GET_TOP_CFRAME_INDEX(hcl); 
 		HCL_ASSERT (hcl, oldtop >= 0);
 
 		SWITCH_TOP_CFRAME (hcl, COP_EMIT_CALL, HCL_SMOOI_TO_OOP(0));
 
 		/* compile <operator> */
 		PUSH_CFRAME (hcl, COP_COMPILE_OBJECT, car);
-/* TODO: do pre-filtering. if car is a literal, it's not a valid function call - this can also be check in the reader.
- *       if it's a symbol and it evaluates to a literal, it can only be caught in the runtime  
-* this check along with the .cdr check, can be done in the reader if i create a special flag (e.g. QUOTED) applicable to CONS.
-* what happens if someone likes to manipulate the list as the list is not a single object type unlike array???
-*     (define (x y) (10 20 30))
-*/
 
 		/* compile <operand1> ... etc */
 		cdr = HCL_CONS_CDR(obj);
@@ -1333,11 +1401,33 @@ static int compile_object (hcl_t* hcl)
 			goto done;
 
 		case HCL_BRAND_CONS:
-			if (compile_cons_expression (hcl, cf->operand) <= -1) return -1;
+		{
+			switch (HCL_OBJ_GET_FLAGS_SYNCODE(cf->operand))
+			{
+				case HCL_CONCODE_ARRAY:
+					if (compile_cons_array_expression(hcl, cf->operand) <= -1) return -1;
+					break;
+/*
+				case HCL_CONCODE_BYTEARRA:
+					if (compile_cons_bytearray_expression (hcl, cf->operand) <= -1) return -1;
+					break;
+*/
+				case HCL_CONCODE_DICTIONARY:
+					if (compile_cons_dictionary_expression(hcl, cf->operand) <= -1) return -1;
+					break;
+
+				/* TODO: QLIST? */
+				default:
+					if (compile_cons_xlist_expression (hcl, cf->operand) <= -1) return -1;
+					break;
+			}
 			break;
+		}
 
 		case HCL_BRAND_SYMBOL_ARRAY:
-			hcl_setsynerrbfmt (hcl, HCL_SYNERR_VARDCLBANNED, HCL_NULL, HCL_NULL, "variable declaration disallowed - %O", cf->operand); /* TODO: error location */
+			hcl_setsynerrbfmt (
+				hcl, HCL_SYNERR_VARDCLBANNED, HCL_NULL, HCL_NULL,
+				"variable declaration disallowed - %O", cf->operand); /* TODO: error location */
 			return -1;
 
 		default:
@@ -1404,8 +1494,9 @@ static int compile_object_list (hcl_t* hcl)
 
 		if (!HCL_IS_CONS(hcl, coperand))
 		{
-			HCL_DEBUG1 (hcl, "Syntax error - redundant cdr in the object list - %O\n", coperand);
-			hcl_setsynerr (hcl, HCL_SYNERR_DOTBANNED, HCL_NULL, HCL_NULL); /* TODO: error location */
+			hcl_setsynerrbfmt (
+				hcl, HCL_SYNERR_DOTBANNED, HCL_NULL, HCL_NULL,
+				"redundant cdr in the object list - %O", coperand); /* TODO: error location */
 			return -1;
 		}
 
@@ -1460,6 +1551,106 @@ static int compile_object_list (hcl_t* hcl)
 done:
 	return 0;
 }
+
+static int compile_array_list (hcl_t* hcl)
+{
+	hcl_cframe_t* cf;
+	hcl_oop_t coperand;
+
+	cf = GET_TOP_CFRAME(hcl);
+	HCL_ASSERT (hcl, cf->opcode == COP_COMPILE_ARRAY_LIST);
+
+	coperand = cf->operand;
+
+	if (HCL_IS_NIL(hcl, coperand))
+	{
+		POP_CFRAME (hcl);
+	}
+	else
+	{
+		hcl_oop_t car, cdr;
+		hcl_ooi_t oldidx;
+
+		if (!HCL_IS_CONS(hcl, coperand))
+		{
+			hcl_setsynerrbfmt (
+				hcl, HCL_SYNERR_DOTBANNED, HCL_NULL, HCL_NULL, 
+ 				"redundant cdr in the array list - %O", coperand); /* TODO: error location */
+			return -1;
+		}
+
+		car = HCL_CONS_CAR(coperand);
+		cdr = HCL_CONS_CDR(coperand);
+
+		oldidx = cf->u.array_list.index;
+
+		SWITCH_TOP_CFRAME (hcl, COP_COMPILE_OBJECT, car);
+		if (!HCL_IS_NIL(hcl, cdr))
+		{
+			PUSH_SUBCFRAME (hcl, COP_COMPILE_ARRAY_LIST, cdr);
+			cf = GET_SUBCFRAME(hcl);
+			cf->u.array_list.index = oldidx + 1;
+		}
+
+		PUSH_SUBCFRAME (hcl, COP_EMIT_POP_INTO_ARRAY, HCL_SMOOI_TO_OOP(oldidx));
+	}
+
+	return 0;
+}
+
+static int compile_dictionary_list (hcl_t* hcl)
+{
+	hcl_cframe_t* cf;
+	hcl_oop_t coperand;
+
+	cf = GET_TOP_CFRAME(hcl);
+	HCL_ASSERT (hcl, cf->opcode == COP_COMPILE_DICTIONARY_LIST);
+
+	coperand = cf->operand;
+
+	if (HCL_IS_NIL(hcl, coperand))
+	{
+		POP_CFRAME (hcl);
+	}
+	else
+	{
+		hcl_oop_t car, cdr, cadr, cddr;
+
+		if (!HCL_IS_CONS(hcl, coperand))
+		{
+			hcl_setsynerrbfmt (
+				hcl, HCL_SYNERR_DOTBANNED, HCL_NULL, HCL_NULL, 
+ 				"redundant cdr in the dictionary list - %O", coperand); /* TODO: error location */
+			return -1;
+		}
+
+		car = HCL_CONS_CAR(coperand);
+		cdr = HCL_CONS_CDR(coperand);
+
+		SWITCH_TOP_CFRAME (hcl, COP_COMPILE_OBJECT, car);
+		if (HCL_IS_NIL(hcl, cdr))
+		{
+			hcl_setsynerrbfmt (
+				hcl, HCL_SYNERR_UNBALKV, HCL_NULL, HCL_NULL,
+				"no value for key %O", car);
+			return -1;
+		}
+		
+		cadr = HCL_CONS_CAR(cdr);
+		cddr = HCL_CONS_CDR(cdr);
+
+		if (!HCL_IS_NIL(hcl, cddr))
+		{
+			PUSH_SUBCFRAME (hcl, COP_COMPILE_DICTIONARY_LIST, cddr);
+		}
+
+		PUSH_SUBCFRAME (hcl, COP_EMIT_POP_INTO_DICTIONARY, HCL_SMOOI_TO_OOP(0));
+		PUSH_SUBCFRAME(hcl, COP_COMPILE_OBJECT, cadr);
+	}
+
+	return 0;
+}
+
 /* ========================================================================= */
 
 static HCL_INLINE int patch_nearest_post_if_body (hcl_t* hcl)
@@ -1771,6 +1962,66 @@ static HCL_INLINE int emit_call (hcl_t* hcl)
 	return n;
 }
 
+static HCL_INLINE int emit_make_array (hcl_t* hcl)
+{
+	hcl_cframe_t* cf;
+	int n;
+
+	cf = GET_TOP_CFRAME(hcl);
+	HCL_ASSERT (hcl, cf->opcode == COP_EMIT_MAKE_ARRAY);
+	HCL_ASSERT (hcl, HCL_OOP_IS_SMOOI(cf->operand));
+
+	n = emit_single_param_instruction (hcl, HCL_CODE_MAKE_ARRAY, HCL_OOP_TO_SMOOI(cf->operand));
+
+	POP_CFRAME (hcl);
+	return n;
+}
+
+
+static HCL_INLINE int emit_make_dictionary (hcl_t* hcl)
+{
+	hcl_cframe_t* cf;
+	int n;
+
+	cf = GET_TOP_CFRAME(hcl);
+	HCL_ASSERT (hcl, cf->opcode == COP_EMIT_MAKE_DICTIONARY);
+	HCL_ASSERT (hcl, HCL_OOP_IS_SMOOI(cf->operand));
+
+	n = emit_single_param_instruction (hcl, HCL_CODE_MAKE_DICTIONARY, HCL_OOP_TO_SMOOI(cf->operand));
+
+	POP_CFRAME (hcl);
+	return n;
+}
+
+static HCL_INLINE int emit_pop_into_array (hcl_t* hcl)
+{
+	hcl_cframe_t* cf;
+	int n;
+
+	cf = GET_TOP_CFRAME(hcl);
+	HCL_ASSERT (hcl, cf->opcode == COP_EMIT_POP_INTO_ARRAY);
+	HCL_ASSERT (hcl, HCL_OOP_IS_SMOOI(cf->operand));
+
+	n = emit_single_param_instruction (hcl, HCL_CODE_POP_INTO_ARRAY, HCL_OOP_TO_SMOOI(cf->operand));
+
+	POP_CFRAME (hcl);
+	return n;
+}
+
+static HCL_INLINE int emit_pop_into_dictionary (hcl_t* hcl)
+{
+	hcl_cframe_t* cf;
+	int n;
+
+	cf = GET_TOP_CFRAME(hcl);
+	HCL_ASSERT (hcl, cf->opcode == COP_EMIT_POP_INTO_DICTIONARY);
+
+	n = emit_byte_instruction (hcl, HCL_CODE_POP_INTO_DICTIONARY);
+
+	POP_CFRAME (hcl);
+	return n;
+}
+
 static HCL_INLINE int emit_lambda (hcl_t* hcl)
 {
 	hcl_cframe_t* cf;
@@ -1912,7 +2163,7 @@ int hcl_compile (hcl_t* hcl, hcl_oop_t obj)
 		switch (cf->opcode)
 		{
 			case COP_COMPILE_OBJECT:
-				if (compile_object (hcl) <= -1) goto oops;
+				if (compile_object(hcl) <= -1) goto oops;
 				break;
 
 			case COP_COMPILE_OBJECT_LIST:
@@ -1920,19 +2171,43 @@ int hcl_compile (hcl_t* hcl, hcl_oop_t obj)
 			case COP_COMPILE_IF_OBJECT_LIST:
 			case COP_COMPILE_IF_OBJECT_LIST_TAIL:
 			case COP_COMPILE_ARGUMENT_LIST:
-				if (compile_object_list (hcl) <= -1) goto oops;
+				if (compile_object_list(hcl) <= -1) goto oops;
+				break;
+
+			case COP_COMPILE_ARRAY_LIST:
+				if (compile_array_list(hcl) <= -1) goto oops;
+				break;
+
+			case COP_COMPILE_DICTIONARY_LIST:
+				if (compile_dictionary_list(hcl) <= -1) goto oops;
 				break;
 
 			case COP_EMIT_CALL:
-				if (emit_call (hcl) <= -1) goto oops;
+				if (emit_call(hcl) <= -1) goto oops;
+				break;
+
+			case COP_EMIT_MAKE_ARRAY:
+				if (emit_make_array(hcl) <= -1) goto oops;
+				break;
+
+			case COP_EMIT_MAKE_DICTIONARY:
+				if (emit_make_dictionary(hcl) <= -1) goto oops;
+				break;
+
+			case COP_EMIT_POP_INTO_ARRAY:
+				if (emit_pop_into_array(hcl) <= -1) goto oops;
+				break;
+
+			case COP_EMIT_POP_INTO_DICTIONARY:
+				if (emit_pop_into_dictionary(hcl) <= -1) goto oops;
 				break;
 
 			case COP_EMIT_LAMBDA:
-				if (emit_lambda (hcl) <= -1) goto oops;
+				if (emit_lambda(hcl) <= -1) goto oops;
 				break;
 
 			case COP_EMIT_POP_STACKTOP:
-				if (emit_pop_stacktop (hcl) <= -1) goto oops;
+				if (emit_pop_stacktop(hcl) <= -1) goto oops;
 				break;
 
 			case COP_EMIT_RETURN:

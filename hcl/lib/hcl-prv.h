@@ -307,6 +307,11 @@ struct hcl_cframe_t
 		{
 			hcl_ooi_t body_pos;
 		} post_if;
+
+		struct
+		{
+			hcl_ooi_t index;
+		} array_list;
 	} u;
 };
 

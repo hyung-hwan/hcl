@@ -71,10 +71,10 @@ static hcl_oop_oop_t expand_bucket (hcl_t* hcl, hcl_oop_oop_t oldbuc)
 		ass = (hcl_oop_cons_t)oldbuc->slot[--oldsz];
 		if ((hcl_oop_t)ass != hcl->_nil)
 		{
-			HCL_ASSERT (hcl, HCL_BRANDOF(hcl,ass) == HCL_BRAND_CONS);
+			HCL_ASSERT (hcl, HCL_IS_CONS(hcl,ass));
 
 			key = (hcl_oop_char_t)ass->car;
-			HCL_ASSERT (hcl, HCL_BRANDOF(hcl,key) == HCL_BRAND_SYMBOL);
+			HCL_ASSERT (hcl, HCL_IS_SYMBOL(hcl,key));
 
 			index = hcl_hashoochars(key->slot, HCL_OBJ_GET_SIZE(key)) % newsz;
 			while (newbuc->slot[index] != hcl->_nil) index = (index + 1) % newsz;
@@ -105,8 +105,8 @@ static hcl_oop_cons_t find_or_upsert (hcl_t* hcl, hcl_oop_set_t dic, hcl_oop_cha
 	{
 		ass = (hcl_oop_cons_t)dic->bucket->slot[index];
 
-		HCL_ASSERT (hcl, HCL_BRANDOF(hcl,ass) == HCL_BRAND_CONS);
-		HCL_ASSERT (hcl, HCL_BRANDOF(hcl,ass->car) == HCL_BRAND_SYMBOL);
+		HCL_ASSERT (hcl, HCL_IS_CONS(hcl,ass));
+		HCL_ASSERT (hcl, HCL_IS_SYMBOL(hcl,ass->car));
 
 		if (HCL_OBJ_GET_SIZE(key) == HCL_OBJ_GET_SIZE(ass->car) &&
 		    hcl_equaloochars (key->slot, ((hcl_oop_char_t)ass->car)->slot, HCL_OBJ_GET_SIZE(key))) 
@@ -198,7 +198,7 @@ static hcl_oop_cons_t lookup (hcl_t* hcl, hcl_oop_set_t dic, const hcl_oocs_t* n
 	hcl_oop_cons_t ass;
 
 	HCL_ASSERT (hcl, HCL_OOP_IS_SMOOI(dic->tally));
-	HCL_ASSERT (hcl, HCL_BRANDOF(hcl,dic->bucket) == HCL_BRAND_ARRAY);
+	HCL_ASSERT (hcl, HCL_IS_ARRAY(hcl,dic->bucket));
 
 	index = hcl_hashoochars(name->ptr, name->len) % HCL_OBJ_GET_SIZE(dic->bucket);
 
@@ -206,8 +206,8 @@ static hcl_oop_cons_t lookup (hcl_t* hcl, hcl_oop_set_t dic, const hcl_oocs_t* n
 	{
 		ass = (hcl_oop_cons_t)dic->bucket->slot[index];
 
-		HCL_ASSERT (hcl, HCL_BRANDOF(hcl,ass) == HCL_BRAND_CONS);
-		HCL_ASSERT (hcl, HCL_BRANDOF(hcl,ass->car) == HCL_BRAND_SYMBOL);
+		HCL_ASSERT (hcl, HCL_IS_CONS(hcl,ass));
+		HCL_ASSERT (hcl, HCL_IS_SYMBOL(hcl,ass->car));
 
 		if (name->len == HCL_OBJ_GET_SIZE(ass->car) &&
 		    hcl_equaloochars(name->ptr, ((hcl_oop_char_t)ass->car)->slot, name->len)) 
@@ -242,13 +242,13 @@ hcl_oop_cons_t hcl_lookupsysdic (hcl_t* hcl, const hcl_oocs_t* name)
 
 hcl_oop_cons_t hcl_putatdic (hcl_t* hcl, hcl_oop_set_t dic, hcl_oop_t key, hcl_oop_t value)
 {
-	HCL_ASSERT (hcl, HCL_BRANDOF(hcl,key) == HCL_BRAND_SYMBOL);
+	HCL_ASSERT (hcl, HCL_IS_SYMBOL(hcl,key));
 	return find_or_upsert (hcl, dic, (hcl_oop_char_t)key, value);
 }
 
 hcl_oop_cons_t hcl_getatdic (hcl_t* hcl, hcl_oop_set_t dic, hcl_oop_t key)
 {
-	HCL_ASSERT (hcl, HCL_BRANDOF(hcl,key) == HCL_BRAND_SYMBOL);
+	HCL_ASSERT (hcl, HCL_IS_SYMBOL(hcl,key));
 	return find_or_upsert (hcl, dic, (hcl_oop_char_t)key, HCL_NULL);
 }
 

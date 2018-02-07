@@ -837,7 +837,8 @@ static char* syntax_error_msg[] =
 	"else without if",
 	"break outside loop",
 
-	"invalid callable"
+	"invalid callable",
+	"unbalanced key/value pair"
 };
 
 static void print_synerr (hcl_t* hcl)

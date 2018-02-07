@@ -622,9 +622,8 @@ static int get_radix_number (hcl_t* hcl, hcl_ooci_t rc, int radix)
 
 	if (CHAR_TO_NUM(c, radix) >= radix)
 	{
-		/* no digit after the radix specifier */
-HCL_DEBUG2 (hcl, "NO DIGIT AFTER RADIX SPECIFIER IN [%.*S] \n", (hcl_ooi_t)hcl->c->tok.name.len, hcl->c->tok.name.ptr);
-		hcl_setsynerr (hcl, HCL_SYNERR_RADNUMLIT, TOKEN_LOC(hcl), TOKEN_NAME(hcl));
+		hcl_setsynerrbfmt (hcl, HCL_SYNERR_RADNUMLIT, TOKEN_LOC(hcl), TOKEN_NAME(hcl), 
+			"no digit after radix specifier in %.*js", hcl->c->tok.name.len, hcl->c->tok.name.ptr);
 		return -1;
 	}
 
@@ -643,8 +642,9 @@ HCL_DEBUG2 (hcl, "NO DIGIT AFTER RADIX SPECIFIER IN [%.*S] \n", (hcl_ooi_t)hcl->
 			GET_CHAR_TO (hcl, c);
 		}
 		while (!is_delimiter(c));
-HCL_DEBUG2 (hcl, "INVALID DIGIT IN RADIXED NUMBER IN [%.*S] \n", (hcl_ooi_t)hcl->c->tok.name.len, hcl->c->tok.name.ptr);
-		hcl_setsynerr (hcl, HCL_SYNERR_RADNUMLIT, TOKEN_LOC(hcl), TOKEN_NAME(hcl));
+
+		hcl_setsynerrbfmt (hcl, HCL_SYNERR_RADNUMLIT, TOKEN_LOC(hcl), TOKEN_NAME(hcl),
+			"invalid digit in radixed number in %.*js", hcl->c->tok.name.len, hcl->c->tok.name.ptr);
 		return -1;
 	}
 
@@ -654,10 +654,9 @@ HCL_DEBUG2 (hcl, "INVALID DIGIT IN RADIXED NUMBER IN [%.*S] \n", (hcl_ooi_t)hcl-
 	return 0;
 }
 
-static int get_quote_token (hcl_t* hcl)
+static int get_quoted_token (hcl_t* hcl)
 {
 	hcl_ooci_t c;
-	int radix;
 
 	HCL_ASSERT (hcl, hcl->c->lxc.c == '\'');
 
@@ -669,9 +668,12 @@ static int get_quote_token (hcl_t* hcl)
 			ADD_TOKEN_CHAR (hcl, '\'');
 			ADD_TOKEN_CHAR(hcl, c);
 			SET_TOKEN_TYPE (hcl, HCL_IOTOK_QPAREN);
+			break;
 
-		//default:
-			
+		default:
+			hcl_setsynerrbfmt (hcl, HCL_SYNERR_ILCHR, TOKEN_LOC(hcl), TOKEN_NAME(hcl),
+				"invalid quoted token character %jc", c);
+			return -1;
 	}
 
 	return 0;
@@ -743,8 +745,8 @@ static int get_sharp_token (hcl_t* hcl)
 			GET_CHAR_TO (hcl, c);
 			if (is_delimiter(c))
 			{
-HCL_DEBUG2 (hcl, "NO VALID CHARACTER AFTER #\\ in [%.*S]\n", (hcl_ooi_t)hcl->c->tok.name.len, hcl->c->tok.name.ptr);
-				hcl_setsynerr (hcl, HCL_SYNERR_CHARLIT, TOKEN_LOC(hcl), TOKEN_NAME(hcl));
+				hcl_setsynerrbfmt (hcl, HCL_SYNERR_CHARLIT, TOKEN_LOC(hcl), TOKEN_NAME(hcl),
+					"no valid character after #\\ in %.*js", hcl->c->tok.name.len, hcl->c->tok.name.ptr);
 				return -1;
 			}
 
@@ -767,8 +769,8 @@ HCL_DEBUG2 (hcl, "NO VALID CHARACTER AFTER #\\ in [%.*S]\n", (hcl_ooi_t)hcl->c->
 					{
 						if (!is_xdigitchar(hcl->c->tok.name.ptr[i]))
 						{
-HCL_DEBUG2 (hcl, "INVALID HEX-CHARACTER IN [%.*S]\n", (hcl_ooi_t)hcl->c->tok.name.len, hcl->c->tok.name.ptr);
-							hcl_setsynerr (hcl, HCL_SYNERR_CHARLIT, TOKEN_LOC(hcl), TOKEN_NAME(hcl)); 
+							hcl_setsynerrbfmt (hcl, HCL_SYNERR_CHARLIT, TOKEN_LOC(hcl), TOKEN_NAME(hcl),
+								"invalid hexadecimal character in %.*js", hcl->c->tok.name.len, hcl->c->tok.name.ptr);
 							return -1;
 						}
 
@@ -818,8 +820,8 @@ HCL_DEBUG2 (hcl, "INVALID HEX-CHARACTER IN [%.*S]\n", (hcl_ooi_t)hcl->c->tok.nam
 				}
 				else
 				{
-HCL_DEBUG2 (hcl, "INVALID CHARACTER LITERAL [%.*S]\n", (hcl_ooi_t)hcl->c->tok.name.len, hcl->c->tok.name.ptr);
-					hcl_setsynerr (hcl, HCL_SYNERR_CHARLIT, TOKEN_LOC(hcl), TOKEN_NAME(hcl));
+					hcl_setsynerrbfmt (hcl, HCL_SYNERR_CHARLIT, TOKEN_LOC(hcl), TOKEN_NAME(hcl),
+						"invalid character literal %.*js", hcl->c->tok.name.len, hcl->c->tok.name.ptr);
 					return -1;
 				}
 			}
@@ -889,8 +891,8 @@ HCL_DEBUG2 (hcl, "INVALID CHARACTER LITERAL [%.*S]\n", (hcl_ooi_t)hcl->c->tok.na
 			}
 			else
 			{
-HCL_DEBUG2 (hcl, "INVALID HASHED LITERAL NAME [%.*S]\n", (hcl_ooi_t)hcl->c->tok.name.len, hcl->c->tok.name.ptr);
-				hcl_setsynerr (hcl, HCL_SYNERR_HASHLIT, TOKEN_LOC(hcl), TOKEN_NAME(hcl));
+				hcl_setsynerrbfmt (hcl, HCL_SYNERR_HASHLIT, TOKEN_LOC(hcl), TOKEN_NAME(hcl),
+					"invalid hashed literal name %.*js", hcl->c->tok.name.len, hcl->c->tok.name.ptr);
 				return -1;
 			}
 
@@ -966,28 +968,26 @@ retry:
 			break;
 
 		case '}':
-			ADD_TOKEN_CHAR(hcl, c);
+			ADD_TOKEN_CHAR (hcl, c);
 			SET_TOKEN_TYPE (hcl, HCL_IOTOK_RBRACE);
 			break;
 
 		case '|': 
 			ADD_TOKEN_CHAR (hcl, c);
-			SET_TOKEN_TYPE(hcl, HCL_IOTOK_VBAR);
+			SET_TOKEN_TYPE (hcl, HCL_IOTOK_VBAR);
 			break;
 
 		case '.':
 			SET_TOKEN_TYPE (hcl, HCL_IOTOK_DOT);
-			ADD_TOKEN_CHAR(hcl, c);
+			ADD_TOKEN_CHAR (hcl, c);
 			break;
-
-		
 
 		case '\"':
 			if (get_string(hcl, '\"', '\\', 0, 0) <= -1) return -1;
 			break;
 
 		case '\'':
-			if (get_quote_token(hcl) <= -1) return -1;
+			if (get_quoted_token(hcl) <= -1) return -1;
 			break;
 
 		case '#':  
@@ -1263,7 +1263,7 @@ static HCL_INLINE hcl_oop_t enter_list (hcl_t* hcl, int flagv)
 static HCL_INLINE hcl_oop_t leave_list (hcl_t* hcl, int* flagv, int* oldflagv)
 {
 	hcl_oop_t head;
-	int fv;
+	int fv, concode;
 
 	/* the stack must not be empty - cannot leave a list without entering it */
 	HCL_ASSERT (hcl, !HCL_IS_NIL(hcl,hcl->c->r.s));
@@ -1277,10 +1277,12 @@ static HCL_INLINE hcl_oop_t leave_list (hcl_t* hcl, int* flagv, int* oldflagv)
 	pop (hcl);
 
 	fv = HCL_OOP_TO_SMOOI(HCL_CONS_CAR(hcl->c->r.s));
+	concode = LIST_FLAG_GET_CONCODE(fv);
 	pop (hcl);
 
 #if 0
-	if (fv & ARRAY)
+	/* TODO: literalize the list if all the elements are all literals */
+	if (concode == HCL_CONCODE_ARRAY)
 	{
 		/* convert a list to an array */
 		hcl_oop_oop_t arr;
@@ -1291,7 +1293,12 @@ static HCL_INLINE hcl_oop_t leave_list (hcl_t* hcl, int* flagv, int* oldflagv)
 		count = 0;
 		while (ptr != hcl->_nil)
 		{
+			hcl_oop_t car;
 			HCL_ASSERT (hcl, HCL_OBJ_GET_FLAGS_BRAND(ptr) == HCL_BRAND_CONS);
+			car = HCL_CONS_CAR(ptr);
+
+			if (!HCL_OOP_IS_NUMERIC(car)) goto done;  /* TODO: check if the element is a literal properly here */
+
 			ptr = HCL_CONS_CDR(ptr);
 			count++;
 		}
@@ -1311,6 +1318,7 @@ static HCL_INLINE hcl_oop_t leave_list (hcl_t* hcl, int* flagv, int* oldflagv)
 
 		head = (hcl_oop_t)arr;
 	}
+done:
 #endif
 
 	*oldflagv = fv;
@@ -1330,7 +1338,22 @@ static HCL_INLINE hcl_oop_t leave_list (hcl_t* hcl, int* flagv, int* oldflagv)
 	}
 
 	/* return the head of the list being left */
-	HCL_OBJ_SET_FLAGS_SYNCODE(head, LIST_FLAG_GET_CONCODE(fv));
+	if (HCL_IS_NIL(hcl,head))
+	{
+		/* the list is empty. literalize the empty list according to
+		 * the list opener. for a list, it is same as #nil. */
+		switch (concode)
+		{
+			case HCL_CONCODE_ARRAY:
+				return (hcl_oop_t)hcl_makearray(hcl, 0);
+			case HCL_CONCODE_BYTEARRAY:
+				return (hcl_oop_t)hcl_makebytearray(hcl, HCL_NULL, 0); 
+			case HCL_CONCODE_DICTIONARY:
+				return (hcl_oop_t)hcl_makedic(hcl, 100); /* TODO: default dictionary size for empty definition? */
+		}
+	}
+
+	if (HCL_IS_CONS(hcl,head)) HCL_OBJ_SET_FLAGS_SYNCODE(head, concode);
 	return head;
 }
 
@@ -1637,13 +1660,13 @@ static int read_object (hcl_t* hcl)
 				flagv = 0;
 				LIST_FLAG_SET_CONCODE (flagv, HCL_CONCODE_BYTEARRAY);
 				goto start_list;
-			case HCL_IOTOK_QPAREN:
-				flagv = 0;
-				LIST_FLAG_SET_CONCODE (flagv, HCL_CONCODE_QLIST);
-				goto start_list;
 			case HCL_IOTOK_DPAREN:
 				flagv = 0;
 				LIST_FLAG_SET_CONCODE (flagv, HCL_CONCODE_DICTIONARY);
+				goto start_list;
+			case HCL_IOTOK_QPAREN:
+				flagv = 0;
+				LIST_FLAG_SET_CONCODE (flagv, HCL_CONCODE_QLIST);
 				goto start_list;
 			case HCL_IOTOK_LPAREN:
 				flagv = 0;
@@ -1672,8 +1695,8 @@ static int read_object (hcl_t* hcl)
 					/* cannot have a period:
 					 *   1. at the top level - not inside ()
 					 *   2. at the beginning of a list 
-					 *   3. inside an array #() */
-					hcl_setsynerr (hcl, HCL_SYNERR_DOTBANNED, TOKEN_LOC(hcl), TOKEN_NAME(hcl));
+					 *   3. inside an  #(), #[], #{}, () */
+					hcl_setsynerr (hcl, HCL_SYNERR_DOTBANNED, TOKEN_LOC(hcl), HCL_NULL); 
 					return -1;
 				}
 

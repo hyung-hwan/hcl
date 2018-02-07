@@ -493,6 +493,27 @@ int hcl_decode (hcl_t* hcl, hcl_ooi_t start, hcl_ooi_t end)
 				break;
 			/* -------------------------------------------------------- */
 
+			case HCL_CODE_MAKE_ARRAY:
+				FETCH_PARAM_CODE_TO (hcl, b1);
+				LOG_INST_1 (hcl, "make_array %zu", b1);
+				break;
+
+			case HCL_CODE_POP_INTO_ARRAY:
+				FETCH_PARAM_CODE_TO (hcl, b1);
+				LOG_INST_1 (hcl, "pop_into_array %zu", b1);
+				break;
+
+			case HCL_CODE_MAKE_DICTIONARY:
+				FETCH_PARAM_CODE_TO (hcl, b1);
+				LOG_INST_1 (hcl, "make_dictionary %zu", b1);
+				break;
+
+			case HCL_CODE_POP_INTO_DICTIONARY:
+				LOG_INST_0 (hcl, "pop_into_dictionary");
+				break;
+
+			/* -------------------------------------------------------- */
+
 			case BCODE_DUP_STACKTOP:
 				LOG_INST_0 (hcl, "dup_stacktop");
 				break;
