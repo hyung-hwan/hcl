@@ -790,57 +790,6 @@ static void cancel_tick (void)
 
 /* ========================================================================= */
 
-
-static char* syntax_error_msg[] = 
-{
-	"no error",
-	"illegal character",
-	"comment not closed",
-	"string not closed",
-	"invalid hashed literal",
-	"wrong character literal",
-	"invalid numeric literal",
-	"out of integer range",
-
-	"sudden end of input",
-	"( expected",
-	") expected",
-	"] expected",
-	"} expected",
-	"| expected",
-
-	"string expected",
-	"byte too small or too large",
-	"nesting level too deep",
-
-	"| disallowed",
-	". disallowed",
-	"#include error",
-
-	"loop body too big",
-	"if body too big",
-	"lambda block too big",
-	"lambda block too deep",
-	"argument name list expected",
-	"argument name expected",
-	"duplicate argument name",
-	"variable name expected",
-	"wrong number of arguments",
-	"too many arguments defined",
-	"too many variables defined",
-	"variable declaration disallowed",
-	"duplicate variable name",
-	"disallowed variable name",
-	"disallowed argument name",
-
-	"elif without if",
-	"else without if",
-	"break outside loop",
-
-	"invalid callable",
-	"unbalanced key/value pair"
-};
-
 static void print_synerr (hcl_t* hcl)
 {
 	hcl_synerr_t synerr;
@@ -859,17 +808,14 @@ static void print_synerr (hcl_t* hcl)
 		hcl_logbfmt (hcl, HCL_LOG_STDERR, "%s", xtn->read_path);
 	}
 
-	hcl_logbfmt (hcl, HCL_LOG_STDERR, "[%zu,%zu] syntax error - %hs", 
-		synerr.loc.line, synerr.loc.colm, syntax_error_msg[synerr.num]);
+	hcl_logbfmt (hcl, HCL_LOG_STDERR, "[%zu,%zu] %js", 
+		synerr.loc.line, synerr.loc.colm,
+		(hcl_geterrmsg(hcl) != hcl_geterrstr(hcl)? hcl_geterrmsg(hcl): hcl_geterrstr(hcl))
+	);
 
 	if (synerr.tgt.len > 0)
 	{
 		hcl_logbfmt (hcl, HCL_LOG_STDERR, " - %.*js", synerr.tgt.len, synerr.tgt.ptr);
-	}
-
-	if (hcl_geterrmsg(hcl) != hcl_geterrstr(hcl))
-	{
-		hcl_logbfmt (hcl, HCL_LOG_STDERR, " - %js", hcl_geterrmsg(hcl));
 	}
 
 	hcl_logbfmt (hcl, HCL_LOG_STDERR, "\n");

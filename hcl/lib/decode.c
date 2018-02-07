@@ -503,6 +503,16 @@ int hcl_decode (hcl_t* hcl, hcl_ooi_t start, hcl_ooi_t end)
 				LOG_INST_1 (hcl, "pop_into_array %zu", b1);
 				break;
 
+			case HCL_CODE_MAKE_BYTEARRAY:
+				FETCH_PARAM_CODE_TO (hcl, b1);
+				LOG_INST_1 (hcl, "make_bytearray %zu", b1);
+				break;
+
+			case HCL_CODE_POP_INTO_BYTEARRAY:
+				FETCH_PARAM_CODE_TO (hcl, b1);
+				LOG_INST_1 (hcl, "pop_into_bytearray %zu", b1);
+				break;
+
 			case HCL_CODE_MAKE_DIC:
 				FETCH_PARAM_CODE_TO (hcl, b1);
 				LOG_INST_1 (hcl, "make_dic %zu", b1);

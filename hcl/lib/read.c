@@ -1282,7 +1282,7 @@ static HCL_INLINE hcl_oop_t leave_list (hcl_t* hcl, int* flagv, int* oldflagv)
 
 #if 0
 	/* TODO: literalize the list if all the elements are all literals */
-	if (concode == HCL_CONCODE_ARRAY)
+	if (concode == HCL_CONCODE_ARRAY || concode == HCL_CONCODE_BYTEARRAY /*|| concode == HCL_CONCODE_DIC*/)
 	{
 		/* convert a list to an array */
 		hcl_oop_oop_t arr;
@@ -1350,6 +1350,10 @@ done:
 				return (hcl_oop_t)hcl_makebytearray(hcl, HCL_NULL, 0); 
 			case HCL_CONCODE_DIC:
 				return (hcl_oop_t)hcl_makedic(hcl, 100); /* TODO: default dictionary size for empty definition? */
+
+			case HCL_CONCODE_XLIST:
+				hcl_setsynerr (hcl, HCL_SYNERR_EMPTYXLIST, TOKEN_LOC(hcl), HCL_NULL);
+				return HCL_NULL;
 		}
 	}
 

@@ -312,6 +312,11 @@ struct hcl_cframe_t
 		{
 			hcl_ooi_t index;
 		} array_list;
+
+		struct
+		{
+			hcl_ooi_t index;
+		} bytearray_list;
 	} u;
 };
 
@@ -702,8 +707,14 @@ enum hcl_bcode_t
 	BCODE_STORE_INTO_OBJVAR_X         = 0xE8, /* 232 ## */
 	BCODE_POP_INTO_OBJVAR_X           = 0xEC, /* 236 ## */
 
+	/* UNUSED 237 */
+	HCL_CODE_MAKE_BYTEARRAY           = 0xEE, /* 238 */
+	HCL_CODE_POP_INTO_BYTEARRAY       = 0xEF, /* 239 */
+
 	BCODE_SEND_MESSAGE_X              = 0xF0, /* 240 ## */
+
 	/* UNUSED 241 */
+
 	HCL_CODE_MAKE_DIC                 = 0xF2, /* 242 */
 	HCL_CODE_POP_INTO_DIC             = 0xF3, /* 243 */
 	BCODE_SEND_MESSAGE_TO_SUPER_X     = 0xF4, /* 244 ## */

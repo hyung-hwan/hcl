@@ -1045,7 +1045,7 @@ static int start_initial_process_and_context (hcl_t* hcl)
 	ctx->method_or_nargs = HCL_SMOOI_TO_OOP(0);
 /* TODO: XXXXX */
 	ctx->ntmprs = HCL_SMOOI_TO_OOP(0);
-	ctx->home = ctx; /* // is this correct??? */
+	ctx->home = ctx; /*  is this correct??? */
 /* END XXXXX */
 
 	/* [NOTE]
@@ -1841,6 +1841,42 @@ static int execute (hcl_t* hcl)
 				((hcl_oop_oop_t)t2)->slot[b1] = t1;
 				break;
 			}
+
+			case HCL_CODE_MAKE_BYTEARRAY:
+			{
+				hcl_oop_t t;
+
+				FETCH_PARAM_CODE_TO (hcl, b1);
+				LOG_INST_1 (hcl, "make_bytearray %zu", b1);
+
+				/* create an empty array */
+				t = hcl_makebytearray (hcl, HCL_NULL, b1);
+				if (!t) return -1;
+
+				HCL_STACK_PUSH (hcl, t); /* push the byte array created */
+				break;
+			}
+
+			case HCL_CODE_POP_INTO_BYTEARRAY:
+			{
+				hcl_oop_t t1, t2;
+				hcl_ooi_t bv;
+
+				FETCH_PARAM_CODE_TO (hcl, b1);
+				LOG_INST_1 (hcl, "pop_into_bytearray %zu", b1);
+
+				t1 = HCL_STACK_GETTOP(hcl); /* value to store */
+				if (!HCL_OOP_IS_SMOOI(t1) || (bv = HCL_OOP_TO_SMOOI(t1)) < 0 || bv > 255)
+				{
+					hcl_seterrbfmt (hcl, HCL_ERANGE, "not a byte or out of byte range - %O", t1);
+					return -1;
+				}
+				HCL_STACK_POP (hcl);
+				t2 = HCL_STACK_GETTOP(hcl); /* array */
+				((hcl_oop_byte_t)t2)->slot[b1] = bv;
+				break;
+			}
+
 
 			case HCL_CODE_MAKE_DIC:
 			{

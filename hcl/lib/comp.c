@@ -265,7 +265,9 @@ static int emit_single_param_instruction (hcl_t* hcl, int cmd, hcl_oow_t param_1
 
 		case HCL_CODE_MAKE_DIC: /* TODO: don't these need write_long2? */
 		case HCL_CODE_MAKE_ARRAY:
+		case HCL_CODE_MAKE_BYTEARRAY:
 		case HCL_CODE_POP_INTO_ARRAY:
+		case HCL_CODE_POP_INTO_BYTEARRAY:
 			bc = cmd;
 			goto write_long;
 	}
@@ -616,6 +618,7 @@ enum
 	COP_COMPILE_IF_OBJECT_LIST_TAIL,
 
 	COP_COMPILE_ARRAY_LIST,
+	COP_COMPILE_BYTEARRAY_LIST,
 	COP_COMPILE_DIC_LIST,
 
 	COP_SUBCOMPILE_ELIF,
@@ -624,8 +627,10 @@ enum
 	COP_EMIT_CALL,
 
 	COP_EMIT_MAKE_ARRAY,
+	COP_EMIT_MAKE_BYTEARRAY,
 	COP_EMIT_MAKE_DIC,
 	COP_EMIT_POP_INTO_ARRAY,
+	COP_EMIT_POP_INTO_BYTEARRAY,
 	COP_EMIT_POP_INTO_DIC,
 
 	COP_EMIT_LAMBDA,
@@ -1124,9 +1129,40 @@ static int compile_cons_array_expression (hcl_t* hcl, hcl_oop_t obj)
 	cf = GET_SUBCFRAME(hcl);
 	cf->u.array_list.index = 0;
 
-	/* patch the argument count in the operand field of the COP_MAKE_ARRAY frame */
+	/* patch the argument count in the operand field of the COP_EMIT_MAKE_ARRAY frame */
 	cf = GET_TOP_CFRAME(hcl);
 	HCL_ASSERT (hcl, cf->opcode == COP_EMIT_MAKE_ARRAY);
+	cf->operand = HCL_SMOOI_TO_OOP(nargs);
+
+	return 0;
+}
+
+static int compile_cons_bytearray_expression (hcl_t* hcl, hcl_oop_t obj)
+{
+	/* #[ ] */
+	hcl_ooi_t nargs;
+	hcl_cframe_t* cf;
+
+	/* NOTE: cframe management functions don't use the object memory.
+	 *       many operations can be performed without taking GC into account */
+	SWITCH_TOP_CFRAME (hcl, COP_EMIT_MAKE_BYTEARRAY, HCL_SMOOI_TO_OOP(0));
+
+	nargs = hcl_countcons(hcl, obj);
+	if (nargs > MAX_CODE_PARAM) 
+	{
+		/* TODO: change to syntax error */
+		hcl_setsynerrbfmt (hcl, HCL_SYNERR_ARGFLOOD, HCL_NULL, HCL_NULL, "too many(%zd) elements into byte-array - %O", nargs, obj); 
+		return -1;
+	}
+
+	/* redundant cdr check is performed inside compile_object_list() */
+	PUSH_SUBCFRAME (hcl, COP_COMPILE_BYTEARRAY_LIST, obj);
+	cf = GET_SUBCFRAME(hcl);
+	cf->u.bytearray_list.index = 0;
+
+	/* patch the argument count in the operand field of the COP_EMIT_MAKE_BYTEARRAY frame */
+	cf = GET_TOP_CFRAME(hcl);
+	HCL_ASSERT (hcl, cf->opcode == COP_EMIT_MAKE_BYTEARRAY);
 	cf->operand = HCL_SMOOI_TO_OOP(nargs);
 
 	return 0;
@@ -1151,7 +1187,7 @@ static int compile_cons_dic_expression (hcl_t* hcl, hcl_oop_t obj)
 	/* redundant cdr check is performed inside compile_object_list() */
 	PUSH_SUBCFRAME (hcl, COP_COMPILE_DIC_LIST, obj);
 
-	/* patch the argument count in the operand field of the COP_MAKE_DIC frame */
+	/* patch the argument count in the operand field of the COP_EMIT_MAKE_DIC frame */
 	cf = GET_TOP_CFRAME(hcl);
 	HCL_ASSERT (hcl, cf->opcode == COP_EMIT_MAKE_DIC);
 	cf->operand = HCL_SMOOI_TO_OOP(nargs);
@@ -1406,11 +1442,11 @@ static int compile_object (hcl_t* hcl)
 				case HCL_CONCODE_ARRAY:
 					if (compile_cons_array_expression(hcl, cf->operand) <= -1) return -1;
 					break;
-/*
-				case HCL_CONCODE_BYTEARRA:
+
+				case HCL_CONCODE_BYTEARRAY:
 					if (compile_cons_bytearray_expression (hcl, cf->operand) <= -1) return -1;
 					break;
-*/
+
 				case HCL_CONCODE_DIC:
 					if (compile_cons_dic_expression(hcl, cf->operand) <= -1) return -1;
 					break;
@@ -1596,6 +1632,54 @@ static int compile_array_list (hcl_t* hcl)
 
 	return 0;
 }
+
+
+static int compile_bytearray_list (hcl_t* hcl)
+{
+	hcl_cframe_t* cf;
+	hcl_oop_t coperand;
+
+	cf = GET_TOP_CFRAME(hcl);
+	HCL_ASSERT (hcl, cf->opcode == COP_COMPILE_BYTEARRAY_LIST);
+
+	coperand = cf->operand;
+
+	if (HCL_IS_NIL(hcl, coperand))
+	{
+		POP_CFRAME (hcl);
+	}
+	else
+	{
+		hcl_oop_t car, cdr;
+		hcl_ooi_t oldidx;
+
+		if (!HCL_IS_CONS(hcl, coperand))
+		{
+			hcl_setsynerrbfmt (
+				hcl, HCL_SYNERR_DOTBANNED, HCL_NULL, HCL_NULL, 
+ 				"redundant cdr in the byte-array list - %O", coperand); /* TODO: error location */
+			return -1;
+		}
+
+		car = HCL_CONS_CAR(coperand);
+		cdr = HCL_CONS_CDR(coperand);
+
+		oldidx = cf->u.bytearray_list.index;
+
+		SWITCH_TOP_CFRAME (hcl, COP_COMPILE_OBJECT, car);
+		if (!HCL_IS_NIL(hcl, cdr))
+		{
+			PUSH_SUBCFRAME (hcl, COP_COMPILE_BYTEARRAY_LIST, cdr);
+			cf = GET_SUBCFRAME(hcl);
+			cf->u.bytearray_list.index = oldidx + 1;
+		}
+
+		PUSH_SUBCFRAME (hcl, COP_EMIT_POP_INTO_BYTEARRAY, HCL_SMOOI_TO_OOP(oldidx));
+	}
+
+	return 0;
+}
+
 
 static int compile_dic_list (hcl_t* hcl)
 {
@@ -1976,6 +2060,20 @@ static HCL_INLINE int emit_make_array (hcl_t* hcl)
 	return n;
 }
 
+static HCL_INLINE int emit_make_bytearray (hcl_t* hcl)
+{
+	hcl_cframe_t* cf;
+	int n;
+
+	cf = GET_TOP_CFRAME(hcl);
+	HCL_ASSERT (hcl, cf->opcode == COP_EMIT_MAKE_BYTEARRAY);
+	HCL_ASSERT (hcl, HCL_OOP_IS_SMOOI(cf->operand));
+
+	n = emit_single_param_instruction (hcl, HCL_CODE_MAKE_BYTEARRAY, HCL_OOP_TO_SMOOI(cf->operand));
+
+	POP_CFRAME (hcl);
+	return n;
+}
 
 static HCL_INLINE int emit_make_dic (hcl_t* hcl)
 {
@@ -2002,6 +2100,21 @@ static HCL_INLINE int emit_pop_into_array (hcl_t* hcl)
 	HCL_ASSERT (hcl, HCL_OOP_IS_SMOOI(cf->operand));
 
 	n = emit_single_param_instruction (hcl, HCL_CODE_POP_INTO_ARRAY, HCL_OOP_TO_SMOOI(cf->operand));
+
+	POP_CFRAME (hcl);
+	return n;
+}
+
+static HCL_INLINE int emit_pop_into_bytearray (hcl_t* hcl)
+{
+	hcl_cframe_t* cf;
+	int n;
+
+	cf = GET_TOP_CFRAME(hcl);
+	HCL_ASSERT (hcl, cf->opcode == COP_EMIT_POP_INTO_BYTEARRAY);
+	HCL_ASSERT (hcl, HCL_OOP_IS_SMOOI(cf->operand));
+
+	n = emit_single_param_instruction (hcl, HCL_CODE_POP_INTO_BYTEARRAY, HCL_OOP_TO_SMOOI(cf->operand));
 
 	POP_CFRAME (hcl);
 	return n;
@@ -2177,6 +2290,10 @@ int hcl_compile (hcl_t* hcl, hcl_oop_t obj)
 				if (compile_array_list(hcl) <= -1) goto oops;
 				break;
 
+			case COP_COMPILE_BYTEARRAY_LIST:
+				if (compile_bytearray_list(hcl) <= -1) goto oops;
+				break;
+
 			case COP_COMPILE_DIC_LIST:
 				if (compile_dic_list(hcl) <= -1) goto oops;
 				break;
@@ -2189,12 +2306,20 @@ int hcl_compile (hcl_t* hcl, hcl_oop_t obj)
 				if (emit_make_array(hcl) <= -1) goto oops;
 				break;
 
+			case COP_EMIT_MAKE_BYTEARRAY:
+				if (emit_make_bytearray(hcl) <= -1) goto oops;
+				break;
+
 			case COP_EMIT_MAKE_DIC:
 				if (emit_make_dic(hcl) <= -1) goto oops;
 				break;
 
 			case COP_EMIT_POP_INTO_ARRAY:
 				if (emit_pop_into_array(hcl) <= -1) goto oops;
+				break;
+
+			case COP_EMIT_POP_INTO_BYTEARRAY:
+				if (emit_pop_into_bytearray(hcl) <= -1) goto oops;
 				break;
 
 			case COP_EMIT_POP_INTO_DIC:
@@ -2249,7 +2374,7 @@ int hcl_compile (hcl_t* hcl, hcl_oop_t obj)
 
 			default:
 				HCL_DEBUG1 (hcl, "Internal error - invalid compiler opcode %d\n", cf->opcode);
-				hcl_seterrnum (hcl, HCL_EINTERN);
+				hcl_seterrbfmt (hcl, HCL_EINTERN, "invalid compiler opcode %d", cf->opcode);
 				goto oops;
 		}
 	}
