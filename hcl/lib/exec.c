@@ -1148,7 +1148,7 @@ static hcl_oop_process_t start_initial_process (hcl_t* hcl, hcl_oop_context_t ct
 	return proc;
 }
 
-static int start_initial_process_and_context (hcl_t* hcl)
+static int start_initial_process_and_context (hcl_t* hcl, hcl_ooi_t initial_ip)
 {
 	hcl_oop_context_t ctx;
 	hcl_oop_process_t proc;
@@ -1161,7 +1161,7 @@ static int start_initial_process_and_context (hcl_t* hcl)
 	 * and is not really worked on except that it is used to call the
 	 * initial method. so it doesn't really require any extra stack space. */
 /* TODO: verify this theory of mine. */
-	hcl->ip = 0;
+	hcl->ip = initial_ip;
 	hcl->sp = -1;
 
 	ctx->ip = HCL_SMOOI_TO_OOP(0); /* point to the beginning */
@@ -2416,14 +2416,14 @@ oops:
 	return -1;
 }
 
-int hcl_execute (hcl_t* hcl)
+int hcl_executefromip (hcl_t* hcl, hcl_ooi_t initial_ip)
 {
 	int n;
 
 	HCL_ASSERT (hcl, hcl->initial_context == HCL_NULL);
 	HCL_ASSERT (hcl, hcl->active_context == HCL_NULL);
 
-	if (start_initial_process_and_context (hcl) <= -1) return -1;
+	if (start_initial_process_and_context(hcl, initial_ip) <= -1) return -1;
 	hcl->initial_context = hcl->processor->active->initial_context;
 
 	n = execute (hcl);
@@ -2434,3 +2434,8 @@ int hcl_execute (hcl_t* hcl)
 	return n;
 }
 
+
+int hcl_execute (hcl_t* hcl)
+{
+	return hcl_executefromip (hcl, 0);
+}

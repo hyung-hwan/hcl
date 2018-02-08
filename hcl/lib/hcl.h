@@ -1557,6 +1557,11 @@ HCL_EXPORT int hcl_execute (
 	hcl_t* hcl
 );
 
+HCL_EXPORT int hcl_executefromip (
+	hcl_t*    hcl,
+	hcl_ooi_t initial_ip
+);
+
 /**
  * The hcl_invoke() function sends a message named \a mthname to an object
  * named \a objname.

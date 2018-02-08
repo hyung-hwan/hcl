@@ -1029,6 +1029,10 @@ int main (int argc, char* argv[])
 		}
 		else
 		{
+			hcl_oow_t code_offset;
+
+			code_offset = hcl->code.bc.len;
+
 			hcl_proutbfmt (hcl, 0, "\n");
 			if (hcl_compile(hcl, obj) <= -1)
 			{
@@ -1041,6 +1045,8 @@ int main (int argc, char* argv[])
 					hcl_logbfmt (hcl, HCL_LOG_STDERR, "ERROR: cannot compile object - [%d] %js\n", hcl_geterrnum(hcl), hcl_geterrmsg(hcl));
 				}
 				/* carry on? */
+
+				hcl->code.bc.len = code_offset; /* just in case */
 			}
 			else
 			{
@@ -1048,7 +1054,7 @@ int main (int argc, char* argv[])
 				HCL_LOG0 (hcl, HCL_LOG_MNEMONIC, "------------------------------------------\n");
 				g_hcl = hcl;
 				//setup_tick ();
-				if (hcl_execute(hcl) <= -1)
+				if (hcl_executefromip(hcl, code_offset) <= -1)
 				{
 					hcl_logbfmt (hcl, HCL_LOG_STDERR, "ERROR: cannot execute - [%d] %js\n", hcl_geterrnum(hcl), hcl_geterrmsg(hcl));
 				}
