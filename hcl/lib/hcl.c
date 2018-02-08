@@ -116,6 +116,9 @@ int hcl_init (hcl_t* hcl, hcl_mmgr_t* mmgr, hcl_oow_t heapsz, const hcl_vmprim_t
 	hcl_rbt_setstyle (&hcl->pmtable, hcl_getrbtstyle(HCL_RBT_STYLE_INLINE_COPIERS));
 
 	fill_bigint_tables (hcl);
+
+	hcl->proc_map_free_first = -1;
+	hcl->proc_map_free_last = -1;
 	return 0;
 
 oops:
@@ -185,6 +188,13 @@ void hcl_fini (hcl_t* hcl)
 		hcl->sem_heap_count = 0;
 	}
 
+	if (hcl->proc_map)
+	{
+		hcl_freemem (hcl, hcl->proc_map);
+		hcl->proc_map_capa = 0;
+		hcl->proc_map_free_first = -1;
+		hcl->proc_map_free_last = -1;
+	}
 
 	if (hcl->code.bc.arr)
 	{

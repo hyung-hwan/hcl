@@ -57,6 +57,23 @@
 #define PROC_STATE_SUSPENDED 0
 #define PROC_STATE_TERMINATED -1
 
+
+static HCL_INLINE const char* proc_state_to_string (int state)
+{
+	static const hcl_bch_t* str[] = 
+	{
+		"TERMINATED",
+		"SUSPENDED",
+		"RUNNABLE",
+		"WAITING",
+		"RUNNING"
+	};
+
+	return str[state + 1];
+}
+
+#define PROC_MAP_INC 64
+
 #define SEM_LIST_INC 256
 #define SEM_HEAP_INC 256
 #define SEM_LIST_MAX (SEM_LIST_INC * 1000)
@@ -273,10 +290,87 @@ static HCL_INLINE hcl_oop_t make_context (hcl_t* hcl, hcl_ooi_t ntmprs)
 	return hcl_allocoopobj (hcl, HCL_BRAND_CONTEXT, HCL_CONTEXT_NAMED_INSTVARS + (hcl_oow_t)ntmprs);
 }
 
+
+static HCL_INLINE int prepare_to_alloc_pid (hcl_t* hcl)
+{
+	hcl_oow_t new_capa;
+	hcl_ooi_t i, j;
+	hcl_oop_t* tmp;
+
+	HCL_ASSERT (hcl, hcl->proc_map_free_first <= -1);
+	HCL_ASSERT (hcl, hcl->proc_map_free_last <= -1);
+
+	new_capa = hcl->proc_map_capa + PROC_MAP_INC;
+	if (new_capa > HCL_SMOOI_MAX)
+	{
+		if (hcl->proc_map_capa >= HCL_SMOOI_MAX)
+		{
+		#if defined(HCL_DEBUG_VM_PROCESSOR)
+			HCL_LOG0 (hcl, HCL_LOG_IC | HCL_LOG_FATAL, "Processor - too many processes\n");
+		#endif
+			hcl_seterrnum (hcl, HCL_EPFULL);
+			return -1;
+		}
+
+		new_capa = HCL_SMOOI_MAX;
+	}
+
+	tmp = hcl_reallocmem (hcl, hcl->proc_map, HCL_SIZEOF(hcl_oop_t) * new_capa);
+	if (!tmp) return -1;
+
+	hcl->proc_map_free_first = hcl->proc_map_capa;
+	for (i = hcl->proc_map_capa, j = hcl->proc_map_capa + 1; j < new_capa; i++, j++)
+	{
+		tmp[i] = HCL_SMOOI_TO_OOP(j);
+	}
+	tmp[i] = HCL_SMOOI_TO_OOP(-1);
+	hcl->proc_map_free_last = i;
+
+	hcl->proc_map = tmp;
+	hcl->proc_map_capa = new_capa;
+
+	return 0;
+}
+
+static HCL_INLINE void alloc_pid (hcl_t* hcl, hcl_oop_process_t proc)
+{
+	hcl_ooi_t pid;
+
+	pid = hcl->proc_map_free_first;
+	proc->id = HCL_SMOOI_TO_OOP(pid);
+	HCL_ASSERT (hcl, HCL_OOP_IS_SMOOI(hcl->proc_map[pid]));
+	hcl->proc_map_free_first = HCL_OOP_TO_SMOOI(hcl->proc_map[pid]);
+	if (hcl->proc_map_free_first <= -1) hcl->proc_map_free_last = -1;
+	hcl->proc_map[pid] = (hcl_oop_t)proc;
+}
+
+static HCL_INLINE void free_pid (hcl_t* hcl, hcl_oop_process_t proc)
+{
+	hcl_ooi_t pid;
+
+	pid = HCL_OOP_TO_SMOOI(proc->id);
+	HCL_ASSERT (hcl, pid < hcl->proc_map_capa);
+
+	hcl->proc_map[pid] = HCL_SMOOI_TO_OOP(-1);
+	if (hcl->proc_map_free_last <= -1)
+	{
+		HCL_ASSERT (hcl, hcl->proc_map_free_first <= -1);
+		hcl->proc_map_free_first = pid;
+	}
+	else
+	{
+		hcl->proc_map[hcl->proc_map_free_last] = HCL_SMOOI_TO_OOP(pid);
+	}
+	hcl->proc_map_free_last = pid;
+}
+
+
 static hcl_oop_process_t make_process (hcl_t* hcl, hcl_oop_context_t c)
 {
 	hcl_oop_process_t proc;
 	hcl_oow_t stksize;
+
+	if (hcl->proc_map_free_first <= -1 && prepare_to_alloc_pid(hcl) <= -1) return HCL_NULL;
 
 	stksize = hcl->option.dfl_procstk_size;
 	if (stksize > HCL_TYPE_MAX(hcl_oow_t) - HCL_PROCESS_NAMED_INSTVARS)
@@ -287,6 +381,9 @@ static hcl_oop_process_t make_process (hcl_t* hcl, hcl_oop_context_t c)
 	hcl_poptmp (hcl);
 	if (!proc) return HCL_NULL;
 
+	/* assign a process id to the process */
+	alloc_pid (hcl, proc);
+
 	proc->state = HCL_SMOOI_TO_OOP(PROC_STATE_SUSPENDED);
 	proc->initial_context = c;
 	proc->current_context = c;
@@ -295,7 +392,7 @@ static hcl_oop_process_t make_process (hcl_t* hcl, hcl_oop_context_t c)
 	HCL_ASSERT (hcl, (hcl_oop_t)c->sender == hcl->_nil);
 
 #if defined(HCL_DEBUG_VM_PROCESSOR)
-	HCL_LOG2 (hcl, HCL_LOG_IC | HCL_LOG_DEBUG, "Processor - made process %O of size %zu\n", proc, HCL_OBJ_GET_SIZE(proc));
+	HCL_LOG2 (hcl, HCL_LOG_IC | HCL_LOG_DEBUG, "Processor - process[%zd] **CREATED**->%hs\n", HCL_OOP_TO_SMOOI(proc->id), proc_state_to_string(HCL_OOP_TO_SMOOI(proc->state)));
 #endif
 	return proc;
 }
@@ -308,6 +405,10 @@ static HCL_INLINE void sleep_active_process (hcl_t* hcl, int state)
 
 	STORE_ACTIVE_SP(hcl);
 
+#if defined(HCL_DEBUG_VM_PROCESSOR)
+	HCL_LOG3 (hcl, HCL_LOG_IC | HCL_LOG_DEBUG, "Processor - process[%zd] %hs->%hs in sleep_active_process\n", HCL_OOP_TO_SMOOI(hcl->processor->active->id), proc_state_to_string(HCL_OOP_TO_SMOOI(hcl->processor->active->state)), proc_state_to_string(state));
+#endif
+
 	/* store the current active context to the current process.
 	 * it is the suspended context of the process to be suspended */
 	HCL_ASSERT (hcl, hcl->processor->active != hcl->nil_process);
@@ -317,6 +418,11 @@ static HCL_INLINE void sleep_active_process (hcl_t* hcl, int state)
 
 static HCL_INLINE void wake_new_process (hcl_t* hcl, hcl_oop_process_t proc)
 {
+
+#if defined(HCL_DEBUG_VM_PROCESSOR)
+	HCL_LOG2 (hcl, HCL_LOG_IC | HCL_LOG_DEBUG, "Processor - process[%zd] %hs->RUNNING in wake_process\n", HCL_OOP_TO_SMOOI(proc->id), proc_state_to_string(HCL_OOP_TO_SMOOI(proc->state)));
+#endif
+
 	/* activate the given process */
 	proc->state = HCL_SMOOI_TO_OOP(PROC_STATE_RUNNING);
 	hcl->processor->active = proc;
@@ -326,8 +432,8 @@ static HCL_INLINE void wake_new_process (hcl_t* hcl, hcl_oop_process_t proc)
 	/* activate the suspended context of the new process */
 	SWITCH_ACTIVE_CONTEXT (hcl, proc->current_context);
 
-#if defined(HCL_DEBUG_VM_PROCESSOR)
-	HCL_LOG3 (hcl, HCL_LOG_IC | HCL_LOG_DEBUG, "Processor - woke up process %O context %O ip=%zd\n", hcl->processor->active, hcl->active_context, hcl->ip);
+#if defined(HCL_DEBUG_VM_PROCESSOR) && (HCL_DEBUG_VM_PROCESSOR >= 2)
+	HCL_LOG3 (hcl, HCL_LOG_IC | HCL_LOG_DEBUG, "Processor - woke up process[%zd] context %O ip=%zd\n", HCL_OOP_TO_SMOOI(hcl->processor->active->id), hcl->active_context, hcl->ip);
 #endif
 }
 
@@ -364,7 +470,7 @@ static HCL_INLINE void switch_to_next_runnable_process (hcl_t* hcl)
 	if (nrp != hcl->processor->active) switch_to_process (hcl, nrp, PROC_STATE_RUNNABLE);
 }
 
-static HCL_INLINE int chain_into_processor (hcl_t* hcl, hcl_oop_process_t proc)
+static HCL_INLINE int chain_into_processor (hcl_t* hcl, hcl_oop_process_t proc, int new_state)
 {
 	/* the process is not scheduled at all. 
 	 * link it to the processor's process list. */
@@ -374,6 +480,14 @@ static HCL_INLINE int chain_into_processor (hcl_t* hcl, hcl_oop_process_t proc)
 	HCL_ASSERT (hcl, (hcl_oop_t)proc->next == hcl->_nil);
 
 	HCL_ASSERT (hcl, proc->state == HCL_SMOOI_TO_OOP(PROC_STATE_SUSPENDED));
+
+#if defined(HCL_DEBUG_VM_PROCESSOR)
+	HCL_LOG3 (hcl, HCL_LOG_IC | HCL_LOG_DEBUG, 
+		"Processor - process[%zd] %hs->%hs in chain_into_processor\n",
+		HCL_OOP_TO_SMOOI(proc->id),
+		proc_state_to_string(HCL_OOP_TO_SMOOI(proc->state)),
+		proc_state_to_string(new_state));
+#endif
 
 	tally = HCL_OOP_TO_SMOOI(hcl->processor->tally);
 
@@ -398,6 +512,7 @@ static HCL_INLINE int chain_into_processor (hcl_t* hcl, hcl_oop_process_t proc)
 		hcl->processor->runnable_head = proc;
 	}
 	hcl->processor->runnable_tail = proc;
+	proc->state = HCL_SMOOI_TO_OOP(new_state);
 
 	tally++;
 	hcl->processor->tally = HCL_SMOOI_TO_OOP(tally);
@@ -405,14 +520,14 @@ static HCL_INLINE int chain_into_processor (hcl_t* hcl, hcl_oop_process_t proc)
 	return 0;
 }
 
-static HCL_INLINE void unchain_from_processor (hcl_t* hcl, hcl_oop_process_t proc, int state)
+static HCL_INLINE void unchain_from_processor (hcl_t* hcl, hcl_oop_process_t proc, int new_state)
 {
 	hcl_ooi_t tally;
 
 	/* the processor's process chain must be composed of running/runnable
 	 * processes only */
 	HCL_ASSERT (hcl, proc->state == HCL_SMOOI_TO_OOP(PROC_STATE_RUNNING) ||
-	             proc->state == HCL_SMOOI_TO_OOP(PROC_STATE_RUNNABLE));
+	                 proc->state == HCL_SMOOI_TO_OOP(PROC_STATE_RUNNABLE));
 
 	tally = HCL_OOP_TO_SMOOI(hcl->processor->tally);
 	HCL_ASSERT (hcl, tally > 0);
@@ -422,13 +537,19 @@ static HCL_INLINE void unchain_from_processor (hcl_t* hcl, hcl_oop_process_t pro
 	if ((hcl_oop_t)proc->next != hcl->_nil) proc->next->prev = proc->prev;
 	else hcl->processor->runnable_tail = proc->prev;
 
+#if defined(HCL_DEBUG_VM_PROCESSOR)
+	HCL_LOG3 (hcl, HCL_LOG_IC | HCL_LOG_DEBUG, "Processor - process[%zd] %hs->%hs in unchain_from_processor\n", HCL_OOP_TO_SMOOI(proc->id), proc_state_to_string(HCL_OOP_TO_SMOOI(proc->state)), proc_state_to_string(HCL_OOP_TO_SMOOI(new_state)));
+#endif
+
 	proc->prev = (hcl_oop_process_t)hcl->_nil;
 	proc->next = (hcl_oop_process_t)hcl->_nil;
-	proc->state = HCL_SMOOI_TO_OOP(state);
+	proc->state = HCL_SMOOI_TO_OOP(new_state);
 
 	tally--;
 	if (tally == 0) hcl->processor->active = hcl->nil_process;
 	hcl->processor->tally = HCL_SMOOI_TO_OOP(tally);
+
+
 }
 
 static HCL_INLINE void chain_into_semaphore (hcl_t* hcl, hcl_oop_process_t proc, hcl_oop_semaphore_t sem)
@@ -480,7 +601,7 @@ static void terminate_process (hcl_t* hcl, hcl_oop_process_t proc)
 		/* RUNNING/RUNNABLE ---> TERMINATED */
 
 	#if defined(HCL_DEBUG_VM_PROCESSOR)
-		HCL_LOG1 (hcl, HCL_LOG_IC | HCL_LOG_DEBUG, "Processor - process %O RUNNING/RUNNABLE->TERMINATED\n", proc);
+		HCL_LOG2 (hcl, HCL_LOG_IC | HCL_LOG_DEBUG, "Processor - process[%zd] %hs->TERMINATED in terminate_process\n", HCL_OOP_TO_SMOOI(proc->id), proc_state_to_string(HCL_OOP_TO_SMOOI(proc->state)));
 	#endif
 
 		if (proc == hcl->processor->active)
@@ -513,12 +634,15 @@ static void terminate_process (hcl_t* hcl, hcl_oop_process_t proc)
 			unchain_from_processor (hcl, proc, PROC_STATE_TERMINATED);
 			proc->sp = HCL_SMOOI_TO_OOP(-1); /* invalidate the process stack */
 		}
+
+		/* when terminated, clear it from the pid table and set the process id to a negative number */
+		free_pid (hcl, proc);
 	}
 	else if (proc->state == HCL_SMOOI_TO_OOP(PROC_STATE_SUSPENDED))
 	{
 		/* SUSPENDED ---> TERMINATED */
 	#if defined(HCL_DEBUG_VM_PROCESSOR)
-		HCL_LOG1 (hcl, HCL_LOG_IC | HCL_LOG_DEBUG, "Processor - process %O SUSPENDED->TERMINATED\n", proc);
+		HCL_LOG2 (hcl, HCL_LOG_IC | HCL_LOG_DEBUG, "Processor - process[%zd] %hs->TERMINATED in terminate_process\n", HCL_OOP_TO_SMOOI(proc->id), proc_state_to_string(HCL_OOP_TO_SMOOI(proc->state)));
 	#endif
 
 		proc->state = HCL_SMOOI_TO_OOP(PROC_STATE_TERMINATED);
@@ -528,6 +652,9 @@ static void terminate_process (hcl_t* hcl, hcl_oop_process_t proc)
 		{
 			unchain_from_semaphore (hcl, proc);
 		}
+
+		/* when terminated, clear it from the pid table and set the process id to a negative number */
+		free_pid (hcl, proc);
 	}
 	else if (proc->state == HCL_SMOOI_TO_OOP(PROC_STATE_WAITING))
 	{
@@ -545,13 +672,12 @@ static void resume_process (hcl_t* hcl, hcl_oop_process_t proc)
 		HCL_ASSERT (hcl, (hcl_oop_t)proc->next == hcl->_nil);
 
 	#if defined(HCL_DEBUG_VM_PROCESSOR)
-		HCL_LOG1 (hcl, HCL_LOG_IC | HCL_LOG_DEBUG, "Processor - process %O SUSPENDED->RUNNING\n", proc);
+		HCL_LOG2 (hcl, HCL_LOG_IC | HCL_LOG_DEBUG, "Processor - process[%zd] %hs->RUNNABLE in resume_process\n", HCL_OOP_TO_SMOOI(proc->id), proc_state_to_string(HCL_OOP_TO_SMOOI(proc->state)));
 	#endif
 
-		chain_into_processor (hcl, proc); /* TODO: error check */
-
+		chain_into_processor (hcl, proc, PROC_STATE_RUNNABLE); /* TODO: error check */
 		/*proc->current_context = proc->initial_context;*/
-		proc->state = HCL_SMOOI_TO_OOP(PROC_STATE_RUNNABLE);
+		
 
 		/* don't switch to this process. just set the state to RUNNING */
 	}
@@ -1010,8 +1136,8 @@ static hcl_oop_process_t start_initial_process (hcl_t* hcl, hcl_oop_context_t ct
 	proc = make_process (hcl, ctx);
 	if (!proc) return HCL_NULL;
 
-	if (chain_into_processor (hcl, proc) <= -1) return HCL_NULL;
-	proc->state = HCL_SMOOI_TO_OOP(PROC_STATE_RUNNING); /* skip RUNNABLE and go to RUNNING */
+	/* skip RUNNABLE and go to RUNNING */
+	if (chain_into_processor (hcl, proc, PROC_STATE_RUNNING) <= -1) return HCL_NULL; 
 	hcl->processor->active = proc;
 
 	/* do something that resume_process() would do with less overhead */
@@ -1201,7 +1327,7 @@ static int execute (hcl_t* hcl)
 
 		if (hcl->ip >= hcl->code.bc.len) 
 		{
-			HCL_DEBUG0 (hcl, "IP reached the end of bytecode. Stopping execution\n");
+			HCL_DEBUG2 (hcl, "IP(%zd) reached the end of bytecode(%zu). Stopping execution\n", hcl->ip, hcl->code.bc.len);
 			break;
 		}
 

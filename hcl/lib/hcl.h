@@ -594,7 +594,7 @@ struct hcl_context_t
 };
 
 
-#define HCL_PROCESS_NAMED_INSTVARS 7 /* TODO: RENAME THIS TO SOMETHING ELSE */
+#define HCL_PROCESS_NAMED_INSTVARS 8 /* TODO: RENAME THIS TO SOMETHING ELSE */
 typedef struct hcl_process_t hcl_process_t;
 typedef struct hcl_process_t* hcl_oop_process_t;
 
@@ -608,6 +608,7 @@ struct hcl_process_t
 	hcl_oop_context_t initial_context;
 	hcl_oop_context_t current_context;
 
+	hcl_oop_t         id; /* SmallInteger */
 	hcl_oop_t         state; /* SmallInteger */
 	hcl_oop_t         sp;    /* stack pointer. SmallInteger */
 
@@ -631,7 +632,7 @@ struct hcl_semaphore_t
 	hcl_oop_t heap_ftime_nsec; /* firing time */
 };
 
-#define HCL_PROCESS_SCHEDULER_NAMED_INSTVARS 5
+#define HCL_PROCESS_SCHEDULER_NAMED_INSTVARS 4
 typedef struct hcl_process_scheduler_t hcl_process_scheduler_t;
 typedef struct hcl_process_scheduler_t* hcl_oop_process_scheduler_t;
 struct hcl_process_scheduler_t
@@ -641,7 +642,6 @@ struct hcl_process_scheduler_t
 	hcl_oop_process_t active; /*  pointer to an active process in the runnable process list */
 	hcl_oop_process_t runnable_head; /* runnable process list */
 	hcl_oop_process_t runnable_tail; /* runnable process list */
-	hcl_oop_t sempq; /* SemaphoreHeap */
 };
 
 /**
@@ -979,6 +979,11 @@ struct hcl_t
 
 	hcl_oop_t* tmp_stack[256]; /* stack for temporaries */
 	hcl_oow_t tmp_count;
+
+	hcl_oop_t* proc_map;
+	hcl_oow_t proc_map_capa;
+	hcl_ooi_t proc_map_free_first;
+	hcl_ooi_t proc_map_free_last;
 
 	/* == EXECUTION REGISTERS == */
 	hcl_oop_context_t initial_context; /* fake initial context */

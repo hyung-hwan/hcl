@@ -56,9 +56,13 @@
  * object instead of putting in in a separate byte array. */
 #define HCL_USE_OBJECT_TRAILER
 
-/* this is for gc debugging */
-/*#define HCL_DEBUG_PROCESSOR*/
-#define HCL_DEBUG_VM_EXEC
+
+
+#if !defined(NDEBUG)
+#define HCL_DEBUG_VM_PROCESSOR 1
+#define HCL_DEBUG_VM_EXEC 1
+#define MOO_DEBUG_BIGINT 1
+#endif
 
 /* allow the caller to drive process switching by calling
  * stix_switchprocess(). */
