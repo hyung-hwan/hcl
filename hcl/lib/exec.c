@@ -27,30 +27,6 @@
 
 #include "hcl-prv.h"
 
-/* TODO: remove these headers after having migrated system-dependent functions of of this file */
-#if defined(_WIN32)
-#	include <windows.h>
-#elif defined(__OS2__)
-#	define INCL_DOSMISC
-#	define INCL_DOSDATETIME
-#	define INCL_DOSERRORS
-#	include <os2.h>
-#	include <time.h>
-#elif defined(__MSDOS__)
-#	include <time.h>
-#elif defined(macintosh)
-#	include <Types.h>
-#	include <OSUtils.h>
-#	include <Timer.h>
-#else
-#	if defined(HAVE_TIME_H)
-#		include <time.h>
-#	endif
-#	if defined(HAVE_SYS_TIME_H)
-#		include <sys/time.h>
-#	endif
-#endif
-
 #define PROC_STATE_RUNNING 3
 #define PROC_STATE_WAITING 2
 #define PROC_STATE_RUNNABLE 1
@@ -139,147 +115,21 @@ static HCL_INLINE const char* proc_state_to_string (int state)
 #	define LOG_INST_3(hcl,fmt,a1,a2,a3)
 #endif
 
-/* ------------------------------------------------------------------------- */
-static HCL_INLINE void vm_gettime (hcl_t* hcl, hcl_ntime_t* now)
+static int vm_startup (hcl_t* hcl)
 {
-#if defined(_WIN32)
+	HCL_DEBUG0 (hcl, "VM started up\n");
 
-	/* TODO: */
+	if (hcl->vmprim.vm_startup(hcl) <= -1) return -1;
+	hcl->vmprim.vm_gettime (hcl, &hcl->exec_start_time); /* raw time. no adjustment */
 
-#elif defined(__OS2__)
-	ULONG out;
-
-/* TODO: handle overflow?? */
-/* TODO: use DosTmrQueryTime() and DosTmrQueryFreq()? */
-	DosQuerySysInfo (QSV_MS_COUNT, QSV_MS_COUNT, &out, HCL_SIZEOF(out)); /* milliseconds */
-	/* it must return NO_ERROR */
-
-	HCL_INITNTIME (now, HCL_MSEC_TO_SEC(out), HCL_MSEC_TO_NSEC(out));
-#elif defined(__MSDOS__) && defined(_INTELC32_)
-	clock_t c;
-
-/* TODO: handle overflow?? */
-	c = clock ();
-	now->sec = c / CLOCKS_PER_SEC;
-	#if (CLOCKS_PER_SEC == 1000)
-		now->nsec = HCL_MSEC_TO_NSEC(c % CLOCKS_PER_SEC);
-	#elif (CLOCKS_PER_SEC == 1000000L)
-		now->nsec = HCL_USEC_TO_NSEC(c % CLOCKS_PER_SEC);
-	#elif (CLOCKS_PER_SEC == 1000000000L)
-		now->nsec = (c % CLOCKS_PER_SEC);
-	#else
-	#	error UNSUPPORTED CLOCKS_PER_SEC
-	#endif
-#elif defined(macintosh)
-	UnsignedWide tick;
-	hcl_uint64_t tick64;
-
-	Microseconds (&tick);
-
-	tick64 = *(hcl_uint64_t*)&tick;
-	HCL_INITNTIME (now, HCL_USEC_TO_SEC(tick64), HCL_USEC_TO_NSEC(tick64));
-
-#elif defined(HAVE_CLOCK_GETTIME) && defined(CLOCK_MONOTONIC)
-	struct timespec ts;
-	clock_gettime (CLOCK_MONOTONIC, &ts);
-	HCL_INITNTIME(now, ts.tv_sec, ts.tv_nsec);
-
-#elif defined(HAVE_CLOCK_GETTIME) && defined(CLOCK_REALTIME)
-	struct timespec ts;
-	clock_gettime (CLOCK_REALTIME, &ts);
-	HCL_INITNTIME(now, ts.tv_sec, ts.tv_nsec);
-	HCL_SUBNTIME (now, now, &hcl->vm_time_offset); /* offset */
-#else
-	struct timeval tv;
-	gettimeofday (&tv, HCL_NULL);
-	HCL_INITNTIME(now, tv.tv_sec, HCL_USEC_TO_NSEC(tv.tv_usec));
-
-	/* at the first call, vm_time_offset should be 0. so subtraction takes
-	 * no effect. once it becomes non-zero, it offsets the actual time.
-	 * this is to keep the returned time small enough to be held in a 
-	 * small integer on platforms where the small integer is not large enough */
-	HCL_SUBNTIME (now, now, &hcl->vm_time_offset); 
-#endif
-}
-
-static HCL_INLINE void vm_sleep (hcl_t* hcl, const hcl_ntime_t* dur)
-{
-#if defined(_WIN32)
-	if (hcl->waitable_timer)
-	{
-		LARGE_INTEGER li;
-		li.QuadPart = -HCL_SECNSEC_TO_NSEC(dur->sec, dur->nsec);
-		if(SetWaitableTimer(timer, &li, 0, HCL_NULL, HCL_NULL, FALSE) == FALSE) goto normal_sleep;
-		WaitForSingleObject(timer, INFINITE);
-	}
-	else
-	{
-	normal_sleep:
-		/* fallback to normal Sleep() */
-		Sleep (HCL_SECNSEC_TO_MSEC(dur->sec,dur->nsec));
-	}
-#elif defined(__OS2__)
-
-	/* TODO: in gui mode, this is not a desirable method??? 
-	 *       this must be made event-driven coupled with the main event loop */
-	DosSleep (HCL_SECNSEC_TO_MSEC(dur->sec,dur->nsec));
-
-#elif defined(macintosh)
-
-	/* TODO: ... */
-
-#elif defined(__MSDOS__) && defined(_INTELC32_)
-
-	clock_t c;
-
-	c = clock ();
-	c += dur->sec * CLOCKS_PER_SEC;
-	#if (CLOCKS_PER_SEC == 1000)
-		c += HCL_NSEC_TO_MSEC(dur->nsec);
-	#elif (CLOCKS_PER_SEC == 1000000L)
-		c += HCL_NSEC_TO_USEC(dur->nsec);
-	#elif (CLOCKS_PER_SEC == 1000000000L)
-		c += dur->nsec;
-	#else
-	#	error UNSUPPORTED CLOCKS_PER_SEC
-	#endif
-
-/* TODO: handle clock overvlow */
-/* TODO: check if there is abortion request or interrupt */
-	while (c > clock()) ;
-
-#else
-	struct timespec ts;
-	ts.tv_sec = dur->sec;
-	ts.tv_nsec = dur->nsec;
-	nanosleep (&ts, HCL_NULL);
-#endif
-}
-
-
-static void vm_startup (hcl_t* hcl)
-{
-	hcl_ntime_t now;
-
-#if defined(_WIN32)
-	hcl->waitable_timer = CreateWaitableTimer(HCL_NULL, TRUE, HCL_NULL);
-#endif
-
-	/* reset hcl->vm_time_offset so that vm_gettime is not affected */
-	HCL_INITNTIME(&hcl->vm_time_offset, 0, 0);
-	vm_gettime (hcl, &now);
-	hcl->vm_time_offset = now;
+	return 0;
 }
 
 static void vm_cleanup (hcl_t* hcl)
 {
-#if defined(_WIN32)
-	if (hcl->waitable_timer)
-	{
-		CloseHandle (hcl->waitable_timer);
-		hcl->waitable_timer = HCL_NULL;
-	}
-#endif
+	hcl->vmprim.vm_gettime (hcl, &hcl->exec_end_time); /* raw time. no adjustment */
+	hcl->vmprim.vm_cleanup (hcl);
+	HCL_DEBUG0 (hcl, "VM started up\n");
 }
 
 /* ------------------------------------------------------------------------- */
@@ -1224,7 +1074,7 @@ static int execute (hcl_t* hcl)
 
 	HCL_ASSERT (hcl, hcl->active_context != HCL_NULL);
 
-	vm_startup (hcl);
+	if (vm_startup (hcl) <= -1) return -1;
 	hcl->proc_switched = 0;
 
 	while (1)
@@ -1232,7 +1082,7 @@ static int execute (hcl_t* hcl)
 		if (hcl->sem_heap_count > 0)
 		{
 			hcl_ntime_t ft, now;
-			vm_gettime (hcl, &now);
+			hcl->vmprim.vm_gettime (hcl, &now);
 
 			do
 			{
@@ -1276,8 +1126,8 @@ static int execute (hcl_t* hcl)
 				else if (hcl->processor->active == hcl->nil_process)
 				{
 					HCL_SUBNTIME (&ft, &ft, (hcl_ntime_t*)&now);
-					vm_sleep (hcl, &ft); /* TODO: change this to i/o multiplexer??? */
-					vm_gettime (hcl, &now);
+					hcl->vmprim.vm_sleep (hcl, &ft); /* TODO: change this to i/o multiplexer??? */
+					hcl->vmprim.vm_gettime (hcl, &now);
 				}
 				else 
 				{
@@ -1327,8 +1177,9 @@ static int execute (hcl_t* hcl)
 
 		if (hcl->ip >= hcl->code.bc.len) 
 		{
-			HCL_DEBUG2 (hcl, "IP(%zd) reached the end of bytecode(%zu). Stopping execution\n", hcl->ip, hcl->code.bc.len);
-			break;
+			HCL_DEBUG1 (hcl, "IP reached the end of bytecode(%zu). Stopping execution\n", hcl->code.bc.len);
+			return_value = hcl->_nil;
+			goto handle_return;
 		}
 
 #if defined(HCL_DEBUG_VM_EXEC)

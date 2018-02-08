@@ -61,7 +61,8 @@
 #if !defined(NDEBUG)
 #define HCL_DEBUG_VM_PROCESSOR 1
 #define HCL_DEBUG_VM_EXEC 1
-#define MOO_DEBUG_BIGINT 1
+#define HCL_DEBUG_BIGINT 1
+#define HCL_PROFILE_VM 1
 #endif
 
 /* allow the caller to drive process switching by calling

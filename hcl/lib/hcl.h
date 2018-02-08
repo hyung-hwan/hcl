@@ -700,14 +700,28 @@ typedef void (*hcl_log_write_t) (hcl_t* hcl, hcl_oow_t mask, const hcl_ooch_t* m
 typedef void (*hcl_syserrstrb_t) (hcl_t* hcl, int syserr, hcl_bch_t* buf, hcl_oow_t len);
 typedef void (*hcl_syserrstru_t) (hcl_t* hcl, int syserr, hcl_uch_t* buf, hcl_oow_t len);
 
+typedef int (*hcl_vmprim_startup_t) (hcl_t* hcl);
+typedef void (*hcl_vmprim_cleanup_t) (hcl_t* hcl);
+typedef void (*hcl_vmprim_gettime_t) (hcl_t* hcl, hcl_ntime_t* now);
+
+
+typedef void (*hcl_vmprim_sleep_t) (hcl_t* hcl, const hcl_ntime_t* duration);
+
 struct hcl_vmprim_t
 {
 	hcl_vmprim_dlopen_t   dl_open;
 	hcl_vmprim_dlclose_t  dl_close;
 	hcl_vmprim_dlsym_t    dl_getsym;
+
 	hcl_log_write_t       log_write;
 	hcl_syserrstrb_t      syserrstrb;
 	hcl_syserrstru_t      syserrstru;
+
+	hcl_vmprim_startup_t   vm_startup;
+	hcl_vmprim_cleanup_t   vm_cleanup;
+	hcl_vmprim_gettime_t   vm_gettime;
+
+	hcl_vmprim_sleep_t   vm_sleep;
 };
 
 typedef struct hcl_vmprim_t hcl_vmprim_t;
@@ -992,7 +1006,9 @@ struct hcl_t
 	hcl_ooi_t ip;
 	int proc_switched; /* TODO: this is temporary. implement something else to skip immediate context switching */
 	int switch_proc;
-	hcl_ntime_t vm_time_offset;
+
+	hcl_ntime_t exec_start_time;
+	hcl_ntime_t exec_end_time;
 	/* == END EXECUTION REGISTERS == */
 
 	/* == BIGINT CONVERSION == */

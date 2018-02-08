@@ -88,6 +88,8 @@ struct xtn_t
 	const char* read_path; /* main source file */
 	const char* print_path; 
 
+	int vm_running;
+
 	int logfd;
 	int logmask;
 	int logfd_istty;
@@ -548,6 +550,316 @@ static void syserrstrb (hcl_t* hcl, int syserr, hcl_bch_t* buf, hcl_oow_t len)
 #endif
 }
 
+
+static int vm_startup (hcl_t* hcl)
+{
+#if defined(_WIN32)
+	xtn_t* xtn = (xtn_t*)hcl_getxtn(hcl);
+	xtn->waitable_timer = CreateWaitableTimer(HCL_NULL, TRUE, HCL_NULL);
+
+#else
+
+	xtn_t* xtn = (xtn_t*)hcl_getxtn(hcl);
+	int pcount = 0, flag;
+
+#if defined(USE_DEVPOLL)
+	xtn->ep = open ("/dev/poll", O_RDWR);
+	if (xtn->ep == -1) 
+	{
+		hcl_syserr_to_errnum (errno);
+		HCL_DEBUG1 (hcl, "Cannot create devpoll - %hs\n", strerror(errno));
+		goto oops;
+	}
+
+	flag = fcntl (xtn->ep, F_GETFD);
+	if (flag >= 0) fcntl (xtn->ep, F_SETFD, flag | FD_CLOEXEC);
+
+#elif defined(USE_EPOLL)
+	#if defined(EPOLL_CLOEXEC)
+	xtn->ep = epoll_create1 (EPOLL_CLOEXEC);
+	#else
+	xtn->ep = epoll_create (1024);
+	#endif
+	if (xtn->ep == -1) 
+	{
+		hcl_syserr_to_errnum (errno);
+		HCL_DEBUG1 (hcl, "Cannot create epoll - %hs\n", strerror(errno));
+		goto oops;
+	}
+
+	#if defined(EPOLL_CLOEXEC)
+	/* do nothing */
+	#else
+	flag = fcntl (xtn->ep, F_GETFD);
+	if (flag >= 0) fcntl (xtn->ep, F_SETFD, flag | FD_CLOEXEC);
+	#endif
+
+#elif defined(USE_POLL)
+
+	MUTEX_INIT (&xtn->ev.reg.pmtx);
+
+#elif defined(USE_SELECT)
+	FD_ZERO (&xtn->ev.reg.rfds);
+	FD_ZERO (&xtn->ev.reg.wfds);
+	xtn->ev.reg.maxfd = -1;
+	MUTEX_INIT (&xtn->ev.reg.smtx);
+#endif /* USE_DEVPOLL */
+
+#if defined(USE_THREAD)
+	if (pipe(xtn->p) == -1)
+	{
+		hcl_syserr_to_errnum (errno);
+		HCL_DEBUG1 (hcl, "Cannot create pipes - %hs\n", strerror(errno));
+		goto oops;
+	}
+	pcount = 2;
+
+	#if defined(O_CLOEXEC)
+	flag = fcntl (xtn->p[0], F_GETFD);
+	if (flag >= 0) fcntl (xtn->p[0], F_SETFD, flag | FD_CLOEXEC);
+	flag = fcntl (xtn->p[1], F_GETFD);
+	if (flag >= 0) fcntl (xtn->p[1], F_SETFD, flag | FD_CLOEXEC);
+	#endif
+
+	#if defined(O_NONBLOCK)
+	flag = fcntl (xtn->p[0], F_GETFL);
+	if (flag >= 0) fcntl (xtn->p[0], F_SETFL, flag | O_NONBLOCK);
+	flag = fcntl (xtn->p[1], F_GETFL);
+	if (flag >= 0) fcntl (xtn->p[1], F_SETFL, flag | O_NONBLOCK);
+	#endif
+
+	if (_add_poll_fd(hcl, xtn->p[0], XPOLLIN) <= -1) goto oops;
+
+	pthread_mutex_init (&xtn->ev.mtx, HCL_NULL);
+	pthread_cond_init (&xtn->ev.cnd, HCL_NULL);
+	pthread_cond_init (&xtn->ev.cnd2, HCL_NULL);
+
+	xtn->iothr_abort = 0;
+	xtn->iothr_up = 0;
+	/*pthread_create (&xtn->iothr, HCL_NULL, iothr_main, hcl);*/
+
+	
+#endif /* USE_THREAD */
+
+	xtn->vm_running = 1;
+	return 0;
+
+oops:
+
+#if defined(USE_THREAD)
+	if (pcount > 0)
+	{
+		close (xtn->p[0]);
+		close (xtn->p[1]);
+	}
+#endif
+
+#if defined(USE_DEVPOLL) || defined(USE_EPOLL)
+	if (xtn->ep >= 0)
+	{
+		close (xtn->ep);
+		xtn->ep = -1;
+	}
+#endif
+
+	return -1;
+#endif
+}
+
+static void vm_cleanup (hcl_t* hcl)
+{
+#if defined(_WIN32)
+	xtn_t* xtn = (xatn_t*)hcl_getxtn(hcl);
+	if (xtn->waitable_timer)
+	{
+		CloseHandle (xtn->waitable_timer);
+		xtn->waitable_timer = HCL_NULL;
+	}
+#else
+	xtn_t* xtn = (xtn_t*)hcl_getxtn(hcl);
+
+	xtn->vm_running = 0;
+
+#if defined(USE_THREAD)
+	if (xtn->iothr_up)
+	{
+		xtn->iothr_abort = 1;
+		write (xtn->p[1], "Q", 1);
+		pthread_cond_signal (&xtn->ev.cnd);
+		pthread_join (xtn->iothr, HCL_NULL);
+		xtn->iothr_up = 0;
+	}
+	pthread_cond_destroy (&xtn->ev.cnd);
+	pthread_cond_destroy (&xtn->ev.cnd2);
+	pthread_mutex_destroy (&xtn->ev.mtx);
+
+	_del_poll_fd (hcl, xtn->p[0]);
+	close (xtn->p[1]);
+	close (xtn->p[0]);
+#endif /* USE_THREAD */
+
+#if defined(USE_DEVPOLL) 
+	if (xtn->ep >= 0)
+	{
+		close (xtn->ep);
+		xtn->ep = -1;
+	}
+	/*destroy_poll_data_space (hcl);*/
+#elif defined(USE_EPOLL)
+	if (xtn->ep >= 0)
+	{
+		close (xtn->ep);
+		xtn->ep = -1;
+	}
+#elif defined(USE_POLL)
+	if (xtn->ev.reg.ptr)
+	{
+		hcl_freemem (hcl, xtn->ev.reg.ptr);
+		xtn->ev.reg.ptr = HCL_NULL;
+		xtn->ev.reg.len = 0;
+		xtn->ev.reg.capa = 0;
+	}
+	if (xtn->ev.buf)
+	{
+		hcl_freemem (hcl, xtn->ev.buf);
+		xtn->ev.buf = HCL_NULL;
+	}
+	/*destroy_poll_data_space (hcl);*/
+	MUTEX_DESTROY (&xtn->ev.reg.pmtx);
+#elif defined(USE_SELECT)
+	FD_ZERO (&xtn->ev.reg.rfds);
+	FD_ZERO (&xtn->ev.reg.wfds);
+	xtn->ev.reg.maxfd = -1;
+	MUTEX_DESTROY (&xtn->ev.reg.smtx);
+#endif
+
+#endif
+}
+
+static void vm_gettime (hcl_t* hcl, hcl_ntime_t* now)
+{
+#if defined(_WIN32)
+	/* TODO: */
+#elif defined(__OS2__)
+	ULONG out;
+
+/* TODO: handle overflow?? */
+/* TODO: use DosTmrQueryTime() and DosTmrQueryFreq()? */
+	DosQuerySysInfo (QSV_MS_COUNT, QSV_MS_COUNT, &out, HCL_SIZEOF(out)); /* milliseconds */
+	/* it must return NO_ERROR */
+	HCL_INITNTIME (now, HCL_MSEC_TO_SEC(out), HCL_MSEC_TO_NSEC(out));
+#elif defined(__DOS__) && (defined(_INTELC32_) || defined(__WATCOMC__))
+	clock_t c;
+
+/* TODO: handle overflow?? */
+	c = clock ();
+	now->sec = c / CLOCKS_PER_SEC;
+	#if (CLOCKS_PER_SEC == 100)
+		now->nsec = HCL_MSEC_TO_NSEC((c % CLOCKS_PER_SEC) * 10);
+	#elif (CLOCKS_PER_SEC == 1000)
+		now->nsec = HCL_MSEC_TO_NSEC(c % CLOCKS_PER_SEC);
+	#elif (CLOCKS_PER_SEC == 1000000L)
+		now->nsec = HCL_USEC_TO_NSEC(c % CLOCKS_PER_SEC);
+	#elif (CLOCKS_PER_SEC == 1000000000L)
+		now->nsec = (c % CLOCKS_PER_SEC);
+	#else
+	#	error UNSUPPORTED CLOCKS_PER_SEC
+	#endif
+#elif defined(macintosh)
+	UnsignedWide tick;
+	hcl_uint64_t tick64;
+	Microseconds (&tick);
+	tick64 = *(hcl_uint64_t*)&tick;
+	HCL_INITNTIME (now, HCL_USEC_TO_SEC(tick64), HCL_USEC_TO_NSEC(tick64));
+#elif defined(HAVE_CLOCK_GETTIME) && defined(CLOCK_MONOTONIC)
+	struct timespec ts;
+	clock_gettime (CLOCK_MONOTONIC, &ts);
+	HCL_INITNTIME(now, ts.tv_sec, ts.tv_nsec);
+#elif defined(HAVE_CLOCK_GETTIME) && defined(CLOCK_REALTIME)
+	struct timespec ts;
+	clock_gettime (CLOCK_REALTIME, &ts);
+	HCL_INITNTIME(now, ts.tv_sec, ts.tv_nsec);
+#else
+	struct timeval tv;
+	gettimeofday (&tv, HCL_NULL);
+	HCL_INITNTIME(now, tv.tv_sec, HCL_USEC_TO_NSEC(tv.tv_usec));
+#endif
+}
+
+static void vm_sleep (hcl_t* hcl, const hcl_ntime_t* dur)
+{
+#if defined(_WIN32)
+	xtn_t* xtn = hcl_getxtn(hcl);
+	if (xtn->waitable_timer)
+	{
+		LARGE_INTEGER li;
+		li.QuadPart = -HCL_SECNSEC_TO_NSEC(dur->sec, dur->nsec);
+		if(SetWaitableTimer(timer, &li, 0, HCL_NULL, HCL_NULL, FALSE) == FALSE) goto normal_sleep;
+		WaitForSingleObject(timer, INFINITE);
+	}
+	else
+	{
+	normal_sleep:
+		/* fallback to normal Sleep() */
+		Sleep (HCL_SECNSEC_TO_MSEC(dur->sec,dur->nsec));
+	}
+#elif defined(__OS2__)
+
+	/* TODO: in gui mode, this is not a desirable method??? 
+	 *       this must be made event-driven coupled with the main event loop */
+	DosSleep (HCL_SECNSEC_TO_MSEC(dur->sec,dur->nsec));
+
+#elif defined(macintosh)
+
+	/* TODO: ... */
+
+#elif defined(__DOS__) && (defined(_INTELC32_) || defined(__WATCOMC__))
+
+	clock_t c;
+
+	c = clock ();
+	c += dur->sec * CLOCKS_PER_SEC;
+
+	#if (CLOCKS_PER_SEC == 100)
+		c += HCL_NSEC_TO_MSEC(dur->nsec) / 10;
+	#elif (CLOCKS_PER_SEC == 1000)
+		c += HCL_NSEC_TO_MSEC(dur->nsec);
+	#elif (CLOCKS_PER_SEC == 1000000L)
+		c += HCL_NSEC_TO_USEC(dur->nsec);
+	#elif (CLOCKS_PER_SEC == 1000000000L)
+		c += dur->nsec;
+	#else
+	#	error UNSUPPORTED CLOCKS_PER_SEC
+	#endif
+
+/* TODO: handle clock overvlow */
+/* TODO: check if there is abortion request or interrupt */
+	while (c > clock()) 
+	{
+		_halt_cpu();
+	}
+
+#else
+	#if defined(USE_THREAD)
+	/* the sleep callback is called only if there is no IO semaphore 
+	 * waiting. so i can safely call vm_muxwait() without a muxwait callback
+	 * when USE_THREAD is true */
+		vm_muxwait (hcl, dur, HCL_NULL);
+	#elif defined(HAVE_NANOSLEEP)
+		struct timespec ts;
+		ts.tv_sec = dur->sec;
+		ts.tv_nsec = dur->nsec;
+		nanosleep (&ts, HCL_NULL);
+	#elif defined(HAVE_USLEEP)
+		usleep (HCL_SECNSEC_TO_USEC(dur->sec, dur->nsec));
+	#else
+	#	error UNSUPPORT SLEEP
+	#endif
+#endif
+}
+
+/* ========================================================================= */
+
 static void fini_hcl (hcl_t* hcl)
 {
 	xtn_t* xtn = hcl_getxtn(hcl);
@@ -906,8 +1218,12 @@ int main (int argc, char* argv[])
 
 
 	memset (&vmprim, 0, HCL_SIZEOF(vmprim));
-	vmprim.log_write = log_write;
+	vmprim.log_write  = log_write;
 	vmprim.syserrstrb = syserrstrb;
+	vmprim.vm_startup = vm_startup;
+	vmprim.vm_cleanup = vm_cleanup;
+	vmprim.vm_gettime = vm_gettime;
+	vmprim.vm_sleep   = vm_sleep;
 
 	hcl = hcl_open (&sys_mmgr, HCL_SIZEOF(xtn_t), 2048000lu, &vmprim, HCL_NULL);
 	if (!hcl)
