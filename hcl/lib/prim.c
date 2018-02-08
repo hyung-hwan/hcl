@@ -95,7 +95,7 @@ start_over:
 	}
 }
 
-static int prim_log (hcl_t* hcl, hcl_ooi_t nargs)
+static hcl_pfrc_t prim_log (hcl_t* hcl, hcl_ooi_t nargs)
 {
 /* TODO: accept log level */
 	hcl_oop_t msg, level;
@@ -158,12 +158,53 @@ static int prim_log (hcl_t* hcl, hcl_ooi_t nargs)
 	}
 
 	HCL_STACK_SETRET (hcl, nargs, hcl->_nil);
-	return 0;
+	return HCL_PF_SUCCESS;
+}
+
+/* ------------------------------------------------------------------------- */
+static hcl_pfrc_t prim_eqv (hcl_t* hcl, hcl_ooi_t nargs)
+{
+	hcl_oop_t a0, a1, rv;
+
+	a0 = HCL_STACK_GETARG(hcl, nargs, 0);
+	a1 = HCL_STACK_GETARG(hcl, nargs, 1);
+
+	rv = (a0 == a1? hcl->_true: hcl->_false);
+
+	HCL_STACK_SETRET (hcl, nargs, rv);
+	return HCL_PF_SUCCESS;
+}
+
+static hcl_pfrc_t prim_eql (hcl_t* hcl, hcl_ooi_t nargs)
+{
+	int n;
+	n = hcl_equalobjs(hcl, HCL_STACK_GETARG(hcl, nargs, 0), HCL_STACK_GETARG(hcl, nargs, 1));
+	if (n <= -1) return HCL_PF_FAILURE;
+
+	HCL_STACK_SETRET (hcl, nargs, (n? hcl->_true: hcl->_false));
+	return HCL_PF_SUCCESS;
+}
+
+static hcl_pfrc_t prim_not (hcl_t* hcl, hcl_ooi_t nargs)
+{
+	hcl_oop_t arg, rv;
+
+	arg = HCL_STACK_GETARG(hcl, nargs, 0);
+	if (arg == hcl->_true) rv = hcl->_false;
+	else if (arg == hcl->_false) rv = hcl->_true;
+	else
+	{
+		hcl_seterrbfmt (hcl, HCL_EINVAL, "boolean parameter expected - %O", arg);
+		return HCL_PF_FAILURE;
+	}
+
+	HCL_STACK_SETRET (hcl, nargs, rv);
+	return HCL_PF_SUCCESS;
 }
 
 /* ------------------------------------------------------------------------- */
 
-static int oop_to_ooi (hcl_t* hcl, hcl_oop_t iv, hcl_ooi_t* ov)
+static hcl_pfrc_t oop_to_ooi (hcl_t* hcl, hcl_oop_t iv, hcl_ooi_t* ov)
 {
 	if (HCL_OOP_IS_SMOOI(iv))
 	{
@@ -177,12 +218,12 @@ static int oop_to_ooi (hcl_t* hcl, hcl_oop_t iv, hcl_ooi_t* ov)
 	}
 	else
 	{
-		/* TODO: set error number or something...to indicate primitive failure... */
+		hcl_seterrbfmt (hcl, HCL_EINVAL, "not a numeric object - %O", iv);
 		return -1;
 	}
 }
 
-static int prim_plus (hcl_t* hcl, hcl_ooi_t nargs)
+static hcl_pfrc_t prim_plus (hcl_t* hcl, hcl_ooi_t nargs)
 {
 	hcl_ooi_t x = 0;
 	hcl_oow_t i;
@@ -193,18 +234,18 @@ static int prim_plus (hcl_t* hcl, hcl_ooi_t nargs)
 		hcl_ooi_t v;
 
 		arg = HCL_STACK_GETARG(hcl, nargs, i);
-		if (oop_to_ooi(hcl, arg, &v) <= -1) return -1;
+		if (oop_to_ooi(hcl, arg, &v) <= -1) return HCL_PF_FAILURE;
 		x += v;
 	}
 
 	ret = hcl_makeinteger (hcl, x);
-	if (!ret) return -1;
+	if (!ret) return HCL_PF_FAILURE;
 
 	HCL_STACK_SETRET (hcl, nargs, ret);
-	return 0;
+	return HCL_PF_SUCCESS;
 }
 
-static int prim_minus (hcl_t* hcl, hcl_ooi_t nargs)
+static hcl_pfrc_t prim_minus (hcl_t* hcl, hcl_ooi_t nargs)
 {
 	hcl_ooi_t x = 0;
 	hcl_oow_t i;
@@ -213,24 +254,24 @@ static int prim_minus (hcl_t* hcl, hcl_ooi_t nargs)
 	if (nargs > 0)
 	{
 		arg = HCL_STACK_GETARG(hcl, nargs, 0);
-		if (oop_to_ooi(hcl, arg, &x) <= -1) return -1;
+		if (oop_to_ooi(hcl, arg, &x) <= -1) return HCL_PF_FAILURE;
 		for (i = 1; i < nargs; i++)
 		{
 			hcl_ooi_t v;
 			arg = HCL_STACK_GETARG(hcl, nargs, i);
-			if (oop_to_ooi(hcl, arg, &v) <= -1) return -1;
+			if (oop_to_ooi(hcl, arg, &v) <= -1) return HCL_PF_FAILURE;
 			x -= v;
 		}
 	}
 
 	ret = hcl_makeinteger (hcl, x);
-	if (!ret) return -1;
+	if (!ret) return HCL_PF_FAILURE;
 
 	HCL_STACK_SETRET (hcl, nargs, ret);
-	return 0;
+	return HCL_PF_SUCCESS;
 }
 
-static int prim_printf (hcl_t* hcl, hcl_ooi_t nargs)
+static hcl_pfrc_t prim_printf (hcl_t* hcl, hcl_ooi_t nargs)
 {
 	hcl_ooi_t x = 0;
 	hcl_oow_t i;
@@ -239,27 +280,35 @@ static int prim_printf (hcl_t* hcl, hcl_ooi_t nargs)
 	if (nargs > 0)
 	{
 		arg = HCL_STACK_GETARG(hcl, nargs, 0);
-		if (oop_to_ooi(hcl, arg, &x) <= -1) return -1;
+		if (oop_to_ooi(hcl, arg, &x) <= -1) return HCL_PF_FAILURE;
 		for (i = 1; i < nargs; i++)
 		{
 			hcl_ooi_t v;
 			arg = HCL_STACK_GETARG(hcl, nargs, i);
-			if (oop_to_ooi(hcl, arg, &v) <= -1) return -1;
+			if (oop_to_ooi(hcl, arg, &v) <= -1) return HCL_PF_FAILURE;
 			x -= v;
 		}
 	}
 
 	ret = hcl_makeinteger (hcl, x);
-	if (!ret) return -1;
+	if (!ret) return HCL_PF_FAILURE;
 
 	HCL_STACK_SETRET (hcl, nargs, ret);
-	return 0;
+	return HCL_PF_SUCCESS;
 }
 /* ------------------------------------------------------------------------- */
 
 static prim_t builtin_prims[] =
 {
 	{ 0, HCL_TYPE_MAX(hcl_oow_t), prim_log,   3,  { 'l','o','g' } },
+
+	{ 1, 1,                       prim_not,   3,  { 'n','o','t' } }, 
+/*	{ 2, 2,                       prim_and,   3,  { 'a','n','d' } },
+	{ 2, 2,                       prim_or,    2,  { 'o','r' } }, */
+
+
+	{ 2, 2,                       prim_eqv,   4,  { 'e','q','v','?' } },
+	{ 2, 2,                       prim_eql,   4,  { 'e','q','l','?' } },
 
 	/*
 	{ 2, 2,                       prim_gt,    1,  { '>' } },
@@ -269,16 +318,15 @@ static prim_t builtin_prims[] =
 	{ 2, 2,                       prim_eq,    1,  { '=' } },
 	{ 2, 2,                       prim_ne,    2,  { '/','=' } },
 
-	{ 2, 2,                       prim_eql,   3,  { 'e','q','l' } },
 	{ 2, 2,                       prim_max,   3,  { 'm','a','x' } },
 	{ 2, 2,                       prim_min,   3,  { 'm','i','n' } },
 
-	{ 2, 2,                       prim_and,   3,  { 'a','n','d' } },
-	{ 2, 2,                       prim_or,    2,  { 'o','r' } },
-	{ 1, 1,                       prim_not,   3,  { 'n','o','t' } }, */
+	*/
+
 
 	{ 0, HCL_TYPE_MAX(hcl_oow_t), prim_plus,   1,  { '+' } },
 	{ 0, HCL_TYPE_MAX(hcl_oow_t), prim_minus,  1,  { '-' } },
+	
 
 	{ 0, HCL_TYPE_MAX(hcl_oow_t), prim_printf, 6, { 'p','r','i','n','t','f' } },
 };
@@ -291,15 +339,15 @@ int hcl_addbuiltinprims (hcl_t* hcl)
 
 	for (i = 0; i < HCL_COUNTOF(builtin_prims); i++)
 	{
-		prim = hcl_makeprim (hcl, builtin_prims[i].impl, builtin_prims[i].minargs, builtin_prims[i].maxargs);
+		prim = hcl_makeprim(hcl, builtin_prims[i].impl, builtin_prims[i].minargs, builtin_prims[i].maxargs);
 		if (!prim) return -1;
 
 		hcl_pushtmp (hcl, &prim);
-		name = hcl_makesymbol (hcl, builtin_prims[i].name, builtin_prims[i].namelen);
+		name = hcl_makesymbol(hcl, builtin_prims[i].name, builtin_prims[i].namelen);
 		hcl_poptmp (hcl);
 		if (!name) return -1;
 
-		if (!hcl_putatsysdic (hcl, name, prim)) return -1;
+		if (!hcl_putatsysdic(hcl, name, prim)) return -1;
 	}
 
 	return 0;

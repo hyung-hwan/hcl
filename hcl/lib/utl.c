@@ -351,6 +351,7 @@ hcl_bch_t* hcl_findbcharinbcstr (const hcl_bch_t* ptr, hcl_bch_t c)
 
 	return HCL_NULL;
 }
+
 /* ----------------------------------------------------------------------- */
 
 int hcl_concatoocstrtosbuf (hcl_t* hcl, const hcl_ooch_t* str, int id)

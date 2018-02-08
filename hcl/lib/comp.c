@@ -991,44 +991,37 @@ static int compile_set (hcl_t* hcl, hcl_oop_t src)
 
 	if (HCL_IS_NIL(hcl, obj))
 	{
-		HCL_DEBUG1 (hcl, "Syntax error - no variable name in set - %O\n", src);
-		hcl_setsynerr (hcl, HCL_SYNERR_VARNAME, HCL_NULL, HCL_NULL); /* TODO: error location */
+		hcl_setsynerrbfmt (hcl, HCL_SYNERR_VARNAME, HCL_NULL, HCL_NULL, "no variable name in set - %O", src); /* TODO: error location */
 		return -1;
 	}
 	else if (!HCL_IS_CONS(hcl, obj))
 	{
-		HCL_DEBUG1 (hcl, "Syntax error - redundant cdr in set - %O\n", src);
-		hcl_setsynerr (hcl, HCL_SYNERR_DOTBANNED, HCL_NULL, HCL_NULL); /* TODO: error location */
+		hcl_setsynerrbfmt (hcl, HCL_SYNERR_DOTBANNED, HCL_NULL, HCL_NULL, "redundant cdr in set - %O", src); /* TODO: error location */
 		return -1;
 	}
 
 	var = HCL_CONS_CAR(obj);
 	if (HCL_BRANDOF(hcl, var) != HCL_BRAND_SYMBOL)
 	{
-		HCL_DEBUG1 (hcl, "Syntax error - variable name not a symbol - %O\n", var);
-		hcl_setsynerr (hcl, HCL_SYNERR_VARNAME, HCL_NULL, HCL_NULL); /* TODO: error location */
+		hcl_setsynerrbfmt (hcl, HCL_SYNERR_VARNAME, HCL_NULL, HCL_NULL, "variable name not a symbol - %O", var); /* TODO: error location */
 		return -1;
 	}
 
 	if (HCL_OBJ_GET_FLAGS_SYNCODE(var))
 	{
-		HCL_DEBUG1 (hcl, "Syntax error - special symbol not to be used as a variable name - %O\n", var); 
-		hcl_setsynerr (hcl, HCL_SYNERR_BANNEDVARNAME, HCL_NULL, HCL_NULL); /* TOOD: error location */
+		hcl_setsynerrbfmt (hcl, HCL_SYNERR_BANNEDVARNAME, HCL_NULL, HCL_NULL, "special symbol not to be used as a variable name - %O", var); /* TOOD: error location */
 		return -1;
 	}
 
 	obj = HCL_CONS_CDR(obj);
 	if (HCL_IS_NIL(hcl, obj))
 	{
-		/* no value */
-		HCL_DEBUG1 (hcl, "Syntax error - no value specified in set - %O\n", src);
-		hcl_setsynerr (hcl, HCL_SYNERR_ARGCOUNT, HCL_NULL, HCL_NULL); /* TODO: error location */
+		hcl_setsynerrbfmt (hcl, HCL_SYNERR_ARGCOUNT, HCL_NULL, HCL_NULL, "no value specified in set - %O", src); /* TODO: error location */
 		return -1;
 	}
 	else if (!HCL_IS_CONS(hcl, obj))
 	{
-		HCL_DEBUG1 (hcl, "Syntax error - redundant cdr in set - %O\n", src);
-		hcl_setsynerr (hcl, HCL_SYNERR_DOTBANNED, HCL_NULL, HCL_NULL); /* TODO: error location */
+		hcl_setsynerrbfmt (hcl, HCL_SYNERR_DOTBANNED, HCL_NULL, HCL_NULL, "redundant cdr in set - %O", src); /* TODO: error location */
 		return -1;
 	}
 
@@ -1037,17 +1030,16 @@ static int compile_set (hcl_t* hcl, hcl_oop_t src)
 	obj = HCL_CONS_CDR(obj);
 	if (!HCL_IS_NIL(hcl, obj))
 	{
-		HCL_DEBUG1 (hcl, "Synatx error - too many arguments to set - %O\n", src);
-		hcl_setsynerr (hcl, HCL_SYNERR_ARGCOUNT, HCL_NULL, HCL_NULL); /* TODO: error location */
+		hcl_setsynerrbfmt (hcl, HCL_SYNERR_ARGCOUNT, HCL_NULL, HCL_NULL, "too many arguments to set - %O", src); /* TODO: error location */
 		return -1;
 	}
 
 	SWITCH_TOP_CFRAME (hcl, COP_COMPILE_OBJECT, val);
 
-	if (find_temporary_variable_backward (hcl, var, &index) <= -1)
+	if (find_temporary_variable_backward(hcl, var, &index) <= -1)
 	{
 		PUSH_SUBCFRAME (hcl, COP_EMIT_SET, var); /* set doesn't evaluate the variable name */
-		cf = GET_SUBCFRAME (hcl);
+		cf = GET_SUBCFRAME(hcl);
 		cf->u.set.var_type = VAR_NAMED;
 	}
 	else
@@ -1056,7 +1048,7 @@ static int compile_set (hcl_t* hcl, hcl_oop_t src)
 		HCL_ASSERT (hcl, index <= HCL_SMOOI_MAX); 
 
 		PUSH_SUBCFRAME (hcl, COP_EMIT_SET, HCL_SMOOI_TO_OOP(index)); 
-		cf = GET_SUBCFRAME (hcl);
+		cf = GET_SUBCFRAME(hcl);
 		cf->u.set.var_type = VAR_INDEXED;
 	}
 
@@ -2335,41 +2327,41 @@ int hcl_compile (hcl_t* hcl, hcl_oop_t obj)
 				break;
 
 			case COP_EMIT_RETURN:
-				if (emit_return (hcl) <= -1) goto oops;
+				if (emit_return(hcl) <= -1) goto oops;
 				break;
 
 			case COP_EMIT_SET:
-				if (emit_set (hcl) <= -1) goto oops;
+				if (emit_set(hcl) <= -1) goto oops;
 				break;
 
 			case COP_POST_IF_COND:
-				if (post_if_cond (hcl) <= -1) goto oops;
+				if (post_if_cond(hcl) <= -1) goto oops;
 				break;
 
 			case COP_POST_IF_BODY:
-				if (post_if_body (hcl) <= -1) goto oops;
+				if (post_if_body(hcl) <= -1) goto oops;
 				break;
 
 			case COP_POST_UNTIL_BODY:
 			case COP_POST_WHILE_BODY:
-				if (post_while_body (hcl) <= -1) goto oops;
+				if (post_while_body(hcl) <= -1) goto oops;
 				break;
 
 			case COP_POST_UNTIL_COND:
 			case COP_POST_WHILE_COND:
-				if (post_while_cond (hcl) <= -1) goto oops;
+				if (post_while_cond(hcl) <= -1) goto oops;
 				break;
 
 			case COP_SUBCOMPILE_ELIF:
-				if (subcompile_elif (hcl) <= -1) goto oops;
+				if (subcompile_elif(hcl) <= -1) goto oops;
 				break;
 
 			case COP_SUBCOMPILE_ELSE:
-				if (subcompile_else (hcl) <= -1) goto oops;
+				if (subcompile_else(hcl) <= -1) goto oops;
 				break;
 
 			case COP_UPDATE_BREAK:
-				if (update_break (hcl) <= -1) goto oops;
+				if (update_break(hcl) <= -1) goto oops;
 				break;
 
 			default:

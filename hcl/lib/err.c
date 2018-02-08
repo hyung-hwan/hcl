@@ -314,16 +314,25 @@ void hcl_getsynerr (hcl_t* hcl, hcl_synerr_t* synerr)
 
 void hcl_setsynerrbfmt (hcl_t* hcl, hcl_synerrnum_t num, const hcl_ioloc_t* loc, const hcl_oocs_t* tgt, const hcl_bch_t* msgfmt, ...)
 {
+	static hcl_bch_t syntax_error[] = "syntax error - ";
+
 	if (msgfmt) 
 	{
 		va_list ap;
+		int i, selen;
+
 		va_start (ap, msgfmt);
 		hcl_seterrbfmtv (hcl, HCL_ESYNERR, msgfmt, ap);
 		va_end (ap);
+
+		selen = HCL_COUNTOF(syntax_error) - 1;
+		HCL_MEMMOVE (&hcl->errmsg.buf[selen], &hcl->errmsg.buf[0], HCL_SIZEOF(hcl->errmsg.buf[0]) * (HCL_COUNTOF(hcl->errmsg.buf) - selen));
+		for (i = 0; i < selen; i++) hcl->errmsg.buf[i] = syntax_error[i];
+		hcl->errmsg.buf[HCL_COUNTOF(hcl->errmsg.buf) - 1] = '\0';
 	}
 	else 
 	{
-		hcl_seterrbfmt (hcl, HCL_ESYNERR, "syntax error - %hs", synerr_to_errstr(num));
+		hcl_seterrbfmt (hcl, HCL_ESYNERR, "%hs%hs", syntax_error, synerr_to_errstr(num));
 	}
 	hcl->c->synerr.num = num;
 
@@ -354,16 +363,25 @@ void hcl_setsynerrbfmt (hcl_t* hcl, hcl_synerrnum_t num, const hcl_ioloc_t* loc,
 
 void hcl_setsynerrufmt (hcl_t* hcl, hcl_synerrnum_t num, const hcl_ioloc_t* loc, const hcl_oocs_t* tgt, const hcl_uch_t* msgfmt, ...)
 {
+	static hcl_bch_t syntax_error[] = "syntax error - ";
+
 	if (msgfmt) 
 	{
 		va_list ap;
+		int i, selen;
+
 		va_start (ap, msgfmt);
 		hcl_seterrufmtv (hcl, HCL_ESYNERR, msgfmt, ap);
 		va_end (ap);
+
+		selen = HCL_COUNTOF(syntax_error) - 1;
+		HCL_MEMMOVE (&hcl->errmsg.buf[selen], &hcl->errmsg.buf[0], HCL_SIZEOF(hcl->errmsg.buf[0]) * (HCL_COUNTOF(hcl->errmsg.buf) - selen));
+		for (i = 0; i < selen; i++) hcl->errmsg.buf[i] = syntax_error[i];
+		hcl->errmsg.buf[HCL_COUNTOF(hcl->errmsg.buf) - 1] = '\0';
 	}
 	else 
 	{
-		hcl_seterrbfmt (hcl, HCL_ESYNERR, "syntax error - %hs", synerr_to_errstr(num));
+		hcl_seterrbfmt (hcl, HCL_ESYNERR, "%hs%hs", syntax_error, synerr_to_errstr(num));
 	}
 	hcl->c->synerr.num = num;
 
@@ -373,11 +391,18 @@ void hcl_setsynerrufmt (hcl_t* hcl, hcl_synerrnum_t num, const hcl_ioloc_t* loc,
 	 * hcl->c->tok.loc due to 'const' prefixed to loc. */
 	/*hcl->c->synerr.loc = loc? *loc: hcl->c->tok.loc;*/
 	if (loc)
+	{
 		hcl->c->synerr.loc = *loc;
+	}
 	else
+	{
 		hcl->c->synerr.loc = hcl->c->tok.loc;
-	
-	if (tgt) hcl->c->synerr.tgt = *tgt;
+	}
+
+	if (tgt)
+	{
+		hcl->c->synerr.tgt = *tgt;
+	}
 	else 
 	{
 		hcl->c->synerr.tgt.ptr = HCL_NULL;

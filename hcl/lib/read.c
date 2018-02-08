@@ -222,7 +222,7 @@ static HCL_INLINE int is_alnumchar (hcl_ooci_t c)
 
 static HCL_INLINE int is_delimiter (hcl_ooci_t c)
 {
-	return c == '(' || c == ')' || c == '[' || c == ']' || c == '{' || c == '}' || c == '\"' || c == '#' || c == ';' || c == '|' || is_spacechar(c) || c == HCL_UCI_EOF;
+	return c == '(' || c == ')' || c == '[' || c == ']' || c == '{' || c == '}' || c == '\"' || c == '\'' || c == '#' || c == ';' || c == '|' || is_spacechar(c) || c == HCL_UCI_EOF;
 }
 
 
@@ -692,15 +692,13 @@ static int get_sharp_token (hcl_t* hcl)
 	 * #bBBBB binary
 	 * #oOOOO octal 
 	 * #xXXXX hexadecimal
-	 * #t
-	 * #f
 	 * #true
 	 * #false
 	 * #include
 	 * #\C  * character
 	 * #\xHHHH  * unicode
 	 * #\uHHHH
-	 * #( )  * vector
+	 * #( )  * array
 	 * #[ ]  * byte array
 	 * #{ }  * dictionary
 	 * #< > -- xxx
@@ -720,6 +718,8 @@ static int get_sharp_token (hcl_t* hcl)
 			if (get_radix_number (hcl, c, radix) <= -1) return -1;
 			break;
 
+#if 0 
+/* i changed mind. i don't want to have #t for true and #f for false. */
 		case 't':
 			ADD_TOKEN_CHAR (hcl, '#');
 			ADD_TOKEN_CHAR (hcl, 't');
@@ -737,6 +737,7 @@ static int get_sharp_token (hcl_t* hcl)
 			unget_char (hcl, &hcl->c->lxc);
 			SET_TOKEN_TYPE (hcl, HCL_IOTOK_FALSE);
 			break;
+#endif
 
 		case '\\': /* character literal */
 			ADD_TOKEN_CHAR (hcl, '#');
@@ -777,44 +778,44 @@ static int get_sharp_token (hcl_t* hcl)
 						c = c * 16 + CHAR_TO_NUM(hcl->c->tok.name.ptr[i], 16);
 					}
 				}
-				else if (does_token_name_match (hcl, VOCA_SPACE))
+				else if (does_token_name_match(hcl, VOCA_SPACE))
 				{
 					c = ' ';
 				}
-				else if (does_token_name_match (hcl, VOCA_NEWLINE))
+				else if (does_token_name_match(hcl, VOCA_NEWLINE))
 				{
 					/* TODO: convert it to host newline convention. how to handle if it's composed of 2 letters like \r\n? */
 					c = '\n';
 				}
-				else if (does_token_name_match (hcl, VOCA_BACKSPACE))
+				else if (does_token_name_match(hcl, VOCA_BACKSPACE))
 				{
 					c = '\b';
 				}
-				else if (does_token_name_match (hcl, VOCA_TAB))
+				else if (does_token_name_match(hcl, VOCA_TAB))
 				{
 					c = '\t';
 				}
-				else if (does_token_name_match (hcl, VOCA_LINEFEED))
+				else if (does_token_name_match(hcl, VOCA_LINEFEED))
 				{
 					c = '\n';
 				}
-				else if (does_token_name_match (hcl, VOCA_PAGE))
+				else if (does_token_name_match(hcl, VOCA_PAGE))
 				{
 					c = '\f';
 				}
-				else if (does_token_name_match (hcl, VOCA_RETURN))
+				else if (does_token_name_match(hcl, VOCA_RETURN))
 				{
 					c = '\r';
 				}
-				else if (does_token_name_match (hcl, VOCA_NUL))
+				else if (does_token_name_match(hcl, VOCA_NUL)) /* null character. not #nil */
 				{
 					c = '\0';
 				}
-				else if (does_token_name_match (hcl, VOCA_VTAB))
+				else if (does_token_name_match(hcl, VOCA_VTAB))
 				{
 					c = '\v';
 				}
-				else if (does_token_name_match (hcl, VOCA_RUBOUT))
+				else if (does_token_name_match(hcl, VOCA_RUBOUT))
 				{
 					c = '\x7F'; /* DEL */
 				}
@@ -838,19 +839,19 @@ static int get_sharp_token (hcl_t* hcl)
 			unget_char (hcl, &hcl->c->lxc);
 			break;
 
-		case '(': /* #( - array literal */
+		case '(': /* #( - array opener */
 			ADD_TOKEN_CHAR (hcl, '#');
 			ADD_TOKEN_CHAR(hcl, c);
 			SET_TOKEN_TYPE (hcl, HCL_IOTOK_APAREN);
 			break;
 
-		case '[': /* #[ - byte array literal */
+		case '[': /* #[ - byte array opener */
 			ADD_TOKEN_CHAR (hcl, '#');
 			ADD_TOKEN_CHAR(hcl, c);
 			SET_TOKEN_TYPE (hcl, HCL_IOTOK_BAPAREN);
 			break;
 
-		case '{':
+		case '{': /* #{ - dictionary opener */
 			ADD_TOKEN_CHAR (hcl, '#');
 			ADD_TOKEN_CHAR(hcl, c);
 			SET_TOKEN_TYPE (hcl, HCL_IOTOK_DPAREN);
@@ -986,9 +987,11 @@ retry:
 			if (get_string(hcl, '\"', '\\', 0, 0) <= -1) return -1;
 			break;
 
+#if 0
 		case '\'':
 			if (get_quoted_token(hcl) <= -1) return -1;
 			break;
+#endif
 
 		case '#':  
 			if (get_sharp_token(hcl) <= -1) return -1;
@@ -1061,6 +1064,12 @@ retry:
 
 		default:
 		ident:
+			if (is_delimiter(c))
+			{
+				hcl_setsynerrbfmt (hcl, HCL_SYNERR_ILCHR, TOKEN_LOC(hcl), HCL_NULL, "illegal character %jc encountered", c);
+				return -1;
+			}
+
 			SET_TOKEN_TYPE (hcl, HCL_IOTOK_IDENT);
 			while (1)
 			{
@@ -1351,9 +1360,9 @@ done:
 			case HCL_CONCODE_DIC:
 				return (hcl_oop_t)hcl_makedic(hcl, 100); /* TODO: default dictionary size for empty definition? */
 
-			case HCL_CONCODE_XLIST:
-				hcl_setsynerr (hcl, HCL_SYNERR_EMPTYXLIST, TOKEN_LOC(hcl), HCL_NULL);
-				return HCL_NULL;
+			/* NOTE: empty xlist will get translated to #nil.
+			 *       this is useful when used in the lambda expression to express an empty argument.
+			 *      (lambda () ...) is equivalent to  (lambda #nil ...) */
 		}
 	}
 
@@ -1668,10 +1677,12 @@ static int read_object (hcl_t* hcl)
 				flagv = 0;
 				LIST_FLAG_SET_CONCODE (flagv, HCL_CONCODE_DIC);
 				goto start_list;
+#if 0
 			case HCL_IOTOK_QPAREN:
 				flagv = 0;
 				LIST_FLAG_SET_CONCODE (flagv, HCL_CONCODE_QLIST);
 				goto start_list;
+#endif
 			case HCL_IOTOK_LPAREN:
 				flagv = 0;
 				LIST_FLAG_SET_CONCODE (flagv, HCL_CONCODE_XLIST);

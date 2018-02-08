@@ -1040,23 +1040,26 @@ int main (int argc, char* argv[])
 				{
 					hcl_logbfmt (hcl, HCL_LOG_STDERR, "ERROR: cannot compile object - [%d] %js\n", hcl_geterrnum(hcl), hcl_geterrmsg(hcl));
 				}
-
 				/* carry on? */
 			}
+			else
+			{
+				hcl_decode (hcl, 0, hcl->code.bc.len);
+				HCL_LOG0 (hcl, HCL_LOG_MNEMONIC, "------------------------------------------\n");
+				g_hcl = hcl;
+				//setup_tick ();
+				if (hcl_execute(hcl) <= -1)
+				{
+					hcl_logbfmt (hcl, HCL_LOG_STDERR, "ERROR: cannot execute - [%d] %js\n", hcl_geterrnum(hcl), hcl_geterrmsg(hcl));
+				}
+				//cancel_tick();
+				g_hcl = HCL_NULL;
+			}
 		}
+
+
 	}
 
-hcl_decode (hcl, 0, hcl->code.bc.len);
-HCL_LOG0 (hcl, HCL_LOG_MNEMONIC, "------------------------------------------\n");
-g_hcl = hcl;
-//setup_tick ();
-if (hcl_execute(hcl) <= -1)
-{
-	hcl_logbfmt (hcl, HCL_LOG_STDERR, "ERROR: cannot execute - [%d] %js\n", hcl_geterrnum(hcl), hcl_geterrmsg(hcl));
-
-}
-//cancel_tick();
-g_hcl = HCL_NULL;
 
 
 

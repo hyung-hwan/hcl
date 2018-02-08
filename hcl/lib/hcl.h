@@ -818,7 +818,14 @@ struct hcl_cb_t
 /* =========================================================================
  * PRIMITIVE MODULE MANIPULATION
  * ========================================================================= */
-typedef int (*hcl_prim_impl_t) (hcl_t* hcl, hcl_ooi_t nargs);
+enum hcl_pfrc_t
+{
+	HCL_PF_FAILURE = -1,
+	HCL_PF_SUCCESS = 0
+};
+typedef enum hcl_pfrc_t hcl_pfrc_t;
+
+typedef hcl_pfrc_t (*hcl_prim_impl_t) (hcl_t* hcl, hcl_ooi_t nargs);
 
 typedef struct hcl_prim_mod_t hcl_prim_mod_t;
 
@@ -1049,8 +1056,15 @@ struct hcl_t
 
 /* you can't access arguments and receiver after this macro. 
  * also you must not call this macro more than once */
-#define HCL_STACK_SETRET(hcl,nargs,retv) (HCL_STACK_POPS(hcl, nargs), HCL_STACK_SETTOP(hcl, retv))
+
+#define HCL_STACK_SETRET(hcl,nargs,retv) \
+	do { \
+		HCL_STACK_POPS(hcl, nargs); \
+		HCL_STACK_SETTOP(hcl, (retv)); \
+	} while(0)
+
 #define HCL_STACK_SETRETTORCV(hcl,nargs) (HCL_STACK_POPS(hcl, nargs))
+
 
 
 
