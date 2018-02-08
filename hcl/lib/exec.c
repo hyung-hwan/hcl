@@ -117,7 +117,7 @@ static HCL_INLINE const char* proc_state_to_string (int state)
 
 static int vm_startup (hcl_t* hcl)
 {
-	HCL_DEBUG0 (hcl, "VM started up\n");
+	HCL_DEBUG1 (hcl, "VM started up at IP %zd\n", hcl->ip);
 
 	if (hcl->vmprim.vm_startup(hcl) <= -1) return -1;
 	hcl->vmprim.vm_gettime (hcl, &hcl->exec_start_time); /* raw time. no adjustment */
@@ -129,7 +129,7 @@ static void vm_cleanup (hcl_t* hcl)
 {
 	hcl->vmprim.vm_gettime (hcl, &hcl->exec_end_time); /* raw time. no adjustment */
 	hcl->vmprim.vm_cleanup (hcl);
-	HCL_DEBUG0 (hcl, "VM started up\n");
+	HCL_DEBUG1 (hcl, "VM cleaned up at IP %zd\n", hcl->ip);
 }
 
 /* ------------------------------------------------------------------------- */
@@ -2270,6 +2270,10 @@ oops:
 int hcl_executefromip (hcl_t* hcl, hcl_ooi_t initial_ip)
 {
 	int n;
+	int log_default_type_mask;
+
+	log_default_type_mask = hcl->log.default_type_mask;
+	hcl->log.default_type_mask |= HCL_LOG_VM;
 
 	HCL_ASSERT (hcl, hcl->initial_context == HCL_NULL);
 	HCL_ASSERT (hcl, hcl->active_context == HCL_NULL);
@@ -2282,6 +2286,8 @@ int hcl_executefromip (hcl_t* hcl, hcl_ooi_t initial_ip)
 /* TODO: reset processor fields. set processor->tally to zero. processor->active to nil_process... */
 	hcl->initial_context = HCL_NULL;
 	hcl->active_context = HCL_NULL;
+
+	hcl->log.default_type_mask = log_default_type_mask;
 	return n;
 }
 

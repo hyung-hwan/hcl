@@ -93,6 +93,8 @@ struct xtn_t
 	int logfd;
 	int logmask;
 	int logfd_istty;
+
+	int reader_istty;
 };
 
 /* ========================================================================= */
@@ -199,6 +201,11 @@ static HCL_INLINE hcl_ooi_t open_input (hcl_t* hcl, hcl_ioinarg_t* arg)
 	{
 		hcl_seterrnum (hcl, HCL_EIOERR);
 		goto oops;
+	}
+
+	if (!arg->includer)
+	{
+		xtn->reader_istty = isatty(fileno(bb->fp));
 	}
 
 	arg->handle = bb;
@@ -1235,7 +1242,6 @@ int main (int argc, char* argv[])
 
 	{
 		hcl_oow_t tab_size;
-
 		tab_size = 5000;
 		hcl_setoption (hcl, HCL_SYMTAB_SIZE, &tab_size);
 		tab_size = 5000;
@@ -1361,12 +1367,10 @@ int main (int argc, char* argv[])
 					hcl_logbfmt (hcl, HCL_LOG_STDERR, "ERROR: cannot compile object - [%d] %js\n", hcl_geterrnum(hcl), hcl_geterrmsg(hcl));
 				}
 				/* carry on? */
-
-				hcl->code.bc.len = code_offset; /* just in case */
 			}
-			else
+			else if (xtn->reader_istty)
 			{
-				hcl_decode (hcl, 0, hcl->code.bc.len);
+				hcl_decode (hcl, code_offset, hcl->code.bc.len - code_offset);
 				HCL_LOG0 (hcl, HCL_LOG_MNEMONIC, "------------------------------------------\n");
 				g_hcl = hcl;
 				//setup_tick ();
@@ -1378,27 +1382,25 @@ int main (int argc, char* argv[])
 				g_hcl = HCL_NULL;
 			}
 		}
-
-
 	}
 
-
-
-
-{
-HCL_LOG0 (hcl, HCL_LOG_MNEMONIC, "------------------------------------------\n");
-HCL_LOG2 (hcl, HCL_LOG_MNEMONIC, "BYTECODES hcl->code.bc.len = > %lu hcl->code.lit.len => %lu\n", 
-	(unsigned long int)hcl->code.bc.len, (unsigned long int)hcl->code.lit.len);
-hcl_decode (hcl, 0, hcl->code.bc.len);
-
-/*hcl_dumpsymtab (hcl);*/
-}
-
+	if (!xtn->reader_istty)
+	{
+		hcl_decode (hcl, 0, hcl->code.bc.len);
+		HCL_LOG2 (hcl, HCL_LOG_MNEMONIC, "BYTECODES hcl->code.bc.len = > %lu hcl->code.lit.len => %lu\n", 
+			(unsigned long int)hcl->code.bc.len, (unsigned long int)hcl->code.lit.len);
+		g_hcl = hcl;
+		//setup_tick ();
+		if (hcl_execute(hcl) <= -1)
+		{
+			hcl_logbfmt (hcl, HCL_LOG_STDERR, "ERROR: cannot execute - [%d] %js\n", hcl_geterrnum(hcl), hcl_geterrmsg(hcl));
+		}
+		//cancel_tick();
+		g_hcl = HCL_NULL;
+		/*hcl_dumpsymtab (hcl);*/
+	}
 
 	hcl_close (hcl);
 
-#if defined(_WIN32) && defined(_DEBUG)
-getchar();
-#endif
 	return 0;
 }

@@ -2242,16 +2242,20 @@ static HCL_INLINE int emit_set (hcl_t* hcl)
 int hcl_compile (hcl_t* hcl, hcl_oop_t obj)
 {
 	hcl_oow_t saved_bc_len, saved_lit_len;
+	int log_default_type_mask;
 
 	HCL_ASSERT (hcl, GET_TOP_CFRAME_INDEX(hcl) < 0);
 
 	saved_bc_len = hcl->code.bc.len;
 	saved_lit_len = hcl->code.lit.len;
 
+	log_default_type_mask = hcl->log.default_type_mask;
+	hcl->log.default_type_mask |= HCL_LOG_COMPILER;
+
 	HCL_ASSERT (hcl, hcl->c->tv.size == 0);
 	HCL_ASSERT (hcl, hcl->c->blk.depth == -1);
 
-/* TODO: in case i implement all global variables as block arguments at the top level... */
+/* TODO: in case i implement all global variables as block arguments at the top level...what should i do? */
 	hcl->c->blk.depth++;
 	if (store_temporary_variable_count_for_block(hcl, hcl->c->tv.size) <= -1) return -1;
 
@@ -2379,10 +2383,14 @@ int hcl_compile (hcl_t* hcl, hcl_oop_t obj)
 	HCL_ASSERT (hcl, hcl->c->tv.size == 0);
 	HCL_ASSERT (hcl, hcl->c->blk.depth == 0);
 	hcl->c->blk.depth--;
+
+	hcl ->log.default_type_mask = log_default_type_mask;
 	return 0;
 
 oops:
 	POP_ALL_CFRAMES (hcl);
+
+	hcl->log.default_type_mask = log_default_type_mask;
 
 	/* rollback any bytecodes or literals emitted so far */
 	hcl->code.bc.len = saved_bc_len;
