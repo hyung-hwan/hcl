@@ -138,6 +138,10 @@ AC_CHECK_FUNCS([clock_nanosleep nanosleep usleep])
 AC_CHECK_FUNCS([snprintf _vsnprintf _vsnwprintf])
 AC_CHECK_FUNCS([isatty])
 
+save_LIBS="$LIBS"
+AC_SEARCH_LIBS([dlopen], [dl dld], [DL_LIBS="$ac_cv_search_dlopen"])
+LIBS="$save_LIBS"
+AC_SUBST(DL_LIBS)
 
 dnl check is the import library for unicows.dll exists
 dnl this check doesn't look for a particular symbol

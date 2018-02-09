@@ -690,7 +690,11 @@ typedef struct hcl_t hcl_t;
 /* =========================================================================
  * VIRTUAL MACHINE PRIMITIVES
  * ========================================================================= */
-#define HCL_MOD_NAME_LEN_MAX 120
+enum hcl_vmprim_opendl_flag_t
+{
+	HCL_VMPRIM_OPENDL_PFMOD = (1 << 0)
+};
+typedef enum hcl_vmprim_opendl_flag_t hcl_vmprim_opendl_flag_t;
 
 typedef void* (*hcl_vmprim_dlopen_t) (hcl_t* hcl, const hcl_uch_t* name);
 typedef void (*hcl_vmprim_dlclose_t) (hcl_t* hcl, void* handle);

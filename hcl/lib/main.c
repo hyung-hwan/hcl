@@ -54,14 +54,14 @@
 #	include <Timer.h>
 #else
 
-#	if defined(HCL_ENABLE_LIBLTDL)
+#	if defined(MOO_ENABLE_LIBLTDL)
 #		include <ltdl.h>
 #		define USE_LTDL
 #		define sys_dl_error() lt_dlerror()
 #		define sys_dl_open(x) lt_dlopen(x)
 #		define sys_dl_openext(x) lt_dlopenext(x)
 #		define sys_dl_close(x) lt_dlclose(x)
-#		define sys_dl_sym(x,n) lt_dlsym(x,n)
+#		define sys_dl_getsym(x,n) lt_dlsym(x,n)
 #	elif defined(HAVE_DLFCN_H)
 #		include <dlfcn.h>
 #		define USE_DLFCN
@@ -69,7 +69,7 @@
 #		define sys_dl_open(x) dlopen(x,RTLD_NOW)
 #		define sys_dl_openext(x) dlopen(x,RTLD_NOW)
 #		define sys_dl_close(x) dlclose(x)
-#		define sys_dl_sym(x,n) dlsym(x,n)
+#		define sys_dl_getsym(x,n) dlsym(x,n)
 #	else
 #		error UNSUPPORTED DYNAMIC LINKER
 #	endif
@@ -90,6 +90,33 @@
 
 #endif
 
+#if !defined(HCL_DEFAULT_PFMODPREFIX)
+#	if defined(_WIN32)
+#		define HCL_DEFAULT_PFMODPREFIX "hcl-"
+#	elif defined(__OS2__)
+#		define HCL_DEFAULT_PFMODPREFIX "hcl"
+#	elif defined(__DOS__)
+#		define HCL_DEFAULT_PFMODPREFIX "hcl"
+#	else
+#		define HCL_DEFAULT_PFMODPREFIX "libhcl-"
+#	endif
+#endif
+
+#if !defined(HCL_DEFAULT_PFMODPOSTFIX)
+#	if defined(_WIN32)
+#		define HCL_DEFAULT_PFMODPOSTFIX ""
+#	elif defined(__OS2__)
+#		define HCL_DEFAULT_PFMODPOSTFIX ""
+#	elif defined(__DOS__)
+#		define HCL_DEFAULT_PFMODPOSTFIX ""
+#	else
+#		if defined(USE_DLFCN)
+#			define HCL_DEFAULT_PFMODPOSTFIX ".so"
+#		else
+#			define HCL_DEFAULT_PFMODPOSTFIX ""
+#		endif
+#	endif
+#endif
 
 typedef struct bb_t bb_t;
 struct bb_t
@@ -415,6 +442,210 @@ static hcl_ooi_t print_handler (hcl_t* hcl, hcl_iocmd_t cmd, void* arg)
 
 /* ========================================================================= */
 
+static void* dl_open (hcl_t* hcl, const hcl_ooch_t* name, int flags)
+{
+#if defined(USE_LTDL) || defined(USE_DLFCN)
+	hcl_bch_t stabuf[128], * bufptr;
+	hcl_oow_t ucslen, bcslen, bufcapa;
+	void* handle;
+
+	#if defined(HCL_OOCH_IS_UCH)
+	if (hcl_convootobcstr(hcl, name, &ucslen, HCL_NULL, &bufcapa) <= -1) return HCL_NULL;
+	/* +1 for terminating null. but it's not needed because HCL_COUNTOF(HCL_DEFAULT_PFMODPREFIX)
+	 * and HCL_COUNTOF(HCL_DEFAULT_PFMODPOSTIFX) include the terminating nulls. Never mind about
+	 * the extra 2 characters. */
+	#else
+	bufcapa = hcl_countbcstr(name);
+	#endif
+	bufcapa += HCL_COUNTOF(HCL_DEFAULT_PFMODPREFIX) + HCL_COUNTOF(HCL_DEFAULT_PFMODPOSTFIX) + 1; 
+
+	if (bufcapa <= HCL_COUNTOF(stabuf)) bufptr = stabuf;
+	else
+	{
+		bufptr = hcl_allocmem(hcl, bufcapa * HCL_SIZEOF(*bufptr));
+		if (!bufptr) return HCL_NULL;
+	}
+
+	if (flags & HCL_VMPRIM_OPENDL_PFMOD)
+	{
+		hcl_oow_t len, i, xlen;
+
+		/* opening a primitive function module - mostly libhcl-xxxx */
+		len = hcl_copybcstr(bufptr, bufcapa, HCL_DEFAULT_PFMODPREFIX);
+
+		bcslen = bufcapa - len;
+	#if defined(HCL_OOCH_IS_UCH)
+		hcl_convootobcstr(hcl, name, &ucslen, &bufptr[len], &bcslen);
+	#else
+		bcslen = hcl_copybcstr(&bufptr[len], bcslen, name);
+	#endif
+
+		/* length including the prefix and the name. but excluding the postfix */
+		xlen  = len + bcslen; 
+
+		for (i = len; i < xlen; i++) 
+		{
+			/* convert a period(.) to a dash(-) */
+			if (bufptr[i] == '.') bufptr[i] = '-';
+		}
+ 
+	retry:
+		hcl_copybcstr (&bufptr[xlen], bufcapa - xlen, HCL_DEFAULT_PFMODPOSTFIX);
+
+		/* both prefix and postfix attached. for instance, libhcl-xxx */
+		handle = sys_dl_openext(bufptr);
+		if (!handle) 
+		{
+			HCL_DEBUG3 (hcl, "Failed to open(ext) DL %hs[%js] - %hs\n", bufptr, name, sys_dl_error());
+
+			/* try without prefix and postfix */
+			bufptr[xlen] = '\0';
+			handle = sys_dl_openext(&bufptr[len]);
+			if (!handle) 
+			{
+				hcl_bch_t* dash;
+				HCL_DEBUG3 (hcl, "Failed to open(ext) DL %hs[%js] - %s\n", &bufptr[len], name, sys_dl_error());
+				dash = hcl_rfindbchar(bufptr, hcl_countbcstr(bufptr), '-');
+				if (dash) 
+				{
+					/* remove a segment at the back. 
+					 * [NOTE] a dash contained in the original name before
+					 *        period-to-dash transformation may cause extraneous/wrong
+					 *        loading reattempts. */
+					xlen = dash - bufptr;
+					goto retry;
+				}
+			}
+			else 
+			{
+				HCL_DEBUG3 (hcl, "Opened(ext) DL %hs[%js] handle %p\n", &bufptr[len], name, handle);
+			}
+		}
+		else
+		{
+			HCL_DEBUG3 (hcl, "Opened(ext) DL %hs[%js] handle %p\n", bufptr, name, handle);
+		}
+	}
+	else
+	{
+		/* opening a raw shared object without a prefix and/or a postfix */
+	#if defined(HCL_OOCH_IS_UCH)
+		bcslen = bufcapa;
+		hcl_convootobcstr(hcl, name, &ucslen, bufptr, &bcslen);
+	#else
+		bcslen = hcl_copybcstr(bufptr, bufcapa, name);
+	#endif
+
+		if (hcl_findbchar (bufptr, bcslen, '.'))
+		{
+			handle = sys_dl_open(bufptr);
+			if (!handle) HCL_DEBUG2 (hcl, "Failed to open DL %hs - %s\n", bufptr, sys_dl_error());
+			else HCL_DEBUG2 (hcl, "Opened DL %hs handle %p\n", bufptr, handle);
+		}
+		else
+		{
+			handle = sys_dl_openext(bufptr);
+			if (!handle) HCL_DEBUG2 (hcl, "Failed to open(ext) DL %hs - %s\n", bufptr, sys_dl_error());
+			else HCL_DEBUG2 (hcl, "Opened(ext) DL %hs handle %p\n", bufptr, handle);
+		}
+	}
+
+	if (bufptr != stabuf) hcl_freemem (hcl, bufptr);
+	return handle;
+
+#else
+
+/* TODO: support various platforms */
+	/* TODO: implemenent this */
+	HCL_DEBUG1 (hcl, "Dynamic loading not implemented - cannot open %js\n", name);
+	hcl_seterrnum (hcl, HCL_ENOIMPL);
+	return HCL_NULL;
+#endif
+}
+
+static void dl_close (hcl_t* hcl, void* handle)
+{
+#if defined(USE_LTDL) || defined(USE_DLFCN)
+	HCL_DEBUG1 (hcl, "Closed DL handle %p\n", handle);
+	sys_dl_close (handle);
+
+#else
+	/* TODO: implemenent this */
+	HCL_DEBUG1 (hcl, "Dynamic loading not implemented - cannot close handle %p\n", handle);
+#endif
+}
+
+static void* dl_getsym (hcl_t* hcl, void* handle, const hcl_ooch_t* name)
+{
+#if defined(USE_LTDL) || defined(USE_DLFCN)
+	hcl_bch_t stabuf[64], * bufptr;
+	hcl_oow_t bufcapa, ucslen, bcslen, i;
+	const hcl_bch_t* symname;
+	void* sym;
+
+	#if defined(HCL_OOCH_IS_UCH)
+	if (hcl_convootobcstr(hcl, name, &ucslen, HCL_NULL, &bcslen) <= -1) return HCL_NULL;
+	#else
+	bcslen = hcl_countbcstr (name);
+	#endif
+
+	if (bcslen >= HCL_COUNTOF(stabuf) - 2)
+	{
+		bufcapa = bcslen + 3;
+		bufptr = hcl_allocmem(hcl, bufcapa * HCL_SIZEOF(*bufptr));
+		if (!bufptr) return HCL_NULL;
+	}
+	else
+	{
+		bufcapa = HCL_COUNTOF(stabuf);
+		bufptr = stabuf;
+	}
+
+	bcslen = bufcapa - 1;
+	#if defined(HCL_OOCH_IS_UCH)
+	hcl_convootobcstr (hcl, name, &ucslen, &bufptr[1], &bcslen);
+	#else
+	bcslen = hcl_copybcstr(&bufptr[1], bcslen, name);
+	#endif
+
+	/* convert a period(.) to an underscore(_) */
+	for (i = 1; i <= bcslen; i++) if (bufptr[i] == '.') bufptr[i] = '_';
+
+	symname = &bufptr[1]; /* try the name as it is */
+	sym = sys_dl_getsym(handle, symname);
+	if (!sym)
+	{
+		bufptr[0] = '_';
+		symname = &bufptr[0]; /* try _name */
+		sym = sys_dl_getsym(handle, symname);
+		if (!sym)
+		{
+			bufptr[bcslen + 1] = '_'; 
+			bufptr[bcslen + 2] = '\0';
+
+			symname = &bufptr[1]; /* try name_ */
+			sym = sys_dl_getsym(handle, symname);
+
+			if (!sym)
+			{
+				symname = &bufptr[0]; /* try _name_ */
+				sym = sys_dl_getsym(handle, symname);
+			}
+		}
+	}
+
+	if (sym) HCL_DEBUG3 (hcl, "Loaded module symbol %js from handle %p - %hs\n", name, handle, symname);
+	if (bufptr != stabuf) hcl_freemem (hcl, bufptr);
+	return sym;
+
+#else
+	/* TODO: IMPLEMENT THIS */
+	HCL_DEBUG2 (hcl, "Dynamic loading not implemented - Cannot load module symbol %js from handle %p\n", name, handle);
+	hcl_seterrnum (hcl, HCL_ENOIMPL);
+	return HCL_NULL;
+#endif
+}
+
 static int write_all (int fd, const char* ptr, hcl_oow_t len)
 {
 	while (len > 0)
@@ -433,6 +664,11 @@ static int write_all (int fd, const char* ptr, hcl_oow_t len)
 			#elif defined(EWOULDBLOCK)
 			if (errno == EWOULDBLOCK) continue;
 			#endif
+		#endif
+
+		#if defined(EINTR)
+			/* TODO: would this interfere with non-blocking nature of this VM? */
+			if (errno == EINTR) continue;
 		#endif
 			return -1;
 		}
@@ -885,6 +1121,7 @@ static void vm_sleep (hcl_t* hcl, const hcl_ntime_t* dur)
 #endif
 }
 
+
 /* ========================================================================= */
 
 static void fini_hcl (hcl_t* hcl)
@@ -1245,6 +1482,9 @@ int main (int argc, char* argv[])
 
 
 	memset (&vmprim, 0, HCL_SIZEOF(vmprim));
+	vmprim.dl_open = dl_open;
+	vmprim.dl_close = dl_close;
+	vmprim.dl_getsym = dl_getsym;
 	vmprim.log_write  = log_write;
 	vmprim.syserrstrb = syserrstrb;
 	vmprim.vm_startup = vm_startup;
