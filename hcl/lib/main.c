@@ -1518,8 +1518,8 @@ int main (int argc, char* argv[])
 		hcl_setoption (hcl, HCL_TRAIT, &trait);
 
 		/* disable GC logs */
-		trait = ~HCL_LOG_GC;
-		hcl_setoption (hcl, HCL_LOG_MASK, &trait);
+		/*trait = ~HCL_LOG_GC;
+		hcl_setoption (hcl, HCL_LOG_MASK, &trait);*/
 	}
 
 	xtn = hcl_getxtn (hcl);

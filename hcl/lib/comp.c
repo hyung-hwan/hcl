@@ -664,13 +664,13 @@ static int compile_break (hcl_t* hcl, hcl_oop_t src)
 	{
 		if (HCL_IS_CONS(hcl,obj))
 		{
-			HCL_DEBUG1 (hcl, "Syntax error - redundant argument in break - %O\n", src);
-			hcl_setsynerr (hcl, HCL_SYNERR_ARGCOUNT, HCL_NULL, HCL_NULL); /* TODO: error location */
+			hcl_setsynerrbfmt (hcl, HCL_SYNERR_ARGCOUNT, HCL_NULL, HCL_NULL,
+				"redundant argument in break - %O", src); /* TODO: error location */
 		}
 		else
 		{
-			HCL_DEBUG1 (hcl, "Syntax error - redundant cdr in break - %O\n", src);
-			hcl_setsynerr (hcl, HCL_SYNERR_DOTBANNED, HCL_NULL, HCL_NULL); /* TODO: error location */
+			hcl_setsynerrbfmt (hcl, HCL_SYNERR_DOTBANNED, HCL_NULL, HCL_NULL,
+				"redundant cdr in break - %O", src); /* TODO: error location */
 			return -1;
 		}
 		return -1;
@@ -705,8 +705,8 @@ static int compile_break (hcl_t* hcl, hcl_oop_t src)
 		}
 	}
 
-	HCL_DEBUG1 (hcl, "Syntax error - break outside loop - %O\n", src);
-	hcl_setsynerr (hcl, HCL_SYNERR_BREAK, HCL_NULL, HCL_NULL); /* TODO: error location */
+	hcl_setsynerrbfmt (hcl, HCL_SYNERR_BREAK, HCL_NULL, HCL_NULL, 
+		"break outside loop - %O", src); /* TODO: error location */
 	return -1;
 }
 
@@ -732,14 +732,14 @@ static int compile_if (hcl_t* hcl, hcl_oop_t src)
 	if (HCL_IS_NIL(hcl, obj))
 	{
 		/* no value */
-		HCL_DEBUG1 (hcl, "Syntax error - no condition specified in if - %O\n", src);
-		hcl_setsynerr (hcl, HCL_SYNERR_ARGCOUNT, HCL_NULL, HCL_NULL); /* TODO: error location */
+		hcl_setsynerrbfmt (hcl, HCL_SYNERR_ARGCOUNT, HCL_NULL, HCL_NULL,
+			"no condition specified in if - %O", src); /* TODO: error location */
 		return -1;
 	}
 	else if (!HCL_IS_CONS(hcl, obj))
 	{
-		HCL_DEBUG1 (hcl, "Syntax error - redundant cdr in if - %O\n", src);
-		hcl_setsynerr (hcl, HCL_SYNERR_DOTBANNED, HCL_NULL, HCL_NULL); /* TODO: error location */
+		hcl_setsynerrbfmt (hcl, HCL_SYNERR_DOTBANNED, HCL_NULL, HCL_NULL,
+			"redundant cdr in if - %O", src); /* TODO: error location */
 		return -1;
 	}
 
@@ -1111,6 +1111,33 @@ static int compile_set (hcl_t* hcl, hcl_oop_t src)
 	return 0;
 }
 
+static int compile_do (hcl_t* hcl, hcl_oop_t src)
+{
+	hcl_oop_t obj;
+
+	HCL_ASSERT (hcl, HCL_CONS_CAR(src) == hcl->_do);
+
+	obj = HCL_CONS_CDR(src);
+
+	if (HCL_IS_NIL(hcl, obj))
+	{
+		/* no value */
+		hcl_setsynerrbfmt (hcl, HCL_SYNERR_ARGCOUNT, HCL_NULL, HCL_NULL,
+			"no expression specified in do - %O", src); /* TODO: error location */
+		return -1;
+	}
+	else if (!HCL_IS_CONS(hcl, obj))
+	{
+		hcl_setsynerrbfmt (hcl, HCL_SYNERR_DOTBANNED, HCL_NULL, HCL_NULL,
+			"redundant cdr in do - %O", src); /* TODO: error location */
+		return -1;
+	}
+
+	SWITCH_TOP_CFRAME (hcl, COP_COMPILE_OBJECT_LIST, obj); 
+	return 0;
+}
+
+
 static int compile_while (hcl_t* hcl, hcl_oop_t src, int next_cop)
 {
 	/* (while (xxxx) ... ) */
@@ -1127,14 +1154,14 @@ static int compile_while (hcl_t* hcl, hcl_oop_t src, int next_cop)
 	if (HCL_IS_NIL(hcl, obj))
 	{
 		/* no value */
-		HCL_DEBUG1 (hcl, "Syntax error - no condition specified in while - %O\n", src);
-		hcl_setsynerr (hcl, HCL_SYNERR_ARGCOUNT, HCL_NULL, HCL_NULL); /* TODO: error location */
+		hcl_setsynerrbfmt (hcl, HCL_SYNERR_ARGCOUNT, HCL_NULL, HCL_NULL,
+			"no loop condition specified - %O", src); /* TODO: error location */
 		return -1;
 	}
 	else if (!HCL_IS_CONS(hcl, obj))
 	{
-		HCL_DEBUG1 (hcl, "Syntax error - redundant cdr in while - %O\n", src);
-		hcl_setsynerr (hcl, HCL_SYNERR_DOTBANNED, HCL_NULL, HCL_NULL); /* TODO: error location */
+		hcl_setsynerrbfmt (hcl, HCL_SYNERR_DOTBANNED, HCL_NULL, HCL_NULL,
+			"redundant cdr in loop - %O", src); /* TODO: error location */
 		return -1;
 	}
 
@@ -1273,8 +1300,7 @@ static int compile_cons_xlist_expression (hcl_t* hcl, hcl_oop_t obj)
 				break;
 
 			case HCL_SYNCODE_DO:
-HCL_DEBUG0 (hcl, "DO NOT IMPLEMENTED...\n");
-/* TODO: not implemented yet */
+				if (compile_do(hcl, obj) <= -1) return -1;
 				break;
 
 			case HCL_SYNCODE_ELSE:

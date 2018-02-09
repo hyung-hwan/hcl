@@ -39,7 +39,7 @@ void* hcl_allocbytes (hcl_t* hcl, hcl_oow_t size)
 	if (!ptr && hcl->errnum == HCL_EOOMEM && !(hcl->option.trait & HCL_NOGC))
 	{
 		hcl_gc (hcl);
-		HCL_LOG4 (hcl, HCL_LOG_INFO,
+		HCL_LOG4 (hcl, HCL_LOG_GC | HCL_LOG_INFO,
 			"GC completed - current heap ptr %p limit %p size %zd free %zd\n", 
 			hcl->curheap->ptr, hcl->curheap->limit,
 			(hcl_oow_t)(hcl->curheap->limit - hcl->curheap->base),
