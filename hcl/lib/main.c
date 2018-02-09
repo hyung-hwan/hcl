@@ -1601,9 +1601,9 @@ int main (int argc, char* argv[])
 				hcl_logbfmt (hcl, HCL_LOG_STDERR, "ERROR: cannot read object - [%d] %js\n", hcl_geterrnum(hcl), hcl_geterrmsg(hcl));
 			}
 
-			break;
+			if (!xtn->reader_istty) goto oops;
+			continue;
 		}
-
 
 		if (hcl_print(hcl, obj) <= -1)
 		{
@@ -1627,6 +1627,8 @@ int main (int argc, char* argv[])
 					hcl_logbfmt (hcl, HCL_LOG_STDERR, "ERROR: cannot compile object - [%d] %js\n", hcl_geterrnum(hcl), hcl_geterrmsg(hcl));
 				}
 				/* carry on? */
+
+				if (!xtn->reader_istty) goto oops;
 			}
 			else if (xtn->reader_istty)
 			{
@@ -1660,7 +1662,11 @@ int main (int argc, char* argv[])
 		/*hcl_dumpsymtab (hcl);*/
 	}
 
-	hcl_close (hcl);
 
+	hcl_close (hcl);
 	return 0;
+
+oops:
+	hcl_close (hcl);
+	return -1;
 }

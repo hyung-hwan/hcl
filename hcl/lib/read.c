@@ -1276,6 +1276,7 @@ static HCL_INLINE hcl_oop_t leave_list (hcl_t* hcl, int* flagv, int* oldflagv)
 
 	/* the stack must not be empty - cannot leave a list without entering it */
 	HCL_ASSERT (hcl, !HCL_IS_NIL(hcl,hcl->c->r.s));
+/* TODO: fix bug here. unblanced ) cause assertion failure here */
 
 	/*head = HCL_CONS_CAR(HCL_CONS_CDR(hcl->c->r.s));*/
 
