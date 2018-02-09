@@ -38,7 +38,7 @@
 #if defined(_WIN32)
 #	include <windows.h>
 #	include <tchar.h>
-#	if defined(STIX_HAVE_CFG_H)
+#	if defined(HCL_HAVE_CFG_H) && defined(HCL_ENABLE_LIBLTDL)
 #		include <ltdl.h>
 #		define USE_LTDL
 #	endif
@@ -53,11 +53,26 @@
 #elif defined(macintosh)
 #	include <Timer.h>
 #else
-#	include <errno.h>
-#	include <unistd.h>
-#	include <fcntl.h>
-#	include <ltdl.h>
-#	define USE_LTDL
+
+#	if defined(HCL_ENABLE_LIBLTDL)
+#		include <ltdl.h>
+#		define USE_LTDL
+#		define sys_dl_error() lt_dlerror()
+#		define sys_dl_open(x) lt_dlopen(x)
+#		define sys_dl_openext(x) lt_dlopenext(x)
+#		define sys_dl_close(x) lt_dlclose(x)
+#		define sys_dl_sym(x,n) lt_dlsym(x,n)
+#	elif defined(HAVE_DLFCN_H)
+#		include <dlfcn.h>
+#		define USE_DLFCN
+#		define sys_dl_error() dlerror()
+#		define sys_dl_open(x) dlopen(x,RTLD_NOW)
+#		define sys_dl_openext(x) dlopen(x,RTLD_NOW)
+#		define sys_dl_close(x) dlclose(x)
+#		define sys_dl_sym(x,n) dlsym(x,n)
+#	else
+#		error UNSUPPORTED DYNAMIC LINKER
+#	endif
 
 #	if defined(HAVE_TIME_H)
 #		include <time.h>
@@ -68,6 +83,11 @@
 #	if defined(HAVE_SIGNAL_H)
 #		include <signal.h>
 #	endif
+
+#	include <errno.h>
+#	include <unistd.h>
+#	include <fcntl.h>
+
 #endif
 
 
