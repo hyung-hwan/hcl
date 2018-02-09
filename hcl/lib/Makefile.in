@@ -135,7 +135,7 @@ am__installdirs = "$(DESTDIR)$(pkglibdir)" "$(DESTDIR)$(bindir)" \
 	"$(DESTDIR)$(pkgincludedir)"
 LTLIBRARIES = $(pkglib_LTLIBRARIES)
 am__DEPENDENCIES_1 =
-am__DEPENDENCIES_2 = $(am__DEPENDENCIES_1)
+am__DEPENDENCIES_2 = $(am__DEPENDENCIES_1) $(am__DEPENDENCIES_1)
 libhcl_la_DEPENDENCIES = $(am__DEPENDENCIES_2)
 am_libhcl_la_OBJECTS = libhcl_la-bigint.lo libhcl_la-comp.lo \
 	libhcl_la-debug.lo libhcl_la-decode.lo libhcl_la-dic.lo \
@@ -223,6 +223,7 @@ CTAGS = ctags
 am__DIST_COMMON = $(srcdir)/Makefile.in $(srcdir)/hcl-cfg.h.in \
 	$(top_srcdir)/ac/depcomp
 DISTFILES = $(DIST_COMMON) $(DIST_SOURCES) $(TEXINFOS) $(EXTRA_DIST)
+#endif
 pkgincludedir = $(includedir)
 pkglibdir = $(libdir)
 ACLOCAL = @ACLOCAL@
@@ -247,6 +248,7 @@ CYGPATH_W = @CYGPATH_W@
 DEFS = @DEFS@
 DEPDIR = @DEPDIR@
 DLLTOOL = @DLLTOOL@
+DL_LIBS = @DL_LIBS@
 DSYMUTIL = @DSYMUTIL@
 DUMPBIN = @DUMPBIN@
 ECHO_C = @ECHO_C@
@@ -381,7 +383,12 @@ LDFLAGS_ALL_COMMON = -L$(abs_builddir) -L$(libdir)
 ##################################################
 CPPFLAGS_LIB_COMMON = $(CPPFLAGS_ALL_COMMON)
 LDFLAGS_LIB_COMMON = $(LDFLAGS_ALL_COMMON) -version-info 1:0:0 -no-undefined
-LIBADD_LIB_COMMON = $(LIBM)
+
+#if ENABLE_LIBLTDL
+#CPPFLAGS_LIB_COMMON += $(LTDLINCL)
+#LIBADD_LIB_COMMON += $(LIBLTDL)
+#else
+LIBADD_LIB_COMMON = $(LIBM) $(DL_LIBS)
 pkginclude_HEADERS = \
 	hcl-cfg.h \
 	hcl-cmn.h \
