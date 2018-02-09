@@ -759,29 +759,68 @@ static int compile_if (hcl_t* hcl, hcl_oop_t src)
 	return 0;
 }
 
-static int compile_lambda (hcl_t* hcl, hcl_oop_t src)
+static int compile_lambda (hcl_t* hcl, hcl_oop_t src, int defun)
 {
 	hcl_oop_t obj, args;
 	hcl_oow_t nargs, ntmprs;
 	hcl_ooi_t jump_inst_pos;
 	hcl_oow_t saved_tv_count, tv_dup_start;
+	hcl_oop_t defun_name;
 
 	HCL_ASSERT (hcl, HCL_IS_CONS(hcl, src));
-	HCL_ASSERT (hcl, HCL_CONS_CAR(src) == hcl->_lambda);
 
 	saved_tv_count = hcl->c->tv.size;
 	obj = HCL_CONS_CDR(src);
 
+	if (defun)
+	{
+		HCL_ASSERT (hcl, HCL_CONS_CAR(src) == hcl->_defun);
+
+		if (HCL_IS_NIL(hcl, obj))
+		{
+			hcl_setsynerrbfmt (hcl, HCL_SYNERR_ARGNAMELIST, HCL_NULL, HCL_NULL,
+				"no defun name - %O", src); /* TODO: error location */
+			return -1;
+		}
+		else if (!HCL_IS_CONS(hcl, obj))
+		{
+			hcl_setsynerrbfmt (hcl, HCL_SYNERR_DOTBANNED, HCL_NULL, HCL_NULL,
+				"redundant cdr in defun - %O", src); /* TODO: error location */
+			return -1;
+		}
+
+		defun_name = HCL_CONS_CAR(obj);
+		if (!HCL_IS_SYMBOL(hcl, defun_name))
+		{
+			hcl_setsynerrbfmt (hcl, HCL_SYNERR_VARNAME, HCL_NULL, HCL_NULL,
+				"defun name not a symbol - %O", defun_name); /* TODO: error location */
+			return -1;
+		}
+
+		if (HCL_OBJ_GET_FLAGS_SYNCODE(defun_name))
+		{
+			hcl_setsynerrbfmt (hcl, HCL_SYNERR_BANNEDVARNAME, HCL_NULL, HCL_NULL, 
+				"special symbol not to be used as a defun name - %O", defun_name); /* TOOD: error location */
+			return -1;
+		}
+
+		obj = HCL_CONS_CDR(obj);
+	}
+	else
+	{
+		HCL_ASSERT (hcl, HCL_CONS_CAR(src) == hcl->_lambda);
+	}
+
 	if (HCL_IS_NIL(hcl, obj))
 	{
-		HCL_DEBUG1 (hcl, "Syntax error - no argument list in lambda - %O\n", src);
-		hcl_setsynerr (hcl, HCL_SYNERR_ARGNAMELIST, HCL_NULL, HCL_NULL); /* TODO: error location */
+		hcl_setsynerrbfmt (hcl, HCL_SYNERR_ARGNAMELIST, HCL_NULL, HCL_NULL,
+			"no argument list in lambda - %O", src); /* TODO: error location */
 		return -1;
 	}
 	else if (!HCL_IS_CONS(hcl, obj))
 	{
-		HCL_DEBUG1 (hcl, "Syntax error - redundant cdr in lambda - %O\n", src);
-		hcl_setsynerr (hcl, HCL_SYNERR_DOTBANNED, HCL_NULL, HCL_NULL); /* TODO: error location */
+		hcl_setsynerrbfmt (hcl, HCL_SYNERR_DOTBANNED, HCL_NULL, HCL_NULL,
+			"redundant cdr in lambda - %O", src); /* TODO: error location */
 		return -1;
 	}
 
@@ -797,8 +836,8 @@ static int compile_lambda (hcl_t* hcl, hcl_oop_t src)
 
 		if (!HCL_IS_CONS(hcl, args))
 		{
-			HCL_DEBUG1 (hcl, "Syntax error - not a lambda argument list - %O\n", args);
-			hcl_setsynerr (hcl, HCL_SYNERR_ARGNAMELIST, HCL_NULL, HCL_NULL); /* TODO: error location */
+			hcl_setsynerrbfmt (hcl, HCL_SYNERR_ARGNAMELIST, HCL_NULL, HCL_NULL, 
+				"not a lambda argument list - %O", args); /* TODO: error location */
 			return -1;
 		}
 
@@ -930,6 +969,29 @@ static int compile_lambda (hcl_t* hcl, hcl_oop_t src)
 	if (emit_single_param_instruction (hcl, HCL_CODE_JUMP_FORWARD_0, MAX_CODE_JUMP) <= -1) return -1;
 
 	SWITCH_TOP_CFRAME (hcl, COP_COMPILE_OBJECT_LIST, obj);
+
+	if (defun)
+	{
+		hcl_oow_t index;
+		hcl_cframe_t* cf;
+
+		if (find_temporary_variable_backward(hcl, defun_name, &index) <= -1)
+		{
+			PUSH_SUBCFRAME (hcl, COP_EMIT_SET, defun_name); /* set doesn't evaluate the variable name */
+			cf = GET_SUBCFRAME(hcl);
+			cf->u.set.var_type = VAR_NAMED;
+		}
+		else
+		{
+			/* the check in compile_lambda() must ensure this condition */
+			HCL_ASSERT (hcl, index <= HCL_SMOOI_MAX); 
+
+			PUSH_SUBCFRAME (hcl, COP_EMIT_SET, HCL_SMOOI_TO_OOP(index)); 
+			cf = GET_SUBCFRAME(hcl);
+			cf->u.set.var_type = VAR_INDEXED;
+		}
+	}
+
 	PUSH_SUBCFRAME (hcl, COP_EMIT_LAMBDA, HCL_SMOOI_TO_OOP(jump_inst_pos));
 
 	return 0;
@@ -995,7 +1057,7 @@ static int compile_set (hcl_t* hcl, hcl_oop_t src)
 	}
 
 	var = HCL_CONS_CAR(obj);
-	if (HCL_BRANDOF(hcl, var) != HCL_BRAND_SYMBOL)
+	if (!HCL_IS_SYMBOL(hcl, var))
 	{
 		hcl_setsynerrbfmt (hcl, HCL_SYNERR_VARNAME, HCL_NULL, HCL_NULL, "variable name not a symbol - %O", var); /* TODO: error location */
 		return -1;
@@ -1207,8 +1269,7 @@ static int compile_cons_xlist_expression (hcl_t* hcl, hcl_oop_t obj)
 				break;
 
 			case HCL_SYNCODE_DEFUN:
-HCL_DEBUG0 (hcl, "DEFUN NOT IMPLEMENTED...\n");
-/* TODO: not implemented yet */
+				if (compile_lambda(hcl, obj, 1) <= -1) return -1;
 				break;
 
 			case HCL_SYNCODE_DO:
@@ -1230,7 +1291,7 @@ HCL_DEBUG0 (hcl, "DO NOT IMPLEMENTED...\n");
 
 			case HCL_SYNCODE_LAMBDA:
 				/* (lambda (x y) (+ x y)) */
-				if (compile_lambda(hcl, obj) <= -1) return -1;
+				if (compile_lambda(hcl, obj, 0) <= -1) return -1;
 				break;
 
 			case HCL_SYNCODE_SET:
