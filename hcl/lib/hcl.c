@@ -624,7 +624,7 @@ int hcl_importmod (hcl_t* hcl, const hcl_ooch_t* name, hcl_oow_t len)
 		HCL_ASSERT (hcl, mdp != HCL_NULL);
 
 		HCL_DEBUG1 (hcl, "Cannot import module [%js] - already active\n", mdp->mod.name);
-		hcl_seterrnum (hcl, HCL_EPERM);
+		hcl_seterrbfmt (hcl, HCL_EPERM, "unable to import module [%js] - already active", mdp->mod.name);
 		goto done2;
 	}
 
@@ -634,7 +634,7 @@ int hcl_importmod (hcl_t* hcl, const hcl_ooch_t* name, hcl_oow_t len)
 	if (!mdp->mod.import)
 	{
 		HCL_DEBUG1 (hcl, "Cannot import module [%js] - importing not supported by the module\n", mdp->mod.name);
-		hcl_seterrnum (hcl, HCL_ENOIMPL);
+		hcl_seterrbfmt (hcl, HCL_ENOIMPL, "unable to import module [%js] - not supported by the module", mdp->mod.name);
 		goto done;
 	}
 
