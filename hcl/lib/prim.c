@@ -30,7 +30,7 @@ struct prim_t
 {
 	hcl_oow_t minargs;
 	hcl_oow_t maxargs;
-	hcl_prim_impl_t impl;
+	hcl_pfimpl_t impl;
 
 	hcl_oow_t namelen;
 	hcl_ooch_t name[10];
@@ -40,7 +40,7 @@ typedef struct prim_t prim_t;
 
 /* ------------------------------------------------------------------------- */
 
-hcl_oop_t hcl_makeprim (hcl_t* hcl, hcl_prim_impl_t primimpl, hcl_oow_t minargs, hcl_oow_t maxargs)
+hcl_oop_t hcl_makeprim (hcl_t* hcl, hcl_pfimpl_t primimpl, hcl_oow_t minargs, hcl_oow_t maxargs)
 {
 	hcl_oop_word_t obj;
 

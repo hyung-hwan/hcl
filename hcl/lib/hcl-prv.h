@@ -1132,6 +1132,38 @@ HCL_EXPORT int hcl_compile (
 );
 
 /* ========================================================================= */
+/* hcl.c                                                                     */
+/* ========================================================================= */
+
+hcl_mod_data_t* hcl_openmod (
+	hcl_t*            hcl,
+	const hcl_ooch_t* name,
+	hcl_oow_t         namelen,
+	int               hints /* 0 or bitwise-ORed of hcl_mod_hint_t enumerators */
+);
+
+void hcl_closemod (
+	hcl_t*            hcl,
+	hcl_mod_data_t*   mdp
+);
+
+int hcl_importmod (
+	hcl_t*            hcl,
+	const hcl_ooch_t* name,
+	hcl_oow_t         len
+);
+
+/*
+ * The hcl_querymod() function finds a primitive function in modules
+ * with a full primitive identifier.
+ */
+hcl_pfbase_t* hcl_querymod (
+	hcl_t*            hcl,
+	const hcl_ooch_t* pfid,
+	hcl_oow_t         pfidlen
+);
+
+/* ========================================================================= */
 /* prim.c                                                                    */
 /* ========================================================================= */
 int hcl_addbuiltinprims (

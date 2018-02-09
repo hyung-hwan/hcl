@@ -696,9 +696,9 @@ enum hcl_vmprim_opendl_flag_t
 };
 typedef enum hcl_vmprim_opendl_flag_t hcl_vmprim_opendl_flag_t;
 
-typedef void* (*hcl_vmprim_dlopen_t) (hcl_t* hcl, const hcl_uch_t* name);
+typedef void* (*hcl_vmprim_dlopen_t) (hcl_t* hcl, const hcl_ooch_t* name, int flags);
 typedef void (*hcl_vmprim_dlclose_t) (hcl_t* hcl, void* handle);
-typedef void* (*hcl_vmprim_dlsym_t) (hcl_t* hcl, void* handle, const hcl_uch_t* name);
+typedef void* (*hcl_vmprim_dlgetsym_t) (hcl_t* hcl, void* handle, const hcl_ooch_t* name);
 
 typedef void (*hcl_log_write_t) (hcl_t* hcl, hcl_oow_t mask, const hcl_ooch_t* msg, hcl_oow_t len);
 typedef void (*hcl_syserrstrb_t) (hcl_t* hcl, int syserr, hcl_bch_t* buf, hcl_oow_t len);
@@ -715,7 +715,7 @@ struct hcl_vmprim_t
 {
 	hcl_vmprim_dlopen_t   dl_open;
 	hcl_vmprim_dlclose_t  dl_close;
-	hcl_vmprim_dlsym_t    dl_getsym;
+	hcl_vmprim_dlgetsym_t    dl_getsym;
 
 	hcl_log_write_t       log_write;
 	hcl_syserrstrb_t      syserrstrb;
@@ -834,7 +834,7 @@ struct hcl_cb_t
 
 
 /* =========================================================================
- * PRIMITIVE MODULE MANIPULATION
+ * PRIMITIVE FUNCTIONS
  * ========================================================================= */
 enum hcl_pfrc_t
 {
@@ -843,39 +843,85 @@ enum hcl_pfrc_t
 };
 typedef enum hcl_pfrc_t hcl_pfrc_t;
 
-typedef hcl_pfrc_t (*hcl_prim_impl_t) (hcl_t* hcl, hcl_ooi_t nargs);
+typedef hcl_pfrc_t (*hcl_pfimpl_t) (hcl_t* hcl, hcl_ooi_t nargs);
 
-typedef struct hcl_prim_mod_t hcl_prim_mod_t;
 
-typedef int (*hcl_prim_mod_load_t) (
-	hcl_t*          hcl,
-	hcl_prim_mod_t* mod
+typedef struct hcl_pfbase_t hcl_pfbase_t;
+struct hcl_pfbase_t
+{
+	hcl_pfimpl_t handler;
+	hcl_oow_t    minargs;
+	hcl_oow_t    maxargs;
+};
+
+typedef struct hcl_pfinfo_t hcl_pfinfo_t;
+struct hcl_pfinfo_t
+{
+	hcl_ooch_t        mthname[32];
+	int               variadic;
+	hcl_pfbase_t      base;
+};
+/* =========================================================================
+ * PRIMITIVE MODULE MANIPULATION
+ * ========================================================================= */
+#define HCL_MOD_NAME_LEN_MAX 120
+
+typedef struct hcl_mod_t hcl_mod_t;
+
+enum hcl_mod_hint_t
+{
+	HCL_MOD_LOAD_FOR_IMPORT = (1 << 0)
+};
+typedef enum hcl_mod_hint_t hcl_mod_hint_t;
+
+typedef int (*hcl_mod_load_t) (
+	hcl_t*     hcl,
+	hcl_mod_t* mod
 );
 
-typedef hcl_prim_impl_t (*hcl_prim_mod_query_t) (
+typedef int (*hcl_mod_import_t) (
 	hcl_t*           hcl,
-	hcl_prim_mod_t*  mod,
-	const hcl_uch_t* name
+	hcl_mod_t*       mod
 );
 
-typedef void (*hcl_prim_mod_unload_t) (
-	hcl_t*          hcl,
-	hcl_prim_mod_t* mod
+typedef hcl_pfbase_t* (*hcl_mod_query_t) (
+	hcl_t*            hcl,
+	hcl_mod_t*        mod,
+	const hcl_ooch_t* name,
+	hcl_oow_t         namelen
 );
 
-struct hcl_prim_mod_t
+typedef void (*hcl_mod_unload_t) (
+	hcl_t*     hcl,
+	hcl_mod_t* mod
+);
+
+typedef void (*hcl_mod_gc_t) (
+	hcl_t*     hcl,
+	hcl_mod_t* mod
+);
+
+struct hcl_mod_t
 {
-	hcl_prim_mod_unload_t unload;
-	hcl_prim_mod_query_t  query;
-	void*                  ctx;
+	/* input */
+	const hcl_ooch_t name[HCL_MOD_NAME_LEN_MAX + 1];
+	/*const*/ int hints; /* bitwised-ORed of hcl_mod_hint_t enumerators */
+
+	/* user-defined data */
+	hcl_mod_import_t import;
+	hcl_mod_query_t  query;
+	hcl_mod_unload_t unload;
+	hcl_mod_gc_t     gc;
+	void*            ctx;
 };
 
-struct hcl_prim_mod_data_t 
+struct hcl_mod_data_t 
 {
-	void* handle;
-	hcl_prim_mod_t mod;
+	void*           handle;
+	hcl_rbt_pair_t* pair; /* internal backreference to hcl->modtab */
+	hcl_mod_t       mod;
 };
-typedef struct hcl_prim_mod_data_t hcl_prim_mod_data_t;
+typedef struct hcl_mod_data_t hcl_mod_data_t;
 
 
 struct hcl_sbuf_t
@@ -937,7 +983,7 @@ struct hcl_t
 	hcl_vmprim_t vmprim;
 
 	hcl_cb_t* cblist;
-	hcl_rbt_t pmtable; /* primitive module table */
+	hcl_rbt_t modtab; /* primitive module table */
 
 	struct
 	{
@@ -1815,7 +1861,7 @@ HCL_EXPORT hcl_oop_t hcl_reversecons (
 
 HCL_EXPORT hcl_oop_t hcl_makeprim (
 	hcl_t*          hcl,
-	hcl_prim_impl_t primimpl,
+	hcl_pfimpl_t    primimpl,
 	hcl_oow_t       minargs,
 	hcl_oow_t       maxargs
 );

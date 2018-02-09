@@ -971,7 +971,7 @@ static HCL_INLINE int call_primitive (hcl_t* hcl, hcl_ooi_t nargs)
 		return -1;
 	}
 
-	return ((hcl_prim_impl_t)rcv->slot[0]) (hcl, nargs);
+	return ((hcl_pfimpl_t)rcv->slot[0]) (hcl, nargs);
 }
 
 /* ------------------------------------------------------------------------- */

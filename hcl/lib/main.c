@@ -54,7 +54,7 @@
 #	include <Timer.h>
 #else
 
-#	if defined(MOO_ENABLE_LIBLTDL)
+#	if defined(HCL_ENABLE_LIBLTDL)
 #		include <ltdl.h>
 #		define USE_LTDL
 #		define sys_dl_error() lt_dlerror()
@@ -83,7 +83,7 @@
 #	if defined(HAVE_SIGNAL_H)
 #		include <signal.h>
 #	endif
-
+	
 #	include <errno.h>
 #	include <unistd.h>
 #	include <fcntl.h>
