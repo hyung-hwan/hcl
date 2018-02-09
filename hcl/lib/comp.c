@@ -810,15 +810,15 @@ static int compile_lambda (hcl_t* hcl, hcl_oop_t src)
 			arg = HCL_CONS_CAR(ptr);
 			if (!HCL_IS_SYMBOL(hcl, arg))
 			{
-				HCL_DEBUG1 (hcl, "Syntax error - lambda argument not a symbol - %O\n", arg);
-				hcl_setsynerr (hcl, HCL_SYNERR_ARGNAME, HCL_NULL, HCL_NULL); /* TODO: error location */
+				hcl_setsynerrbfmt (hcl, HCL_SYNERR_ARGNAME, HCL_NULL, HCL_NULL,
+					"lambda argument not a symbol - %O", arg); /* TODO: error location */
 				return -1;
 			}
 
 			if (HCL_OBJ_GET_FLAGS_SYNCODE(arg))
 			{
-				HCL_DEBUG1 (hcl, "Syntax error - special symbol not to be declared as an argument name - %O\n", arg); 
-				hcl_setsynerr (hcl, HCL_SYNERR_BANNEDARGNAME, HCL_NULL, HCL_NULL); /* TOOD: error location */
+				hcl_setsynerrbfmt (hcl, HCL_SYNERR_BANNEDARGNAME, HCL_NULL, HCL_NULL,
+					"special symbol not to be declared as an argument name - %O", arg); /* TOOD: error location */
 				return -1;
 			}
 
@@ -826,8 +826,8 @@ static int compile_lambda (hcl_t* hcl, hcl_oop_t src)
 			{
 				if (hcl->errnum == HCL_EEXIST)
 				{
-					HCL_DEBUG1 (hcl, "Syntax error - lambda argument duplicate - %O\n", arg);
-					hcl_setsynerr (hcl, HCL_SYNERR_ARGNAMEDUP, HCL_NULL, HCL_NULL); /* TODO: error location */
+					hcl_setsynerrbfmt (hcl, HCL_SYNERR_ARGNAMEDUP, HCL_NULL, HCL_NULL,
+						"lambda argument duplicate - %O", arg); /* TODO: error location */
 				}
 				return -1;
 			}
@@ -838,8 +838,8 @@ static int compile_lambda (hcl_t* hcl, hcl_oop_t src)
 			{
 				if (!HCL_IS_NIL(hcl, ptr))
 				{
-					HCL_DEBUG1 (hcl, "Syntax error - redundant cdr in lambda argument list - %O\n", args);
-					hcl_setsynerr (hcl, HCL_SYNERR_DOTBANNED, HCL_NULL, HCL_NULL); /* TODO: error location */
+					hcl_setsynerrbfmt (hcl, HCL_SYNERR_DOTBANNED, HCL_NULL, HCL_NULL,
+						"redundant cdr in lambda argument list - %O", args); /* TODO: error location */
 					return -1;
 				}
 				break;
@@ -855,8 +855,7 @@ static int compile_lambda (hcl_t* hcl, hcl_oop_t src)
 		 * block arguments, evaluation which is done by message passing
 		 * limits the number of arguments that can be passed. so the
 		 * check is implemented */
-		HCL_DEBUG1 (hcl, "Syntax error - too many arguments - %O\n", args);
-		hcl_setsynerr (hcl, HCL_SYNERR_ARGFLOOD, HCL_NULL, HCL_NULL); 
+		hcl_setsynerrbfmt (hcl, HCL_SYNERR_ARGFLOOD, HCL_NULL, HCL_NULL, "too many(%zu) arguments - %O", nargs, args); 
 		return -1;
 	}
 
@@ -878,8 +877,8 @@ static int compile_lambda (hcl_t* hcl, hcl_oop_t src)
 			{
 				if (HCL_OBJ_GET_FLAGS_SYNCODE(((hcl_oop_oop_t)dcl)->slot[i]))
 				{
-					HCL_DEBUG1 (hcl, "Syntax error - special symbol not to be declared as a variable name - %O\n", obj); 
-					hcl_setsynerr (hcl, HCL_SYNERR_BANNEDVARNAME, HCL_NULL, HCL_NULL); /* TOOD: error location */
+					hcl_setsynerrbfmt (hcl, HCL_SYNERR_BANNEDVARNAME, HCL_NULL, HCL_NULL, 
+						"special symbol not to be declared as a variable name - %O", obj); /* TOOD: error location */
 					return -1;
 				}
 
@@ -887,8 +886,8 @@ static int compile_lambda (hcl_t* hcl, hcl_oop_t src)
 				{
 					if (hcl->errnum == HCL_EEXIST)
 					{
-						HCL_DEBUG1 (hcl, "Syntax error - local variable duplicate - %O\n", ((hcl_oop_oop_t)dcl)->slot[i]);
-						hcl_setsynerr (hcl, HCL_SYNERR_VARNAMEDUP, HCL_NULL, HCL_NULL); /* TODO: error location */
+						hcl_setsynerrbfmt (hcl, HCL_SYNERR_VARNAMEDUP, HCL_NULL, HCL_NULL,
+							"local variable duplicate - %O", ((hcl_oop_oop_t)dcl)->slot[i]); /* TODO: error location */
 					}
 
 					return -1;
@@ -906,15 +905,13 @@ static int compile_lambda (hcl_t* hcl, hcl_oop_t src)
 	HCL_ASSERT (hcl, ntmprs == hcl->c->tv.size - saved_tv_count);
 	if (ntmprs > MAX_CODE_NBLKTMPRS)
 	{
-		HCL_DEBUG1 (hcl, "Syntax error - too many variables - %O\n", args);
-		hcl_setsynerr (hcl, HCL_SYNERR_VARFLOOD, HCL_NULL, HCL_NULL); 
+		hcl_setsynerrbfmt (hcl, HCL_SYNERR_VARFLOOD, HCL_NULL, HCL_NULL, "too many(%zu) variables - %O", ntmprs, args); 
 		return -1;
 	}
 
 	if (hcl->c->blk.depth == HCL_TYPE_MAX(hcl_ooi_t))
 	{
-		HCL_DEBUG1 (hcl, "Syntax error - lambda block depth too deep - %O\n", src);
-		hcl_setsynerr (hcl, HCL_SYNERR_BLKDEPTH, HCL_NULL, HCL_NULL); 
+		hcl_setsynerrbfmt (hcl, HCL_SYNERR_BLKDEPTH, HCL_NULL, HCL_NULL, "lambda block depth too deep - %O", src); 
 		return -1;
 	}
 	hcl->c->blk.depth++;
@@ -951,14 +948,12 @@ static int compile_return (hcl_t* hcl, hcl_oop_t src)
 	{
 /* TODO: should i allow (return)? does it return the last value on the stack? */
 		/* no value */
-		HCL_DEBUG1 (hcl, "Syntax error - no value specified in return - %O\n", src);
-		hcl_setsynerr (hcl, HCL_SYNERR_ARGCOUNT, HCL_NULL, HCL_NULL); /* TODO: error location */
+		hcl_setsynerrbfmt (hcl, HCL_SYNERR_ARGCOUNT, HCL_NULL, HCL_NULL, "no value specified in return - %O", src); /* TODO: error location */
 		return -1;
 	}
 	else if (!HCL_IS_CONS(hcl, obj))
 	{
-		HCL_DEBUG1 (hcl, "Syntax error - redundant cdr in return - %O\n", src);
-		hcl_setsynerr (hcl, HCL_SYNERR_DOTBANNED, HCL_NULL, HCL_NULL); /* TODO: error location */
+		hcl_setsynerrbfmt (hcl, HCL_SYNERR_DOTBANNED, HCL_NULL, HCL_NULL, "redundant cdr in return - %O", src); /* TODO: error location */
 		return -1;
 	}
 
@@ -967,8 +962,7 @@ static int compile_return (hcl_t* hcl, hcl_oop_t src)
 	obj = HCL_CONS_CDR(obj);
 	if (!HCL_IS_NIL(hcl, obj))
 	{
-		HCL_DEBUG1 (hcl, "Synatx error - too many arguments to return - %O\n", src);
-		hcl_setsynerr (hcl, HCL_SYNERR_ARGCOUNT, HCL_NULL, HCL_NULL); /* TODO: error location */
+		hcl_setsynerrbfmt (hcl, HCL_SYNERR_ARGCOUNT, HCL_NULL, HCL_NULL,  "more than 1 argument to return - %O", src); /* TODO: error location */
 		return -1;
 	}
 
@@ -1370,8 +1364,8 @@ static HCL_INLINE int compile_symbol (hcl_t* hcl, hcl_oop_t obj)
 
 	if (HCL_OBJ_GET_FLAGS_SYNCODE(obj))
 	{
-		HCL_DEBUG1 (hcl, "Syntax error - special symbol not to be used as a variable name - %O\n", obj); 
-		hcl_setsynerr (hcl, HCL_SYNERR_BANNEDVARNAME, HCL_NULL, HCL_NULL); /* TOOD: error location */
+		hcl_setsynerrbfmt (hcl, HCL_SYNERR_BANNEDVARNAME, HCL_NULL, HCL_NULL,
+			"special symbol not to be used as a variable name - %O", obj); /* TOOD: error location */
 		return -1;
 	}
 

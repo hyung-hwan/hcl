@@ -1361,8 +1361,9 @@ done:
 				return (hcl_oop_t)hcl_makedic(hcl, 100); /* TODO: default dictionary size for empty definition? */
 
 			/* NOTE: empty xlist will get translated to #nil.
-			 *       this is useful when used in the lambda expression to express an empty argument.
-			 *      (lambda () ...) is equivalent to  (lambda #nil ...) */
+			 *       this is useful when used in the lambda expression to express an empty argument. also in defun.
+			 *      (lambda () ...) is equivalent to  (lambda #nil ...) 
+			 *      (defun x() ...) */
 		}
 	}
 
@@ -1622,9 +1623,9 @@ static int read_object (hcl_t* hcl)
 		switch (TOKEN_TYPE(hcl)) 
 		{
 			default:
-				HCL_DEBUG3 (hcl, "invalid token type encountered %d - %.*js\n", TOKEN_TYPE(hcl), TOKEN_NAME_LEN(hcl), TOKEN_NAME_PTR(hcl));
 				HCL_ASSERT (hcl, !"should never happen - invalid token type");
-				hcl_seterrnum (hcl, HCL_EINTERN);
+				hcl_seterrbfmt (hcl, HCL_EINTERN, "invalid token encountered - %d %.*js", 
+					TOKEN_TYPE(hcl), TOKEN_NAME_LEN(hcl), TOKEN_NAME_PTR(hcl));
 				return -1;
 
 			case HCL_IOTOK_EOF:
