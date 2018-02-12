@@ -487,3 +487,59 @@ int hcl_addbuiltinprims (hcl_t* hcl)
 
 	return 0;
 }
+
+
+/* ------------------------------------------------------------------------- */
+
+
+static hcl_pfrc_t pf_hello (hcl_t* hcl, hcl_ooi_t nargs)
+{
+	return prim_log(hcl, nargs);
+}
+
+static int walker (hcl_t* hcl, hcl_oop_dic_t dic, hcl_oop_cons_t pair, void* ctx)
+{
+	HCL_DEBUG2 (hcl, "walker ===> %O  =====> %O\n", HCL_CONS_CAR(pair), HCL_CONS_CDR(pair));
+	return 0;
+}
+
+static hcl_pfrc_t pf_walk (hcl_t* hcl, hcl_ooi_t nargs)
+{
+	hcl_oop_t arg;
+
+	arg = HCL_STACK_GETARG(hcl, nargs, 0);
+	if (!HCL_IS_DIC(hcl,arg))
+	{
+		hcl_seterrbfmt (hcl, HCL_EINVAL, "parameter not a dictionary - %O", arg);
+		return HCL_PF_FAILURE;
+	}
+
+	hcl_walkdic (hcl, (hcl_oop_dic_t)arg, walker, HCL_NULL);
+	HCL_STACK_SETRET (hcl, nargs, hcl->_true);
+	return HCL_PF_SUCCESS;
+}
+
+static hcl_pfinfo_t pfinfos[] =
+{
+	{ { 'h','e','l','l','o','\0' },         0, { pf_hello,  1,  1  } },
+	{ { 'w','a','l','k','\0' },             0, { pf_walk,   1,  1  } }
+};
+
+/* ------------------------------------------------------------------------ */
+
+static hcl_pfbase_t* query (hcl_t* hcl, hcl_mod_t* mod, const hcl_ooch_t* name, hcl_oow_t namelen)
+{
+	return hcl_findpfbase (hcl, pfinfos, HCL_COUNTOF(pfinfos), name, namelen);
+}
+
+static void unload (hcl_t* hcl, hcl_mod_t* mod)
+{
+}
+
+int hcl_mod_test (hcl_t* hcl, hcl_mod_t* mod)
+{
+	mod->query = query;
+	mod->unload = unload; 
+	mod->ctx = HCL_NULL;
+	return 0;
+}

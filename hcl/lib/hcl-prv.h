@@ -889,33 +889,6 @@ hcl_oop_t hcl_findsymbol (
 
 
 /* ========================================================================= */
-/* dic.c                                                                     */
-/* ========================================================================= */
-hcl_oop_cons_t hcl_putatsysdic (
-	hcl_t*     hcl,
-	hcl_oop_t  key,
-	hcl_oop_t  value
-);
-
-hcl_oop_cons_t hcl_getatsysdic (
-	hcl_t*     hcl,
-	hcl_oop_t  key
-);
-
-hcl_oop_cons_t hcl_putatdic (
-	hcl_t*        hcl,
-	hcl_oop_dic_t dic,
-	hcl_oop_t     key,
-	hcl_oop_t     value
-);
-
-hcl_oop_cons_t hcl_getatdic (
-	hcl_t*        hcl,
-	hcl_oop_dic_t dic,
-	hcl_oop_t     key
-);
-
-/* ========================================================================= */
 /* proc.c                                                                    */
 /* ========================================================================= */
 hcl_oop_process_t hcl_makeproc (
@@ -1139,19 +1112,12 @@ HCL_EXPORT int hcl_compile (
 hcl_mod_data_t* hcl_openmod (
 	hcl_t*            hcl,
 	const hcl_ooch_t* name,
-	hcl_oow_t         namelen,
-	int               hints /* 0 or bitwise-ORed of hcl_mod_hint_t enumerators */
+	hcl_oow_t         namelen
 );
 
 void hcl_closemod (
 	hcl_t*            hcl,
 	hcl_mod_data_t*   mdp
-);
-
-int hcl_importmod (
-	hcl_t*            hcl,
-	const hcl_ooch_t* name,
-	hcl_oow_t         len
 );
 
 /*

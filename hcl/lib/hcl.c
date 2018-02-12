@@ -200,14 +200,14 @@ void hcl_fini (hcl_t* hcl)
 
 	if (hcl->code.bc.arr)
 	{
-		hcl_freengcobj (hcl, hcl->code.bc.arr);
+		hcl_freengcobj (hcl, (hcl_oop_t)hcl->code.bc.arr);
 		hcl->code.bc.arr = HCL_NULL;
 		hcl->code.bc.len = 0;
 	}
 
 	if (hcl->code.lit.arr)
 	{
-		hcl_freengcobj (hcl, hcl->code.lit.arr);
+		hcl_freengcobj (hcl, (hcl_oop_t)hcl->code.lit.arr);
 		hcl->code.lit.arr = HCL_NULL;
 		hcl->code.lit.len = 0;
 	}
@@ -396,19 +396,13 @@ void hcl_freemem (hcl_t* hcl, void* ptr)
 
 #if defined(HCL_ENABLE_STATIC_MODULE)
 
-#if defined(HCL_ENABLE_MOD_CON)
-#	include "../mod/_con.h"
-#endif
-#if defined(HCL_ENABLE_MOD_FFI)
-#	include "../mod/_ffi.h"
-#endif
-#if defined(HCL_ENABLE_MOD_SCK)
-#	include "../mod/_sck.h"
-#endif
-#include "../mod/_stdio.h"
-#if defined(HCL_ENABLE_MOD_X11)
-#	include "../mod/_x11.h"
-#endif
+/*#include "../mod/_array.h"*/
+
+static int hcl_mod_fake (hcl_t* hcl, hcl_mod_t* mod)
+{
+	hcl_seterrbfmt (hcl, HCL_EPERM, "not allowed to load ___fake___ module");
+	return -1;
+}
 
 static struct
 {
@@ -417,25 +411,11 @@ static struct
 }
 static_modtab[] = 
 {
-#if defined(HCL_ENABLE_MOD_CON)
-	{ "con",        hcl_mod_con },
-#endif
-#if defined(HCL_ENABLE_MOD_FFI)
-	{ "ffi",        hcl_mod_ffi },
-#endif
-#if defined(HCL_ENABLE_MOD_SCK)
-	{ "sck",        hcl_mod_sck },
-	{ "sck.addr",   hcl_mod_sck_addr },
-#endif
-	{ "stdio",      hcl_mod_stdio },
-#if defined(HCL_ENABLE_MOD_X11)
-	{ "x11",        hcl_mod_x11 },
-	/*{ "x11.win",    hcl_mod_x11_win },*/
-#endif
+	{ "___fake___",      hcl_mod_fake },
 };
 #endif
 
-hcl_mod_data_t* hcl_openmod (hcl_t* hcl, const hcl_ooch_t* name, hcl_oow_t namelen, int hints)
+hcl_mod_data_t* hcl_openmod (hcl_t* hcl, const hcl_ooch_t* name, hcl_oow_t namelen)
 {
 	hcl_rbt_pair_t* pair;
 	hcl_mod_data_t* mdp;
@@ -473,7 +453,7 @@ hcl_mod_data_t* hcl_openmod (hcl_t* hcl, const hcl_ooch_t* name, hcl_oow_t namel
 	/* TODO: binary search ... */
 	for (n = 0; n < HCL_COUNTOF(static_modtab); n++)
 	{
-		if (hcl_compoocharsbcstr (name, namelen, static_modtab[n].modname) == 0) 
+		if (hcl_compoocharsbcstr(name, namelen, static_modtab[n].modname) == 0) 
 		{
 			load = static_modtab[n].modload;
 			break;
@@ -490,7 +470,7 @@ hcl_mod_data_t* hcl_openmod (hcl_t* hcl, const hcl_ooch_t* name, hcl_oow_t namel
 
 		/* i copy-insert 'md' into the table before calling 'load'.
 		 * to pass the same address to load(), query(), etc */
-		pair = hcl_rbt_insert (&hcl->modtab, (hcl_ooch_t*)name, namelen, &md, HCL_SIZEOF(md));
+		pair = hcl_rbt_insert(&hcl->modtab, (hcl_ooch_t*)name, namelen, &md, HCL_SIZEOF(md));
 		if (pair == HCL_NULL)
 		{
 			hcl_seterrnum (hcl, HCL_ESYSMEM);
@@ -499,8 +479,7 @@ hcl_mod_data_t* hcl_openmod (hcl_t* hcl, const hcl_ooch_t* name, hcl_oow_t namel
 
 		mdp = (hcl_mod_data_t*)HCL_RBT_VPTR(pair);
 		HCL_ASSERT (hcl, HCL_SIZEOF(mdp->mod.hints) == HCL_SIZEOF(int));
-		mdp->mod.hints = hints;
-		if (load (hcl, &mdp->mod) <= -1)
+		if (load(hcl, &mdp->mod) <= -1)
 		{
 			hcl_rbt_delete (&hcl->modtab, (hcl_ooch_t*)name, namelen);
 			return HCL_NULL;
@@ -529,10 +508,10 @@ hcl_mod_data_t* hcl_openmod (hcl_t* hcl, const hcl_ooch_t* name, hcl_oow_t namel
 
 	/* attempt to find a dynamic external module */
 	HCL_MEMSET (&md, 0, HCL_SIZEOF(md));
-	hcl_copyoochars ((hcl_ooch_t*)md.mod.name, name, namelen);
+	hcl_copyoochars((hcl_ooch_t*)md.mod.name, name, namelen);
 	if (hcl->vmprim.dl_open && hcl->vmprim.dl_getsym && hcl->vmprim.dl_close)
 	{
-		md.handle = hcl->vmprim.dl_open (hcl, &buf[MOD_PREFIX_LEN], HCL_VMPRIM_OPENDL_PFMOD);
+		md.handle = hcl->vmprim.dl_open(hcl, &buf[MOD_PREFIX_LEN], HCL_VMPRIM_OPENDL_PFMOD);
 	}
 
 	if (md.handle == HCL_NULL) 
@@ -543,11 +522,10 @@ hcl_mod_data_t* hcl_openmod (hcl_t* hcl, const hcl_ooch_t* name, hcl_oow_t namel
 	}
 
 	/* attempt to get hcl_mod_xxx where xxx is the module name*/
-	load = hcl->vmprim.dl_getsym (hcl, md.handle, buf);
+	load = hcl->vmprim.dl_getsym(hcl, md.handle, buf);
 	if (!load) 
 	{
-		const hcl_ooch_t* oldmsg = hcl_backuperrmsg (hcl);
-		hcl_seterrbfmt (hcl, hcl_geterrnum(hcl), "unable to get module symbol [%js] in [%.*js] - %js", buf, namelen, name, oldmsg);
+		hcl_seterrbfmt (hcl, hcl_geterrnum(hcl), "unable to get module symbol [%js] in [%.*js]", buf, namelen, name);
 		HCL_DEBUG3 (hcl, "Cannot get a module symbol [%js] in [%.*js]\n", buf, namelen, name);
 		hcl->vmprim.dl_close (hcl, md.handle);
 		return HCL_NULL;
@@ -555,7 +533,7 @@ hcl_mod_data_t* hcl_openmod (hcl_t* hcl, const hcl_ooch_t* name, hcl_oow_t namel
 
 	/* i copy-insert 'md' into the table before calling 'load'.
 	 * to pass the same address to load(), query(), etc */
-	pair = hcl_rbt_insert (&hcl->modtab, (void*)name, namelen, &md, HCL_SIZEOF(md));
+	pair = hcl_rbt_insert(&hcl->modtab, (void*)name, namelen, &md, HCL_SIZEOF(md));
 	if (pair == HCL_NULL)
 	{
 		HCL_DEBUG2 (hcl, "Cannot register a module [%.*js]\n", namelen, name);
@@ -566,8 +544,7 @@ hcl_mod_data_t* hcl_openmod (hcl_t* hcl, const hcl_ooch_t* name, hcl_oow_t namel
 
 	mdp = (hcl_mod_data_t*)HCL_RBT_VPTR(pair);
 	HCL_ASSERT (hcl, HCL_SIZEOF(mdp->mod.hints) == HCL_SIZEOF(int));
-	mdp->mod.hints = hints;
-	if (load (hcl, &mdp->mod) <= -1)
+	if (load(hcl, &mdp->mod) <= -1)
 	{
 		const hcl_ooch_t* oldmsg = hcl_backuperrmsg (hcl);
 		hcl_seterrbfmt (hcl, hcl_geterrnum(hcl), "module initializer [%js] returned failure in [%.*js] - %js", buf, namelen, name, oldmsg); 
@@ -607,53 +584,6 @@ void hcl_closemod (hcl_t* hcl, hcl_mod_data_t* mdp)
 		/*mdp->pair = HCL_NULL;*/ /* this reset isn't needed as the area will get freed by hcl_rbt_delete()) */
 		hcl_rbt_delete (&hcl->modtab, mdp->mod.name, hcl_countoocstr(mdp->mod.name));
 	}
-}
-
-int hcl_importmod (hcl_t* hcl, const hcl_ooch_t* name, hcl_oow_t len)
-{
-	hcl_rbt_pair_t* pair;
-	hcl_mod_data_t* mdp;
-	int r = -1;
-
-	pair = hcl_rbt_search (&hcl->modtab, name, len);
-	if (pair)
-	{
-		mdp = (hcl_mod_data_t*)HCL_RBT_VPTR(pair);
-		HCL_ASSERT (hcl, mdp != HCL_NULL);
-
-		HCL_DEBUG1 (hcl, "Cannot import module [%js] - already active\n", mdp->mod.name);
-		hcl_seterrbfmt (hcl, HCL_EPERM, "unable to import module [%js] - already active", mdp->mod.name);
-		goto done2;
-	}
-
-	mdp = hcl_openmod (hcl, name, len, HCL_MOD_LOAD_FOR_IMPORT);
-	if (!mdp) goto done2;
-
-	if (!mdp->mod.import)
-	{
-		HCL_DEBUG1 (hcl, "Cannot import module [%js] - importing not supported by the module\n", mdp->mod.name);
-		hcl_seterrbfmt (hcl, HCL_ENOIMPL, "unable to import module [%js] - not supported by the module", mdp->mod.name);
-		goto done;
-	}
-
-	if (mdp->mod.import (hcl, &mdp->mod) <= -1)
-	{
-		HCL_DEBUG1 (hcl, "Cannot import module [%js] - module's import() returned failure\n", mdp->mod.name);
-		goto done;
-	}
-
-	r = 0; /* everything successful */
-
-done:
-	/* close the module opened above.
-	 * [NOTE] if the import callback calls the hcl_querymod(), the returned
-	 *        function pointers will get all invalidated here. so never do 
-	 *        anything like that */
-	hcl_closemod (hcl, mdp);
-
-done2:
-	return r;
-
 }
 
 hcl_pfbase_t* hcl_querymod (hcl_t* hcl, const hcl_ooch_t* pfid, hcl_oow_t pfidlen)
@@ -696,7 +626,7 @@ hcl_pfbase_t* hcl_querymod (hcl_t* hcl, const hcl_ooch_t* pfid, hcl_oow_t pfidle
 	else
 	{
 		/* open a module using the part before the last period */
-		mdp = hcl_openmod (hcl, pfid, mod_name_len, 0);
+		mdp = hcl_openmod (hcl, pfid, mod_name_len);
 		if (!mdp) return HCL_NULL;
 	}
 
@@ -711,5 +641,42 @@ hcl_pfbase_t* hcl_querymod (hcl_t* hcl, const hcl_ooch_t* pfid, hcl_oow_t pfidle
 	HCL_DEBUG4 (hcl, "Found a primitive function [%.*js] in a module [%js] - %p\n",
 		pfidlen - mod_name_len - 1, sep + 1, mdp->mod.name, pfbase);
 	return pfbase;
+}
+
+
+hcl_pfbase_t* hcl_findpfbase (hcl_t* hcl, hcl_pfinfo_t* pfinfo, hcl_oow_t pfcount, const hcl_ooch_t* name, hcl_oow_t namelen)
+{
+	int n;
+
+	/* binary search */
+#if 0
+	/* [NOTE] this algorithm is NOT underflow safe with hcl_oow_t types */
+	int left, right, mid;
+
+	for (left = 0, right = pfcount - 1; left <= right; )
+	{
+		/*mid = (left + right) / 2;*/
+		mid = left + ((right - left) / 2);
+
+		n = hcl_compoocharsoocstr (name, namelen, pfinfo[mid].mthname);
+		if (n < 0) right = mid - 1; /* this substraction can make right negative. so i can't use hcl_oow_t for the variable */
+		else if (n > 0) left = mid + 1;
+		else return &pfinfo[mid].base;
+	}
+#else
+	/* [NOTE] this algorithm is underflow safe with hcl_oow_t types */
+	hcl_oow_t base, mid, lim;
+
+	for (base = 0, lim = pfcount; lim > 0; lim >>= 1)
+	{
+		mid = base + (lim >> 1);
+		n = hcl_compoocharsoocstr (name, namelen, pfinfo[mid].mthname);
+		if (n == 0) return &pfinfo[mid].base;
+		if (n > 0) { base = mid + 1; lim--; }
+	}
+#endif
+
+	hcl_seterrnum (hcl, HCL_ENOENT);
+	return HCL_NULL;
 }
 

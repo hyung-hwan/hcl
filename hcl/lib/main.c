@@ -504,8 +504,11 @@ static void* dl_open (hcl_t* hcl, const hcl_ooch_t* name, int flags)
 			if (!handle) 
 			{
 				hcl_bch_t* dash;
-				hcl_seterrbfmt (hcl, HCL_ESYSERR, "unable to open(ext) DL %js - %hs", name, sys_dl_error());
-				HCL_DEBUG3 (hcl, "Failed to open(ext) DL %hs[%js] - %hs\n", &bufptr[len], name, sys_dl_error());
+				const hcl_bch_t* dl_errstr;
+				dl_errstr = sys_dl_error();
+				HCL_DEBUG3 (hcl, "Failed to open(ext) DL %hs[%js] - %hs\n", &bufptr[len], name, dl_errstr);
+				hcl_seterrbfmt (hcl, HCL_ESYSERR, "unable to open(ext) DL %js - %hs", name, dl_errstr);
+
 				dash = hcl_rfindbchar(bufptr, hcl_countbcstr(bufptr), '-');
 				if (dash) 
 				{
@@ -537,13 +540,15 @@ static void* dl_open (hcl_t* hcl, const hcl_ooch_t* name, int flags)
 		bcslen = hcl_copybcstr(bufptr, bufcapa, name);
 	#endif
 
-		if (hcl_findbchar (bufptr, bcslen, '.'))
+		if (hcl_findbchar(bufptr, bcslen, '.'))
 		{
 			handle = sys_dl_open(bufptr);
 			if (!handle) 
 			{
-				hcl_seterrbfmt (hcl, HCL_ESYSERR, "unable to open DL %js - %hs", name, sys_dl_error());
-				HCL_DEBUG2 (hcl, "Failed to open DL %hs - %hs\n", bufptr, sys_dl_error());
+				const hcl_bch_t* dl_errstr;
+				dl_errstr = sys_dl_error();
+				HCL_DEBUG2 (hcl, "Failed to open DL %hs - %hs\n", bufptr, dl_errstr);
+				hcl_seterrbfmt (hcl, HCL_ESYSERR, "unable to open DL %js - %hs", name, dl_errstr);
 			}
 			else HCL_DEBUG2 (hcl, "Opened DL %hs handle %p\n", bufptr, handle);
 		}
@@ -552,8 +557,10 @@ static void* dl_open (hcl_t* hcl, const hcl_ooch_t* name, int flags)
 			handle = sys_dl_openext(bufptr);
 			if (!handle) 
 			{
-				hcl_seterrbfmt (hcl, HCL_ESYSERR, "unable to open(ext) DL %js - %hs", name, sys_dl_error());
-				HCL_DEBUG2 (hcl, "Failed to open(ext) DL %hs - %s\n", bufptr, sys_dl_error());
+				const hcl_bch_t* dl_errstr;
+				dl_errstr = sys_dl_error();
+				HCL_DEBUG2 (hcl, "Failed to open(ext) DL %hs - %s\n", bufptr, dl_errstr);
+				hcl_seterrbfmt (hcl, HCL_ESYSERR, "unable to open(ext) DL %js - %hs", name, dl_errstr);
 			}
 			else HCL_DEBUG2 (hcl, "Opened(ext) DL %hs handle %p\n", bufptr, handle);
 		}
@@ -642,7 +649,11 @@ static void* dl_getsym (hcl_t* hcl, void* handle, const hcl_ooch_t* name)
 				sym = sys_dl_getsym(handle, symname);
 				if (!sym)
 				{
-					hcl_seterrbfmt (hcl, HCL_ENOENT, "unable to get module symbol %hs", symname);
+					const hcl_bch_t* dl_errstr;
+					dl_errstr = sys_dl_error();
+					HCL_DEBUG3 (hcl, "Failed to get module symbol %js from handle %p - %hs\n", name, handle, dl_errstr);
+					hcl_seterrbfmt (hcl, HCL_ENOENT, "unable to get module symbol %hs - %hs", symname, dl_errstr);
+					
 				}
 			}
 		}

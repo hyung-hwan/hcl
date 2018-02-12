@@ -268,7 +268,7 @@ hcl_oop_t hcl_makedic (hcl_t* hcl, hcl_oow_t inisize)
 		obj->tally = HCL_SMOOI_TO_OOP(0);
 
 		hcl_pushtmp (hcl, (hcl_oop_t*)&obj);
-		bucket = (hcl_oop_oop_t)hcl_makearray (hcl, inisize);
+		bucket = (hcl_oop_oop_t)hcl_makearray(hcl, inisize);
 		hcl_poptmp (hcl);
 
 		if (!bucket) obj = HCL_NULL;
@@ -277,3 +277,20 @@ hcl_oop_t hcl_makedic (hcl_t* hcl, hcl_oow_t inisize)
 
 	return (hcl_oop_t)obj;
 }
+
+int hcl_walkdic (hcl_t* hcl, hcl_oop_dic_t dic, hcl_dic_walker_t walker, void* ctx)
+{
+	hcl_oow_t i;
+
+	hcl_pushtmp (hcl, (hcl_oop_t*)&dic);
+
+	for (i = 0; i < HCL_OBJ_GET_SIZE(dic->bucket); i++)
+	{
+		hcl_oop_t tmp = dic->bucket->slot[i];
+		if (HCL_IS_CONS(hcl, tmp) && walker(hcl, dic, (hcl_oop_cons_t)tmp, ctx) <= -1) return -1;
+	}
+
+	hcl_poptmp (hcl);
+	return 0;
+}
+

@@ -296,6 +296,7 @@ next:
 				 * the variable p is */
 				ps.type = PRINT_STACK_CONS;
 				ps.obj = HCL_CONS_CDR(cur);
+				ps.idx = concode; /* this is not an index but use this field to restore concode */
 				x = push (hcl, &ps);
 				if (x <= -1) return -1;
 
@@ -309,6 +310,7 @@ next:
 			resume_cons:
 				HCL_ASSERT (hcl, ps.type == PRINT_STACK_CONS);
 				cur = ps.obj; /* Get back the CDR pushed */
+				concode = ps.idx; /* restore the concode */
 				if (HCL_IS_NIL(hcl,cur)) 
 				{
 					/* The CDR part points to a NIL object, which

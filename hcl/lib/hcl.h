@@ -77,24 +77,6 @@ enum hcl_errnum_t
 	HCL_EECERR,    /**< encoding conversion error */
 	HCL_EBUFFULL,  /**< buffer full */
 
-#if 0
-	HCL_EINVAL,   /**< invalid parameter or data */
-	HCL_ETOOBIG,  /**< data too large */
-	HCL_EPERM,    /**< operation not permitted */
-	HCL_ERANGE,   /**< range error. overflow and underflow */
-	HCL_ENOENT,   /**< no matching entry */
-	HCL_EEXIST,   /**< duplicate entry */
-	HCL_EBCFULL,  /**< byte-code full */
-	HCL_EDFULL,   /**< dictionary full */
-	HCL_EPFULL,   /**< processor full */
-	HCL_ESHFULL,  /**< semaphore heap full */
-	HCL_ESLFULL,  /**< semaphore list full */
-	HCL_EDIVBY0,  /**< divide by zero */
-	HCL_EIOERR,   /**< I/O error */
-	HCL_EECERR,   /**< encoding conversion error */
-	HCL_EFINIS,   /**< end of data/input/stream/etc */
-#endif
-
 	HCL_ESYNERR,  /**< syntax error */
 	HCL_ECALL,    /**< runtime error - cannot call */
 	HCL_ERECALL,  /**< runtime error - cannot call again */
@@ -493,10 +475,20 @@ struct hcl_trailer_t
 	hcl_oob_t slot[1];
 };
 
-#define HCL_SET_NAMED_INSTVARS 2
-typedef struct hcl_set_t hcl_set_t;
-typedef struct hcl_set_t* hcl_oop_dic_t;
-struct hcl_set_t
+#define HCL_CONS_NAMED_INSTVARS 2
+typedef struct hcl_cons_t hcl_cons_t;
+typedef struct hcl_cons_t* hcl_oop_cons_t;
+struct hcl_cons_t
+{
+	HCL_OBJ_HEADER;
+	hcl_oop_t car;
+	hcl_oop_t cdr;
+};
+
+#define HCL_DIC_NAMED_INSTVARS 2
+typedef struct hcl_dic_t hcl_dic_t;
+typedef struct hcl_dic_t* hcl_oop_dic_t;
+struct hcl_dic_t
 {
 	HCL_OBJ_HEADER;
 	hcl_oop_t     tally;  /* SmallInteger */
@@ -869,20 +861,9 @@ struct hcl_pfinfo_t
 
 typedef struct hcl_mod_t hcl_mod_t;
 
-enum hcl_mod_hint_t
-{
-	HCL_MOD_LOAD_FOR_IMPORT = (1 << 0)
-};
-typedef enum hcl_mod_hint_t hcl_mod_hint_t;
-
 typedef int (*hcl_mod_load_t) (
 	hcl_t*     hcl,
 	hcl_mod_t* mod
-);
-
-typedef int (*hcl_mod_import_t) (
-	hcl_t*           hcl,
-	hcl_mod_t*       mod
 );
 
 typedef hcl_pfbase_t* (*hcl_mod_query_t) (
@@ -909,7 +890,6 @@ struct hcl_mod_t
 	/*const*/ int hints; /* bitwised-ORed of hcl_mod_hint_t enumerators */
 
 	/* user-defined data */
-	hcl_mod_import_t import;
 	hcl_mod_query_t  query;
 	hcl_mod_unload_t unload;
 	hcl_mod_gc_t     gc;
@@ -1138,6 +1118,647 @@ struct hcl_t
 #define HCL_STACK_SETRETTORCV(hcl,nargs) (HCL_STACK_POPS(hcl, nargs))
 
 
+/* =========================================================================
+ * HCL VM LOGGING
+ * ========================================================================= */
+
+enum hcl_log_mask_t
+{
+	HCL_LOG_DEBUG      = (1 << 0),
+	HCL_LOG_INFO       = (1 << 1),
+	HCL_LOG_WARN       = (1 << 2),
+	HCL_LOG_ERROR      = (1 << 3),
+	HCL_LOG_FATAL      = (1 << 4),
+
+	HCL_LOG_UNTYPED    = (1 << 6), /* only to be used by HCL_DEBUGx() and HCL_INFOx() */
+	HCL_LOG_COMPILER   = (1 << 7),
+	HCL_LOG_VM         = (1 << 8),
+	HCL_LOG_MNEMONIC   = (1 << 9), /* bytecode mnemonic */
+	HCL_LOG_GC         = (1 << 10),
+	HCL_LOG_IC         = (1 << 11), /* instruction cycle, fetch-decode-execute */
+	HCL_LOG_PRIMITIVE  = (1 << 12),
+	HCL_LOG_APP        = (1 << 13), /* hcl applications, set by hcl logging primitive */
+
+	HCL_LOG_ALL_LEVELS = (HCL_LOG_DEBUG  | HCL_LOG_INFO | HCL_LOG_WARN | HCL_LOG_ERROR | HCL_LOG_FATAL),
+	HCL_LOG_ALL_TYPES  = (HCL_LOG_UNTYPED | HCL_LOG_COMPILER | HCL_LOG_VM | HCL_LOG_MNEMONIC | HCL_LOG_GC | HCL_LOG_IC | HCL_LOG_PRIMITIVE | HCL_LOG_APP),
+
+
+	HCL_LOG_STDOUT     = (1 << 14), /* write log messages to stdout without timestamp. HCL_LOG_STDOUT wins over HCL_LOG_STDERR. */
+	HCL_LOG_STDERR     = (1 << 15)  /* write log messages to stderr without timestamp. */
+
+};
+typedef enum hcl_log_mask_t hcl_log_mask_t;
+
+/* all bits must be set to get enabled */
+#define HCL_LOG_ENABLED(hcl,mask) (((hcl)->option.log_mask & (mask)) == (mask))
+
+#define HCL_LOG0(hcl,mask,fmt) do { if (HCL_LOG_ENABLED(hcl,mask)) hcl_logbfmt(hcl, mask, fmt); } while(0)
+#define HCL_LOG1(hcl,mask,fmt,a1) do { if (HCL_LOG_ENABLED(hcl,mask)) hcl_logbfmt(hcl, mask, fmt, a1); } while(0)
+#define HCL_LOG2(hcl,mask,fmt,a1,a2) do { if (HCL_LOG_ENABLED(hcl,mask)) hcl_logbfmt(hcl, mask, fmt, a1, a2); } while(0)
+#define HCL_LOG3(hcl,mask,fmt,a1,a2,a3) do { if (HCL_LOG_ENABLED(hcl,mask)) hcl_logbfmt(hcl, mask, fmt, a1, a2, a3); } while(0)
+#define HCL_LOG4(hcl,mask,fmt,a1,a2,a3,a4) do { if (HCL_LOG_ENABLED(hcl,mask)) hcl_logbfmt(hcl, mask, fmt, a1, a2, a3, a4); } while(0)
+#define HCL_LOG5(hcl,mask,fmt,a1,a2,a3,a4,a5) do { if (HCL_LOG_ENABLED(hcl,mask)) hcl_logbfmt(hcl, mask, fmt, a1, a2, a3, a4, a5); } while(0)
+#define HCL_LOG6(hcl,mask,fmt,a1,a2,a3,a4,a5,a6) do { if (HCL_LOG_ENABLED(hcl,mask)) hcl_logbfmt(hcl, mask, fmt, a1, a2, a3, a4, a5, a6); } while(0)
+
+#if defined(NDEBUG)
+	/* [NOTE]
+	 *  get rid of debugging message totally regardless of
+	 *  the log mask in the release build.
+	 */
+#	define HCL_DEBUG0(hcl,fmt)
+#	define HCL_DEBUG1(hcl,fmt,a1)
+#	define HCL_DEBUG2(hcl,fmt,a1,a2)
+#	define HCL_DEBUG3(hcl,fmt,a1,a2,a3)
+#	define HCL_DEBUG4(hcl,fmt,a1,a2,a3,a4)
+#	define HCL_DEBUG5(hcl,fmt,a1,a2,a3,a4,a5)
+#	define HCL_DEBUG6(hcl,fmt,a1,a2,a3,a4,a5,a6)
+#else
+#	define HCL_DEBUG0(hcl,fmt) HCL_LOG0(hcl, HCL_LOG_DEBUG | HCL_LOG_UNTYPED, fmt)
+#	define HCL_DEBUG1(hcl,fmt,a1) HCL_LOG1(hcl, HCL_LOG_DEBUG | HCL_LOG_UNTYPED, fmt, a1)
+#	define HCL_DEBUG2(hcl,fmt,a1,a2) HCL_LOG2(hcl, HCL_LOG_DEBUG | HCL_LOG_UNTYPED, fmt, a1, a2)
+#	define HCL_DEBUG3(hcl,fmt,a1,a2,a3) HCL_LOG3(hcl, HCL_LOG_DEBUG | HCL_LOG_UNTYPED, fmt, a1, a2, a3)
+#	define HCL_DEBUG4(hcl,fmt,a1,a2,a3,a4) HCL_LOG4(hcl, HCL_LOG_DEBUG | HCL_LOG_UNTYPED, fmt, a1, a2, a3, a4)
+#	define HCL_DEBUG5(hcl,fmt,a1,a2,a3,a4,a5) HCL_LOG5(hcl, HCL_LOG_DEBUG | HCL_LOG_UNTYPED, fmt, a1, a2, a3, a4, a5)
+#	define HCL_DEBUG6(hcl,fmt,a1,a2,a3,a4,a5,a6) HCL_LOG6(hcl, HCL_LOG_DEBUG | HCL_LOG_UNTYPED, fmt, a1, a2, a3, a4, a5, a6)
+#endif
+
+#define HCL_INFO0(hcl,fmt) HCL_LOG0(hcl, HCL_LOG_INFO | HCL_LOG_UNTYPED, fmt)
+#define HCL_INFO1(hcl,fmt,a1) HCL_LOG1(hcl, HCL_LOG_INFO | HCL_LOG_UNTYPED, fmt, a1)
+#define HCL_INFO2(hcl,fmt,a1,a2) HCL_LOG2(hcl, HCL_LOG_INFO | HCL_LOG_UNTYPED, fmt, a1, a2)
+#define HCL_INFO3(hcl,fmt,a1,a2,a3) HCL_LOG3(hcl, HCL_LOG_INFO | HCL_LOG_UNTYPED, fmt, a1, a2, a3)
+#define HCL_INFO4(hcl,fmt,a1,a2,a3,a4) HCL_LOG4(hcl, HCL_LOG_INFO | HCL_LOG_UNTYPED, fmt, a1, a2, a3, a4)
+#define HCL_INFO5(hcl,fmt,a1,a2,a3,a4,a5) HCL_LOG5(hcl, HCL_LOG_INFO | HCL_LOG_UNTYPED, fmt, a1, a2, a3, a4, a5)
+#define HCL_INFO6(hcl,fmt,a1,a2,a3,a4,a5,a6) HCL_LOG6(hcl, HCL_LOG_INFO | HCL_LOG_UNTYPED, fmt, a1, a2, a3, a4, a5, a6)
+
+
+/* =========================================================================
+ * HCL ASSERTION
+ * ========================================================================= */
+#if defined(NDEBUG)
+#	define HCL_ASSERT(hcl,expr) ((void)0)
+#else
+#	define HCL_ASSERT(hcl,expr) ((void)((expr) || (hcl_assertfailed (hcl, #expr, __FILE__, __LINE__), 0)))
+#endif
+
+/* =========================================================================
+ * HCL COMMON OBJECTS
+ * ========================================================================= */
+enum 
+{
+	HCL_BRAND_NIL = 1,
+	HCL_BRAND_TRUE,
+	HCL_BRAND_FALSE,
+	HCL_BRAND_CHARACTER,
+	HCL_BRAND_INTEGER,
+	HCL_BRAND_CONS,
+	HCL_BRAND_ARRAY,
+	HCL_BRAND_BYTE_ARRAY,
+	HCL_BRAND_SYMBOL_ARRAY, /* special. internal use only */
+	HCL_BRAND_SYMBOL,
+	HCL_BRAND_STRING,
+	HCL_BRAND_DIC,
+
+	HCL_BRAND_CFRAME,/* compiler frame */
+	HCL_BRAND_PRIM,
+
+	HCL_BRAND_CONTEXT,
+	HCL_BRAND_PROCESS,
+	HCL_BRAND_PROCESS_SCHEDULER,
+	HCL_BRAND_SEMAPHORE
+};
+
+enum
+{
+	/* SYNCODE 0 means it's not a syncode object. so it begins with 1 */
+	HCL_SYNCODE_BREAK = 1,
+	HCL_SYNCODE_DEFUN,
+	HCL_SYNCODE_DO,
+	HCL_SYNCODE_ELIF,
+	HCL_SYNCODE_ELSE,
+	HCL_SYNCODE_IF,
+	HCL_SYNCODE_LAMBDA,
+	HCL_SYNCODE_RETURN,
+	HCL_SYNCODE_SET,
+	HCL_SYNCODE_UNTIL,
+	HCL_SYNCODE_WHILE
+};
+
+
+enum
+{
+	/* these can be set in the SYNCODE flags for cons cells */
+	HCL_CONCODE_XLIST = 0,  /* () - executable list */
+	HCL_CONCODE_ARRAY,      /* #() */
+	HCL_CONCODE_BYTEARRAY,  /* #[] */
+	HCL_CONCODE_DIC,        /* #{} */
+	HCL_CONCODE_QLIST       /* '() - quoted list, data list */
+};
+
+#define HCL_IS_NIL(hcl,v) (v == (hcl)->_nil)
+#define HCL_IS_TRUE(hcl,v) (v == (hcl)->_true)
+#define HCL_IS_FALSE(hcl,v) (v == (hcl)->_false)
+#define HCL_IS_INTEGER(hcl,v) (HCL_OOP_IS_POINTER(v) && HCL_OBJ_GET_FLAGS_BRAND(v) == HCL_BRAND_INTEGER)
+#define HCL_IS_SYMBOL(hcl,v) (HCL_OOP_IS_POINTER(v) && HCL_OBJ_GET_FLAGS_BRAND(v) == HCL_BRAND_SYMBOL)
+#define HCL_IS_SYMBOL_ARRAY(hcl,v) (HCL_OOP_IS_POINTER(v) && HCL_OBJ_GET_FLAGS_BRAND(v) == HCL_BRAND_SYMBOL_ARRAY)
+#define HCL_IS_CONTEXT(hcl,v) (HCL_OOP_IS_POINTER(v) && HCL_OBJ_GET_FLAGS_BRAND(v) == HCL_BRAND_CONTEXT)
+#define HCL_IS_PROCESS(hcl,v) (HCL_OOP_IS_POINTER(v) && HCL_OBJ_GET_FLAGS_BRAND(v) == HCL_BRAND_PROCESS)
+#define HCL_IS_CONS(hcl,v) (HCL_OOP_IS_POINTER(v) && HCL_OBJ_GET_FLAGS_BRAND(v) == HCL_BRAND_CONS)
+#define HCL_IS_CONS_XLIST(hcl,v) (HCL_IS_CONS(hcl,v) && HCL_OBJ_GET_FLAGS_SYNCODE(v) == HCL_CONCODE_XLIST)
+#define HCL_IS_ARRAY(hcl,v) (HCL_OOP_IS_POINTER(v) && HCL_OBJ_GET_FLAGS_BRAND(v) == HCL_BRAND_ARRAY)
+#define HCL_IS_DIC(hcl,v) (HCL_OOP_IS_POINTER(v) && HCL_OBJ_GET_FLAGS_BRAND(v) == HCL_BRAND_DIC)
+#define HCL_IS_PRIM(hcl,v) (HCL_OOP_IS_POINTER(v) && HCL_OBJ_GET_FLAGS_BRAND(v) == HCL_BRAND_PRIM)
+
+#define HCL_CONS_CAR(v)  (((hcl_cons_t*)(v))->car)
+#define HCL_CONS_CDR(v)  (((hcl_cons_t*)(v))->cdr)
+
+typedef int (*hcl_dic_walker_t) (
+	hcl_t*          hcl,
+	hcl_oop_dic_t   dic,
+	hcl_oop_cons_t  pair,
+	void*           ctx
+);
+
+#if defined(__cplusplus)
+extern "C" {
+#endif
+
+#define hcl_switchprocess(hcl) ((hcl)->switch_proc = 1)
+
+HCL_EXPORT hcl_t* hcl_open (
+	hcl_mmgr_t*         mmgr,
+	hcl_oow_t           xtnsize,
+	hcl_oow_t           heapsize,
+	const hcl_vmprim_t* vmprim,
+	hcl_errnum_t*       errnum
+);
+
+HCL_EXPORT void hcl_close (
+	hcl_t* vm
+);
+
+HCL_EXPORT int hcl_init (
+	hcl_t*              vm,
+	hcl_mmgr_t*         mmgr,
+	hcl_oow_t           heapsize,
+	const hcl_vmprim_t* vmprim
+);
+
+HCL_EXPORT void hcl_fini (
+	hcl_t* vm
+);
+
+
+#if defined(HCL_HAVE_INLINE)
+	static HCL_INLINE hcl_mmgr_t* hcl_getmmgr (hcl_t* hcl) { return hcl->mmgr; }
+	static HCL_INLINE void* hcl_getxtn (hcl_t* hcl) { return (void*)(hcl + 1); }
+
+	/*static HCL_INLINE hcl_cmgr_t* hcl_getcmgr (hcl_t* hcl) { return hcl->cmgr; }
+	static HCL_INLINE void hcl_setcmgr (hcl_t* hcl, hcl_cmgr_t* cmgr) { hcl->cmgr = cmgr; }*/
+
+	static HCL_INLINE hcl_errnum_t hcl_geterrnum (hcl_t* hcl) { return hcl->errnum; }
+	static HCL_INLINE void hcl_seterrnum (hcl_t* hcl, hcl_errnum_t errnum) { hcl->errnum = errnum; hcl->errmsg.len = 0; }
+#else
+#	define hcl_getmmgr(hcl) ((hcl)->mmgr)
+#	define hcl_getxtn(hcl) ((void*)((hcl) + 1))
+
+#	define hcl_getcmgr(hcl) ((hcl)->cmgr)
+#	define hcl_setcmgr(hcl,mgr) ((hcl)->cmgr = (mgr))
+
+#	define hcl_geterrnum(hcl) ((hcl)->errnum)
+#	define hcl_seterrnum(hcl,num) ((hcl)->errmsg.len = 0, (hcl)->errnum = (num))
+#endif
+
+HCL_EXPORT void hcl_seterrbfmt (
+	hcl_t*           hcl,
+	hcl_errnum_t     errnum,
+	const hcl_bch_t* fmt,
+	...
+);
+
+HCL_EXPORT void hcl_seterrufmt (
+	hcl_t*           hcl,
+	hcl_errnum_t     errnum,
+	const hcl_uch_t* fmt,
+	...
+);
+
+HCL_EXPORT void hcl_seterrwithsyserr (
+	hcl_t* hcl,
+	int    syserr
+);
+
+HCL_EXPORT const hcl_ooch_t* hcl_geterrstr (
+	hcl_t* hcl
+);
+
+HCL_EXPORT const hcl_ooch_t* hcl_geterrmsg (
+	hcl_t* hcl
+);
+
+HCL_EXPORT const hcl_ooch_t* hcl_backuperrmsg (
+	hcl_t* hcl
+);
+
+/**
+ * The hcl_getoption() function gets the value of an option
+ * specified by \a id into the buffer pointed to by \a value.
+ *
+ * \return 0 on success, -1 on failure
+ */
+HCL_EXPORT int hcl_getoption (
+	hcl_t*         hcl,
+	hcl_option_t   id,
+	void*          value
+);
+
+/**
+ * The hcl_setoption() function sets the value of an option 
+ * specified by \a id to the value pointed to by \a value.
+ *
+ * \return 0 on success, -1 on failure
+ */
+HCL_EXPORT int hcl_setoption (
+	hcl_t*        hcl,
+	hcl_option_t  id,
+	const void*   value
+);
+
+
+HCL_EXPORT hcl_cb_t* hcl_regcb (
+	hcl_t*    hcl,
+	hcl_cb_t* tmpl
+);
+
+HCL_EXPORT void hcl_deregcb (
+	hcl_t*    hcl,
+	hcl_cb_t* cb
+);
+
+/**
+ * The hcl_gc() function performs garbage collection.
+ * It is not affected by #HCL_NOGC.
+ */
+HCL_EXPORT void hcl_gc (
+	hcl_t* hcl
+);
+
+HCL_EXPORT hcl_oow_t hcl_getpayloadbytes (
+	hcl_t*    hcl,
+	hcl_oop_t oop
+);
+
+HCL_EXPORT hcl_oop_t hcl_instantiate (
+	hcl_t*          hcl,
+	hcl_oop_t       _class,
+	const void*      vptr,
+	hcl_oow_t       vlen
+);
+
+HCL_EXPORT hcl_oop_t hcl_shallowcopy (
+	hcl_t*          hcl,
+	hcl_oop_t       oop
+);
+
+/**
+ * The hcl_ignite() function creates key initial objects.
+ */
+HCL_EXPORT int hcl_ignite (
+	hcl_t* hcl
+);
+
+/**
+ * The hcl_execute() function executes an activated context.
+ */
+HCL_EXPORT int hcl_execute (
+	hcl_t* hcl
+);
+
+HCL_EXPORT int hcl_executefromip (
+	hcl_t*    hcl,
+	hcl_ooi_t initial_ip
+);
+
+/**
+ * The hcl_invoke() function sends a message named \a mthname to an object
+ * named \a objname.
+ */
+HCL_EXPORT int hcl_invoke (
+	hcl_t*            hcl,
+	const hcl_oocs_t* objname,
+	const hcl_oocs_t* mthname
+);
+
+
+HCL_EXPORT int hcl_attachio (
+	hcl_t*       hcl,
+	hcl_ioimpl_t reader,
+	hcl_ioimpl_t printer
+);
+
+HCL_EXPORT void hcl_detachio (
+	hcl_t*       hcl
+);
+
+
+HCL_EXPORT hcl_oop_t hcl_read (
+	hcl_t*       hcl
+);
+
+HCL_EXPORT int hcl_print (
+	hcl_t*       hcl,
+	hcl_oop_t    obj
+);
+
+HCL_EXPORT int hcl_compile (
+	hcl_t*       hcl,
+	hcl_oop_t    obj
+);
+
+HCL_EXPORT int hcl_decode (
+	hcl_t*            hcl,
+	hcl_ooi_t         start,
+	hcl_ooi_t         end
+);
+
+/* =========================================================================
+ * SYNTAX ERROR HANDLING
+ * ========================================================================= */
+HCL_EXPORT void hcl_getsynerr (
+	hcl_t*             hcl,
+	hcl_synerr_t*      synerr
+);
+
+
+HCL_EXPORT void hcl_setsynerrbfmt (
+	hcl_t*              hcl,
+	hcl_synerrnum_t     num,
+	const hcl_ioloc_t*  loc,
+	const hcl_oocs_t*   tgt,
+	const hcl_bch_t*    msgfmt,
+	...
+);
+
+HCL_EXPORT void hcl_setsynerrufmt (
+	hcl_t*              hcl,
+	hcl_synerrnum_t     num,
+	const hcl_ioloc_t*  loc,
+	const hcl_oocs_t*   tgt,
+	const hcl_uch_t*    msgfmt,
+	...
+);
+
+#if defined(HCL_HAVE_INLINE)
+	static HCL_INLINE void hcl_setsynerr (hcl_t* hcl,	hcl_synerrnum_t num, const hcl_ioloc_t* loc,	const hcl_oocs_t* tgt)
+	{
+		hcl_setsynerrbfmt (hcl, num, loc, tgt, HCL_NULL);
+	}
+#else
+#	define hcl_setsynerr(hcl,num,loc,tgt) hcl_setsynerrbfmt(hcl,num,loc,tgt,HCL_NULL)
+#endif
+
+/* =========================================================================
+ * TEMPORARY OOP MANAGEMENT FUNCTIONS
+ * ========================================================================= */
+HCL_EXPORT void hcl_pushtmp (
+	hcl_t*     hcl,
+	hcl_oop_t* oop_ptr
+);
+
+HCL_EXPORT void hcl_poptmp (
+	hcl_t*     hcl
+);
+
+HCL_EXPORT void hcl_poptmps (
+	hcl_t*     hcl,
+	hcl_oow_t  count
+);
+
+/* =========================================================================
+ * SYSTEM MEMORY MANAGEMENT FUCNTIONS VIA MMGR
+ * ========================================================================= */
+HCL_EXPORT void* hcl_allocmem (
+	hcl_t*     hcl,
+	hcl_oow_t size
+);
+
+HCL_EXPORT void* hcl_callocmem (
+	hcl_t*     hcl,
+	hcl_oow_t size
+);
+
+HCL_EXPORT void* hcl_reallocmem (
+	hcl_t*     hcl,
+	void*       ptr,
+	hcl_oow_t size
+);
+
+HCL_EXPORT void hcl_freemem (
+	hcl_t* hcl,
+	void*   ptr
+);
+
+
+/* =========================================================================
+ * PRIMITIVE FUNCTION MANIPULATION
+ * ========================================================================= */
+HCL_EXPORT hcl_pfbase_t* hcl_findpfbase (
+	hcl_t*              hcl,
+	hcl_pfinfo_t*       pfinfo,
+	hcl_oow_t           pfcount,
+	const hcl_ooch_t*   name,
+	hcl_oow_t           namelen
+);
+
+
+/* =========================================================================
+ * LOGGING
+ * ========================================================================= */
+HCL_EXPORT hcl_ooi_t hcl_logbfmt (
+	hcl_t*           hcl,
+	hcl_oow_t        mask,
+	const hcl_bch_t* fmt,
+	...
+);
+
+HCL_EXPORT hcl_ooi_t hcl_logoofmt (
+	hcl_t*            hcl,
+	hcl_oow_t         mask,
+	const hcl_ooch_t* fmt,
+	...
+);
+
+#if defined(HCL_OOCH_IS_UCH)
+#	define hcl_logoofmt hcl_logufmt
+#else
+#	define hcl_logoofmt hcl_logbfmt
+#endif
+
+
+/* =========================================================================
+ * OBJECT MANAGEMENT
+ * ========================================================================= */
+HCL_EXPORT hcl_oop_t hcl_makenil (
+	hcl_t*     hcl
+);
+
+HCL_EXPORT hcl_oop_t hcl_maketrue (
+	hcl_t*     hcl
+);
+
+HCL_EXPORT hcl_oop_t hcl_makefalse (
+	hcl_t*     hcl
+);
+
+HCL_EXPORT hcl_oop_t hcl_makeinteger (
+	hcl_t*     hcl,
+	hcl_ooi_t  v
+);
+
+HCL_EXPORT hcl_oop_t hcl_makecons (
+	hcl_t*     hcl,
+	hcl_oop_t  car,
+	hcl_oop_t  cdr
+);
+
+HCL_EXPORT hcl_oop_t hcl_makearray (
+	hcl_t*     hcl,
+	hcl_oow_t  size
+);
+
+HCL_EXPORT hcl_oop_t hcl_makebytearray (
+	hcl_t*           hcl,
+	const hcl_oob_t* ptr,
+	hcl_oow_t        len
+);
+
+HCL_EXPORT hcl_oop_t hcl_makestring (
+	hcl_t*            hcl,
+	const hcl_ooch_t* ptr,
+	hcl_oow_t         len
+);
+
+HCL_EXPORT hcl_oop_t hcl_makedic (
+	hcl_t*            hcl, 
+	hcl_oow_t         inisize /* initial bucket size */
+);
+
+HCL_EXPORT hcl_oop_t hcl_makeprocess (
+	hcl_t*            hcl, 
+	hcl_oow_t         stksize
+);
+
+HCL_EXPORT hcl_oop_t hcl_makecontext (
+	hcl_t*            hcl,
+	hcl_ooi_t         ntmprs
+);
+
+
+HCL_EXPORT void hcl_freengcobj (
+	hcl_t*           hcl,
+	hcl_oop_t        obj
+);
+
+HCL_EXPORT hcl_oop_t hcl_makengcbytearray (
+	hcl_t*           hcl,
+	const hcl_oob_t* ptr,
+	hcl_oow_t        len
+);
+
+HCL_EXPORT hcl_oop_t hcl_remakengcbytearray (
+	hcl_t*           hcl,
+	hcl_oop_t        obj,
+	hcl_oow_t        newsz
+);
+
+HCL_EXPORT hcl_oop_t hcl_makengcarray (
+	hcl_t*           hcl,
+	hcl_oow_t        len
+);
+
+HCL_EXPORT hcl_oop_t hcl_remakengcarray (
+	hcl_t*           hcl,
+	hcl_oop_t        obj,
+	hcl_oow_t        newsz
+);
+
+
+HCL_EXPORT hcl_oop_t hcl_makeprim (
+	hcl_t*          hcl,
+	hcl_pfimpl_t    primimpl,
+	hcl_oow_t       minargs,
+	hcl_oow_t       maxargs
+);
+
+/* =========================================================================
+ * CONS OBJECT UTILITIES
+ * ========================================================================= */
+HCL_EXPORT hcl_oow_t hcl_countcons (
+	hcl_t*           hcl,
+	hcl_oop_t        cons
+);
+
+
+HCL_EXPORT hcl_oop_t hcl_getlastconscdr (
+	hcl_t*           hcl,
+	hcl_oop_t        cons
+);
+
+HCL_EXPORT hcl_oop_t hcl_reversecons (
+	hcl_t*           hcl,
+	hcl_oop_t        cons
+);
+
+/* =========================================================================
+ * DICTIONARY ACCESS FUNCTIONS
+ * ========================================================================= */
+HCL_EXPORT hcl_oop_cons_t hcl_putatsysdic (
+	hcl_t*     hcl,
+	hcl_oop_t  key,
+	hcl_oop_t  value
+);
+
+HCL_EXPORT hcl_oop_cons_t hcl_getatsysdic (
+	hcl_t*     hcl,
+	hcl_oop_t  key
+);
+
+HCL_EXPORT hcl_oop_cons_t hcl_putatdic (
+	hcl_t*        hcl,
+	hcl_oop_dic_t dic,
+	hcl_oop_t     key,
+	hcl_oop_t     value
+);
+
+HCL_EXPORT hcl_oop_cons_t hcl_getatdic (
+	hcl_t*        hcl,
+	hcl_oop_dic_t dic,
+	hcl_oop_t     key
+);
+
+HCL_EXPORT int hcl_walkdic (
+	hcl_t*           hcl,
+	hcl_oop_dic_t    dic,
+	hcl_dic_walker_t walker,
+	void*            ctx
+);
+
+
+
+/* =========================================================================
+ * OBJECT HASHING AND COMPARISION
+ * ========================================================================= */
+
+HCL_EXPORT int hcl_hashobj (
+	hcl_t*     hcl, 
+	hcl_oop_t  obj, 
+	hcl_oow_t* xhv
+);
+
+HCL_EXPORT int hcl_equalobjs (
+	hcl_t*     hcl,
+	hcl_oop_t  rcv,
+	hcl_oop_t  arg
+);
 
 
 /* =========================================================================
@@ -1298,587 +1919,10 @@ HCL_EXPORT hcl_bch_t* hcl_dupbchars (
 	hcl_oow_t        bcslen
 );
 
-/* =========================================================================
- * HCL VM LOGGING
- * ========================================================================= */
-
-enum hcl_log_mask_t
-{
-	HCL_LOG_DEBUG      = (1 << 0),
-	HCL_LOG_INFO       = (1 << 1),
-	HCL_LOG_WARN       = (1 << 2),
-	HCL_LOG_ERROR      = (1 << 3),
-	HCL_LOG_FATAL      = (1 << 4),
-
-	HCL_LOG_UNTYPED    = (1 << 6), /* only to be used by HCL_DEBUGx() and HCL_INFOx() */
-	HCL_LOG_COMPILER   = (1 << 7),
-	HCL_LOG_VM         = (1 << 8),
-	HCL_LOG_MNEMONIC   = (1 << 9), /* bytecode mnemonic */
-	HCL_LOG_GC         = (1 << 10),
-	HCL_LOG_IC         = (1 << 11), /* instruction cycle, fetch-decode-execute */
-	HCL_LOG_PRIMITIVE  = (1 << 12),
-	HCL_LOG_APP        = (1 << 13), /* hcl applications, set by hcl logging primitive */
-
-	HCL_LOG_ALL_LEVELS = (HCL_LOG_DEBUG  | HCL_LOG_INFO | HCL_LOG_WARN | HCL_LOG_ERROR | HCL_LOG_FATAL),
-	HCL_LOG_ALL_TYPES  = (HCL_LOG_UNTYPED | HCL_LOG_COMPILER | HCL_LOG_VM | HCL_LOG_MNEMONIC | HCL_LOG_GC | HCL_LOG_IC | HCL_LOG_PRIMITIVE | HCL_LOG_APP),
-
-
-	HCL_LOG_STDOUT     = (1 << 14), /* write log messages to stdout without timestamp. HCL_LOG_STDOUT wins over HCL_LOG_STDERR. */
-	HCL_LOG_STDERR     = (1 << 15)  /* write log messages to stderr without timestamp. */
-
-};
-typedef enum hcl_log_mask_t hcl_log_mask_t;
-
-/* all bits must be set to get enabled */
-#define HCL_LOG_ENABLED(hcl,mask) (((hcl)->option.log_mask & (mask)) == (mask))
-
-#define HCL_LOG0(hcl,mask,fmt) do { if (HCL_LOG_ENABLED(hcl,mask)) hcl_logbfmt(hcl, mask, fmt); } while(0)
-#define HCL_LOG1(hcl,mask,fmt,a1) do { if (HCL_LOG_ENABLED(hcl,mask)) hcl_logbfmt(hcl, mask, fmt, a1); } while(0)
-#define HCL_LOG2(hcl,mask,fmt,a1,a2) do { if (HCL_LOG_ENABLED(hcl,mask)) hcl_logbfmt(hcl, mask, fmt, a1, a2); } while(0)
-#define HCL_LOG3(hcl,mask,fmt,a1,a2,a3) do { if (HCL_LOG_ENABLED(hcl,mask)) hcl_logbfmt(hcl, mask, fmt, a1, a2, a3); } while(0)
-#define HCL_LOG4(hcl,mask,fmt,a1,a2,a3,a4) do { if (HCL_LOG_ENABLED(hcl,mask)) hcl_logbfmt(hcl, mask, fmt, a1, a2, a3, a4); } while(0)
-#define HCL_LOG5(hcl,mask,fmt,a1,a2,a3,a4,a5) do { if (HCL_LOG_ENABLED(hcl,mask)) hcl_logbfmt(hcl, mask, fmt, a1, a2, a3, a4, a5); } while(0)
-#define HCL_LOG6(hcl,mask,fmt,a1,a2,a3,a4,a5,a6) do { if (HCL_LOG_ENABLED(hcl,mask)) hcl_logbfmt(hcl, mask, fmt, a1, a2, a3, a4, a5, a6); } while(0)
-
-#if defined(NDEBUG)
-	/* [NOTE]
-	 *  get rid of debugging message totally regardless of
-	 *  the log mask in the release build.
-	 */
-#	define HCL_DEBUG0(hcl,fmt)
-#	define HCL_DEBUG1(hcl,fmt,a1)
-#	define HCL_DEBUG2(hcl,fmt,a1,a2)
-#	define HCL_DEBUG3(hcl,fmt,a1,a2,a3)
-#	define HCL_DEBUG4(hcl,fmt,a1,a2,a3,a4)
-#	define HCL_DEBUG5(hcl,fmt,a1,a2,a3,a4,a5)
-#	define HCL_DEBUG6(hcl,fmt,a1,a2,a3,a4,a5,a6)
-#else
-#	define HCL_DEBUG0(hcl,fmt) HCL_LOG0(hcl, HCL_LOG_DEBUG | HCL_LOG_UNTYPED, fmt)
-#	define HCL_DEBUG1(hcl,fmt,a1) HCL_LOG1(hcl, HCL_LOG_DEBUG | HCL_LOG_UNTYPED, fmt, a1)
-#	define HCL_DEBUG2(hcl,fmt,a1,a2) HCL_LOG2(hcl, HCL_LOG_DEBUG | HCL_LOG_UNTYPED, fmt, a1, a2)
-#	define HCL_DEBUG3(hcl,fmt,a1,a2,a3) HCL_LOG3(hcl, HCL_LOG_DEBUG | HCL_LOG_UNTYPED, fmt, a1, a2, a3)
-#	define HCL_DEBUG4(hcl,fmt,a1,a2,a3,a4) HCL_LOG4(hcl, HCL_LOG_DEBUG | HCL_LOG_UNTYPED, fmt, a1, a2, a3, a4)
-#	define HCL_DEBUG5(hcl,fmt,a1,a2,a3,a4,a5) HCL_LOG5(hcl, HCL_LOG_DEBUG | HCL_LOG_UNTYPED, fmt, a1, a2, a3, a4, a5)
-#	define HCL_DEBUG6(hcl,fmt,a1,a2,a3,a4,a5,a6) HCL_LOG6(hcl, HCL_LOG_DEBUG | HCL_LOG_UNTYPED, fmt, a1, a2, a3, a4, a5, a6)
-#endif
-
-#define HCL_INFO0(hcl,fmt) HCL_LOG0(hcl, HCL_LOG_INFO | HCL_LOG_UNTYPED, fmt)
-#define HCL_INFO1(hcl,fmt,a1) HCL_LOG1(hcl, HCL_LOG_INFO | HCL_LOG_UNTYPED, fmt, a1)
-#define HCL_INFO2(hcl,fmt,a1,a2) HCL_LOG2(hcl, HCL_LOG_INFO | HCL_LOG_UNTYPED, fmt, a1, a2)
-#define HCL_INFO3(hcl,fmt,a1,a2,a3) HCL_LOG3(hcl, HCL_LOG_INFO | HCL_LOG_UNTYPED, fmt, a1, a2, a3)
-#define HCL_INFO4(hcl,fmt,a1,a2,a3,a4) HCL_LOG4(hcl, HCL_LOG_INFO | HCL_LOG_UNTYPED, fmt, a1, a2, a3, a4)
-#define HCL_INFO5(hcl,fmt,a1,a2,a3,a4,a5) HCL_LOG5(hcl, HCL_LOG_INFO | HCL_LOG_UNTYPED, fmt, a1, a2, a3, a4, a5)
-#define HCL_INFO6(hcl,fmt,a1,a2,a3,a4,a5,a6) HCL_LOG6(hcl, HCL_LOG_INFO | HCL_LOG_UNTYPED, fmt, a1, a2, a3, a4, a5, a6)
-
 
 /* =========================================================================
- * HCL ASSERTION
+ * ASSERTION SUPPORT
  * ========================================================================= */
-#if defined(NDEBUG)
-#	define HCL_ASSERT(hcl,expr) ((void)0)
-#else
-#	define HCL_ASSERT(hcl,expr) ((void)((expr) || (hcl_assertfailed (hcl, #expr, __FILE__, __LINE__), 0)))
-#endif
-
-/* =========================================================================
- * HCL COMMON OBJECTS
- * ========================================================================= */
-enum 
-{
-	HCL_BRAND_NIL = 1,
-	HCL_BRAND_TRUE,
-	HCL_BRAND_FALSE,
-	HCL_BRAND_CHARACTER,
-	HCL_BRAND_INTEGER,
-	HCL_BRAND_CONS,
-	HCL_BRAND_ARRAY,
-	HCL_BRAND_BYTE_ARRAY,
-	HCL_BRAND_SYMBOL_ARRAY, /* special. internal use only */
-	HCL_BRAND_SYMBOL,
-	HCL_BRAND_STRING,
-	HCL_BRAND_DIC,
-
-	HCL_BRAND_CFRAME,/* compiler frame */
-	HCL_BRAND_PRIM,
-
-	HCL_BRAND_CONTEXT,
-	HCL_BRAND_PROCESS,
-	HCL_BRAND_PROCESS_SCHEDULER,
-	HCL_BRAND_SEMAPHORE
-};
-
-enum
-{
-	/* SYNCODE 0 means it's not a syncode object. so it begins with 1 */
-	HCL_SYNCODE_BREAK = 1,
-	HCL_SYNCODE_DEFUN,
-	HCL_SYNCODE_DO,
-	HCL_SYNCODE_ELIF,
-	HCL_SYNCODE_ELSE,
-	HCL_SYNCODE_IF,
-	HCL_SYNCODE_LAMBDA,
-	HCL_SYNCODE_RETURN,
-	HCL_SYNCODE_SET,
-	HCL_SYNCODE_UNTIL,
-	HCL_SYNCODE_WHILE
-};
-
-
-enum
-{
-	/* these can be set in the SYNCODE flags for cons cells */
-	HCL_CONCODE_XLIST = 0,  /* () - executable list */
-	HCL_CONCODE_ARRAY,      /* #() */
-	HCL_CONCODE_BYTEARRAY,  /* #[] */
-	HCL_CONCODE_DIC,        /* #{} */
-	HCL_CONCODE_QLIST       /* '() - quoted list, data list */
-};
-
-struct hcl_cons_t
-{
-	HCL_OBJ_HEADER;
-	hcl_oop_t car;
-	hcl_oop_t cdr;
-};
-typedef struct hcl_cons_t hcl_cons_t;
-typedef struct hcl_cons_t* hcl_oop_cons_t;
-
-#define HCL_IS_NIL(hcl,v) (v == (hcl)->_nil)
-#define HCL_IS_TRUE(hcl,v) (v == (hcl)->_true)
-#define HCL_IS_FALSE(hcl,v) (v == (hcl)->_false)
-#define HCL_IS_INTEGER(hcl,v) (HCL_OOP_IS_POINTER(v) && HCL_OBJ_GET_FLAGS_BRAND(v) == HCL_BRAND_INTEGER)
-#define HCL_IS_SYMBOL(hcl,v) (HCL_OOP_IS_POINTER(v) && HCL_OBJ_GET_FLAGS_BRAND(v) == HCL_BRAND_SYMBOL)
-#define HCL_IS_SYMBOL_ARRAY(hcl,v) (HCL_OOP_IS_POINTER(v) && HCL_OBJ_GET_FLAGS_BRAND(v) == HCL_BRAND_SYMBOL_ARRAY)
-#define HCL_IS_CONTEXT(hcl,v) (HCL_OOP_IS_POINTER(v) && HCL_OBJ_GET_FLAGS_BRAND(v) == HCL_BRAND_CONTEXT)
-#define HCL_IS_PROCESS(hcl,v) (HCL_OOP_IS_POINTER(v) && HCL_OBJ_GET_FLAGS_BRAND(v) == HCL_BRAND_PROCESS)
-#define HCL_IS_CONS(hcl,v) (HCL_OOP_IS_POINTER(v) && HCL_OBJ_GET_FLAGS_BRAND(v) == HCL_BRAND_CONS)
-#define HCL_IS_CONS_XLIST(hcl,v) (HCL_IS_CONS(hcl,v) && HCL_OBJ_GET_FLAGS_SYNCODE(v) == HCL_CONCODE_XLIST)
-#define HCL_IS_ARRAY(hcl,v) (HCL_OOP_IS_POINTER(v) && HCL_OBJ_GET_FLAGS_BRAND(v) == HCL_BRAND_ARRAY)
-
-#define HCL_IS_PRIM(hcl,v) (HCL_OOP_IS_POINTER(v) && HCL_OBJ_GET_FLAGS_BRAND(v) == HCL_BRAND_PRIM)
-
-#define HCL_CONS_CAR(v)  (((hcl_cons_t*)(v))->car)
-#define HCL_CONS_CDR(v)  (((hcl_cons_t*)(v))->cdr)
-
-#if defined(__cplusplus)
-extern "C" {
-#endif
-
-#define hcl_switchprocess(hcl) ((hcl)->switch_proc = 1)
-
-HCL_EXPORT hcl_t* hcl_open (
-	hcl_mmgr_t*         mmgr,
-	hcl_oow_t           xtnsize,
-	hcl_oow_t           heapsize,
-	const hcl_vmprim_t* vmprim,
-	hcl_errnum_t*       errnum
-);
-
-HCL_EXPORT void hcl_close (
-	hcl_t* vm
-);
-
-HCL_EXPORT int hcl_init (
-	hcl_t*              vm,
-	hcl_mmgr_t*         mmgr,
-	hcl_oow_t           heapsize,
-	const hcl_vmprim_t* vmprim
-);
-
-HCL_EXPORT void hcl_fini (
-	hcl_t* vm
-);
-
-
-#if defined(HCL_HAVE_INLINE)
-	static HCL_INLINE hcl_mmgr_t* hcl_getmmgr (hcl_t* hcl) { return hcl->mmgr; }
-	static HCL_INLINE void* hcl_getxtn (hcl_t* hcl) { return (void*)(hcl + 1); }
-
-	/*static HCL_INLINE hcl_cmgr_t* hcl_getcmgr (hcl_t* hcl) { return hcl->cmgr; }
-	static HCL_INLINE void hcl_setcmgr (hcl_t* hcl, hcl_cmgr_t* cmgr) { hcl->cmgr = cmgr; }*/
-
-	static HCL_INLINE hcl_errnum_t hcl_geterrnum (hcl_t* hcl) { return hcl->errnum; }
-	static HCL_INLINE void hcl_seterrnum (hcl_t* hcl, hcl_errnum_t errnum) { hcl->errnum = errnum; hcl->errmsg.len = 0; }
-#else
-#	define hcl_getmmgr(hcl) ((hcl)->mmgr)
-#	define hcl_getxtn(hcl) ((void*)((hcl) + 1))
-
-#	define hcl_getcmgr(hcl) ((hcl)->cmgr)
-#	define hcl_setcmgr(hcl,mgr) ((hcl)->cmgr = (mgr))
-
-#	define hcl_geterrnum(hcl) ((hcl)->errnum)
-#	define hcl_seterrnum(hcl,num) ((hcl)->errmsg.len = 0, (hcl)->errnum = (num))
-#endif
-
-HCL_EXPORT void hcl_seterrbfmt (
-	hcl_t*           hcl,
-	hcl_errnum_t     errnum,
-	const hcl_bch_t* fmt,
-	...
-);
-
-HCL_EXPORT void hcl_seterrufmt (
-	hcl_t*           hcl,
-	hcl_errnum_t     errnum,
-	const hcl_uch_t* fmt,
-	...
-);
-
-HCL_EXPORT void hcl_seterrwithsyserr (
-	hcl_t* hcl,
-	int    syserr
-);
-
-HCL_EXPORT const hcl_ooch_t* hcl_geterrstr (
-	hcl_t* hcl
-);
-
-HCL_EXPORT const hcl_ooch_t* hcl_geterrmsg (
-	hcl_t* hcl
-);
-
-HCL_EXPORT const hcl_ooch_t* hcl_backuperrmsg (
-	hcl_t* hcl
-);
-
-/**
- * The hcl_getoption() function gets the value of an option
- * specified by \a id into the buffer pointed to by \a value.
- *
- * \return 0 on success, -1 on failure
- */
-HCL_EXPORT int hcl_getoption (
-	hcl_t*         hcl,
-	hcl_option_t   id,
-	void*          value
-);
-
-/**
- * The hcl_setoption() function sets the value of an option 
- * specified by \a id to the value pointed to by \a value.
- *
- * \return 0 on success, -1 on failure
- */
-HCL_EXPORT int hcl_setoption (
-	hcl_t*        hcl,
-	hcl_option_t  id,
-	const void*   value
-);
-
-
-HCL_EXPORT hcl_cb_t* hcl_regcb (
-	hcl_t*    hcl,
-	hcl_cb_t* tmpl
-);
-
-HCL_EXPORT void hcl_deregcb (
-	hcl_t*    hcl,
-	hcl_cb_t* cb
-);
-
-/**
- * The hcl_gc() function performs garbage collection.
- * It is not affected by #HCL_NOGC.
- */
-HCL_EXPORT void hcl_gc (
-	hcl_t* hcl
-);
-
-HCL_EXPORT hcl_oow_t hcl_getpayloadbytes (
-	hcl_t*    hcl,
-	hcl_oop_t oop
-);
-
-/**
- * The hcl_instantiate() function creates a new object of the class 
- * \a _class. The size of the fixed part is taken from the information
- * contained in the class defintion. The \a vlen parameter specifies 
- * the length of the variable part. The \a vptr parameter points to 
- * the memory area to copy into the variable part of the new object.
- * If \a vptr is #HCL_NULL, the variable part is initialized to 0 or
- * an equivalent value depending on the type.
- */
-HCL_EXPORT hcl_oop_t hcl_instantiate (
-	hcl_t*          hcl,
-	hcl_oop_t       _class,
-	const void*      vptr,
-	hcl_oow_t       vlen
-);
-
-HCL_EXPORT hcl_oop_t hcl_shallowcopy (
-	hcl_t*          hcl,
-	hcl_oop_t       oop
-);
-
-/**
- * The hcl_ignite() function creates key initial objects.
- */
-HCL_EXPORT int hcl_ignite (
-	hcl_t* hcl
-);
-
-/**
- * The hcl_execute() function executes an activated context.
- */
-HCL_EXPORT int hcl_execute (
-	hcl_t* hcl
-);
-
-HCL_EXPORT int hcl_executefromip (
-	hcl_t*    hcl,
-	hcl_ooi_t initial_ip
-);
-
-/**
- * The hcl_invoke() function sends a message named \a mthname to an object
- * named \a objname.
- */
-HCL_EXPORT int hcl_invoke (
-	hcl_t*            hcl,
-	const hcl_oocs_t* objname,
-	const hcl_oocs_t* mthname
-);
-
-
-HCL_EXPORT int hcl_attachio (
-	hcl_t*       hcl,
-	hcl_ioimpl_t reader,
-	hcl_ioimpl_t printer
-);
-
-HCL_EXPORT void hcl_detachio (
-	hcl_t*       hcl
-);
-
-
-HCL_EXPORT hcl_oop_t hcl_read (
-	hcl_t*       hcl
-);
-
-HCL_EXPORT int hcl_print (
-	hcl_t*       hcl,
-	hcl_oop_t    obj
-);
-
-HCL_EXPORT int hcl_compile (
-	hcl_t*       hcl,
-	hcl_oop_t    obj
-);
-
-/* Temporary OOP management  */
-HCL_EXPORT void hcl_pushtmp (
-	hcl_t*     hcl,
-	hcl_oop_t* oop_ptr
-);
-
-HCL_EXPORT void hcl_poptmp (
-	hcl_t*     hcl
-);
-
-HCL_EXPORT void hcl_poptmps (
-	hcl_t*     hcl,
-	hcl_oow_t  count
-);
-
-
-HCL_EXPORT int hcl_decode (
-	hcl_t*            hcl,
-	hcl_ooi_t         start,
-	hcl_ooi_t         end
-);
-
-/* Syntax error handling */
-HCL_EXPORT void hcl_getsynerr (
-	hcl_t*             hcl,
-	hcl_synerr_t*      synerr
-);
-
-
-HCL_EXPORT void hcl_setsynerrbfmt (
-	hcl_t*              hcl,
-	hcl_synerrnum_t     num,
-	const hcl_ioloc_t*  loc,
-	const hcl_oocs_t*   tgt,
-	const hcl_bch_t*    msgfmt,
-	...
-);
-
-HCL_EXPORT void hcl_setsynerrufmt (
-	hcl_t*              hcl,
-	hcl_synerrnum_t     num,
-	const hcl_ioloc_t*  loc,
-	const hcl_oocs_t*   tgt,
-	const hcl_uch_t*    msgfmt,
-	...
-);
-
-#if defined(HCL_HAVE_INLINE)
-	static HCL_INLINE void hcl_setsynerr (hcl_t* hcl,	hcl_synerrnum_t num, const hcl_ioloc_t* loc,	const hcl_oocs_t* tgt)
-	{
-		hcl_setsynerrbfmt (hcl, num, loc, tgt, HCL_NULL);
-	}
-#else
-#	define hcl_setsynerr(hcl,num,loc,tgt) hcl_setsynerrbfmt(hcl,num,loc,tgt,HCL_NULL)
-#endif
-
-/* Memory allocation/deallocation functions using hcl's MMGR */
-HCL_EXPORT void* hcl_allocmem (
-	hcl_t*     hcl,
-	hcl_oow_t size
-);
-
-HCL_EXPORT void* hcl_callocmem (
-	hcl_t*     hcl,
-	hcl_oow_t size
-);
-
-HCL_EXPORT void* hcl_reallocmem (
-	hcl_t*     hcl,
-	void*       ptr,
-	hcl_oow_t size
-);
-
-HCL_EXPORT void hcl_freemem (
-	hcl_t* hcl,
-	void*   ptr
-);
-
-HCL_EXPORT hcl_ooi_t hcl_logbfmt (
-	hcl_t*           hcl,
-	hcl_oow_t        mask,
-	const hcl_bch_t* fmt,
-	...
-);
-
-HCL_EXPORT hcl_ooi_t hcl_logoofmt (
-	hcl_t*            hcl,
-	hcl_oow_t         mask,
-	const hcl_ooch_t* fmt,
-	...
-);
-
-
-HCL_EXPORT hcl_oop_t hcl_makenil (
-	hcl_t*     hcl
-);
-
-HCL_EXPORT hcl_oop_t hcl_maketrue (
-	hcl_t*     hcl
-);
-
-HCL_EXPORT hcl_oop_t hcl_makefalse (
-	hcl_t*     hcl
-);
-
-HCL_EXPORT hcl_oop_t hcl_makeinteger (
-	hcl_t*     hcl,
-	hcl_ooi_t  v
-);
-
-HCL_EXPORT hcl_oop_t hcl_makecons (
-	hcl_t*     hcl,
-	hcl_oop_t  car,
-	hcl_oop_t  cdr
-);
-
-HCL_EXPORT hcl_oop_t hcl_makearray (
-	hcl_t*     hcl,
-	hcl_oow_t  size
-);
-
-HCL_EXPORT hcl_oop_t hcl_makebytearray (
-	hcl_t*           hcl,
-	const hcl_oob_t* ptr,
-	hcl_oow_t        len
-);
-
-HCL_EXPORT hcl_oop_t hcl_makestring (
-	hcl_t*            hcl,
-	const hcl_ooch_t* ptr,
-	hcl_oow_t         len
-);
-
-HCL_EXPORT hcl_oop_t hcl_makedic (
-	hcl_t*            hcl, 
-	hcl_oow_t         inisize /* initial bucket size */
-);
-
-HCL_EXPORT hcl_oop_t hcl_makeprocess (
-	hcl_t*            hcl, 
-	hcl_oow_t         stksize
-);
-
-HCL_EXPORT hcl_oop_t hcl_makecontext (
-	hcl_t*            hcl,
-	hcl_ooi_t         ntmprs
-);
-
-
-HCL_EXPORT void hcl_freengcobj (
-	hcl_t*           hcl,
-	hcl_oop_t        obj
-);
-
-HCL_EXPORT hcl_oop_t hcl_makengcbytearray (
-	hcl_t*           hcl,
-	const hcl_oob_t* ptr,
-	hcl_oow_t        len
-);
-
-HCL_EXPORT hcl_oop_t hcl_remakengcbytearray (
-	hcl_t*           hcl,
-	hcl_oop_t        obj,
-	hcl_oow_t        newsz
-);
-
-HCL_EXPORT hcl_oop_t hcl_makengcarray (
-	hcl_t*           hcl,
-	hcl_oow_t        len
-);
-
-HCL_EXPORT hcl_oop_t hcl_remakengcarray (
-	hcl_t*           hcl,
-	hcl_oop_t        obj,
-	hcl_oow_t        newsz
-);
-
-
-
-HCL_EXPORT hcl_oow_t hcl_countcons (
-	hcl_t*           hcl,
-	hcl_oop_t        cons
-);
-
-
-HCL_EXPORT hcl_oop_t hcl_getlastconscdr (
-	hcl_t*           hcl,
-	hcl_oop_t        cons
-);
-
-HCL_EXPORT hcl_oop_t hcl_reversecons (
-	hcl_t*           hcl,
-	hcl_oop_t        cons
-);
-
-HCL_EXPORT hcl_oop_t hcl_makeprim (
-	hcl_t*          hcl,
-	hcl_pfimpl_t    primimpl,
-	hcl_oow_t       minargs,
-	hcl_oow_t       maxargs
-);
-
-HCL_EXPORT int hcl_hashobj (
-	hcl_t*     hcl, 
-	hcl_oop_t  obj, 
-	hcl_oow_t* xhv
-);
-
-HCL_EXPORT int hcl_equalobjs (
-	hcl_t*     hcl,
-	hcl_oop_t  rcv,
-	hcl_oop_t  arg
-);
-
 HCL_EXPORT void hcl_assertfailed (
 	hcl_t*           hcl,
 	const hcl_bch_t* expr,

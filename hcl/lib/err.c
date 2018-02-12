@@ -59,13 +59,17 @@ static hcl_ooch_t errstr_29[] = {'d','i','v','i','d','e',' ','b','y',' ','z','e'
 static hcl_ooch_t errstr_30[] = {'I','/','O',' ','e','r','r','o','r','\0'};
 static hcl_ooch_t errstr_31[] = {'e','n','c','o','d','i','n','g',' ','c','o','n','v','e','r','s','i','o','n',' ','e','r','r','o','r','\0'};
 static hcl_ooch_t errstr_32[] = {'b','u','f','f','e','r',' ','f','u','l','l','\0'};
+static hcl_ooch_t errstr_33[] = {'s','y','n','t','a','x',' ','e','r','r','o','r','\0'};
+static hcl_ooch_t errstr_34[] = {'c','a','l','l',' ','e','r','r','o','r','\0'};
+static hcl_ooch_t errstr_35[] = {'r','e','c','a','l','l',' ','p','r','o','h','i','b','i','t','e','d','\0'};
+static hcl_ooch_t errstr_36[] = {'a','r','g','u','m','e','n','t',' ','n','u','m','b','e','r',' ','e','r','r','o','r','\0'};
 static hcl_ooch_t* errstr[] =
 {
 	errstr_0, errstr_1, errstr_2, errstr_3, errstr_4, errstr_5, errstr_6, errstr_7,
 	errstr_8, errstr_9, errstr_10, errstr_11, errstr_12, errstr_13, errstr_14, errstr_15,
 	errstr_16, errstr_17, errstr_18, errstr_19, errstr_20, errstr_21, errstr_22, errstr_23,
 	errstr_24, errstr_25, errstr_26, errstr_27, errstr_28, errstr_29, errstr_30, errstr_31,
-	errstr_32 
+	errstr_32, errstr_33, errstr_34, errstr_35, errstr_36
 };
 
 
