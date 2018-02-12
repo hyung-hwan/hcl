@@ -117,6 +117,7 @@ static char* synerrstr[] =
 
 	"invalid callable",
 	"unbalanced key/value pair",
+	"unbalanced parenthesis/brace/bracket",
 	"empty x-list"
 };
 
@@ -280,13 +281,13 @@ const hcl_ooch_t* hcl_geterrstr (hcl_t* hcl)
 
 const hcl_ooch_t* hcl_geterrmsg (hcl_t* hcl)
 {
-	if (hcl->errmsg.len <= 0) return hcl_errnum_to_errstr (hcl->errnum);
+	if (hcl->errmsg.len <= 0) return hcl_errnum_to_errstr(hcl->errnum);
 	return hcl->errmsg.buf;
 }
 
 const hcl_ooch_t* hcl_backuperrmsg (hcl_t* hcl)
 {
-	hcl_copyoocstr (hcl->errmsg.tmpbuf.ooch, HCL_COUNTOF(hcl->errmsg.tmpbuf.ooch), hcl->errmsg.buf);
+	hcl_copyoocstr (hcl->errmsg.tmpbuf.ooch, HCL_COUNTOF(hcl->errmsg.tmpbuf.ooch), hcl_geterrmsg(hcl));
 	return hcl->errmsg.tmpbuf.ooch;
 }
 

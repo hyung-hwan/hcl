@@ -151,6 +151,7 @@ enum hcl_synerrnum_t
 
 	HCL_SYNERR_CALLABLE,      /* invalid callable */
 	HCL_SYNERR_UNBALKV,       /* unbalanced key/value pair */
+	HCL_SYNERR_UNBALPBB,      /* unbalanced parenthesis/brace/bracket */
 	HCL_SYNERR_EMPTYXLIST     /* empty x-list */
 };
 typedef enum hcl_synerrnum_t hcl_synerrnum_t;

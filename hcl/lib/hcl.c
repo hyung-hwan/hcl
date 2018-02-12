@@ -515,7 +515,7 @@ hcl_mod_data_t* hcl_openmod (hcl_t* hcl, const hcl_ooch_t* name, hcl_oow_t namel
 	{
 	#if !defined(HCL_ENABLE_DYNAMIC_MODULE)
 		HCL_DEBUG2 (hcl, "Cannot find a static module [%.*js]\n", namelen, name);
-		hcl_seterrnum (hcl, HCL_ENOENT);
+		hcl_seterrbfmt (hcl, HCL_ENOENT, "unable to find a static module [%.*js]", namelen, name);
 		return HCL_NULL;
 	#endif
 	}
@@ -523,7 +523,7 @@ hcl_mod_data_t* hcl_openmod (hcl_t* hcl, const hcl_ooch_t* name, hcl_oow_t namel
 
 #if !defined(HCL_ENABLE_DYNAMIC_MODULE)
 	HCL_DEBUG2 (hcl, "Cannot open module [%.*js] - module loading disabled\n", namelen, name);
-	hcl_seterrnum (hcl, HCL_ENOIMPL); /* TODO: is it a good error number for disabled module loading? */
+	hcl_seterrbfmt (hcl, HCL_ENOIMPL, "unable to open module [%.*js] - module loading disabled", namelen, name);
 	return HCL_NULL;
 #endif
 
@@ -538,7 +538,7 @@ hcl_mod_data_t* hcl_openmod (hcl_t* hcl, const hcl_ooch_t* name, hcl_oow_t namel
 	if (md.handle == HCL_NULL) 
 	{
 		HCL_DEBUG2 (hcl, "Cannot open a module [%.*js]\n", namelen, name);
-		hcl_seterrnum (hcl, HCL_ENOENT); /* TODO: be more descriptive about the error */
+		hcl_seterrbfmt (hcl, HCL_ENOENT, "unable to open a module [%.*js]", namelen, name);
 		return HCL_NULL;
 	}
 
@@ -546,8 +546,9 @@ hcl_mod_data_t* hcl_openmod (hcl_t* hcl, const hcl_ooch_t* name, hcl_oow_t namel
 	load = hcl->vmprim.dl_getsym (hcl, md.handle, buf);
 	if (!load) 
 	{
+		const hcl_ooch_t* oldmsg = hcl_backuperrmsg (hcl);
+		hcl_seterrbfmt (hcl, hcl_geterrnum(hcl), "unable to get module symbol [%js] in [%.*js] - %js", buf, namelen, name, oldmsg);
 		HCL_DEBUG3 (hcl, "Cannot get a module symbol [%js] in [%.*js]\n", buf, namelen, name);
-		hcl_seterrnum (hcl, HCL_ENOENT); /* TODO: be more descriptive about the error */
 		hcl->vmprim.dl_close (hcl, md.handle);
 		return HCL_NULL;
 	}
@@ -558,7 +559,7 @@ hcl_mod_data_t* hcl_openmod (hcl_t* hcl, const hcl_ooch_t* name, hcl_oow_t namel
 	if (pair == HCL_NULL)
 	{
 		HCL_DEBUG2 (hcl, "Cannot register a module [%.*js]\n", namelen, name);
-		hcl_seterrnum (hcl, HCL_ESYSMEM);
+		hcl_seterrbfmt (hcl, HCL_ESYSMEM, "unable to register a module [%.*js] for memory shortage", namelen, name);
 		hcl->vmprim.dl_close (hcl, md.handle);
 		return HCL_NULL;
 	}
@@ -568,8 +569,9 @@ hcl_mod_data_t* hcl_openmod (hcl_t* hcl, const hcl_ooch_t* name, hcl_oow_t namel
 	mdp->mod.hints = hints;
 	if (load (hcl, &mdp->mod) <= -1)
 	{
+		const hcl_ooch_t* oldmsg = hcl_backuperrmsg (hcl);
+		hcl_seterrbfmt (hcl, hcl_geterrnum(hcl), "module initializer [%js] returned failure in [%.*js] - %js", buf, namelen, name, oldmsg); 
 		HCL_DEBUG3 (hcl, "Module function [%js] returned failure in [%.*js]\n", buf, namelen, name);
-		hcl_seterrnum (hcl, HCL_ENOENT); /* TODO: proper/better error code and handling */
 		hcl_rbt_delete (&hcl->modtab, name, namelen);
 		hcl->vmprim.dl_close (hcl, mdp->handle);
 		return HCL_NULL;
@@ -612,10 +614,6 @@ int hcl_importmod (hcl_t* hcl, const hcl_ooch_t* name, hcl_oow_t len)
 	hcl_rbt_pair_t* pair;
 	hcl_mod_data_t* mdp;
 	int r = -1;
-
-	/* hcl_openmod(), hcl_closemod(), etc call a user-defined callback.
-	 * i need to protect _class in case the user-defined callback allocates 
-	 * a OOP memory chunk and GC occurs. */
 
 	pair = hcl_rbt_search (&hcl->modtab, name, len);
 	if (pair)

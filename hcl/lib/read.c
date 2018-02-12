@@ -222,7 +222,7 @@ static HCL_INLINE int is_alnumchar (hcl_ooci_t c)
 
 static HCL_INLINE int is_delimiter (hcl_ooci_t c)
 {
-	return c == '(' || c == ')' || c == '[' || c == ']' || c == '{' || c == '}' || c == '\"' || c == '\'' || c == '#' || c == ';' || c == '|' || is_spacechar(c) || c == HCL_UCI_EOF;
+	return c == '(' || c == ')' || c == '[' || c == ']' || c == '{' || c == '}' || c == '\"' || c == '\'' || c == '#' || c == ';' || c == '|' || c == '.' || is_spacechar(c) || c == HCL_UCI_EOF;
 }
 
 
@@ -1075,12 +1075,45 @@ retry:
 			{
 				ADD_TOKEN_CHAR (hcl, c);
 				GET_CHAR_TO (hcl, c);
-				if (is_delimiter(c))
+
+				if (c == '.')
+				{
+					hcl_iolxc_t period;
+
+					period = hcl->c->lxc;
+
+				read_more_seg:
+					GET_CHAR_TO (hcl, c);
+					if (!is_delimiter(c))
+					{
+						SET_TOKEN_TYPE (hcl, HCL_IOTOK_IDENT_DOTTED);
+						ADD_TOKEN_CHAR (hcl, '.');
+						do
+						{
+							ADD_TOKEN_CHAR (hcl, c);
+							GET_CHAR_TO (hcl, c);
+						}
+						while (!is_delimiter(c));
+
+						if (c == '.') goto read_more_seg;
+
+						unget_char (hcl, &hcl->c->lxc);
+						break;
+					}
+					else
+					{
+						unget_char (hcl, &hcl->c->lxc);
+						unget_char (hcl, &period);
+					}
+					break;
+				}
+				else if (is_delimiter(c))
 				{
 					unget_char (hcl, &hcl->c->lxc);
 					break;
 				}
 			}
+
 
 			break;
 	}
@@ -1740,6 +1773,12 @@ static int read_object (hcl_t* hcl)
 				int oldflagv;
 				int concode;
 
+				if (level <= 0)
+				{
+					hcl_setsynerr (hcl, HCL_SYNERR_UNBALPBB, TOKEN_LOC(hcl), HCL_NULL); 
+					return -1;
+				}
+
 				concode = LIST_FLAG_GET_CONCODE(flagv);
 
 				if (req[concode].closer != TOKEN_TYPE(hcl))
@@ -1779,8 +1818,6 @@ static int read_object (hcl_t* hcl)
 				if (LIST_FLAG_GET_CONCODE(oldflagv) == HCL_CONCODE_ARRAY) array_level--;
 				break;
 			}
-
-			
 
 #if 0
 			case HCL_IOTOK_BAPAREN:
@@ -1841,6 +1878,34 @@ static int read_object (hcl_t* hcl)
 
 			case HCL_IOTOK_IDENT:
 				obj = hcl_makesymbol (hcl, TOKEN_NAME_PTR(hcl), TOKEN_NAME_LEN(hcl));
+				break;
+
+			case HCL_IOTOK_IDENT_DOTTED:
+				obj = hcl_makesymbol (hcl, TOKEN_NAME_PTR(hcl), TOKEN_NAME_LEN(hcl));
+				if (obj)
+				{
+					hcl_pfbase_t* pfbase;
+					hcl_oop_t prim;
+
+					pfbase = hcl_querymod (hcl, TOKEN_NAME_PTR(hcl), TOKEN_NAME_LEN(hcl));
+					if (!pfbase)
+					{
+						/* TODO switch to syntax error */
+						return -1;
+					}
+
+					hcl_pushtmp (hcl, &obj);
+					prim = hcl_makeprim(hcl, pfbase->handler, pfbase->minargs, pfbase->maxargs);
+
+					if (!prim || !hcl_putatsysdic(hcl, obj, prim))
+					{
+						hcl_poptmp (hcl);
+						return -1;
+					}
+
+					hcl_poptmp (hcl);
+
+				}
 				break;
 		}
 
@@ -1932,7 +1997,6 @@ static void gc_compiler (hcl_t* hcl)
 	{
 		hcl->c->r.salit.ptr[i] = hcl_moveoop (hcl, hcl->c->r.salit.ptr[i]);
 	}
-
 }
 
 static void fini_compiler (hcl_t* hcl)

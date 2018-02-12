@@ -504,7 +504,8 @@ static void* dl_open (hcl_t* hcl, const hcl_ooch_t* name, int flags)
 			if (!handle) 
 			{
 				hcl_bch_t* dash;
-				HCL_DEBUG3 (hcl, "Failed to open(ext) DL %hs[%js] - %s\n", &bufptr[len], name, sys_dl_error());
+				hcl_seterrbfmt (hcl, HCL_ESYSERR, "unable to open(ext) DL %js - %hs", name, sys_dl_error());
+				HCL_DEBUG3 (hcl, "Failed to open(ext) DL %hs[%js] - %hs\n", &bufptr[len], name, sys_dl_error());
 				dash = hcl_rfindbchar(bufptr, hcl_countbcstr(bufptr), '-');
 				if (dash) 
 				{
@@ -539,13 +540,21 @@ static void* dl_open (hcl_t* hcl, const hcl_ooch_t* name, int flags)
 		if (hcl_findbchar (bufptr, bcslen, '.'))
 		{
 			handle = sys_dl_open(bufptr);
-			if (!handle) HCL_DEBUG2 (hcl, "Failed to open DL %hs - %s\n", bufptr, sys_dl_error());
+			if (!handle) 
+			{
+				hcl_seterrbfmt (hcl, HCL_ESYSERR, "unable to open DL %js - %hs", name, sys_dl_error());
+				HCL_DEBUG2 (hcl, "Failed to open DL %hs - %hs\n", bufptr, sys_dl_error());
+			}
 			else HCL_DEBUG2 (hcl, "Opened DL %hs handle %p\n", bufptr, handle);
 		}
 		else
 		{
 			handle = sys_dl_openext(bufptr);
-			if (!handle) HCL_DEBUG2 (hcl, "Failed to open(ext) DL %hs - %s\n", bufptr, sys_dl_error());
+			if (!handle) 
+			{
+				hcl_seterrbfmt (hcl, HCL_ESYSERR, "unable to open(ext) DL %js - %hs", name, sys_dl_error());
+				HCL_DEBUG2 (hcl, "Failed to open(ext) DL %hs - %s\n", bufptr, sys_dl_error());
+			}
 			else HCL_DEBUG2 (hcl, "Opened(ext) DL %hs handle %p\n", bufptr, handle);
 		}
 	}
@@ -558,7 +567,7 @@ static void* dl_open (hcl_t* hcl, const hcl_ooch_t* name, int flags)
 /* TODO: support various platforms */
 	/* TODO: implemenent this */
 	HCL_DEBUG1 (hcl, "Dynamic loading not implemented - cannot open %js\n", name);
-	hcl_seterrnum (hcl, HCL_ENOIMPL);
+	hcl_seterrnum (hcl, HCL_ENOIMPL, "dynamic loading not implemented - cannot open %js", name);
 	return HCL_NULL;
 #endif
 }
@@ -612,6 +621,7 @@ static void* dl_getsym (hcl_t* hcl, void* handle, const hcl_ooch_t* name)
 	for (i = 1; i <= bcslen; i++) if (bufptr[i] == '.') bufptr[i] = '_';
 
 	symname = &bufptr[1]; /* try the name as it is */
+
 	sym = sys_dl_getsym(handle, symname);
 	if (!sym)
 	{
@@ -630,6 +640,10 @@ static void* dl_getsym (hcl_t* hcl, void* handle, const hcl_ooch_t* name)
 			{
 				symname = &bufptr[0]; /* try _name_ */
 				sym = sys_dl_getsym(handle, symname);
+				if (!sym)
+				{
+					hcl_seterrbfmt (hcl, HCL_ENOENT, "unable to get module symbol %hs", symname);
+				}
 			}
 		}
 	}
@@ -641,7 +655,7 @@ static void* dl_getsym (hcl_t* hcl, void* handle, const hcl_ooch_t* name)
 #else
 	/* TODO: IMPLEMENT THIS */
 	HCL_DEBUG2 (hcl, "Dynamic loading not implemented - Cannot load module symbol %js from handle %p\n", name, handle);
-	hcl_seterrnum (hcl, HCL_ENOIMPL);
+	hcl_seterrbfmt (hcl, HCL_ENOIMPL, "dynamic loading not implemented - Cannot load module symbol %js from handle %p", name, handle);
 	return HCL_NULL;
 #endif
 }
@@ -747,7 +761,6 @@ static void log_write (hcl_t* hcl, hcl_oow_t mask, const hcl_ooch_t* msg, hcl_oo
 	#endif
 		write_all (logfd, ts, tslen);
 	}
-
 
 	if (xtn->logfd_istty)
 	{

@@ -416,6 +416,35 @@ test "${ax_cv_cxx_have_std_namespace}" = "yes" || enable_cxx_is="no"
 
 AM_CONDITIONAL(ENABLE_CXX, test "${enable_cxx_is}" = "yes" )
 
+
+dnl ===== enable-dynamic-module =====
+AC_ARG_ENABLE([dynamic-module],
+	[AS_HELP_STRING([--enable-dynamic-module],[enable dynamic module capability(default. yes)])],
+	enable_dynamic_module_is=$enableval,
+	enable_dynamic_module_is=yes
+)
+test "${enable_shared}" = "no" && enable_dynamic_module_is="no"
+
+if test "${enable_dynamic_module_is}" = "yes"
+then
+	AC_DEFINE([HCL_ENABLE_DYNAMIC_MODULE],[],[enable dynamic module capability])
+fi
+AM_CONDITIONAL(ENABLE_DYNAMIC_MODULE, test "${enable_dynamic_module_is}" = "yes")
+
+dnl ===== enable-static-module =====
+AC_ARG_ENABLE([static-module],
+	[AS_HELP_STRING([--enable-static-module],[build modules statically into the main library(default. no)])],
+	enable_static_module_is=$enableval,
+	enable_static_module_is=no
+)
+test "${enable_shared}" = "no" -a "${enable_static}" = "yes" && enable_static_module_is="yes"
+
+if test "${enable_static_module_is}" = "yes"
+then
+	AC_DEFINE([HCL_ENABLE_STATIC_MODULE],[],[link modules statically into the main library])
+fi
+AM_CONDITIONAL(ENABLE_STATIC_MODULE, test "${enable_static_module_is}" = "yes")
+
 AC_SUBST(HCL_SIZEOF_WCHAR_T, $ac_cv_sizeof_wchar_t)
 AC_SUBST(HCL_SIZEOF_LONG_LONG, $ac_cv_sizeof_long_long)
 AC_SUBST(HCL_SIZEOF_LONG, $ac_cv_sizeof_long)

@@ -216,6 +216,12 @@
 /* __va_copy is available */
 #undef HAVE___VA_COPY
 
+/* enable dynamic module capability */
+#undef HCL_ENABLE_DYNAMIC_MODULE
+
+/* link modules statically into the main library */
+#undef HCL_ENABLE_STATIC_MODULE
+
 /* Big Endian */
 #undef HCL_ENDIAN_BIG
 

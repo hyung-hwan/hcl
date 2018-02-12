@@ -1060,9 +1060,6 @@ static int execute (hcl_t* hcl)
 	hcl_oob_t bcode;
 	hcl_oow_t b1, b2;
 	hcl_oop_t return_value;
-	int unwind_protect;
-	hcl_oop_context_t unwind_start;
-	hcl_oop_context_t unwind_stop;
 
 #if defined(HCL_PROFILE_VM)
 	hcl_uintmax_t inst_counter = 0;
@@ -1543,10 +1540,10 @@ static int execute (hcl_t* hcl)
 					switch (HCL_OBJ_GET_FLAGS_BRAND(rcv))
 					{
 						case HCL_BRAND_CONTEXT:
-							if (activate_context(hcl, b1) <= -1) return -1;
+							if (activate_context(hcl, b1) <= -1) goto oops;
 							break;
 						case HCL_BRAND_PRIM:
-							if (call_primitive(hcl, b1) <= -1) return -1;
+							if (call_primitive(hcl, b1) <= -1) goto oops;
 							break;
 						default:
 							goto cannot_call;
@@ -1557,7 +1554,7 @@ static int execute (hcl_t* hcl)
 				cannot_call:
 					/* run time error */
 					hcl_seterrbfmt (hcl, HCL_ECALL, "cannot call %O", rcv);
-					return -1;
+					goto oops;
 				}
 				break;
 			}
@@ -1801,7 +1798,7 @@ static int execute (hcl_t* hcl)
 
 				/* create an empty array */
 				t = hcl_makearray (hcl, b1);
-				if (!t) return -1;
+				if (!t) goto oops;
 
 				HCL_STACK_PUSH (hcl, t); /* push the array created */
 				break;
@@ -1828,7 +1825,7 @@ static int execute (hcl_t* hcl)
 
 				/* create an empty array */
 				t = hcl_makebytearray (hcl, HCL_NULL, b1);
-				if (!t) return -1;
+				if (!t) goto oops;
 
 				HCL_STACK_PUSH (hcl, t); /* push the byte array created */
 				break;
@@ -1846,7 +1843,7 @@ static int execute (hcl_t* hcl)
 				if (!HCL_OOP_IS_SMOOI(t1) || (bv = HCL_OOP_TO_SMOOI(t1)) < 0 || bv > 255)
 				{
 					hcl_seterrbfmt (hcl, HCL_ERANGE, "not a byte or out of byte range - %O", t1);
-					return -1;
+					goto oops;
 				}
 				HCL_STACK_POP (hcl);
 				t2 = HCL_STACK_GETTOP(hcl); /* array */
@@ -1862,7 +1859,7 @@ static int execute (hcl_t* hcl)
 				FETCH_PARAM_CODE_TO (hcl, b1);
 				LOG_INST_1 (hcl, "make_dic %zu", b1);
 				t = (hcl_oop_t)hcl_makedic (hcl, b1 + 10);
-				if (!t) return -1;
+				if (!t) goto oops;
 				HCL_STACK_PUSH (hcl, t);
 				break;
 			}
@@ -1877,7 +1874,7 @@ static int execute (hcl_t* hcl)
 				t2 = HCL_STACK_GETTOP(hcl); /* key */
 				HCL_STACK_POP (hcl);
 				t3 = HCL_STACK_GETTOP(hcl); /* dictionary */
-				if (!hcl_putatdic (hcl, (hcl_oop_dic_t)t3, t2, t1)) return -1;
+				if (!hcl_putatdic (hcl, (hcl_oop_dic_t)t3, t2, t1)) goto oops;
 				break;
 			}
 
@@ -1916,31 +1913,6 @@ static int execute (hcl_t* hcl)
 			handle_return:
 				if (hcl->active_context->origin == hcl->processor->active->initial_context->origin)
 				{
-					/* method return from a processified block
-					 * 
- 					 * #method(#class) main
-					 * {
-					 *    [^100] newProcess resume.
-					 *    '1111' dump.
-					 *    '1111' dump.
-					 *    '1111' dump.
-					 *    ^300.
-					 * }
-					 * 
-					 * ^100 doesn't terminate a main process as the block
-					 * has been processified. on the other hand, ^100
-					 * in the following program causes main to exit.
-					 * 
-					 * #method(#class) main
-					 * {
-					 *    [^100] value.
-					 *    '1111' dump.
-					 *    '1111' dump.
-					 *    '1111' dump.
-					 *    ^300.
-					 * }
-					 */
-
 /*
 //					HCL_ASSERT (hcl, HCL_CLASSOF(hcl, hcl->active_context) == hcl->_block_context);
 //					HCL_ASSERT (hcl, HCL_CLASSOF(hcl, hcl->processor->active->initial_context) == hcl->_block_context);
@@ -1953,8 +1925,6 @@ static int execute (hcl_t* hcl)
 				}
 				else 
 				{
-					unwind_protect = 0;
-
 					/* set the instruction pointer to an invalid value.
 					 * this is stored into the current method context
 					 * before context switching and marks a dead context */
@@ -1977,23 +1947,6 @@ static int execute (hcl_t* hcl)
 						ctx = hcl->active_context;
 						while ((hcl_oop_t)ctx != hcl->_nil)
 						{
-						#if 0
-							/* TODO: XXXXXXXXXXXXXX for STACK UNWINDING... */
-							if (HCL_CLASSOF(hcl, ctx) == hcl->_method_context)
-							{
-								hcl_ooi_t preamble;
-								preamble = HCL_OOP_TO_SMOOI(((hcl_oop_method_t)ctx->method_or_nargs)->preamble);
-								if (HCL_METHOD_GET_PREAMBLE_CODE(preamble) == HCL_METHOD_PREAMBLE_ENSURE)
-								{
-									if (!unwind_protect)
-									{
-										unwind_protect = 1;
-										unwind_start = ctx;
-									}
-									unwind_stop = ctx;
-								}
-							}
-						#endif
 							if (ctx == hcl->active_context->origin) goto non_local_return_ok;
 							ctx = ctx->sender;
 						}
@@ -2005,8 +1958,8 @@ static int execute (hcl_t* hcl)
 						HCL_ASSERT (hcl, hcl->active_context->origin->ip == HCL_SMOOI_TO_OOP(-1));
 
 						HCL_LOG0 (hcl, HCL_LOG_IC | HCL_LOG_ERROR, "Error - cannot return from dead context\n");
-						hcl_seterrnum (hcl, HCL_EINTERN); /* TODO: can i make this error catchable at the hcl level? */
-						return -1;
+						hcl_seterrbfmt (hcl, HCL_EINTERN, "unable to return from dead context"); /* TODO: can i make this error catchable at the hcl level? */
+						goto oops;
 
 					non_local_return_ok:
 /*HCL_DEBUG2 (hcl, "NON_LOCAL RETURN OK TO... %p %p\n", hcl->active_context->origin, hcl->active_context->origin->sender);*/
@@ -2020,61 +1973,39 @@ static int execute (hcl_t* hcl)
 					hcl->sp = HCL_OOP_TO_SMOOI(hcl->active_context->origin->sp);
 					SWITCH_ACTIVE_CONTEXT (hcl, hcl->active_context->origin->sender);
 
-#if 0 
-XXXXX
-					if (unwind_protect)
+					/* push the return value to the stack of the new active context */
+					HCL_STACK_PUSH (hcl, return_value);
+
+					if (hcl->active_context == hcl->initial_context)
 					{
-						static hcl_ooch_t fbm[] = { 
-							'u', 'n', 'w', 'i', 'n', 'd', 'T', 'o', ':', 
-							'r', 'e', 't', 'u', 'r', 'n', ':'
-						};
-
-						HCL_STACK_PUSH (hcl, (hcl_oop_t)unwind_start);
-						HCL_STACK_PUSH (hcl, (hcl_oop_t)unwind_stop);
-						HCL_STACK_PUSH (hcl, (hcl_oop_t)return_value);
-
-						if (send_private_message (hcl, fbm, 16, 0, 2) <= -1) return -1;
-					}
-					else
-					{
-#endif
-						/* push the return value to the stack of the new active context */
-						HCL_STACK_PUSH (hcl, return_value);
-
-						if (hcl->active_context == hcl->initial_context)
-						{
-							/* the new active context is the fake initial context.
-							 * this context can't get executed further. */
-							HCL_ASSERT (hcl, (hcl_oop_t)hcl->active_context->sender == hcl->_nil);
+						/* the new active context is the fake initial context.
+						 * this context can't get executed further. */
+						HCL_ASSERT (hcl, (hcl_oop_t)hcl->active_context->sender == hcl->_nil);
 /*
 //							HCL_ASSERT (hcl, HCL_CLASSOF(hcl, hcl->active_context) == hcl->_method_context);
 */
-							HCL_ASSERT (hcl, hcl->active_context->receiver_or_source == hcl->_nil);
-							HCL_ASSERT (hcl, hcl->active_context == hcl->processor->active->initial_context);
-							HCL_ASSERT (hcl, hcl->active_context->origin == hcl->processor->active->initial_context->origin);
-							HCL_ASSERT (hcl, hcl->active_context->origin == hcl->active_context);
+						HCL_ASSERT (hcl, hcl->active_context->receiver_or_source == hcl->_nil);
+						HCL_ASSERT (hcl, hcl->active_context == hcl->processor->active->initial_context);
+						HCL_ASSERT (hcl, hcl->active_context->origin == hcl->processor->active->initial_context->origin);
+						HCL_ASSERT (hcl, hcl->active_context->origin == hcl->active_context);
 
-							/* NOTE: this condition is true for the processified block context also.
-							 *   hcl->active_context->origin == hcl->processor->active->initial_context->origin
-							 *   however, the check here is done after context switching and the
-							 *   processified block check has been done against the context before switching */
+						/* NOTE: this condition is true for the processified block context also.
+						 *   hcl->active_context->origin == hcl->processor->active->initial_context->origin
+						 *   however, the check here is done after context switching and the
+						 *   processified block check has been done against the context before switching */
 
-							/* the stack contains the final return value so the stack pointer must be 0. */
-							HCL_ASSERT (hcl, hcl->sp == 0); 
+						/* the stack contains the final return value so the stack pointer must be 0. */
+						HCL_ASSERT (hcl, hcl->sp == 0); 
 
-							if (hcl->option.trait & HCL_AWAIT_PROCS)
-								terminate_process (hcl, hcl->processor->active);
-							else
-								goto done;
+						if (hcl->option.trait & HCL_AWAIT_PROCS)
+							terminate_process (hcl, hcl->processor->active);
+						else
+							goto done;
 
-							/* TODO: store the return value to the VM register.
-							 * the caller to hcl_execute() can fetch it to return it to the system */
-						}
+						/* TODO: store the return value to the VM register.
+						 * the caller to hcl_execute() can fetch it to return it to the system */
 					}
-#if 0
 				}
-#endif
-
 				break;
 
 			case HCL_CODE_RETURN_FROM_BLOCK:
@@ -2135,7 +2066,7 @@ XXXXX
 				 * this base block context is created with no temporaries
 				 * for this reason */
 				blkctx = (hcl_oop_context_t)make_context (hcl, 0);
-				if (!blkctx) return -1;
+				if (!blkctx) goto oops;
 
 				/* the long forward jump instruction has the format of 
 				 *   11000100 KKKKKKKK or 11000100 KKKKKKKK KKKKKKKK 
@@ -2192,7 +2123,7 @@ XXXXX
 				 * this base block context is created with no 
 				 * stack for this reason. */
 				blkctx = (hcl_oop_context_t)make_context (hcl, 0);
-				if (!blkctx) return -1;
+				if (!blkctx) goto oops;
 
 				/* get the receiver to the block copy message after block context instantiation
 				 * not to get affected by potential GC */
@@ -2264,6 +2195,11 @@ done:
 
 oops:
 	/* TODO: anything to do here? */
+	if (hcl->processor->active != hcl->nil_process) 
+	{
+HCL_LOG1 (hcl, HCL_LOG_IC | HCL_LOG_INFO, "TERMINATING ACTIVE PROCESS ... = %zu\n", inst_counter);
+		terminate_process (hcl, hcl->processor->active);
+	}
 	return -1;
 }
 
