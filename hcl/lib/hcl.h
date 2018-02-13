@@ -678,8 +678,6 @@ struct hcl_heap_t
 	hcl_uint8_t* ptr;   /* next allocation pointer */
 };
 
-typedef struct hcl_t hcl_t;
-
 /* =========================================================================
  * VIRTUAL MACHINE PRIMITIVES
  * ========================================================================= */
