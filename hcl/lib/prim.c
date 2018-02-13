@@ -536,7 +536,7 @@ static void unload (hcl_t* hcl, hcl_mod_t* mod)
 {
 }
 
-int hcl_mod_test (hcl_t* hcl, hcl_mod_t* mod)
+int hcl_mod_fake_test (hcl_t* hcl, hcl_mod_t* mod)
 {
 	mod->query = query;
 	mod->unload = unload; 
