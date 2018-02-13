@@ -1656,7 +1656,7 @@ int main (int argc, char* argv[])
 			}
 			else if (xtn->reader_istty)
 			{
-				hcl_decode (hcl, code_offset, hcl->code.bc.len - code_offset);
+				hcl_decode (hcl, code_offset, hcl->code.bc.len);
 				HCL_LOG0 (hcl, HCL_LOG_MNEMONIC, "------------------------------------------\n");
 				g_hcl = hcl;
 				//setup_tick ();
