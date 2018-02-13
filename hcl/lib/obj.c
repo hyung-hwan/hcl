@@ -377,6 +377,25 @@ hcl_oop_t hcl_makeinteger (hcl_t* hcl, hcl_ooi_t v)
 	return hcl_allocwordobj (hcl, HCL_BRAND_INTEGER, (hcl_oow_t*)&v, 1);
 }
 
+hcl_oop_t hcl_makebigint (hcl_t* hcl, int brand, const hcl_liw_t* ptr, hcl_oow_t len)
+{
+	hcl_oop_t oop;
+
+	HCL_ASSERT (hcl, brand == HCL_BRAND_PBIGINT || brand == HCL_BRAND_NBIGINT);
+
+#if (HCL_LIW_BITS == HCL_OOW_BITS)
+	oop = hcl_allocwordobj (hcl, brand, ptr, len);
+#elif (HCL_LIW_BITS == HCL_OOHW_BITS)
+	oop = hcl_allochalfwordobj (hcl, brand, ptr, len);
+#else
+#	error UNSUPPORTED LIW BIT SIZE
+#endif
+	if (!oop) return HCL_NULL;
+
+	HCL_OBJ_SET_FLAGS_BRAND (oop, brand);
+	return oop;
+}
+
 hcl_oop_t hcl_makecons (hcl_t* hcl, hcl_oop_t car, hcl_oop_t cdr)
 {
 	hcl_oop_cons_t cons;

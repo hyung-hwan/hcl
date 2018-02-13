@@ -478,7 +478,6 @@ hcl_mod_data_t* hcl_openmod (hcl_t* hcl, const hcl_ooch_t* name, hcl_oow_t namel
 		}
 
 		mdp = (hcl_mod_data_t*)HCL_RBT_VPTR(pair);
-		HCL_ASSERT (hcl, HCL_SIZEOF(mdp->mod.hints) == HCL_SIZEOF(int));
 		if (load(hcl, &mdp->mod) <= -1)
 		{
 			hcl_rbt_delete (&hcl->modtab, (hcl_ooch_t*)name, namelen);
@@ -543,7 +542,6 @@ hcl_mod_data_t* hcl_openmod (hcl_t* hcl, const hcl_ooch_t* name, hcl_oow_t namel
 	}
 
 	mdp = (hcl_mod_data_t*)HCL_RBT_VPTR(pair);
-	HCL_ASSERT (hcl, HCL_SIZEOF(mdp->mod.hints) == HCL_SIZEOF(int));
 	if (load(hcl, &mdp->mod) <= -1)
 	{
 		const hcl_ooch_t* oldmsg = hcl_backuperrmsg (hcl);

@@ -885,7 +885,6 @@ struct hcl_mod_t
 {
 	/* input */
 	const hcl_ooch_t name[HCL_MOD_NAME_LEN_MAX + 1];
-	/*const*/ int hints; /* bitwised-ORed of hcl_mod_hint_t enumerators */
 
 	/* user-defined data */
 	hcl_mod_query_t  query;
@@ -1215,6 +1214,8 @@ enum
 	HCL_BRAND_SYMBOL,
 	HCL_BRAND_STRING,
 	HCL_BRAND_DIC,
+	HCL_BRAND_PBIGINT, /* positive big integer */
+	HCL_BRAND_NBIGINT, /* negative big integer */
 
 	HCL_BRAND_CFRAME,/* compiler frame */
 	HCL_BRAND_PRIM,
@@ -1265,6 +1266,9 @@ enum
 #define HCL_IS_ARRAY(hcl,v) (HCL_OOP_IS_POINTER(v) && HCL_OBJ_GET_FLAGS_BRAND(v) == HCL_BRAND_ARRAY)
 #define HCL_IS_DIC(hcl,v) (HCL_OOP_IS_POINTER(v) && HCL_OBJ_GET_FLAGS_BRAND(v) == HCL_BRAND_DIC)
 #define HCL_IS_PRIM(hcl,v) (HCL_OOP_IS_POINTER(v) && HCL_OBJ_GET_FLAGS_BRAND(v) == HCL_BRAND_PRIM)
+#define HCL_IS_PBIGINT(hcl,v) (HCL_OOP_IS_POINTER(v) && HCL_OBJ_GET_FLAGS_BRAND(v) == HCL_BRAND_PBIGINT)
+#define HCL_IS_NBIGINT(hcl,v) (HCL_OOP_IS_POINTER(v) && HCL_OBJ_GET_FLAGS_BRAND(v) == HCL_BRAND_NBIGINT)
+#define HCL_IS_BIGINT(hcl,v) (HCL_OOP_IS_POINTER(v) && (HCL_OBJ_GET_FLAGS_BRAND(v) == HCL_BRAND_NBIGINT || HCL_OBJ_GET_FLAGS_BRAND(v) == HCL_BRAND_NBIGINT))
 
 #define HCL_CONS_CAR(v)  (((hcl_cons_t*)(v))->car)
 #define HCL_CONS_CDR(v)  (((hcl_cons_t*)(v))->cdr)
@@ -1610,6 +1614,13 @@ HCL_EXPORT hcl_oop_t hcl_makefalse (
 HCL_EXPORT hcl_oop_t hcl_makeinteger (
 	hcl_t*     hcl,
 	hcl_ooi_t  v
+);
+
+HCL_EXPORT hcl_oop_t hcl_makebigint (
+	hcl_t*           hcl, 
+	int              brand,
+	const hcl_liw_t* ptr,
+	hcl_oow_t        len
 );
 
 HCL_EXPORT hcl_oop_t hcl_makecons (
