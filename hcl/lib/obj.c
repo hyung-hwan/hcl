@@ -182,175 +182,6 @@ hcl_oop_t hcl_allocwordobj (hcl_t* hcl, int brand, const hcl_oow_t* ptr, hcl_oow
 }
 
 
-static HCL_INLINE int decode_spec (hcl_t* hcl, hcl_oop_t _class, hcl_oow_t vlen, hcl_obj_type_t* type, hcl_oow_t* outlen)
-{
-	hcl_oow_t spec;
-	hcl_oow_t named_instvar;
-	hcl_obj_type_t indexed_type;
-
-	HCL_ASSERT (hcl, HCL_OOP_IS_POINTER(_class));
-	HCL_ASSERT (hcl, HCL_CLASSOF(hcl, _class) == hcl->_class);
-
-	HCL_ASSERT (hcl, HCL_OOP_IS_SMOOI(((hcl_oop_class_t)_class)->spec));
-	spec = HCL_OOP_TO_SMOOI(((hcl_oop_class_t)_class)->spec);
-
-	named_instvar = HCL_CLASS_SPEC_NAMED_INSTVAR(spec); /* size of the named_instvar part */
-
-	if (HCL_CLASS_SPEC_IS_INDEXED(spec)) 
-	{
-		indexed_type = HCL_CLASS_SPEC_INDEXED_TYPE(spec);
-
-		if (indexed_type == HCL_OBJ_TYPE_OOP)
-		{
-			if (named_instvar > HCL_MAX_NAMED_INSTVARS ||
-			    vlen > HCL_MAX_INDEXED_INSTVARS(named_instvar))
-			{
-				return -1;
-			}
-
-			HCL_ASSERT (hcl, named_instvar + vlen <= HCL_OBJ_SIZE_MAX);
-		}
-		else
-		{
-			/* a non-pointer indexed class can't have named instance variables */
-			if (named_instvar > 0) return -1;
-			if (vlen > HCL_OBJ_SIZE_MAX) return -1;
-		}
-	}
-	else
-	{
-		/* named instance variables only. treat it as if it is an
-		 * indexable class with no variable data */
-		indexed_type = HCL_OBJ_TYPE_OOP;
-		vlen = 0; /* vlen is not used */
-
-		if (named_instvar > HCL_MAX_NAMED_INSTVARS) return -1;
-		HCL_ASSERT (hcl, named_instvar <= HCL_OBJ_SIZE_MAX);
-	}
-
-	*type = indexed_type;
-	*outlen = named_instvar + vlen;
-	return 0; 
-}
-
-hcl_oop_t hcl_instantiate (hcl_t* hcl, hcl_oop_t _class, const void* vptr, hcl_oow_t vlen)
-{
-#if 0
-	hcl_oop_t oop;
-	hcl_obj_type_t type;
-	hcl_oow_t alloclen;
-	hcl_oow_t tmp_count = 0;
-
-	HCL_ASSERT (hcl, hcl->_nil != HCL_NULL);
-
-	if (decode_spec (hcl, _class, vlen, &type, &alloclen) <= -1) 
-	{
-		hcl_seterrnum (hcl, HCL_EINVAL);
-		return HCL_NULL;
-	}
-
-	hcl_pushtmp (hcl, &_class); tmp_count++;
-
-	switch (type)
-	{
-		case HCL_OBJ_TYPE_OOP:
-			/* both the fixed part(named instance variables) and 
-			 * the variable part(indexed instance variables) are allowed. */
-			oop = hcl_allocoopobj (hcl, alloclen);
-
-			HCL_ASSERT (hcl, vptr == HCL_NULL);
-			/*
-			This function is not GC-safe. so i don't want to initialize
-			the payload of a pointer object. The caller can call this
-			function and initialize payloads then.
-			if (oop && vptr && vlen > 0)
-			{
-				hcl_oop_oop_t hdr = (hcl_oop_oop_t)oop;
-				HCL_MEMCPY (&hdr->slot[named_instvar], vptr, vlen * HCL_SIZEOF(hcl_oop_t));
-			}
-
-			For the above code to work, it should protect the elements of 
-			the vptr array with hcl_pushtmp(). So it might be better 
-			to disallow a non-NULL vptr when indexed_type is OOP. See
-			the assertion above this comment block.
-			*/
-			break;
-
-		case HCL_OBJ_TYPE_CHAR:
-			oop = hcl_alloccharobj (hcl, vptr, alloclen);
-			break;
-
-		case HCL_OBJ_TYPE_BYTE:
-			oop = hcl_allocbyteobj (hcl, vptr, alloclen);
-			break;
-
-		case HCL_OBJ_TYPE_HALFWORD:
-			oop = hcl_allochalfwordobj (hcl, vptr, alloclen);
-			break;
-
-		case HCL_OBJ_TYPE_WORD:
-			oop = hcl_allocwordobj (hcl, vptr, alloclen);
-			break;
-
-		default:
-			hcl_seterrnum (hcl, HCL_EINTERN);
-			oop = HCL_NULL;
-			break;
-	}
-
-	if (oop) HCL_OBJ_SET_CLASS (oop, _class);
-	hcl_poptmps (hcl, tmp_count);
-	return oop;
-#endif
-
-	hcl_seterrnum (hcl, HCL_ENOIMPL);
-	return HCL_NULL;
-}
-
-#if defined(HCL_USE_OBJECT_TRAILER)
-
-hcl_oop_t hcl_instantiatewithtrailer (hcl_t* hcl, hcl_oop_t _class, hcl_oow_t vlen, const hcl_oob_t* tptr, hcl_oow_t tlen)
-{
-#if 0
-	hcl_oop_t oop;
-	hcl_obj_type_t type;
-	hcl_oow_t alloclen;
-	hcl_oow_t tmp_count = 0;
-
-	HCL_ASSERT (hcl, hcl->_nil != HCL_NULL);
-
-	if (decode_spec (hcl, _class, vlen, &type, &alloclen) <= -1) 
-	{
-		hcl_seterrnum (hcl, HCL_EINVAL);
-		return HCL_NULL;
-	}
-
-	hcl_pushtmp (hcl, &_class); tmp_count++;
-
-	switch (type)
-	{
-		case HCL_OBJ_TYPE_OOP:
-			/* NOTE: vptr is not used for GC unsafety */
-			oop = hcl_allocoopobjwithtrailer(hcl, alloclen, tptr, tlen);
-			break;
-
-		default:
-			hcl_seterrnum (hcl, HCL_EINTERN);
-			oop = HCL_NULL;
-			break;
-	}
-
-	if (oop) HCL_OBJ_SET_CLASS (oop, _class);
-	hcl_poptmps (hcl, tmp_count);
-	return oop;
-#endif
-
-	hcl_seterrnum (hcl, HCL_ENOIMPL);
-	return HCL_NULL;
-}
-#endif
-
-
 /* ------------------------------------------------------------------------ *
  * COMMON OBJECTS
  * ------------------------------------------------------------------------ */
@@ -369,12 +200,6 @@ hcl_oop_t hcl_maketrue (hcl_t* hcl)
 hcl_oop_t hcl_makefalse (hcl_t* hcl)
 {
 	return hcl_allocoopobj (hcl, HCL_BRAND_FALSE, 0);
-}
-
-hcl_oop_t hcl_makeinteger (hcl_t* hcl, hcl_ooi_t v)
-{
-	if (HCL_IN_SMOOI_RANGE(v)) return HCL_SMOOI_TO_OOP(v);
-	return hcl_allocwordobj (hcl, HCL_BRAND_INTEGER, (hcl_oow_t*)&v, 1);
 }
 
 hcl_oop_t hcl_makebigint (hcl_t* hcl, int brand, const hcl_liw_t* ptr, hcl_oow_t len)
@@ -425,13 +250,11 @@ hcl_oop_t hcl_makebytearray (hcl_t* hcl, const hcl_oob_t* ptr, hcl_oow_t size)
 	return hcl_allocbyteobj (hcl, HCL_BRAND_BYTE_ARRAY, ptr, size);
 }
 
-hcl_oop_t hcl_makestring (hcl_t* hcl, const hcl_ooch_t* ptr, hcl_oow_t len)
+hcl_oop_t hcl_makestring (hcl_t* hcl, const hcl_ooch_t* ptr, hcl_oow_t len, int ngc)
 {
-	return hcl_alloccharobj (hcl, HCL_BRAND_STRING, ptr, len);
+	/*return hcl_alloccharobj (hcl, HCL_BRAND_STRING, ptr, len);*/
+	return alloc_numeric_array (hcl, HCL_BRAND_STRING, ptr, len, HCL_OBJ_TYPE_CHAR, HCL_SIZEOF(hcl_ooch_t), 1, ngc);
 }
-
-
-
 
 
 /* ------------------------------------------------------------------------ *

@@ -495,41 +495,6 @@ struct hcl_dic_t
 	hcl_oop_oop_t bucket; /* Array */
 };
 
-#define HCL_CLASS_NAMED_INSTVARS 11
-typedef struct hcl_class_t hcl_class_t;
-typedef struct hcl_class_t* hcl_oop_class_t;
-struct hcl_class_t
-{
-	HCL_OBJ_HEADER;
-
-	hcl_oop_t      spec;          /* SmallInteger. instance specification */
-	hcl_oop_t      selfspec;      /* SmallInteger. specification of the class object itself */
-
-	hcl_oop_t      superclass;    /* Another class */
-	hcl_oop_t      subclasses;    /* Array of subclasses */
-
-	hcl_oop_char_t name;          /* Symbol */
-
-	/* == NEVER CHANGE THIS ORDER OF 3 ITEMS BELOW == */
-	hcl_oop_char_t instvars;      /* String */
-	hcl_oop_char_t classvars;     /* String */
-	hcl_oop_char_t classinstvars; /* String */
-	/* == NEVER CHANGE THE ORDER OF 3 ITEMS ABOVE == */
-
-	hcl_oop_char_t pooldics;      /* String */
-
-	/* [0] - instance methods, MethodDictionary
-	 * [1] - class methods, MethodDictionary */
-	hcl_oop_dic_t  mthdic[2];      
-
-	/* indexed part afterwards */
-	hcl_oop_t      slot[1];   /* class instance variables and class variables. */
-};
-#define HCL_CLASS_MTHDIC_INSTANCE 0
-#define HCL_CLASS_MTHDIC_CLASS    1
-
-
-
 #define HCL_CONTEXT_NAMED_INSTVARS 8
 typedef struct hcl_context_t hcl_context_t;
 typedef struct hcl_context_t* hcl_oop_context_t;
@@ -651,7 +616,7 @@ struct hcl_process_scheduler_t
  * object encoded into a pointer.
  */
 #define HCL_BRANDOF(hcl,oop) ( \
-	HCL_OOP_IS_SMOOI(oop)? HCL_BRAND_INTEGER: \
+	HCL_OOP_IS_SMOOI(oop)? HCL_BRAND_SMOOI: \
 	HCL_OOP_IS_CHAR(oop)? HCL_BRAND_CHARACTER: HCL_OBJ_GET_FLAGS_BRAND(oop) \
 )
 
@@ -706,17 +671,17 @@ struct hcl_vmprim_t
 {
 	hcl_vmprim_dlopen_t   dl_open;
 	hcl_vmprim_dlclose_t  dl_close;
-	hcl_vmprim_dlgetsym_t    dl_getsym;
+	hcl_vmprim_dlgetsym_t dl_getsym;
 
 	hcl_log_write_t       log_write;
 	hcl_syserrstrb_t      syserrstrb;
 	hcl_syserrstru_t      syserrstru;
 
-	hcl_vmprim_startup_t   vm_startup;
-	hcl_vmprim_cleanup_t   vm_cleanup;
-	hcl_vmprim_gettime_t   vm_gettime;
+	hcl_vmprim_startup_t  vm_startup;
+	hcl_vmprim_cleanup_t  vm_cleanup;
+	hcl_vmprim_gettime_t  vm_gettime;
 
-	hcl_vmprim_sleep_t   vm_sleep;
+	hcl_vmprim_sleep_t    vm_sleep;
 };
 
 typedef struct hcl_vmprim_t hcl_vmprim_t;
@@ -1206,7 +1171,9 @@ enum
 	HCL_BRAND_TRUE,
 	HCL_BRAND_FALSE,
 	HCL_BRAND_CHARACTER,
-	HCL_BRAND_INTEGER,
+	HCL_BRAND_SMOOI, /* never used as a small integer is encoded in an object pointer */
+	HCL_BRAND_PBIGINT, /* positive big integer */
+	HCL_BRAND_NBIGINT, /* negative big integer */
 	HCL_BRAND_CONS,
 	HCL_BRAND_ARRAY,
 	HCL_BRAND_BYTE_ARRAY,
@@ -1214,8 +1181,6 @@ enum
 	HCL_BRAND_SYMBOL,
 	HCL_BRAND_STRING,
 	HCL_BRAND_DIC,
-	HCL_BRAND_PBIGINT, /* positive big integer */
-	HCL_BRAND_NBIGINT, /* negative big integer */
 
 	HCL_BRAND_CFRAME,/* compiler frame */
 	HCL_BRAND_PRIM,
@@ -1256,7 +1221,6 @@ enum
 #define HCL_IS_NIL(hcl,v) (v == (hcl)->_nil)
 #define HCL_IS_TRUE(hcl,v) (v == (hcl)->_true)
 #define HCL_IS_FALSE(hcl,v) (v == (hcl)->_false)
-#define HCL_IS_INTEGER(hcl,v) (HCL_OOP_IS_POINTER(v) && HCL_OBJ_GET_FLAGS_BRAND(v) == HCL_BRAND_INTEGER)
 #define HCL_IS_SYMBOL(hcl,v) (HCL_OOP_IS_POINTER(v) && HCL_OBJ_GET_FLAGS_BRAND(v) == HCL_BRAND_SYMBOL)
 #define HCL_IS_SYMBOL_ARRAY(hcl,v) (HCL_OOP_IS_POINTER(v) && HCL_OBJ_GET_FLAGS_BRAND(v) == HCL_BRAND_SYMBOL_ARRAY)
 #define HCL_IS_CONTEXT(hcl,v) (HCL_OOP_IS_POINTER(v) && HCL_OBJ_GET_FLAGS_BRAND(v) == HCL_BRAND_CONTEXT)
@@ -1268,7 +1232,7 @@ enum
 #define HCL_IS_PRIM(hcl,v) (HCL_OOP_IS_POINTER(v) && HCL_OBJ_GET_FLAGS_BRAND(v) == HCL_BRAND_PRIM)
 #define HCL_IS_PBIGINT(hcl,v) (HCL_OOP_IS_POINTER(v) && HCL_OBJ_GET_FLAGS_BRAND(v) == HCL_BRAND_PBIGINT)
 #define HCL_IS_NBIGINT(hcl,v) (HCL_OOP_IS_POINTER(v) && HCL_OBJ_GET_FLAGS_BRAND(v) == HCL_BRAND_NBIGINT)
-#define HCL_IS_BIGINT(hcl,v) (HCL_OOP_IS_POINTER(v) && (HCL_OBJ_GET_FLAGS_BRAND(v) == HCL_BRAND_NBIGINT || HCL_OBJ_GET_FLAGS_BRAND(v) == HCL_BRAND_NBIGINT))
+#define HCL_IS_BIGINT(hcl,v) (HCL_OOP_IS_POINTER(v) && (HCL_OBJ_GET_FLAGS_BRAND(v) == HCL_BRAND_PBIGINT || HCL_OBJ_GET_FLAGS_BRAND(v) == HCL_BRAND_NBIGINT))
 
 #define HCL_CONS_CAR(v)  (((hcl_cons_t*)(v))->car)
 #define HCL_CONS_CDR(v)  (((hcl_cons_t*)(v))->cdr)
@@ -1407,13 +1371,6 @@ HCL_EXPORT void hcl_gc (
 HCL_EXPORT hcl_oow_t hcl_getpayloadbytes (
 	hcl_t*    hcl,
 	hcl_oop_t oop
-);
-
-HCL_EXPORT hcl_oop_t hcl_instantiate (
-	hcl_t*          hcl,
-	hcl_oop_t       _class,
-	const void*      vptr,
-	hcl_oow_t       vlen
 );
 
 HCL_EXPORT hcl_oop_t hcl_shallowcopy (
@@ -1611,11 +1568,6 @@ HCL_EXPORT hcl_oop_t hcl_makefalse (
 	hcl_t*     hcl
 );
 
-HCL_EXPORT hcl_oop_t hcl_makeinteger (
-	hcl_t*     hcl,
-	hcl_ooi_t  v
-);
-
 HCL_EXPORT hcl_oop_t hcl_makebigint (
 	hcl_t*           hcl, 
 	int              brand,
@@ -1643,7 +1595,8 @@ HCL_EXPORT hcl_oop_t hcl_makebytearray (
 HCL_EXPORT hcl_oop_t hcl_makestring (
 	hcl_t*            hcl,
 	const hcl_ooch_t* ptr,
-	hcl_oow_t         len
+	hcl_oow_t         len,
+	int               ngc
 );
 
 HCL_EXPORT hcl_oop_t hcl_makedic (

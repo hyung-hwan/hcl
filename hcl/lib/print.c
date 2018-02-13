@@ -132,7 +132,7 @@ next:
 		if (outbfmt(hcl, mask, "$%.1jc", HCL_OOP_TO_CHAR(obj)) <= -1) return -1;
 		goto done;
 	}
-
+ 
 	switch ((brand = HCL_OBJ_GET_FLAGS_BRAND(obj))) 
 	{
 		case HCL_BRAND_NIL:
@@ -147,12 +147,29 @@ next:
 			word_index = WORD_FALSE;
 			goto print_word;
 
+		case HCL_BRAND_SMOOI:
+			/* this type should not appear here as the actual small integer is 
+			 * encoded in an object pointer */
+			hcl_seterrbfmt (hcl, HCL_EINTERN, "internal error - unexpected object type %d", (int)brand);
+			return -1;
 
-		case HCL_BRAND_INTEGER:
-/* TODO: print properly... print big int */
-			HCL_ASSERT (hcl, HCL_OBJ_GET_SIZE(obj) == 1);
-			if (outbfmt(hcl, mask, "%zu", ((hcl_oop_word_t)obj)->slot[0]) <= -1) return -1;
+		case HCL_BRAND_PBIGINT:
+		case HCL_BRAND_NBIGINT:
+		{
+			hcl_oop_t str;
+
+			/* TODO: can i do this without memory allocation? */
+			str = hcl_inttostr(hcl, obj, 10, 1); /* inttostr with ngc on. not using object memory */
+			if (!str) return -1;
+
+			if (outbfmt(hcl, mask, "%.*js", HCL_OBJ_GET_SIZE(str), HCL_OBJ_GET_CHAR_SLOT(str)) <= -1) 
+			{
+				hcl_freengcobj (hcl, str);
+				return -1;
+			}
+			hcl_freengcobj (hcl, str);
 			break;
+		}
 
 #if 0
 		case HCL_BRAND_REAL:
@@ -590,7 +607,7 @@ done:
 
 			default:
 				HCL_DEBUG3 (hcl, "Internal error - unknown print stack type %d at %s:%d\n", (int)ps.type, __FILE__, __LINE__);
-				hcl_seterrbfmt (hcl, HCL_EINTERN, "unknown print stack type %d", (int)ps.type);
+				hcl_seterrbfmt (hcl, HCL_EINTERN, "internal error - unknown print stack type %d", (int)ps.type);
 				return -1;
 		}
 	}

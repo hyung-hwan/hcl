@@ -178,6 +178,43 @@ static int string_to_ooi (hcl_t* hcl, hcl_oocs_t* str, int radixed, hcl_ooi_t* n
 	return 0;
 }
 
+static hcl_oop_t string_to_num (hcl_t* hcl, hcl_oocs_t* str, int radixed)
+{
+	int negsign, base;
+	const hcl_ooch_t* ptr, * end;
+
+	negsign = 0;
+	ptr = str->ptr,
+	end = str->ptr + str->len;
+
+	HCL_ASSERT (hcl, ptr < end);
+
+	if (*ptr == '+' || *ptr == '-')
+	{
+		negsign = *ptr - '+';
+		ptr++;
+	}
+
+	if (radixed)
+	{
+		HCL_ASSERT (hcl, ptr < end);
+
+		base = 0;
+		do
+		{
+			base = base * 10 + CHAR_TO_NUM(*ptr, 10);
+			ptr++;
+		}
+		while (*ptr != 'r');
+
+		ptr++;
+	}
+	else base = 10;
+
+/* TODO: handle floating point numbers ... etc */
+	if (negsign) base = -base;
+	return hcl_strtoint (hcl, ptr, end - ptr, base);
+}
 static HCL_INLINE int is_spacechar (hcl_ooci_t c)
 {
 	/* TODO: handle other space unicode characters */
@@ -1855,33 +1892,25 @@ static int read_object (hcl_t* hcl)
 
 			case HCL_IOTOK_NUMLIT:
 			case HCL_IOTOK_RADNUMLIT:
-			{
-				hcl_ooi_t v;
-				if (string_to_ooi (hcl, TOKEN_NAME(hcl), TOKEN_TYPE(hcl) == HCL_IOTOK_RADNUMLIT, &v) <= -1) 
-				{
-					if (hcl->errnum == HCL_ERANGE) hcl_setsynerr (hcl, HCL_SYNERR_INTRANGE, TOKEN_LOC(hcl), TOKEN_NAME(hcl));
-					return -1;
-				}
-				obj = hcl_makeinteger (hcl, v);
-				break;
-			}
+			obj = string_to_num(hcl, TOKEN_NAME(hcl), TOKEN_TYPE(hcl) == HCL_IOTOK_RADNUMLIT);
+			break;
 
 			/*
 			case HCL_IOTOK_REAL:
-				obj = hcl_makerealent (hcl, HCL_IOTOK_RVAL(hcl));
+				obj = hcl_makerealnum (hcl, HCL_IOTOK_RVAL(hcl));
 				break;
 			*/
 
 			case HCL_IOTOK_STRLIT:
-				obj = hcl_makestring (hcl, TOKEN_NAME_PTR(hcl), TOKEN_NAME_LEN(hcl));
+				obj = hcl_makestring(hcl, TOKEN_NAME_PTR(hcl), TOKEN_NAME_LEN(hcl), 0);
 				break;
 
 			case HCL_IOTOK_IDENT:
-				obj = hcl_makesymbol (hcl, TOKEN_NAME_PTR(hcl), TOKEN_NAME_LEN(hcl));
+				obj = hcl_makesymbol(hcl, TOKEN_NAME_PTR(hcl), TOKEN_NAME_LEN(hcl));
 				break;
 
 			case HCL_IOTOK_IDENT_DOTTED:
-				obj = hcl_makesymbol (hcl, TOKEN_NAME_PTR(hcl), TOKEN_NAME_LEN(hcl));
+				obj = hcl_makesymbol(hcl, TOKEN_NAME_PTR(hcl), TOKEN_NAME_LEN(hcl));
 				if (obj)
 				{
 					hcl_pfbase_t* pfbase;

@@ -169,19 +169,12 @@ static HCL_INLINE int liw_mul_overflow (hcl_liw_t a, hcl_liw_t b, hcl_liw_t* c)
 static int is_normalized_integer (hcl_t* hcl, hcl_oop_t oop)
 {
 	if (HCL_OOP_IS_SMOOI(oop)) return 1;
-	if (HCL_OOP_IS_POINTER(oop))
+	if (HCL_IS_BIGINT(hcl,oop))
 	{
-		hcl_oop_class_t c;
-
-		if (HCL_IS_BIGINT(hcl,c))
-		{
-			hcl_oow_t sz;
-
-			sz = HCL_OBJ_GET_SIZE(oop);
-			HCL_ASSERT (hcl, sz >= 1);
-
-			return ((hcl_oop_liword_t)oop)->slot[sz - 1] == 0? 0: 1;
-		}
+		hcl_oow_t sz;
+		sz = HCL_OBJ_GET_SIZE(oop);
+		HCL_ASSERT (hcl, sz >= 1);
+		return ((hcl_oop_liword_t)oop)->slot[sz - 1] != 0;
 	}
 
 	return 0;
@@ -194,8 +187,7 @@ HCL_INLINE static int is_bigint (hcl_t* hcl, hcl_oop_t x)
 
 HCL_INLINE int hcl_isint (hcl_t* hcl, hcl_oop_t x)
 {
-	if (HCL_OOP_IS_SMOOI(x)) return 1;
-	return HCL_IS_BIGINT(hcl, x);
+	return HCL_OOP_IS_SMOOI(x) || HCL_IS_BIGINT(hcl, x);
 }
 
 static HCL_INLINE int bigint_to_oow (hcl_t* hcl, hcl_oop_t num, hcl_oow_t* w)
@@ -280,7 +272,7 @@ int hcl_inttooow (hcl_t* hcl, hcl_oop_t x, hcl_oow_t* w)
 
 	if (is_bigint(hcl, x)) return bigint_to_oow (hcl, x, w);
 
-	hcl_seterrnum (hcl, HCL_EINVAL);
+	hcl_seterrbfmt (hcl, HCL_EINVAL, "not an integer - %O", x);
 	return 0; /* not convertable - too big, too small, or not an integer */
 }
 
@@ -3946,7 +3938,7 @@ oops_einval:
 	return HCL_NULL;
 }
 
-hcl_oop_t hcl_inttostr (hcl_t* hcl, hcl_oop_t num, int radix)
+hcl_oop_t hcl_inttostr (hcl_t* hcl, hcl_oop_t num, int radix, int ngc)
 {
 	hcl_ooi_t v = 0;
 	hcl_oow_t w;
@@ -3983,7 +3975,7 @@ hcl_oop_t hcl_inttostr (hcl_t* hcl, hcl_oop_t num, int radix)
 		if (v < 0) buf[len++] = '-';
 
 		reverse_string (buf, len);
-		return hcl_makestring(hcl, buf, len);
+		return hcl_makestring(hcl, buf, len, ngc);
 	}
 
 	as = HCL_OBJ_GET_SIZE(num);
@@ -4031,7 +4023,7 @@ hcl_oop_t hcl_inttostr (hcl_t* hcl, hcl_oop_t num, int radix)
 		HCL_ASSERT (hcl, xpos >= 1);
 		if (HCL_IS_NBIGINT(hcl, num)) xbuf[--xpos] = '-';
 
-		s = hcl_makestring (hcl, &xbuf[xpos], xlen - xpos);
+		s = hcl_makestring(hcl, &xbuf[xpos], xlen - xpos, ngc);
 		hcl_freemem (hcl, xbuf);
 		return s;
 	}
@@ -4118,9 +4110,9 @@ hcl_oop_t hcl_inttostr (hcl_t* hcl, hcl_oop_t num, int radix)
 	}
 	while (1);
 
-	if (HCL_IS_NBIGINT(hcl,num)) xbuf[xlen++] = '-';
+	if (HCL_IS_NBIGINT(hcl, num)) xbuf[xlen++] = '-';
 	reverse_string (xbuf, xlen);
-	s = hcl_makestring (hcl, xbuf, xlen);
+	s = hcl_makestring(hcl, xbuf, xlen, ngc);
 
 	hcl_freemem (hcl, t);
 	hcl_freemem (hcl, xbuf);

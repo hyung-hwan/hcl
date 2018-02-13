@@ -118,114 +118,6 @@
 #define HCL_ALIGN(x,y) ((((x) + (y) - 1) / (y)) * (y))
 
 
-/* ========================================================================= */
-/* CLASS SPEC ENCODING                                                       */
-/* ========================================================================= */
-
-/*
- * The spec field of a class object encodes the number of the fixed part
- * and the type of the indexed part. The fixed part is the number of
- * named instance variables. If the spec of a class is indexed, the object
- * of the class can be i nstantiated with the size of the indexed part.
- *
- * For example, on a platform where sizeof(hcl_oow_t) is 4, 
- * the layout of the spec field of a class as an OOP value looks like this:
- * 
- *  31                           10 9   8 7 6 5 4 3  2           1 0 
- * |number of named instance variables|indexed-type|indexability|oop-tag|
- *
- * the number of named instance variables is stored in high 23 bits.
- * the indexed type takes up bit 3 to bit 8 (assuming HCL_OBJ_TYPE_BITS is 6. 
- * HCL_OBJ_TYPE_XXX enumerators are used to represent actual values).
- * and the indexability is stored in bit 2.
- *
- * The maximum number of named(fixed) instance variables for a class is:
- *     2 ^ ((BITS-IN-OOW - HCL_OOP_TAG_BITS) - HCL_OBJ_TYPE_BITS - 1) - 1
- *
- * HCL_OOP_TAG_BITS are decremented from the number of bits in OOW because
- * the spec field is always encoded as a small integer.
- *
- * The number of named instance variables can be greater than 0 if the
- * class spec is not indexed or if it's a pointer indexed class
- * (indexed_type == HCL_OBJ_TYPE_OOP)
- * 
- * indexed_type is one of the #hcl_obj_type_t enumerators.
- */
-
-/*
- * The HCL_CLASS_SPEC_MAKE() macro creates a class spec value.
- *  _class->spec = HCL_SMOOI_TO_OOP(HCL_CLASS_SPEC_MAKE(0, 1, HCL_OBJ_TYPE_CHAR));
- */
-#define HCL_CLASS_SPEC_MAKE(named_instvar,is_indexed,indexed_type) ( \
-	(((hcl_oow_t)(named_instvar)) << (HCL_OBJ_FLAGS_TYPE_BITS + 1)) |  \
-	(((hcl_oow_t)(indexed_type)) << 1) | (((hcl_oow_t)is_indexed) & 1) )
-
-/* what is the number of named instance variables? 
- *  HCL_CLASS_SPEC_NAMED_INSTVAR(HCL_OOP_TO_SMOOI(_class->spec))
- */
-#define HCL_CLASS_SPEC_NAMED_INSTVAR(spec) \
-	(((hcl_oow_t)(spec)) >> (HCL_OBJ_FLAGS_TYPE_BITS + 1))
-
-/* is it a user-indexable class? 
- * all objects can be indexed with basicAt:.
- * this indicates if an object can be instantiated with a dynamic size
- * (new: size) and and can be indexed with at:.
- */
-#define HCL_CLASS_SPEC_IS_INDEXED(spec) (((hcl_oow_t)(spec)) & 1)
-
-/* if so, what is the indexing type? character? pointer? etc? */
-#define HCL_CLASS_SPEC_INDEXED_TYPE(spec) \
-	((((hcl_oow_t)(spec)) >> 1) & HCL_LBMASK(hcl_oow_t, HCL_OBJ_FLAGS_TYPE_BITS))
-
-/* What is the maximum number of named instance variables?
- * This limit is set so because the number must be encoded into the spec field
- * of the class with limited number of bits assigned to the number of
- * named instance variables. the trailing -1 in the calculation of number of
- * bits is to consider the sign bit of a small-integer which is a typical
- * type of the spec field in the class object.
- */
-/*
-#define HCL_MAX_NAMED_INSTVARS \
-	HCL_BITS_MAX(hcl_oow_t, HCL_OOW_BITS - HCL_OOP_TAG_BITS - (HCL_OBJ_FLAGS_TYPE_BITS + 1) - 1)
-*/
-#define HCL_MAX_NAMED_INSTVARS \
-	HCL_BITS_MAX(hcl_oow_t, HCL_SMOOI_ABS_BITS - (HCL_OBJ_FLAGS_TYPE_BITS + 1))
-
-/* Given the number of named instance variables, what is the maximum number 
- * of indexed instance variables? The number of indexed instance variables
- * is not stored in the spec field of the class. It only affects the actual
- * size of an object(obj->_size) selectively combined with the number of 
- * named instance variables. So it's the maximum value of obj->_size minus
- * the number of named instance variables.
- */
-#define HCL_MAX_INDEXED_INSTVARS(named_instvar) (HCL_OBJ_SIZE_MAX - named_instvar)
-
-/*
-#define HCL_CLASS_SELFSPEC_MAKE(class_var,classinst_var) \
-	(((hcl_oow_t)class_var) << ((HCL_OOW_BITS - HCL_OOP_TAG_BITS) / 2)) | ((hcl_oow_t)classinst_var)
-*/
-#define HCL_CLASS_SELFSPEC_MAKE(class_var,classinst_var) \
-	(((hcl_oow_t)class_var) << (HCL_SMOOI_BITS / 2)) | ((hcl_oow_t)classinst_var)
-
-/*
-#define HCL_CLASS_SELFSPEC_CLASSVAR(spec) ((hcl_oow_t)spec >> ((HCL_OOW_BITS - HCL_OOP_TAG_BITS) / 2))
-#define HCL_CLASS_SELFSPEC_CLASSINSTVAR(spec) (((hcl_oow_t)spec) & HCL_LBMASK(hcl_oow_t, (HCL_OOW_BITS - HCL_OOP_TAG_BITS) / 2))
-*/
-#define HCL_CLASS_SELFSPEC_CLASSVAR(spec) ((hcl_oow_t)spec >> (HCL_SMOOI_BITS / 2))
-#define HCL_CLASS_SELFSPEC_CLASSINSTVAR(spec) (((hcl_oow_t)spec) & HCL_LBMASK(hcl_oow_t, (HCL_SMOOI_BITS / 2)))
-
-/*
- * yet another -1 in the calculation of the bit numbers for signed nature of
- * a small-integer
- */
-/*
-#define HCL_MAX_CLASSVARS      HCL_BITS_MAX(hcl_oow_t, (HCL_OOW_BITS - HCL_OOP_TAG_BITS - 1) / 2)
-#define HCL_MAX_CLASSINSTVARS  HCL_BITS_MAX(hcl_oow_t, (HCL_OOW_BITS - HCL_OOP_TAG_BITS - 1) / 2)
-*/
-#define HCL_MAX_CLASSVARS      HCL_BITS_MAX(hcl_oow_t, HCL_SMOOI_ABS_BITS / 2)
-#define HCL_MAX_CLASSINSTVARS  HCL_BITS_MAX(hcl_oow_t, HCL_SMOOI_ABS_BITS / 2)
-
-
 #if defined(HCL_LIMIT_OBJ_SIZE)
 /* limit the maximum object size such that:
  *   1. an index to an object field can be represented in a small integer.
@@ -238,8 +130,6 @@
 #	define HCL_OBJ_SIZE_BITS_MAX (HCL_OBJ_SIZE_MAX * 8)
 #endif
 
-
-typedef hcl_ooi_t (*hcl_outbfmt_t) (hcl_t* hcl, hcl_oow_t mask, const hcl_bch_t* fmt, ...);
 
 #if defined(HCL_INCLUDE_COMPILER)
 
@@ -741,6 +631,16 @@ enum hcl_bcode_t
 	HCL_CODE_NOOP                     = 0xFF  /* 255 */
 };
 
+
+
+typedef hcl_ooi_t (*hcl_outbfmt_t) (
+	hcl_t*           hcl,
+	hcl_oow_t        mask,
+	const hcl_bch_t* fmt,
+	...
+);
+
+
 #if defined(__cplusplus)
 extern "C" {
 #endif
@@ -861,16 +761,6 @@ hcl_oop_t hcl_allocwordobj (
 	const hcl_oow_t* ptr,
 	hcl_oow_t        len
 );
-
-#if defined(HCL_USE_OBJECT_TRAILER)
-hcl_oop_t hcl_instantiatewithtrailer (
-	hcl_t*           hcl, 
-	hcl_oop_t        _class,
-	hcl_oow_t        vlen,
-	const hcl_oob_t* tptr,
-	hcl_oow_t        tlen
-);
-#endif
 
 /* ========================================================================= */
 /* sym.c                                                                     */
@@ -1077,13 +967,14 @@ hcl_oop_t hcl_strtoint (
 	hcl_t*            hcl,
 	const hcl_ooch_t* str,
 	hcl_oow_t         len,
-	int                radix
+	int               radix
 );
 
 hcl_oop_t hcl_inttostr (
 	hcl_t*      hcl,
 	hcl_oop_t   num,
-	int         radix
+	int         radix,
+	int         ngc
 );
 
 
