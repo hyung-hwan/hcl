@@ -395,6 +395,7 @@ int hcl_addbuiltinprims (hcl_t* hcl)
 {
 	hcl_oow_t i;
 	hcl_oop_t prim, name;
+	hcl_oop_cons_t cons;
 
 	for (i = 0; i < HCL_COUNTOF(builtin_prims); i++)
 	{
@@ -406,7 +407,15 @@ int hcl_addbuiltinprims (hcl_t* hcl)
 		hcl_poptmp (hcl);
 		if (!name) return -1;
 
-		if (!hcl_putatsysdic(hcl, name, prim)) return -1;
+		hcl_pushtmp (hcl, &name);
+		cons = hcl_putatsysdic(hcl, name, prim);
+		hcl_poptmp (hcl);
+		if (!cons) return -1;
+
+		/* turn on the kernel bit in the symbol associated with a primitive 
+		 * function. 'set' prevents this symbol from being used as a variable
+		 * name */ 
+		HCL_OBJ_SET_FLAGS_KERNEL (name, 1);
 	}
 
 	return 0;

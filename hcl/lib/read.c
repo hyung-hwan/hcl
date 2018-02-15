@@ -1646,10 +1646,17 @@ static int get_symbol_array_literal (hcl_t* hcl, hcl_oop_t* xlit)
 	HCL_ASSERT (hcl, TOKEN_TYPE(hcl) == HCL_IOTOK_VBAR);
 	GET_TOKEN(hcl); /* skip #[ */
 
-	while (TOKEN_TYPE(hcl) == HCL_IOTOK_IDENT)
+	while (TOKEN_TYPE(hcl) == HCL_IOTOK_IDENT /* || TOKEN_TYPE(hcl) == HCL_IOTOK_IDENT_DOTTED */)
 	{
-		sym = hcl_makesymbol (hcl, TOKEN_NAME_PTR(hcl), TOKEN_NAME_LEN(hcl));
+		sym = hcl_makesymbol(hcl, TOKEN_NAME_PTR(hcl), TOKEN_NAME_LEN(hcl));
 		if (!sym) return -1;
+
+		if (HCL_OBJ_GET_FLAGS_SYNCODE(sym) || HCL_OBJ_GET_FLAGS_KERNEL(sym))
+		{
+			hcl_setsynerrbfmt (hcl, HCL_SYNERR_BANNEDVARNAME, HCL_NULL, HCL_NULL,
+				"special symbol not to be declared as a variable - %O", sym); /* TOOD: error location */
+			return -1;
+		}
 
 		if (add_to_symbol_array_literal_buffer(hcl, sym) <= -1) return -1;
 		GET_TOKEN (hcl);
@@ -1934,6 +1941,7 @@ static int read_object (hcl_t* hcl)
 
 					hcl_poptmp (hcl);
 
+					HCL_OBJ_SET_FLAGS_KERNEL (obj, 1);
 				}
 				break;
 		}

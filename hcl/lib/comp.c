@@ -797,7 +797,7 @@ static int compile_lambda (hcl_t* hcl, hcl_oop_t src, int defun)
 			return -1;
 		}
 
-		if (HCL_OBJ_GET_FLAGS_SYNCODE(defun_name))
+		if (HCL_OBJ_GET_FLAGS_SYNCODE(defun_name) || HCL_OBJ_GET_FLAGS_KERNEL(defun_name))
 		{
 			hcl_setsynerrbfmt (hcl, HCL_SYNERR_BANNEDVARNAME, HCL_NULL, HCL_NULL, 
 				"special symbol not to be used as a defun name - %O", defun_name); /* TOOD: error location */
@@ -854,10 +854,10 @@ static int compile_lambda (hcl_t* hcl, hcl_oop_t src, int defun)
 				return -1;
 			}
 
-			if (HCL_OBJ_GET_FLAGS_SYNCODE(arg))
+			if (HCL_OBJ_GET_FLAGS_SYNCODE(arg) || HCL_OBJ_GET_FLAGS_KERNEL(arg))
 			{
 				hcl_setsynerrbfmt (hcl, HCL_SYNERR_BANNEDARGNAME, HCL_NULL, HCL_NULL,
-					"special symbol not to be declared as an argument name - %O", arg); /* TOOD: error location */
+					"special symbol not to be declared as an argument - %O", arg); /* TOOD: error location */
 				return -1;
 			}
 
@@ -914,10 +914,11 @@ static int compile_lambda (hcl_t* hcl, hcl_oop_t src, int defun)
 			sz = HCL_OBJ_GET_SIZE(dcl);
 			for (i = 0; i < sz; i++)
 			{
-				if (HCL_OBJ_GET_FLAGS_SYNCODE(((hcl_oop_oop_t)dcl)->slot[i]))
+				if (HCL_OBJ_GET_FLAGS_SYNCODE(((hcl_oop_oop_t)dcl)->slot[i]) ||
+				    HCL_OBJ_GET_FLAGS_KERNEL(((hcl_oop_oop_t)dcl)->slot[i]))
 				{
 					hcl_setsynerrbfmt (hcl, HCL_SYNERR_BANNEDVARNAME, HCL_NULL, HCL_NULL, 
-						"special symbol not to be declared as a variable name - %O", obj); /* TOOD: error location */
+						"special symbol not to be declared as a variable - %O", obj); /* TOOD: error location */
 					return -1;
 				}
 
@@ -1063,7 +1064,7 @@ static int compile_set (hcl_t* hcl, hcl_oop_t src)
 		return -1;
 	}
 
-	if (HCL_OBJ_GET_FLAGS_SYNCODE(var))
+	if (HCL_OBJ_GET_FLAGS_SYNCODE(var) || HCL_OBJ_GET_FLAGS_KERNEL(var))
 	{
 		hcl_setsynerrbfmt (hcl, HCL_SYNERR_BANNEDVARNAME, HCL_NULL, HCL_NULL, "special symbol not to be used as a variable name - %O", var); /* TOOD: error location */
 		return -1;
