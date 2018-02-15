@@ -195,6 +195,7 @@ static hcl_oop_t string_to_num (hcl_t* hcl, hcl_oocs_t* str, int radixed)
 		ptr++;
 	}
 
+#if 0
 	if (radixed)
 	{
 		HCL_ASSERT (hcl, ptr < end);
@@ -210,10 +211,34 @@ static hcl_oop_t string_to_num (hcl_t* hcl, hcl_oocs_t* str, int radixed)
 		ptr++;
 	}
 	else base = 10;
+#else
+	if (radixed)
+	{
+		HCL_ASSERT (hcl, ptr < end);
+
+		if (*ptr != '#') 
+		{
+			hcl_seterrnum (hcl, HCL_EINVAL);
+			return -1;
+		}
+		ptr++; /* skip '#' */
+		
+		if (*ptr == 'x') base = 16;
+		else if (*ptr == 'o') base = 8;
+		else if (*ptr == 'b') base = 2;
+		else
+		{
+			hcl_seterrnum (hcl, HCL_EINVAL);
+			return -1;
+		}
+		ptr++;
+	}
+	else base = 10;
+#endif
 
 /* TODO: handle floating point numbers ... etc */
 	if (negsign) base = -base;
-	return hcl_strtoint (hcl, ptr, end - ptr, base);
+	return hcl_strtoint(hcl, ptr, end - ptr, base);
 }
 static HCL_INLINE int is_spacechar (hcl_ooci_t c)
 {
@@ -1878,7 +1903,7 @@ static int read_object (hcl_t* hcl)
 					hcl_setsynerr (hcl, HCL_SYNERR_VBARBANNED, TOKEN_LOC(hcl), TOKEN_NAME(hcl));
 					return -1;
 				}
-				if (get_symbol_array_literal (hcl, &obj) <= -1) return -1;
+				if (get_symbol_array_literal(hcl, &obj) <= -1) return -1;
 				break;
 
 			case HCL_IOTOK_NIL:
@@ -1899,12 +1924,12 @@ static int read_object (hcl_t* hcl)
 
 			case HCL_IOTOK_NUMLIT:
 			case HCL_IOTOK_RADNUMLIT:
-			obj = string_to_num(hcl, TOKEN_NAME(hcl), TOKEN_TYPE(hcl) == HCL_IOTOK_RADNUMLIT);
-			break;
+				obj = string_to_num(hcl, TOKEN_NAME(hcl), TOKEN_TYPE(hcl) == HCL_IOTOK_RADNUMLIT);
+				break;
 
 			/*
 			case HCL_IOTOK_REAL:
-				obj = hcl_makerealnum (hcl, HCL_IOTOK_RVAL(hcl));
+				obj = hcl_makerealnum(hcl, HCL_IOTOK_RVAL(hcl));
 				break;
 			*/
 
@@ -1923,7 +1948,7 @@ static int read_object (hcl_t* hcl)
 					hcl_pfbase_t* pfbase;
 					hcl_oop_t prim;
 
-					pfbase = hcl_querymod (hcl, TOKEN_NAME_PTR(hcl), TOKEN_NAME_LEN(hcl));
+					pfbase = hcl_querymod(hcl, TOKEN_NAME_PTR(hcl), TOKEN_NAME_LEN(hcl));
 					if (!pfbase)
 					{
 						/* TODO switch to syntax error */

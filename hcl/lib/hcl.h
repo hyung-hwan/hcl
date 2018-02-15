@@ -1017,6 +1017,7 @@ struct hcl_t
 		{
 			hcl_uch_t* ptr;
 			hcl_oow_t capa;
+			hcl_oow_t len;
 		} xbuf;
 		struct
 		{

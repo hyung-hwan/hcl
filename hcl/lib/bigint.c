@@ -3954,7 +3954,6 @@ hcl_oop_t hcl_inttostr (hcl_t* hcl, hcl_oop_t num, int radix, int ngc)
 	hcl_liw_t* t = HCL_NULL;
 	hcl_ooch_t* xbuf = HCL_NULL;
 	hcl_oow_t xlen = 0, seglen, reqcapa;
-	hcl_oop_t s;
 
 	HCL_ASSERT (hcl, radix >= 2 && radix <= 36);
 
@@ -3963,19 +3962,36 @@ hcl_oop_t hcl_inttostr (hcl_t* hcl, hcl_oop_t num, int radix, int ngc)
 
 	if (v)
 	{
-		/* Use a static buffer for simple conversion as the largest
-		 * size is known. The largest buffer is required for radix 2.
+		/* The largest buffer is required for radix 2.
 		 * For a binary conversion(radix 2), the number of bits is
 		 * the maximum number of digits that can be produced. +1 is
 		 * needed for the sign. */
-		hcl_ooch_t buf[HCL_OOW_BITS + 1];
-		hcl_oow_t len;
 
-		len = oow_to_text(hcl, w, radix, buf);
-		if (v < 0) buf[len++] = '-';
+		reqcapa = HCL_OOW_BITS + 1;
+		if (hcl->inttostr.xbuf.capa < reqcapa)
+		{
+			xbuf = (hcl_ooch_t*)hcl_reallocmem(hcl, hcl->inttostr.xbuf.ptr, reqcapa);
+			if (!xbuf) return HCL_NULL;
+			hcl->inttostr.xbuf.capa = reqcapa;
+			hcl->inttostr.xbuf.ptr = xbuf;
+		}
+		else
+		{
+			xbuf = hcl->inttostr.xbuf.ptr;
+		}
 
-		reverse_string (buf, len);
-		return hcl_makestring(hcl, buf, len, ngc);
+		xlen = oow_to_text(hcl, w, radix, xbuf);
+		if (v < 0) xbuf[xlen++] = '-';
+
+		reverse_string (xbuf, xlen);
+		if (ngc < 0)
+		{
+			/* special case. don't create a new object.
+			 * the caller can use the data left in hcl->inttostr.xbuf */
+			hcl->inttostr.xbuf.len = xlen;
+			return hcl->_nil;
+		}
+		return hcl_makestring(hcl, xbuf, xlen, ngc);
 	}
 
 	as = HCL_OBJ_GET_SIZE(num);
@@ -3990,10 +4006,6 @@ hcl_oop_t hcl_inttostr (hcl_t* hcl, hcl_oop_t num, int radix, int ngc)
 		xlen = as * ((HCL_LIW_BITS + exp) / exp) + 1;
 		xpos = xlen;
 
-#if 0
-		xbuf = (hcl_ooch_t*)hcl_allocmem(hcl, HCL_SIZEOF(*xbuf) * xlen);
-		if (!xbuf) return HCL_NULL;
-#else
 		reqcapa = HCL_SIZEOF(*xbuf) * xlen; 
 		if (hcl->inttostr.xbuf.capa < reqcapa)
 		{
@@ -4006,7 +4018,6 @@ hcl_oop_t hcl_inttostr (hcl_t* hcl, hcl_oop_t num, int radix, int ngc)
 		{
 			xbuf = hcl->inttostr.xbuf.ptr;
 		}
-#endif
 
 		acc = 0;
 		accbits = 0;
@@ -4038,27 +4049,20 @@ hcl_oop_t hcl_inttostr (hcl_t* hcl, hcl_oop_t num, int radix, int ngc)
 		HCL_ASSERT (hcl, xpos >= 1);
 		if (HCL_IS_NBIGINT(hcl, num)) xbuf[--xpos] = '-';
 
-		s = hcl_makestring(hcl, &xbuf[xpos], xlen - xpos, ngc);
-#if 0
-		hcl_freemem (hcl, xbuf);
-#endif
-		return s;
+		if (ngc < 0)
+		{
+			/* special case. don't create a new object.
+			 * the caller can use the data left in hcl->inttostr.xbuf */
+			HCL_MEMMOVE (&xbuf[0], &xbuf[xpos], HCL_SIZEOF(*xbuf) * (xlen - xpos));
+			hcl->inttostr.xbuf.len = xlen - xpos;
+			return hcl->_nil;
+		}
+
+		return hcl_makestring(hcl, &xbuf[xpos], xlen - xpos, ngc);
 	}
 
 	/* Do it in a hard way for other cases */
-/* TODO: migrate these buffers into hcl_t? */
 /* TODO: find an optimial buffer size */
-#if 0
-	xbuf = (hcl_ooch_t*)hcl_allocmem (hcl, HCL_SIZEOF(*xbuf) * (as * HCL_LIW_BITS + 1));
-	if (!xbuf) return HCL_NULL;
-
-	t = (hcl_liw_t*)hcl_callocmem(hcl, HCL_SIZEOF(*t) * as * 3);
-	if (!t) 
-	{
-		hcl_freemem (hcl, xbuf);
-		return HCL_NULL;
-	}
-#else
 	reqcapa = HCL_SIZEOF(*xbuf) * (as * HCL_LIW_BITS + 1); 
 	if (hcl->inttostr.xbuf.capa < reqcapa)
 	{
@@ -4084,7 +4088,6 @@ hcl_oop_t hcl_inttostr (hcl_t* hcl, hcl_oop_t num, int radix, int ngc)
 	{
 		t = hcl->inttostr.t.ptr;
 	}
-#endif
 
 #if (HCL_LIW_BITS == HCL_OOW_BITS)
 	b[0] = hcl->bigint[radix].multiplier; /* block divisor */
@@ -4157,13 +4160,15 @@ hcl_oop_t hcl_inttostr (hcl_t* hcl, hcl_oop_t num, int radix, int ngc)
 
 	if (HCL_IS_NBIGINT(hcl, num)) xbuf[xlen++] = '-';
 	reverse_string (xbuf, xlen);
-	s = hcl_makestring(hcl, xbuf, xlen, ngc);
+	if (ngc < 0)
+	{
+		/* special case. don't create a new object.
+		 * the caller can use the data left in hcl->inttostr.xbuf */
+		hcl->inttostr.xbuf.len = xlen;
+		return hcl->_nil;
+	}
 
-#if 0
-	hcl_freemem (hcl, t);
-	hcl_freemem (hcl, xbuf);
-#endif
-	return s;
+	return hcl_makestring(hcl, xbuf, xlen, ngc);
 
 oops_einval:
 	hcl_seterrnum (hcl, HCL_EINVAL);

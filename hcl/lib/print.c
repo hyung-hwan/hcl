@@ -156,18 +156,16 @@ next:
 		case HCL_BRAND_PBIGINT:
 		case HCL_BRAND_NBIGINT:
 		{
-			hcl_oop_t str;
+			hcl_oop_t tmp;
 
-			/* TODO: can i do this without memory allocation? */
-			str = hcl_inttostr(hcl, obj, 10, 1); /* inttostr with ngc on. not using object memory */
-			if (!str) return -1;
+			/* -1 to drive hcl_inttostr() to not create a new string object.
+			 * not using the object memory. the result stays in the temporary
+			 * buffer */
+			tmp = hcl_inttostr(hcl, obj, 10, -1); 
+			if (!tmp) return -1;
 
-			if (outbfmt(hcl, mask, "%.*js", HCL_OBJ_GET_SIZE(str), HCL_OBJ_GET_CHAR_SLOT(str)) <= -1) 
-			{
-				hcl_freengcobj (hcl, str);
-				return -1;
-			}
-			hcl_freengcobj (hcl, str);
+			HCL_ASSERT (hcl, (hcl_oop_t)tmp == hcl->_nil); 
+			if (outbfmt(hcl, mask, "%.*js", hcl->inttostr.xbuf.len, hcl->inttostr.xbuf.ptr) <= -1) return -1;
 			break;
 		}
 

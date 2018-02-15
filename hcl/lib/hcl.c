@@ -236,6 +236,7 @@ void hcl_fini (hcl_t* hcl)
 		hcl_freemem (hcl, hcl->inttostr.xbuf.ptr);
 		hcl->inttostr.xbuf.ptr = HCL_NULL;
 		hcl->inttostr.xbuf.capa = 0;
+		hcl->inttostr.xbuf.len = 0;
 	}
 
 	if (hcl->inttostr.t.ptr)
