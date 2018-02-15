@@ -3,7 +3,14 @@ ACLOCAL_AMFLAGS = -I m4
 
 EXTRA_DIST =
 
-SUBDIRS = lib
+SUBDIRS =
+
+if ENABLE_STATIC_MODULE
+SUBDIRS += mod lib
+else
+SUBDIRS += lib mod
+endif
+
 DIST_SUBDIRS = $(SUBDIRS) 
 
 distclean-local:

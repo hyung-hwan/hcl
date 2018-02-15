@@ -88,7 +88,13 @@ PRE_UNINSTALL = :
 POST_UNINSTALL = :
 build_triplet = @build@
 host_triplet = @host@
+@ENABLE_STATIC_MODULE_TRUE@am__append_1 = -lhcl-arr -lhcl-dic \
+@ENABLE_STATIC_MODULE_TRUE@	-lhcl-str
+@ENABLE_STATIC_MODULE_TRUE@am__append_2 = $(abs_builddir)/../mod/libhcl-arr.la \
+@ENABLE_STATIC_MODULE_TRUE@	$(abs_builddir)/../mod/libhcl-dic.la \
+@ENABLE_STATIC_MODULE_TRUE@	$(abs_builddir)/../mod/libhcl-str.la
 bin_PROGRAMS = hcl$(EXEEXT)
+@ENABLE_STATIC_MODULE_FALSE@hcl_DEPENDENCIES = $(am__DEPENDENCIES_2)
 subdir = lib
 ACLOCAL_M4 = $(top_srcdir)/aclocal.m4
 am__aclocal_m4_deps = $(top_srcdir)/m4/ax_cxx_namespace.m4 \
@@ -136,7 +142,6 @@ am__installdirs = "$(DESTDIR)$(pkglibdir)" "$(DESTDIR)$(bindir)" \
 LTLIBRARIES = $(pkglib_LTLIBRARIES)
 am__DEPENDENCIES_1 =
 am__DEPENDENCIES_2 = $(am__DEPENDENCIES_1) $(am__DEPENDENCIES_1)
-libhcl_la_DEPENDENCIES = $(am__DEPENDENCIES_2)
 am_libhcl_la_OBJECTS = libhcl_la-bigint.lo libhcl_la-comp.lo \
 	libhcl_la-debug.lo libhcl_la-decode.lo libhcl_la-dic.lo \
 	libhcl_la-err.lo libhcl_la-exec.lo libhcl_la-gc.lo \
@@ -376,7 +381,8 @@ CPPFLAGS_ALL_COMMON = \
 	-I$(abs_srcdir) \
 	-I$(includedir)	
 
-LDFLAGS_ALL_COMMON = -L$(abs_builddir) -L$(libdir)
+@ENABLE_STATIC_MODULE_FALSE@LDFLAGS_ALL_COMMON = -L$(abs_builddir) -L$(libdir)
+@ENABLE_STATIC_MODULE_TRUE@LDFLAGS_ALL_COMMON = -L$(abs_builddir)/../mod -L$(abs_builddir) -L$(libdir)
 
 ##################################################
 # MAIN LIBRARY 
@@ -424,12 +430,13 @@ libhcl_la_SOURCES = \
 
 libhcl_la_CPPFLAGS = $(CPPFLAGS_LIB_COMMON)
 libhcl_la_LDFLAGS = $(LDFLAGS_LIB_COMMON)
-libhcl_la_LIBADD = $(LIBADD_LIB_COMMON)
+libhcl_la_LIBADD = $(LIBADD_LIB_COMMON) $(am__append_1)
+libhcl_la_DEPENDENCIES = $(am__append_2)
 hcl_SOURCES = main.c
 hcl_CPPFLAGS = $(CPPFLAGS_LIB_COMMON)
 hcl_LDFLAGS = $(LDFLAGS_LIB_COMMON)
 hcl_LDADD = $(LIBADD_LIB_COMMON) -lhcl #-ldyncall_s
-hcl_DEPENDENCIES = libhcl.la
+@ENABLE_STATIC_MODULE_TRUE@hcl_DEPENDENCIES = libhcl.la
 all: hcl-cfg.h
 	$(MAKE) $(AM_MAKEFLAGS) all-am
 

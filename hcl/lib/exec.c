@@ -158,7 +158,7 @@ static HCL_INLINE int prepare_to_alloc_pid (hcl_t* hcl)
 		#if defined(HCL_DEBUG_VM_PROCESSOR)
 			HCL_LOG0 (hcl, HCL_LOG_IC | HCL_LOG_FATAL, "Processor - too many processes\n");
 		#endif
-			hcl_seterrnum (hcl, HCL_EPFULL);
+			hcl_seterrbfmt (hcl, HCL_EPFULL, "maximum number(%zd) of processes reached", HCL_SMOOI_MAX);
 			return -1;
 		}
 
@@ -227,7 +227,7 @@ static hcl_oop_process_t make_process (hcl_t* hcl, hcl_oop_context_t c)
 		stksize = HCL_TYPE_MAX(hcl_oow_t) - HCL_PROCESS_NAMED_INSTVARS;
 
 	hcl_pushtmp (hcl, (hcl_oop_t*)&c);
-	proc =  (hcl_oop_process_t)hcl_allocoopobj (hcl, HCL_BRAND_PROCESS, HCL_PROCESS_NAMED_INSTVARS + stksize);
+	proc = (hcl_oop_process_t)hcl_allocoopobj (hcl, HCL_BRAND_PROCESS, HCL_PROCESS_NAMED_INSTVARS + stksize);
 	hcl_poptmp (hcl);
 	if (!proc) return HCL_NULL;
 
@@ -348,6 +348,7 @@ static HCL_INLINE int chain_into_processor (hcl_t* hcl, hcl_oop_process_t proc, 
 		HCL_LOG0 (hcl, HCL_LOG_IC | HCL_LOG_FATAL, "Processor - too many process\n");
 #endif
 		hcl_seterrnum (hcl, HCL_EPFULL);
+		hcl_seterrbfmt (hcl, HCL_EPFULL, "maximum number(%zd) of processes reached", HCL_SMOOI_MAX);
 		return -1;
 	}
 
@@ -1878,10 +1879,6 @@ static int execute (hcl_t* hcl)
 				break;
 			}
 
-/* TODO: 
-			case HCL_CODE_MAKE_BYTEARRAY:
-			case HCL_CODE_POP_INTO_BYTEARRAY:
-*/
 			/* -------------------------------------------------------- */
 
 			case BCODE_DUP_STACKTOP:
@@ -2011,16 +2008,13 @@ static int execute (hcl_t* hcl)
 			case HCL_CODE_RETURN_FROM_BLOCK:
 				LOG_INST_0 (hcl, "return_from_block");
 
-/*
-//				HCL_ASSERT(HCL_CLASSOF(hcl, hcl->active_context) == hcl->_block_context);
-*/
+				HCL_ASSERT(hcl, HCL_IS_CONTEXT(hcl, hcl->active_context));
 				if (hcl->active_context == hcl->processor->active->initial_context)
 				{
 					/* the active context to return from is an initial context of
 					 * the active process. this process must have been created 
 					 * over a block using the newProcess method. let's terminate
 					 * the process. */
-
 					HCL_ASSERT (hcl, (hcl_oop_t)hcl->active_context->sender == hcl->_nil);
 					terminate_process (hcl, hcl->processor->active);
 				}
@@ -2197,7 +2191,7 @@ oops:
 	/* TODO: anything to do here? */
 	if (hcl->processor->active != hcl->nil_process) 
 	{
-HCL_LOG1 (hcl, HCL_LOG_IC | HCL_LOG_INFO, "TERMINATING ACTIVE PROCESS ... = %zu\n", inst_counter);
+HCL_LOG1 (hcl, HCL_LOG_IC | HCL_LOG_INFO, "TERMINATING ACTIVE PROCESS ... = %zd\n", HCL_OOP_TO_SMOOI(hcl->processor->active->id));
 		terminate_process (hcl, hcl->processor->active);
 	}
 	return -1;

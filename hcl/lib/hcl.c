@@ -402,8 +402,6 @@ void hcl_freemem (hcl_t* hcl, void* ptr)
 }
 
 
-
-
 /* -------------------------------------------------------------------------- */
 
 #define MOD_PREFIX "hcl_mod_"
@@ -411,13 +409,9 @@ void hcl_freemem (hcl_t* hcl, void* ptr)
 
 #if defined(HCL_ENABLE_STATIC_MODULE)
 
-/*#include "../mod/_array.h"*/
-
-static int hcl_mod_fake (hcl_t* hcl, hcl_mod_t* mod)
-{
-	hcl_seterrbfmt (hcl, HCL_EPERM, "not allowed to load ___fake___ module");
-	return -1;
-}
+#include "../mod/_arr.h"
+#include "../mod/_dic.h"
+#include "../mod/_str.h"
 
 static struct
 {
@@ -426,7 +420,9 @@ static struct
 }
 static_modtab[] = 
 {
-	{ "___fake___",      hcl_mod_fake },
+	{ "arr",      hcl_mod_arr },
+	{ "dic",      hcl_mod_dic },
+	{ "str",      hcl_mod_str }
 };
 #endif
 

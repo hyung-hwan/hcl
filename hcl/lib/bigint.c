@@ -281,7 +281,7 @@ int hcl_inttoooi (hcl_t* hcl, hcl_oop_t x, hcl_ooi_t* i)
 	hcl_oow_t w;
 	int n;
 
-	n = hcl_inttooow (hcl, x, &w);
+	n = hcl_inttooow(hcl, x, &w);
 	if (n < 0) 
 	{
 		HCL_ASSERT (hcl, HCL_TYPE_MAX(hcl_ooi_t) + HCL_TYPE_MIN(hcl_ooi_t) == -1); /* assume 2's complement */

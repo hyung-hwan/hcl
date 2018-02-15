@@ -1378,6 +1378,8 @@ static int compile_cons_xlist_expression (hcl_t* hcl, hcl_oop_t obj)
 		}
 		else
 		{
+			hcl_oop_cons_t sdc;
+
 			if (HCL_BRANDOF(hcl, cdr) != HCL_BRAND_CONS)
 			{
 				/* (funname . 10) */
@@ -1388,10 +1390,25 @@ static int compile_cons_xlist_expression (hcl_t* hcl, hcl_oop_t obj)
 			nargs = hcl_countcons(hcl, cdr);
 			if (nargs > MAX_CODE_PARAM) 
 			{
-				/* TODO: change to syntax error */
 				hcl_setsynerrbfmt (hcl, HCL_SYNERR_ARGFLOOD, HCL_NULL, HCL_NULL, "too many(%zd) parameters in function call - %O", nargs, obj); 
 				return -1;
 			}
+
+			sdc = hcl_getatsysdic(hcl, car);
+			if (sdc)
+			{
+				hcl_oop_word_t sdv;
+				sdv = (hcl_oop_word_t)HCL_CONS_CDR(sdc);
+				if (HCL_IS_PRIM(hcl, sdv))
+				{
+					if (nargs < sdv->slot[1] || nargs > sdv->slot[2])
+					{
+						hcl_setsynerrbfmt (hcl, HCL_SYNERR_ARGCOUNT, HCL_NULL, HCL_NULL, 
+							"parameters count(%zd) mismatch in function call - %O - expecting %zu-%zu parameters", nargs, obj, sdv->slot[1], sdv->slot[2]); 
+						return -1;
+					}
+				}
+			};
 		}
 		/* redundant cdr check is performed inside compile_object_list() */
 		PUSH_SUBCFRAME (hcl, COP_COMPILE_ARGUMENT_LIST, cdr);
