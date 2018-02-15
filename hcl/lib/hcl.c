@@ -230,6 +230,20 @@ void hcl_fini (hcl_t* hcl)
 		hcl->log.capa = 0;
 		hcl->log.len = 0;
 	}
+
+	if (hcl->inttostr.xbuf.ptr)
+	{
+		hcl_freemem (hcl, hcl->inttostr.xbuf.ptr);
+		hcl->inttostr.xbuf.ptr = HCL_NULL;
+		hcl->inttostr.xbuf.capa = 0;
+	}
+
+	if (hcl->inttostr.t.ptr)
+	{
+		hcl_freemem (hcl, hcl->inttostr.t.ptr);
+		hcl->inttostr.t.ptr = HCL_NULL;
+		hcl->inttostr.t.capa = 0;
+	}
 }
 
 int hcl_setoption (hcl_t* hcl, hcl_option_t id, const void* value)

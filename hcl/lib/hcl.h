@@ -1010,6 +1010,20 @@ struct hcl_t
 		int safe_ndigits;
 		hcl_oow_t multiplier;
 	} bigint[37];
+
+	struct
+	{
+		struct
+		{
+			hcl_uch_t* ptr;
+			hcl_oow_t capa;
+		} xbuf;
+		struct
+		{
+			hcl_liw_t* ptr;
+			hcl_oow_t capa;
+		} t;
+	} inttostr;
 	/* == END BIGINT CONVERSION == */
 
 	hcl_sbuf_t sbuf[64];
@@ -1165,7 +1179,7 @@ typedef enum hcl_log_mask_t hcl_log_mask_t;
 /* =========================================================================
  * HCL COMMON OBJECTS
  * ========================================================================= */
-enum 
+enum hcl_brand_t
 {
 	HCL_BRAND_NIL = 1,
 	HCL_BRAND_TRUE,
@@ -1190,8 +1204,9 @@ enum
 	HCL_BRAND_PROCESS_SCHEDULER,
 	HCL_BRAND_SEMAPHORE
 };
+typedef enum hcl_brand_t hcl_brand_t;
 
-enum
+enum hcl_syncode_t
 {
 	/* SYNCODE 0 means it's not a syncode object. so it begins with 1 */
 	HCL_SYNCODE_BREAK = 1,
@@ -1206,9 +1221,9 @@ enum
 	HCL_SYNCODE_UNTIL,
 	HCL_SYNCODE_WHILE
 };
+typedef enum hcl_syncode_t hcl_syncode_t;
 
-
-enum
+enum hcl_concode_t
 {
 	/* these can be set in the SYNCODE flags for cons cells */
 	HCL_CONCODE_XLIST = 0,  /* () - executable list */
@@ -1217,6 +1232,7 @@ enum
 	HCL_CONCODE_DIC,        /* #{} */
 	HCL_CONCODE_QLIST       /* '() - quoted list, data list */
 };
+typedef enum hcl_concode_t hcl_concode_t;
 
 #define HCL_IS_NIL(hcl,v) (v == (hcl)->_nil)
 #define HCL_IS_TRUE(hcl,v) (v == (hcl)->_true)

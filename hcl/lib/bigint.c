@@ -3953,7 +3953,7 @@ hcl_oop_t hcl_inttostr (hcl_t* hcl, hcl_oop_t num, int radix, int ngc)
 	hcl_liw_t* a, * q, * r;
 	hcl_liw_t* t = HCL_NULL;
 	hcl_ooch_t* xbuf = HCL_NULL;
-	hcl_oow_t xlen = 0, seglen;
+	hcl_oow_t xlen = 0, seglen, reqcapa;
 	hcl_oop_t s;
 
 	HCL_ASSERT (hcl, radix >= 2 && radix <= 36);
@@ -3990,8 +3990,23 @@ hcl_oop_t hcl_inttostr (hcl_t* hcl, hcl_oop_t num, int radix, int ngc)
 		xlen = as * ((HCL_LIW_BITS + exp) / exp) + 1;
 		xpos = xlen;
 
+#if 0
 		xbuf = (hcl_ooch_t*)hcl_allocmem(hcl, HCL_SIZEOF(*xbuf) * xlen);
 		if (!xbuf) return HCL_NULL;
+#else
+		reqcapa = HCL_SIZEOF(*xbuf) * xlen; 
+		if (hcl->inttostr.xbuf.capa < reqcapa)
+		{
+			xbuf = (hcl_ooch_t*)hcl_reallocmem(hcl, hcl->inttostr.xbuf.ptr, reqcapa);
+			if (!xbuf) return HCL_NULL;
+			hcl->inttostr.xbuf.capa = reqcapa;
+			hcl->inttostr.xbuf.ptr = xbuf;
+		}
+		else
+		{
+			xbuf = hcl->inttostr.xbuf.ptr;
+		}
+#endif
 
 		acc = 0;
 		accbits = 0;
@@ -4024,22 +4039,52 @@ hcl_oop_t hcl_inttostr (hcl_t* hcl, hcl_oop_t num, int radix, int ngc)
 		if (HCL_IS_NBIGINT(hcl, num)) xbuf[--xpos] = '-';
 
 		s = hcl_makestring(hcl, &xbuf[xpos], xlen - xpos, ngc);
+#if 0
 		hcl_freemem (hcl, xbuf);
+#endif
 		return s;
 	}
 
 	/* Do it in a hard way for other cases */
 /* TODO: migrate these buffers into hcl_t? */
 /* TODO: find an optimial buffer size */
+#if 0
 	xbuf = (hcl_ooch_t*)hcl_allocmem (hcl, HCL_SIZEOF(*xbuf) * (as * HCL_LIW_BITS + 1));
 	if (!xbuf) return HCL_NULL;
 
-	t = (hcl_liw_t*)hcl_callocmem (hcl, HCL_SIZEOF(*t) * as * 3);
+	t = (hcl_liw_t*)hcl_callocmem(hcl, HCL_SIZEOF(*t) * as * 3);
 	if (!t) 
 	{
 		hcl_freemem (hcl, xbuf);
 		return HCL_NULL;
 	}
+#else
+	reqcapa = HCL_SIZEOF(*xbuf) * (as * HCL_LIW_BITS + 1); 
+	if (hcl->inttostr.xbuf.capa < reqcapa)
+	{
+		xbuf = (hcl_ooch_t*)hcl_reallocmem(hcl, hcl->inttostr.xbuf.ptr, reqcapa);
+		if (!xbuf) return HCL_NULL;
+		hcl->inttostr.xbuf.capa = reqcapa;
+		hcl->inttostr.xbuf.ptr = xbuf;
+	}
+	else
+	{
+		xbuf = hcl->inttostr.xbuf.ptr;
+	}
+
+	reqcapa = HCL_SIZEOF(*t) * as * 3;
+	if (hcl->inttostr.t.capa < reqcapa)
+	{
+		t = (hcl_liw_t*)hcl_reallocmem(hcl, hcl->inttostr.t.ptr, reqcapa);
+		if (!t) return HCL_NULL;
+		hcl->inttostr.t.capa = reqcapa;
+		hcl->inttostr.t.ptr = t;
+	}
+	else 
+	{
+		t = hcl->inttostr.t.ptr;
+	}
+#endif
 
 #if (HCL_LIW_BITS == HCL_OOW_BITS)
 	b[0] = hcl->bigint[radix].multiplier; /* block divisor */
@@ -4114,8 +4159,10 @@ hcl_oop_t hcl_inttostr (hcl_t* hcl, hcl_oop_t num, int radix, int ngc)
 	reverse_string (xbuf, xlen);
 	s = hcl_makestring(hcl, xbuf, xlen, ngc);
 
+#if 0
 	hcl_freemem (hcl, t);
 	hcl_freemem (hcl, xbuf);
+#endif
 	return s;
 
 oops_einval:

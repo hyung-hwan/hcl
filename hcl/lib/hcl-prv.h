@@ -1053,14 +1053,6 @@ int hcl_outfmtobj (
 );
 
 
-
-/* TODO: remove debugging functions */
-/* ========================================================================= */
-/* debug.c                                                                   */
-/* ========================================================================= */
-void dump_symbol_table (hcl_t* hcl);
-void dump_dictionary (hcl_t* hcl, hcl_oop_dic_t dic, const char* title);
-
 #if defined(__cplusplus)
 }
 #endif
