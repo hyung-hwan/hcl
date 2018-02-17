@@ -54,6 +54,33 @@ static hcl_pfrc_t pf_dic_get (hcl_t* hcl, hcl_ooi_t nargs)
 }
 
 
+static hcl_pfrc_t pf_dic_put (hcl_t* hcl, hcl_ooi_t nargs)
+{
+	hcl_oop_t dic;
+	hcl_oop_t key, val;
+	hcl_oop_cons_t pair;
+
+	dic = HCL_STACK_GETARG(hcl, nargs, 0);
+	key = HCL_STACK_GETARG(hcl, nargs, 1);
+	val = HCL_STACK_GETARG(hcl, nargs, 2);
+
+	if (!HCL_IS_DIC(hcl,dic))
+	{
+		hcl_seterrbfmt (hcl, HCL_EINVAL, "parameter not an dictionary - %O", dic);
+		return HCL_PF_FAILURE;
+	}
+
+	pair = hcl_putatdic(hcl, (hcl_oop_dic_t)dic, key, val);
+	if (!pair)
+	{
+		HCL_STACK_SETRETTOERRNUM (hcl, nargs);
+		return HCL_PF_SUCCESS;
+	}
+
+	HCL_STACK_SETRET (hcl, nargs, HCL_CONS_CDR(pair));
+	return HCL_PF_SUCCESS;
+}
+
 
 static int walker (hcl_t* hcl, hcl_oop_dic_t dic, hcl_oop_cons_t pair, void* ctx)
 {
@@ -84,8 +111,8 @@ static hcl_pfrc_t pf_dic_walk (hcl_t* hcl, hcl_ooi_t nargs)
 static hcl_pfinfo_t pfinfos[] =
 {
 	{ { 'g','e','t','\0' },      0, { pf_dic_get,     2,  2 } },
-/*	{ { 'm','a','k','e','\0' },  0, { pf_dic_make,    1,  1 } },
-	{ { 'p','u','t','\0' },      0, { pf_dic_put,     3,  3 } },*/
+/*	{ { 'm','a','k','e','\0' },  0, { pf_dic_make,    1,  1 } }, */
+	{ { 'p','u','t','\0' },      0, { pf_dic_put,     3,  3 } },
 	{ { 'w','a','l','k','\0' },  0, { pf_dic_walk,    2,  2 } },
 };
 
