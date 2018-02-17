@@ -31,7 +31,6 @@ package H2.Utf8 is
 
 	function From_Unicode_Character (Chr: in Unicode_Character) return Utf8_String;
 	function From_Unicode_String (Str: in Unicode_String) return Utf8_String;
-
 	--| The Sequence_Length function returns the length of a full UTF8 
 	--| sequence representing a single Unicode character given the first
 	--| sequence byte. It returns 0 if the first byte is invalid.
