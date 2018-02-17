@@ -191,7 +191,7 @@ next:
 	}
 	else if (HCL_OOP_IS_SMPTR(obj))
 	{
-		if (outbfmt(hcl, mask, "#\\p%zu", (hcl_oow_t)HCL_OOP_TO_SMPTR(obj)) <= -1) return -1;
+		if (outbfmt(hcl, mask, "#\\p%zX", (hcl_oow_t)HCL_OOP_TO_SMPTR(obj)) <= -1) return -1;
 		goto done;
 	}
 	else if (HCL_OOP_IS_ERROR(obj))

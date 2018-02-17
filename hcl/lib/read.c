@@ -823,12 +823,13 @@ static int get_sharp_token (hcl_t* hcl)
 
 			if (TOKEN_NAME_LEN(hcl) >= 4)
 			{
-				if (hcl->c->tok.name.ptr[2] == 'p')
+				if (TOKEN_NAME_CHAR(hcl, 2) == 'P' || TOKEN_NAME_CHAR(hcl, 2) == 'p')
 				{
 					SET_TOKEN_TYPE (hcl, HCL_IOTOK_SMPTRLIT);
 					goto hexcharlit;
 				}
-				else if (hcl->c->tok.name.ptr[2] == 'x' || hcl->c->tok.name.ptr[2] == 'u')
+				else if (TOKEN_NAME_CHAR(hcl, 2) == 'X' || TOKEN_NAME_CHAR(hcl, 2) == 'x' ||
+				         TOKEN_NAME_CHAR(hcl, 2) == 'U' || TOKEN_NAME_CHAR(hcl, 2) == 'u')
 				{
 					hcl_oow_t i;
 
@@ -845,7 +846,7 @@ static int get_sharp_token (hcl_t* hcl)
 						c = c * 16 + CHAR_TO_NUM(hcl->c->tok.name.ptr[i], 16); /* don't care if it is for 'p' */
 					}
 				}
-				else if (hcl->c->tok.name.ptr[2] == 'e')
+				else if (TOKEN_NAME_CHAR(hcl, 2) == 'E' || TOKEN_NAME_CHAR(hcl, 2) == 'e')
 				{
 					hcl_oow_t i;
 					for (i = 3; i < TOKEN_NAME_LEN(hcl); i++)
@@ -1756,7 +1757,6 @@ static int read_object (hcl_t* hcl)
 		switch (TOKEN_TYPE(hcl)) 
 		{
 			default:
-				HCL_ASSERT (hcl, !"should never happen - invalid token type");
 				hcl_seterrbfmt (hcl, HCL_EINTERN, "invalid token encountered - %d %.*js", 
 					TOKEN_TYPE(hcl), TOKEN_NAME_LEN(hcl), TOKEN_NAME_PTR(hcl));
 				return -1;
@@ -1960,6 +1960,13 @@ static int read_object (hcl_t* hcl)
 					v = v * 16 + CHAR_TO_NUM(TOKEN_NAME_CHAR(hcl, i), 16);
 				}
 
+				if (!HCL_IN_SMPTR_RANGE(v))
+				{
+					hcl_setsynerr (hcl, HCL_SYNERR_SMPTRLIT, TOKEN_LOC(hcl), TOKEN_NAME(hcl));
+					return -1;
+				}
+
+
 				obj = HCL_SMPTR_TO_OOP(v);
 				break;
 			}
@@ -1974,6 +1981,12 @@ static int read_object (hcl_t* hcl)
 				{
 					HCL_ASSERT (hcl, is_digitchar(TOKEN_NAME_CHAR(hcl, i)));
 					v = v * 10 + CHAR_TO_NUM(TOKEN_NAME_CHAR(hcl, i), 10);
+
+					if (v > HCL_ERROR_MAX)
+					{
+						hcl_setsynerr (hcl, HCL_SYNERR_ERRORLIT, TOKEN_LOC(hcl), TOKEN_NAME(hcl));
+						return -1;
+					}
 				}
 
 				obj = HCL_ERROR_TO_OOP(v);

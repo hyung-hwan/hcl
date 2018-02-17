@@ -83,6 +83,8 @@ static char* synerrstr[] =
 	"wrong character literal",
 	"invalid numeric literal",
 	"out of integer range",
+	"wrong error literal",
+	"wrong smptr literal",
 
 	"sudden end of input",
 	"( expected",

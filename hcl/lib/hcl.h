@@ -94,6 +94,8 @@ enum hcl_synerrnum_t
 	HCL_SYNERR_CHARLIT,       /* wrong character literal */
 	HCL_SYNERR_RADNUMLIT ,    /* invalid numeric literal with radix */
 	HCL_SYNERR_INTRANGE,      /* integer range error */
+	HCL_SYNERR_ERRORLIT,      /* wrong error literal */
+	HCL_SYNERR_SMPTRLIT,      /* wrong smptr literal */
 
 	HCL_SYNERR_EOF,           /* sudden end of input */
 	HCL_SYNERR_LPAREN,        /* ( expected */
@@ -236,38 +238,6 @@ typedef struct hcl_obj_word_t*     hcl_oop_word_t;
 #endif
 
 
-#if 0
-/* 
- * OOP encoding
- * An object pointer(OOP) is an ordinary pointer value to an object.
- * but some simple numeric values are also encoded into OOP using a simple
- * bit-shifting and masking.
- *
- * A real OOP is stored without any bit-shifting while a non-OOP value encoded
- * in an OOP is bit-shifted to the left by 2 and the 2 least-significant bits
- * are set to 1 or 2.
- * 
- * This scheme works because the object allocators aligns the object size to
- * a multiple of sizeof(hcl_oop_t). This way, the 2 least-significant bits
- * of a real OOP are always 0s.
- */
-
-#define HCL_OOP_TAG_BITS  2
-#define HCL_OOP_TAG_SMOOI 1
-#define HCL_OOP_TAG_CHAR  2
-
-#define HCL_OOP_IS_NUMERIC(oop) (((hcl_oow_t)oop) & (HCL_OOP_TAG_SMOOI | HCL_OOP_TAG_CHAR))
-#define HCL_OOP_IS_POINTER(oop) (!HCL_OOP_IS_NUMERIC(oop))
-#define HCL_OOP_GET_TAG(oop) (((hcl_oow_t)oop) & HCL_LBMASK(hcl_oow_t, HCL_OOP_TAG_BITS))
-
-#define HCL_OOP_IS_SMOOI(oop) (((hcl_ooi_t)oop) & HCL_OOP_TAG_SMOOI)
-#define HCL_OOP_IS_CHAR(oop) (((hcl_oow_t)oop) & HCL_OOP_TAG_CHAR)
-#define HCL_SMOOI_TO_OOP(num) ((hcl_oop_t)((((hcl_ooi_t)(num)) << HCL_OOP_TAG_BITS) | HCL_OOP_TAG_SMOOI))
-#define HCL_OOP_TO_SMOOI(oop) (((hcl_ooi_t)oop) >> HCL_OOP_TAG_BITS)
-#define HCL_CHAR_TO_OOP(num) ((hcl_oop_t)((((hcl_oow_t)(num)) << HCL_OOP_TAG_BITS) | HCL_OOP_TAG_CHAR))
-#define HCL_OOP_TO_CHAR(oop) (((hcl_oow_t)oop) >> HCL_OOP_TAG_BITS)
-
-#else
 /* 
  * OOP encoding
  * An object pointer(OOP) is an ordinary pointer value to an object.
@@ -327,8 +297,6 @@ typedef struct hcl_obj_word_t*     hcl_oop_word_t;
 #define HCL_OOP_TO_ERROR(oop) (((hcl_oow_t)oop) >> (HCL_OOP_TAG_BITS_LO + HCL_OOP_TAG_BITS_LO))
 #define HCL_ERROR_TO_OOP(num) ((hcl_oop_t)((((hcl_oow_t)(num)) << (HCL_OOP_TAG_BITS_LO + HCL_OOP_TAG_BITS_LO)) | HCL_OOP_TAG_ERROR))
 
-#endif
-
 /* SMOOI takes up 62 bit on a 64-bit architecture and 30 bits 
  * on a 32-bit architecture. The absolute value takes up 61 bits and 29 bits
  * respectively for the 1 sign bit. */
@@ -340,6 +308,21 @@ typedef struct hcl_obj_word_t*     hcl_oop_word_t;
 /*#define HCL_SMOOI_MIN (-HCL_SMOOI_MAX - 1)*/
 #define HCL_SMOOI_MIN (-HCL_SMOOI_MAX)
 #define HCL_IN_SMOOI_RANGE(ooi)  ((ooi) >= HCL_SMOOI_MIN && (ooi) <= HCL_SMOOI_MAX)
+
+
+/* SMPTR is a special value which has been devised to encode an address value
+ * whose low HCL_OOP_TAG_BITS_LO bits are 0. its class is SmallPointer. A pointer
+ * returned by most of system functions would be aligned to the pointer size. 
+ * you can use the followings macros when converting such a pointer without loss. */
+#define HCL_IN_SMPTR_RANGE(ptr) ((((hcl_oow_t)ptr) & HCL_LBMASK(hcl_oow_t, HCL_OOP_TAG_BITS_LO)) == 0)
+
+#define HCL_CHAR_BITS (HCL_OOI_BITS - HCL_OOP_TAG_BITS_LO - HCL_OOP_TAG_BITS_HI)
+#define HCL_CHAR_MIN 0
+#define HCL_CHAR_MAX (~((hcl_oow_t)0) >> (HCL_OOP_TAG_BITS_LO + HCL_OOP_TAG_BITS_HI))
+
+#define HCL_ERROR_BITS (HCL_OOI_BITS - HCL_OOP_TAG_BITS_LO - HCL_OOP_TAG_BITS_HI)
+#define HCL_ERROR_MIN 0
+#define HCL_ERROR_MAX (~((hcl_oow_t)0) >> (HCL_OOP_TAG_BITS_LO + HCL_OOP_TAG_BITS_HI))
 
 /* TODO: There are untested code where smint is converted to hcl_oow_t.
  *       for example, the spec making macro treats the number as hcl_oow_t instead of hcl_ooi_t.
