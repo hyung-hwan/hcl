@@ -754,16 +754,22 @@ static int get_sharp_token (hcl_t* hcl)
 	 * #bBBBB binary
 	 * #oOOOO octal 
 	 * #xXXXX hexadecimal
+	 * #nil
 	 * #true
 	 * #false
 	 * #include
-	 * #\C  * character
-	 * #\xHHHH  * unicode
-	 * #\uHHHH
-	 * #( )  * array
-	 * #[ ]  * byte array
-	 * #{ }  * dictionary
-	 * #< > -- xxx
+	 * #\C      character
+	 * #\XHHHH  unicode character
+	 * #\xHHHH  unicode character
+	 * #\UHHHH  unicode character
+	 * #\uHHHH  unicode character
+	 * #\EDDD   error
+	 * #\eDDD   error
+	 * #\PHHH   smptr
+	 * #\pHHH   smptr
+	 * #( )     array
+	 * #[ ]     byte array
+	 * #{ }     dictionary
 	 */
 
 	switch (c)
@@ -779,27 +785,6 @@ static int get_sharp_token (hcl_t* hcl)
 		radixnum:
 			if (get_radix_number (hcl, c, radix) <= -1) return -1;
 			break;
-
-#if 0 
-/* i changed mind. i don't want to have #t for true and #f for false. */
-		case 't':
-			ADD_TOKEN_CHAR (hcl, '#');
-			ADD_TOKEN_CHAR (hcl, 't');
-			GET_CHAR_TO (hcl, c);
-			if (!is_delimiter(c)) goto long_name;
-			unget_char (hcl, &hcl->c->lxc);
-			SET_TOKEN_TYPE (hcl, HCL_IOTOK_TRUE);
-			break;
-
-		case 'f':
-			ADD_TOKEN_CHAR (hcl, '#');
-			ADD_TOKEN_CHAR (hcl, 'f');
-			GET_CHAR_TO (hcl, c);
-			if (!is_delimiter(c)) goto long_name;
-			unget_char (hcl, &hcl->c->lxc);
-			SET_TOKEN_TYPE (hcl, HCL_IOTOK_FALSE);
-			break;
-#endif
 
 		case '\\': /* character literal */
 			ADD_TOKEN_CHAR (hcl, '#');
