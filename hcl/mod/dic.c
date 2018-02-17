@@ -45,10 +45,8 @@ static hcl_pfrc_t pf_dic_get (hcl_t* hcl, hcl_ooi_t nargs)
 	pair = hcl_getatdic(hcl, (hcl_oop_dic_t)dic, key);
 	if (!pair)
 	{
-		/* TODO: arrange to return ERROR instead of returnin HCL_PF_FAILURE*/
-		hcl_seterrbfmt (hcl, HCL_EINVAL, "invalid key - %O", key);
-		return HCL_PF_FAILURE;
-
+		HCL_STACK_SETRETTOERROR (hcl, nargs, HCL_ENOENT);
+		return HCL_PF_SUCCESS;
 	}
 
 	HCL_STACK_SETRET (hcl, nargs, HCL_CONS_CDR(pair));

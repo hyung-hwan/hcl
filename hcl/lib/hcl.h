@@ -1138,7 +1138,8 @@ struct hcl_t
 		HCL_STACK_SETTOP(hcl, (retv)); \
 	} while(0)
 
-#define HCL_STACK_SETRETTORCV(hcl,nargs) (HCL_STACK_POPS(hcl, nargs))
+#define HCL_STACK_SETRETTOERRNUM(hcl,nargs) HCL_STACK_SETRET(hcl, nargs, HCL_ERROR_TO_OOP(hcl->errnum))
+#define HCL_STACK_SETRETTOERROR(hcl,nargs,ec) HCL_STACK_SETRET(hcl, nargs, HCL_ERROR_TO_OOP(ec))
 
 
 /* =========================================================================
