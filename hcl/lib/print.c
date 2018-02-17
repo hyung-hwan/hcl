@@ -114,6 +114,60 @@ static struct
 };
 
 
+static HCL_INLINE int print_single_char (hcl_t* hcl, hcl_oow_t mask, hcl_ooch_t ch, hcl_outbfmt_t outbfmt)
+{
+	if (ch < ' ') 
+	{
+		hcl_ooch_t escaped;
+
+		switch (ch)
+		{
+			case '\0':
+				escaped = '0';
+				break;
+			case '\n':
+				escaped = 'n';
+				break;
+			case '\r':
+				escaped = 'r';
+				break;
+			case '\t':
+				escaped = 't';
+				break;
+			case '\f':
+				escaped = 'f';
+				break;
+			case '\b':
+				escaped = 'b';
+				break;
+			case '\v':
+				escaped = 'v';
+				break;
+			case '\a':
+				escaped = 'a';
+				break;
+			default:
+				escaped = ch;
+				break;
+		}
+
+		if (escaped == ch)
+		{
+			if (outbfmt(hcl, mask, "\\x%X", ch) <= -1) return -1;
+		}
+		else
+		{
+			if (outbfmt(hcl, mask, "\\%jc", escaped) <= -1) return -1;
+		}
+	}
+	else
+	{
+		if (outbfmt(hcl, mask, "%jc", ch) <= -1) return -1;
+	}
+
+	return 0;
+}
+
 int hcl_outfmtobj (hcl_t* hcl, hcl_oow_t mask, hcl_oop_t obj, hcl_outbfmt_t outbfmt)
 {
 	hcl_oop_t cur;
@@ -129,7 +183,20 @@ next:
 	}
 	else if (HCL_OOP_IS_CHAR(obj))
 	{
-		if (outbfmt(hcl, mask, "$%.1jc", HCL_OOP_TO_CHAR(obj)) <= -1) return -1;
+		hcl_ooch_t ch = HCL_OOP_TO_CHAR(obj);
+		if (outbfmt(hcl, mask, "\'") <= -1 ||
+		    print_single_char(hcl, mask, ch, outbfmt) <= -1 ||
+		    outbfmt(hcl, mask, "\'") <= -1) return -1;
+		goto done;
+	}
+	else if (HCL_OOP_IS_SMPTR(obj))
+	{
+		if (outbfmt(hcl, mask, "#\\p%zu", (hcl_oow_t)HCL_OOP_TO_SMPTR(obj)) <= -1) return -1;
+		goto done;
+	}
+	else if (HCL_OOP_IS_ERROR(obj))
+	{
+		if (outbfmt(hcl, mask, "#\\e%zd", (hcl_ooi_t)HCL_OOP_TO_ERROR(obj)) <= -1) return -1;
 		goto done;
 	}
  
@@ -214,60 +281,13 @@ next:
 
 			if (escape)
 			{
-				hcl_ooch_t escaped;
-
 				if (outbfmt(hcl, mask, "\"") <= -1) return -1;
 				for (i = 0; i < HCL_OBJ_GET_SIZE(obj); i++)
 				{
+					
 					ch = ((hcl_oop_char_t)obj)->slot[i];
-					if (ch < ' ') 
-					{
-						switch (ch)
-						{
-							case '\0':
-								escaped = '0';
-								break;
-							case '\n':
-								escaped = 'n';
-								break;
-							case '\r':
-								escaped = 'r';
-								break;
-							case '\t':
-								escaped = 't';
-								break;
-							case '\f':
-								escaped = 'f';
-								break;
-							case '\b':
-								escaped = 'b';
-								break;
-							case '\v':
-								escaped = 'v';
-								break;
-							case '\a':
-								escaped = 'a';
-								break;
-							default:
-								escaped = ch;
-								break;
-						}
-
-						if (escaped == ch)
-						{
-							if (outbfmt(hcl, mask, "\\x%X", ch) <= -1) return -1;
-						}
-						else
-						{
-							if (outbfmt(hcl, mask, "\\%jc", escaped) <= -1) return -1;
-						}
-					}
-					else
-					{
-						if (outbfmt(hcl, mask, "%jc", ch) <= -1) return -1;
-					}
+					if (print_single_char(hcl, mask, ch, outbfmt) <= -1) return -1;
 				}
-
 				if (outbfmt(hcl, mask, "\"") <= -1) return -1;
 			}
 			else

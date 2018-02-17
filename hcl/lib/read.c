@@ -219,7 +219,7 @@ static hcl_oop_t string_to_num (hcl_t* hcl, hcl_oocs_t* str, int radixed)
 		if (*ptr != '#') 
 		{
 			hcl_seterrnum (hcl, HCL_EINVAL);
-			return -1;
+			return HCL_NULL;
 		}
 		ptr++; /* skip '#' */
 		
@@ -229,7 +229,7 @@ static hcl_oop_t string_to_num (hcl_t* hcl, hcl_oocs_t* str, int radixed)
 		else
 		{
 			hcl_seterrnum (hcl, HCL_EINVAL);
-			return -1;
+			return HCL_NULL;
 		}
 		ptr++;
 	}
@@ -821,24 +821,43 @@ static int get_sharp_token (hcl_t* hcl)
 			} 
 			while (!is_delimiter(c));
 
-			if (hcl->c->tok.name.len >= 4)
+			if (TOKEN_NAME_LEN(hcl) >= 4)
 			{
-				if (hcl->c->tok.name.ptr[2] == 'x' || hcl->c->tok.name.ptr[2] == 'u')
+				if (hcl->c->tok.name.ptr[2] == 'p')
+				{
+					SET_TOKEN_TYPE (hcl, HCL_IOTOK_SMPTRLIT);
+					goto hexcharlit;
+				}
+				else if (hcl->c->tok.name.ptr[2] == 'x' || hcl->c->tok.name.ptr[2] == 'u')
 				{
 					hcl_oow_t i;
 
+				hexcharlit:
 					c = 0;
-					for (i = 3; i < hcl->c->tok.name.len; i++)
+					for (i = 3; i < TOKEN_NAME_LEN(hcl); i++)
 					{
-						if (!is_xdigitchar(hcl->c->tok.name.ptr[i]))
+						if (!is_xdigitchar(TOKEN_NAME_CHAR(hcl, i)))
 						{
 							hcl_setsynerrbfmt (hcl, HCL_SYNERR_CHARLIT, TOKEN_LOC(hcl), TOKEN_NAME(hcl),
-								"invalid hexadecimal character in %.*js", hcl->c->tok.name.len, hcl->c->tok.name.ptr);
+								"invalid hexadecimal character in %.*js", TOKEN_NAME_LEN(hcl), TOKEN_NAME_PTR(hcl));
 							return -1;
 						}
-
-						c = c * 16 + CHAR_TO_NUM(hcl->c->tok.name.ptr[i], 16);
+						c = c * 16 + CHAR_TO_NUM(hcl->c->tok.name.ptr[i], 16); /* don't care if it is for 'p' */
 					}
+				}
+				else if (hcl->c->tok.name.ptr[2] == 'e')
+				{
+					hcl_oow_t i;
+					for (i = 3; i < TOKEN_NAME_LEN(hcl); i++)
+					{
+						if (!is_digitchar(TOKEN_NAME_CHAR(hcl, i)))
+						{
+							hcl_setsynerrbfmt (hcl, HCL_SYNERR_CHARLIT, TOKEN_LOC(hcl), TOKEN_NAME(hcl),
+								"invalid decimal character in %.*js", TOKEN_NAME_LEN(hcl), TOKEN_NAME_PTR(hcl));
+							return -1;
+						}
+					}
+					SET_TOKEN_TYPE (hcl, HCL_IOTOK_ERRORLIT);
 				}
 				else if (does_token_name_match(hcl, VOCA_SPACE))
 				{
@@ -891,12 +910,15 @@ static int get_sharp_token (hcl_t* hcl)
 			else
 			{
 				HCL_ASSERT (hcl, TOKEN_NAME_LEN(hcl) == 3);
-				c = TOKEN_NAME_CHAR(hcl,2);
+				c = TOKEN_NAME_CHAR(hcl, 2);
 			}
 
 			/* reset the token name to the converted character */
-			CLEAR_TOKEN_NAME (hcl);
-			ADD_TOKEN_CHAR (hcl, c);
+			if (hcl->c->tok.type == HCL_IOTOK_CHARLIT)
+			{
+				CLEAR_TOKEN_NAME (hcl);
+				ADD_TOKEN_CHAR (hcl, c);
+			}
 
 			unget_char (hcl, &hcl->c->lxc);
 			break;
@@ -1049,11 +1071,19 @@ retry:
 			if (get_string(hcl, '\"', '\\', 0, 0) <= -1) return -1;
 			break;
 
-#if 0
 		case '\'':
+		#if 0
 			if (get_quoted_token(hcl) <= -1) return -1;
+		#else
+			if (get_string(hcl, '\'', '\\', 0, 0) <= -1) return -1;
+			if (hcl->c->tok.name.len != 1)
+			{
+				hcl_setsynerr (hcl, HCL_SYNERR_CHARLIT, TOKEN_LOC(hcl), TOKEN_NAME(hcl));
+				return -1;
+			}
+			SET_TOKEN_TYPE (hcl, HCL_IOTOK_CHARLIT);
+		#endif
 			break;
-#endif
 
 		case '#':  
 			if (get_sharp_token(hcl) <= -1) return -1;
@@ -1917,6 +1947,38 @@ static int read_object (hcl_t* hcl)
 			case HCL_IOTOK_FALSE:
 				obj = hcl->_false;
 				break;
+
+			case HCL_IOTOK_SMPTRLIT:
+			{
+				hcl_oow_t i;
+				hcl_oow_t v = 0;
+
+				HCL_ASSERT (hcl, TOKEN_NAME_LEN(hcl) >= 4);
+				for (i = 3; i < TOKEN_NAME_LEN(hcl); i++)
+				{
+					HCL_ASSERT (hcl, is_xdigitchar(TOKEN_NAME_CHAR(hcl, i)));
+					v = v * 16 + CHAR_TO_NUM(TOKEN_NAME_CHAR(hcl, i), 16);
+				}
+
+				obj = HCL_SMPTR_TO_OOP(v);
+				break;
+			}
+
+			case HCL_IOTOK_ERRORLIT:
+			{
+				hcl_oow_t i;
+				hcl_ooi_t v = 0;
+
+				HCL_ASSERT (hcl, TOKEN_NAME_LEN(hcl) >= 4);
+				for (i = 3; i < TOKEN_NAME_LEN(hcl); i++)
+				{
+					HCL_ASSERT (hcl, is_digitchar(TOKEN_NAME_CHAR(hcl, i)));
+					v = v * 10 + CHAR_TO_NUM(TOKEN_NAME_CHAR(hcl, i), 10);
+				}
+
+				obj = HCL_ERROR_TO_OOP(v);
+				break;
+			}
 
 			case HCL_IOTOK_CHARLIT:
 				obj = HCL_CHAR_TO_OOP(TOKEN_NAME_CHAR(hcl, 0));
