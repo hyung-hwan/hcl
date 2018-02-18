@@ -34,7 +34,6 @@ struct pf_t
 
 	hcl_oow_t namelen;
 	hcl_ooch_t name[10];
-	
 };
 typedef struct pf_t pf_t;
 
@@ -160,6 +159,12 @@ static hcl_pfrc_t pf_log (hcl_t* hcl, hcl_ooi_t nargs)
 	return HCL_PF_SUCCESS;
 }
 
+static hcl_pfrc_t pf_gc (hcl_t* hcl, hcl_ooi_t nargs)
+{
+	hcl_gc (hcl);
+	HCL_STACK_SETRET (hcl, nargs, hcl->_nil);
+	return HCL_PF_SUCCESS;
+}
 /* ------------------------------------------------------------------------- */
 static hcl_pfrc_t pf_eqv (hcl_t* hcl, hcl_ooi_t nargs)
 {
@@ -360,7 +365,8 @@ static hcl_pfrc_t pf_printf (hcl_t* hcl, hcl_ooi_t nargs)
 
 static pf_t builtin_prims[] =
 {
-	{ 0, HCL_TYPE_MAX(hcl_oow_t), pf_log,   3,  { 'l','o','g' } },
+	{ 0, HCL_TYPE_MAX(hcl_oow_t), pf_log,           3,  { 'l','o','g' } },
+	{ 0, 0,                       pf_gc,            2,  { 'g','c' } },
 
 	{ 1, 1,                       pf_not,   3,  { 'n','o','t' } }, 
 	{ 2, HCL_TYPE_MAX(hcl_oow_t), pf_and,   3,  { 'a','n','d' } },
@@ -387,7 +393,8 @@ static pf_t builtin_prims[] =
 	{ 1, HCL_TYPE_MAX(hcl_oow_t), pf_integer_quo,   1,  { '/' } },
 	{ 2, HCL_TYPE_MAX(hcl_oow_t), pf_integer_rem,   3,  { 'm','o','d' } },
 
-	{ 0, HCL_TYPE_MAX(hcl_oow_t), pf_printf,        6, { 'p','r','i','n','t','f' } },
+	
+	{ 0, HCL_TYPE_MAX(hcl_oow_t), pf_printf,        6,  { 'p','r','i','n','t','f' } },
 };
 
 
