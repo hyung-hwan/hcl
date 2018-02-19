@@ -1633,12 +1633,6 @@ HCL_EXPORT hcl_oop_t hcl_makefalse (
 	hcl_t*     hcl
 );
 
-HCL_EXPORT hcl_oop_t hcl_makebigint (
-	hcl_t*           hcl, 
-	int              brand,
-	const hcl_liw_t* ptr,
-	hcl_oow_t        len
-);
 
 HCL_EXPORT hcl_oop_t hcl_makecons (
 	hcl_t*     hcl,
@@ -1708,12 +1702,30 @@ HCL_EXPORT hcl_oop_t hcl_remakengcarray (
 	hcl_oow_t        newsz
 );
 
-
 HCL_EXPORT hcl_oop_t hcl_makeprim (
 	hcl_t*          hcl,
 	hcl_pfimpl_t    primimpl,
 	hcl_oow_t       minargs,
 	hcl_oow_t       maxargs
+);
+
+
+HCL_EXPORT hcl_oop_t hcl_makebigint (
+	hcl_t*           hcl, 
+	int              brand,
+	const hcl_liw_t* ptr,
+	hcl_oow_t        len
+);
+
+HCL_EXPORT int hcl_inttooow (
+	hcl_t*     hcl,
+	hcl_oop_t  x,
+	hcl_oow_t* w
+);
+
+HCL_EXPORT hcl_oop_t hcl_oowtoint (
+	hcl_t*     hcl,
+	hcl_oow_t  w
 );
 
 /* =========================================================================
@@ -1945,7 +1957,6 @@ HCL_EXPORT hcl_bch_t* hcl_dupbchars (
 	const hcl_bch_t* bcs,
 	hcl_oow_t        bcslen
 );
-
 
 /* =========================================================================
  * ASSERTION SUPPORT

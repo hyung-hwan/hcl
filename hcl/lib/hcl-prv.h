@@ -852,17 +852,6 @@ int hcl_isint (
 	hcl_oop_t x
 );
 
-int hcl_inttooow (
-	hcl_t*     hcl,
-	hcl_oop_t  x,
-	hcl_oow_t* w
-);
-
-hcl_oop_t hcl_oowtoint (
-	hcl_t*     hcl,
-	hcl_oow_t  w
-);
-
 hcl_oop_t hcl_addints (
 	hcl_t*    hcl,
 	hcl_oop_t x,
