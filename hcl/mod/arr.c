@@ -83,11 +83,32 @@ static hcl_pfrc_t pf_arr_put (hcl_t* hcl, hcl_ooi_t nargs)
 	return HCL_PF_SUCCESS;
 }
 
+static hcl_pfrc_t pf_arr_size (hcl_t* hcl, hcl_ooi_t nargs)
+{
+	hcl_oop_oop_t arr;
+	hcl_oop_t size;
+
+	arr = (hcl_oop_oop_t)HCL_STACK_GETARG(hcl, nargs, 0);
+
+	if (!HCL_IS_ARRAY(hcl,arr))
+	{
+		hcl_seterrbfmt (hcl, HCL_EINVAL, "parameter not an array - %O", arr);
+		return HCL_PF_FAILURE;
+	}
+
+	size = hcl_oowtoint(hcl, HCL_OBJ_GET_SIZE(arr));
+	if (!size) return HCL_PF_FAILURE;
+
+	HCL_STACK_SETRET (hcl, nargs, size);
+	return HCL_PF_SUCCESS;
+}
+
 static hcl_pfinfo_t pfinfos[] =
 {
 	{ { 'g','e','t','\0' },      0, { pf_arr_get,     2,  2 } },
 /*	{ { 'm','a','k','e','\0' },  0, { pf_arr_make,    1,  1 } },*/
-	{ { 'p','u','t','\0' },      0, { pf_arr_put,     3,  3 } }
+	{ { 'p','u','t','\0' },      0, { pf_arr_put,     3,  3 } },
+	{ { 's','i','z','e','\0' },  0, { pf_arr_size,    1,  1 } },
 };
 
 /* ------------------------------------------------------------------------ */
