@@ -54,11 +54,40 @@ static hcl_pfrc_t pf_arr_get (hcl_t* hcl, hcl_ooi_t nargs)
 	return HCL_PF_SUCCESS;
 }
 
+static hcl_pfrc_t pf_arr_put (hcl_t* hcl, hcl_ooi_t nargs)
+{
+	hcl_oop_oop_t arr;
+	hcl_oop_t idx, val;
+	hcl_oow_t index;
+
+	arr = (hcl_oop_oop_t)HCL_STACK_GETARG(hcl, nargs, 0);
+	idx = HCL_STACK_GETARG(hcl, nargs, 1);
+	val = HCL_STACK_GETARG(hcl, nargs, 2);
+
+	if (!HCL_IS_ARRAY(hcl,arr))
+	{
+		hcl_seterrbfmt (hcl, HCL_EINVAL, "parameter not an array - %O", arr);
+		return HCL_PF_FAILURE;
+	}
+
+	if (hcl_inttooow(hcl, idx, &index) == 0) return HCL_PF_FAILURE;
+
+	if (index >= HCL_OBJ_GET_SIZE(arr))
+	{
+		hcl_seterrbfmt (hcl, HCL_EINVAL, "array index(%zu) out of bounds(0-%zu)", index, HCL_OBJ_GET_SIZE(arr) - 1);
+		return HCL_PF_FAILURE;
+	}
+
+	arr->slot[index] = val;
+	HCL_STACK_SETRET (hcl, nargs, val);
+	return HCL_PF_SUCCESS;
+}
+
 static hcl_pfinfo_t pfinfos[] =
 {
 	{ { 'g','e','t','\0' },      0, { pf_arr_get,     2,  2 } },
-/*	{ { 'm','a','k','e','\0' },  0, { pf_arr_make,    1,  1 } },
-	{ { 'p','u','t','\0' },      0, { pf_arr_put,     3,  3 } }*/
+/*	{ { 'm','a','k','e','\0' },  0, { pf_arr_make,    1,  1 } },*/
+	{ { 'p','u','t','\0' },      0, { pf_arr_put,     3,  3 } }
 };
 
 /* ------------------------------------------------------------------------ */
