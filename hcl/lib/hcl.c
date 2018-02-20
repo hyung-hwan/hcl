@@ -85,6 +85,14 @@ static void fill_bigint_tables (hcl_t* hcl)
 
 int hcl_init (hcl_t* hcl, hcl_mmgr_t* mmgr, hcl_oow_t heapsz, const hcl_vmprim_t* vmprim)
 {
+	int modtab_inited = 0;
+
+	if (!vmprim->syserrstrb && !vmprim->syserrstru)
+	{
+		hcl_seterrnum (hcl, HCL_EINVAL);
+		return -1;
+	}
+
 	HCL_MEMSET (hcl, 0, HCL_SIZEOF(*hcl));
 	hcl->mmgr = mmgr;
 	hcl->cmgr = hcl_getutf8cmgr();
@@ -95,6 +103,7 @@ int hcl_init (hcl_t* hcl, hcl_mmgr_t* mmgr, hcl_oow_t heapsz, const hcl_vmprim_t
 	hcl->option.dfl_symtab_size = HCL_DFL_SYMTAB_SIZE;
 	hcl->option.dfl_sysdic_size = HCL_DFL_SYSDIC_SIZE;
 	hcl->option.dfl_procstk_size = HCL_DFL_PROCSTK_SIZE;
+	hcl->option.karatsuba_cutoff = HCL_KARATSUBA_CUTOFF; /* this won't be used when NDEBUG is set */
 
 	hcl->log.capa = HCL_ALIGN_POW2(1, HCL_LOG_CAPA_ALIGN); /* TODO: is this a good initial size? */
 	/* alloate the log buffer in advance though it may get reallocated
@@ -113,15 +122,18 @@ int hcl_init (hcl_t* hcl, hcl_mmgr_t* mmgr, hcl_oow_t heapsz, const hcl_vmprim_t
 	if (!hcl->newheap) goto oops;
 
 	if (hcl_rbt_init (&hcl->modtab, hcl, HCL_SIZEOF(hcl_ooch_t), 1) <= -1) goto oops;
+	modtab_inited = 1;
 	hcl_rbt_setstyle (&hcl->modtab, hcl_getrbtstyle(HCL_RBT_STYLE_INLINE_COPIERS));
 
 	fill_bigint_tables (hcl);
 
 	hcl->proc_map_free_first = -1;
 	hcl->proc_map_free_last = -1;
+
 	return 0;
 
 oops:
+	if (modtab_inited) hcl_rbt_fini (&hcl->modtab);
 	if (hcl->newheap) hcl_killheap (hcl, hcl->newheap);
 	if (hcl->curheap) hcl_killheap (hcl, hcl->curheap);
 	if (hcl->permheap) hcl_killheap (hcl, hcl->permheap);
