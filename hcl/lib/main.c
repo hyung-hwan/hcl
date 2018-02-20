@@ -1509,12 +1509,12 @@ int main (int argc, char* argv[])
 	vmprim.dl_open = dl_open;
 	vmprim.dl_close = dl_close;
 	vmprim.dl_getsym = dl_getsym;
-	vmprim.log_write  = log_write;
+	vmprim.log_write = log_write;
 	vmprim.syserrstrb = syserrstrb;
 	vmprim.vm_startup = vm_startup;
 	vmprim.vm_cleanup = vm_cleanup;
 	vmprim.vm_gettime = vm_gettime;
-	vmprim.vm_sleep   = vm_sleep;
+	vmprim.vm_sleep = vm_sleep;
 
 	hcl = hcl_open (&sys_mmgr, HCL_SIZEOF(xtn_t), 2048000lu, &vmprim, HCL_NULL);
 	if (!hcl)
@@ -1522,7 +1522,6 @@ int main (int argc, char* argv[])
 		printf ("cannot open hcl\n");
 		return -1;
 	}
-
 
 	{
 		hcl_oow_t tab_size;
@@ -1597,7 +1596,7 @@ int main (int argc, char* argv[])
 	xtn->read_path = argv[opt.ind++];
 	if (opt.ind < argc) xtn->print_path = argv[opt.ind++];
 
-	if (hcl_attachio (hcl, read_handler, print_handler) <= -1)
+	if (hcl_attachio(hcl, read_handler, print_handler) <= -1)
 	{
 		hcl_logbfmt (hcl, HCL_LOG_STDERR, "ERROR: cannot attache input stream - [%d] %js\n", hcl_geterrnum(hcl), hcl_geterrmsg(hcl));
 		hcl_close (hcl);
@@ -1619,14 +1618,14 @@ int main (int argc, char* argv[])
 			else if (hcl->errnum == HCL_ESYNERR)
 			{
 				print_synerr (hcl);
+				if (xtn->reader_istty) continue;
 			}
 			else
 			{
 				hcl_logbfmt (hcl, HCL_LOG_STDERR, "ERROR: cannot read object - [%d] %js\n", hcl_geterrnum(hcl), hcl_geterrmsg(hcl));
+				
 			}
-
-			if (!xtn->reader_istty) goto oops;
-			continue;
+			goto oops;
 		}
 
 		if (hcl_print(hcl, obj) <= -1)
