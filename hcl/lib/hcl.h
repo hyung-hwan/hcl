@@ -963,10 +963,8 @@ struct hcl_t
 		hcl_oow_t dfl_sysdic_size;
 		hcl_oow_t dfl_procstk_size; 
 
-#if !defined(NDEBUG)
 		/* set automatically when trait is set */
-		int karatsuba_cutoff;
-#endif
+		int karatsuba_cutoff; /* used when NDEBUG is not set only. but keep it here regardless */
 	} option;
 
 	hcl_vmprim_t vmprim;
