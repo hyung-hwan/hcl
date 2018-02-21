@@ -72,21 +72,21 @@ start_over:
 	{
 		if (*ptr == '\0') 
 		{
-			n = hcl_logbfmt (hcl, mask, "%C", *ptr);
+			n = hcl_logbfmt (hcl, mask, "%jc", *ptr);
 			HCL_ASSERT (hcl, n == 1);
 			rem -= n;
 			ptr += n;
 			goto start_over;
 		}
 
-		n = hcl_logbfmt (hcl, mask, "%.*S", rem, ptr);
+		n = hcl_logbfmt (hcl, mask, "%.*js", rem, ptr);
 		if (n <= -1) break;
 		if (n == 0) 
 		{
 			/* to skip the unprinted character. 
 			 * actually, this check is not needed because of '\0' skipping
 			 * at the beginning  of the loop */
-			n = hcl_logbfmt (hcl, mask, "%C", *ptr);
+			n = hcl_logbfmt (hcl, mask, "%jc", *ptr);
 			HCL_ASSERT (hcl, n == 1);
 		}
 		rem -= n;
@@ -114,6 +114,10 @@ static hcl_pfrc_t pf_log (hcl_t* hcl, hcl_ooi_t nargs)
 		{
 			goto dump_object;
 		}
+		else if (HCL_OOP_IS_CHAR(msg))
+		{
+			hcl_logbfmt (hcl, mask, "%jc", HCL_OOP_TO_CHAR(msg));
+		}
 		else if (HCL_OOP_IS_POINTER(msg))
 		{
 			if (HCL_OBJ_GET_FLAGS_TYPE(msg) == HCL_OBJ_TYPE_CHAR)
@@ -135,8 +139,11 @@ static hcl_pfrc_t pf_log (hcl_t* hcl, hcl_ooi_t nargs)
 					inner = ((hcl_oop_oop_t)msg)->slot[i];
 
 					if (i > 0) hcl_logbfmt (hcl, mask, " ");
-					if (HCL_OOP_IS_POINTER(inner) &&
-					    HCL_OBJ_GET_FLAGS_TYPE(inner) == HCL_OBJ_TYPE_CHAR)
+					if (HCL_OOP_IS_CHAR(inner))
+					{
+						hcl_logbfmt (hcl, mask, "%jc", HCL_OOP_TO_CHAR(inner));
+					}
+					else if (HCL_OOP_IS_POINTER(inner) && HCL_OBJ_GET_FLAGS_TYPE(inner) == HCL_OBJ_TYPE_CHAR)
 					{
 						log_char_object (hcl, mask, (hcl_oop_char_t)inner);
 					}
@@ -244,7 +251,7 @@ static hcl_pfrc_t pf_or (hcl_t* hcl, hcl_ooi_t nargs)
 	rv = hcl->_false;
 	for (i = 1; i < nargs; i++)
 	{
-		arg = HCL_STACK_GETARG(hcl, nargs, i);
+			arg = HCL_STACK_GETARG(hcl, nargs, i);
 		if (arg == hcl->_true)
 		{
 			rv = hcl->_true;
