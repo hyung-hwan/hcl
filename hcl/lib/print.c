@@ -181,17 +181,17 @@ next:
 		if (outbfmt(hcl, mask, "%zd", HCL_OOP_TO_SMOOI(obj)) <= -1) return -1;
 		goto done;
 	}
+	else if (HCL_OOP_IS_SMPTR(obj))
+	{
+		if (outbfmt(hcl, mask, "#\\p%zX", (hcl_oow_t)HCL_OOP_TO_SMPTR(obj)) <= -1) return -1;
+		goto done;
+	}
 	else if (HCL_OOP_IS_CHAR(obj))
 	{
 		hcl_ooch_t ch = HCL_OOP_TO_CHAR(obj);
 		if (outbfmt(hcl, mask, "\'") <= -1 ||
 		    print_single_char(hcl, mask, ch, outbfmt) <= -1 ||
 		    outbfmt(hcl, mask, "\'") <= -1) return -1;
-		goto done;
-	}
-	else if (HCL_OOP_IS_SMPTR(obj))
-	{
-		if (outbfmt(hcl, mask, "#\\p%zX", (hcl_oow_t)HCL_OOP_TO_SMPTR(obj)) <= -1) return -1;
 		goto done;
 	}
 	else if (HCL_OOP_IS_ERROR(obj))
