@@ -1196,7 +1196,9 @@ retry:
 			break;
 	}
 
-HCL_DEBUG2 (hcl, "TOKEN: [%.*js]\n", (hcl_ooi_t)TOKEN_NAME_LEN(hcl), TOKEN_NAME_PTR(hcl));
+#if defined(HCL_DEBUG_LEXER)
+	HCL_DEBUG2 (hcl, "TOKEN: [%.*js]\n", (hcl_ooi_t)TOKEN_NAME_LEN(hcl), TOKEN_NAME_PTR(hcl));
+#endif
 
 	return 0;
 }

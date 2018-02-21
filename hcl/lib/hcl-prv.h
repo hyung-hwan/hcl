@@ -57,11 +57,10 @@
 #define HCL_USE_OBJECT_TRAILER
 
 
-
 #if defined(HCL_BUILD_DEBUG)
+#define HCL_DEBUG_LEXER 1
 #define HCL_DEBUG_VM_PROCESSOR 1
 #define HCL_DEBUG_VM_EXEC 1
-#define HCL_DEBUG_BIGINT 1
 #define HCL_PROFILE_VM 1
 #endif
 
@@ -76,10 +75,12 @@
  */
 #define HCL_LIMIT_OBJ_SIZE
 
-#include <stdio.h> /* TODO: delete these header inclusion lines */
-#include <string.h>
-
 #if defined(__has_builtin)
+
+#	if (!__has_builtin(__builtin_memset) || !__has_builtin(__builtin_memcpy) || !__has_builtin(__builtin_memmove) || !__has_builtin(__builtin_memcmp))
+#	include <string.h>
+#	endif
+
 #	if __has_builtin(__builtin_memset)
 #		define HCL_MEMSET(dst,src,size)  __builtin_memset(dst,src,size)
 #	else
@@ -109,6 +110,7 @@
 #	define HCL_MEMCMP(dst,src,size)  __builtin_memcmp(dst,src,size)
 
 #else
+#	include <string.h>
 #	define HCL_MEMSET(dst,src,size)  memset(dst,src,size)
 #	define HCL_MEMCPY(dst,src,size)  memcpy(dst,src,size)
 #	define HCL_MEMMOVE(dst,src,size) memmove(dst,src,size)
