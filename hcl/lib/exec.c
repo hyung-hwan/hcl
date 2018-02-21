@@ -2099,11 +2099,11 @@ static int execute (hcl_t* hcl)
 				/* it emulates thisContext blockCopy: nargs ofTmprCount: ntmprs */
 				HCL_ASSERT (hcl, hcl->sp >= 2);
 
-				HCL_ASSERT (hcl, HCL_CLASSOF(hcl, HCL_STACK_GETTOP(hcl)) == hcl->_small_integer);
+				HCL_ASSERT (hcl, HCL_OOP_IS_SMOOI(HCL_STACK_GETTOP(hcl)));
 				ntmprs = HCL_OOP_TO_SMOOI(HCL_STACK_GETTOP(hcl));
 				HCL_STACK_POP (hcl);
 
-				HCL_ASSERT (hcl, HCL_CLASSOF(hcl, HCL_STACK_GETTOP(hcl)) == hcl->_small_integer);
+				HCL_ASSERT (hcl, HCL_OOP_IS_SMOOI(HCL_STACK_GETTOP(hcl)));
 				nargs = HCL_OOP_TO_SMOOI(HCL_STACK_GETTOP(hcl));
 				HCL_STACK_POP (hcl);
 

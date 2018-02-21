@@ -648,6 +648,8 @@ HCL_SIZEOF_SHORT
 HCL_SIZEOF_INT
 HCL_SIZEOF_LONG
 HCL_SIZEOF_LONG_LONG
+HCL_SIZEOF_CHAR32_T
+HCL_SIZEOF_CHAR16_T
 HCL_SIZEOF_WCHAR_T
 ENABLE_STATIC_MODULE_FALSE
 ENABLE_STATIC_MODULE_TRUE
@@ -801,6 +803,8 @@ with_gnu_ld
 with_sysroot
 enable_libtool_lock
 enable_debug
+enable_override_uch
+enable_unicode
 enable_cxx
 enable_dynamic_module
 enable_static_module
@@ -1449,6 +1453,10 @@ Optional Features:
                           optimize for fast installation [default=yes]
   --disable-libtool-lock  avoid locking (might break parallel builds)
   --enable-debug          build the library in the debug mode (default. no)
+  --enable-override-uch   Use the specified unicode character type (default.
+                          no)
+  --enable-unicode        Use the unicode character type as the default
+                          character type (default. yes)
   --enable-cxx            build the library for C++ if a C++ compiler is
                           available (default. yes)
   --enable-dynamic-module enable dynamic module capability(default. yes)
@@ -18608,6 +18616,72 @@ _ACEOF
 # version HP92453-01 B.11.11.23709.GP, which incorrectly rejects
 # declarations like `int a3[[(sizeof (unsigned char)) >= 0]];'.
 # This bug is HP SR number 8606223364.
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking size of char16_t" >&5
+$as_echo_n "checking size of char16_t... " >&6; }
+if ${ac_cv_sizeof_char16_t+:} false; then :
+  $as_echo_n "(cached) " >&6
+else
+  if ac_fn_c_compute_int "$LINENO" "(long int) (sizeof (char16_t))" "ac_cv_sizeof_char16_t"        "$ac_includes_default"; then :
+
+else
+  if test "$ac_cv_type_char16_t" = yes; then
+     { { $as_echo "$as_me:${as_lineno-$LINENO}: error: in \`$ac_pwd':" >&5
+$as_echo "$as_me: error: in \`$ac_pwd':" >&2;}
+as_fn_error 77 "cannot compute sizeof (char16_t)
+See \`config.log' for more details" "$LINENO" 5; }
+   else
+     ac_cv_sizeof_char16_t=0
+   fi
+fi
+
+fi
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_cv_sizeof_char16_t" >&5
+$as_echo "$ac_cv_sizeof_char16_t" >&6; }
+
+
+
+cat >>confdefs.h <<_ACEOF
+#define SIZEOF_CHAR16_T $ac_cv_sizeof_char16_t
+_ACEOF
+
+
+# The cast to long int works around a bug in the HP C Compiler
+# version HP92453-01 B.11.11.23709.GP, which incorrectly rejects
+# declarations like `int a3[[(sizeof (unsigned char)) >= 0]];'.
+# This bug is HP SR number 8606223364.
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking size of char32_t" >&5
+$as_echo_n "checking size of char32_t... " >&6; }
+if ${ac_cv_sizeof_char32_t+:} false; then :
+  $as_echo_n "(cached) " >&6
+else
+  if ac_fn_c_compute_int "$LINENO" "(long int) (sizeof (char32_t))" "ac_cv_sizeof_char32_t"        "$ac_includes_default"; then :
+
+else
+  if test "$ac_cv_type_char32_t" = yes; then
+     { { $as_echo "$as_me:${as_lineno-$LINENO}: error: in \`$ac_pwd':" >&5
+$as_echo "$as_me: error: in \`$ac_pwd':" >&2;}
+as_fn_error 77 "cannot compute sizeof (char32_t)
+See \`config.log' for more details" "$LINENO" 5; }
+   else
+     ac_cv_sizeof_char32_t=0
+   fi
+fi
+
+fi
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_cv_sizeof_char32_t" >&5
+$as_echo "$ac_cv_sizeof_char32_t" >&6; }
+
+
+
+cat >>confdefs.h <<_ACEOF
+#define SIZEOF_CHAR32_T $ac_cv_sizeof_char32_t
+_ACEOF
+
+
+# The cast to long int works around a bug in the HP C Compiler
+# version HP92453-01 B.11.11.23709.GP, which incorrectly rejects
+# declarations like `int a3[[(sizeof (unsigned char)) >= 0]];'.
+# This bug is HP SR number 8606223364.
 { $as_echo "$as_me:${as_lineno-$LINENO}: checking size of off_t" >&5
 $as_echo_n "checking size of off_t... " >&6; }
 if ${ac_cv_sizeof_off_t+:} false; then :
@@ -19337,6 +19411,59 @@ else
 
 fi
 
+
+# Check whether --enable-override-uch was given.
+if test "${enable_override_uch+set}" = set; then :
+  enableval=$enable_override_uch; enable_override_uch=$enableval
+else
+  enable_override_uch=no
+
+fi
+
+if test "${enable_override_uch}" = "wchar_t"
+then
+	test "${ac_cv_sizeof_wchar_t}" = "0" && enable_override_uch=no
+	test "${ac_cv_sizeof_wchar_t}" = "1" && enable_override_uch=no
+elif test "${enable_override_uch}" = "char16_t"
+then
+	test "${ac_cv_sizeof_char16_t}" = "0" && enable_override_uch=no
+elif test "${enable_override_uch}" = "char32_t"
+then
+	test "${ac_cv_sizeof_char32_t}" = "0" && enable_override_uch=no
+fi
+
+if test "${enable_override_uch}" = "wchar_t"
+then
+
+$as_echo "#define HCL_OVERRIDE_UCH_TYPE wchar_t" >>confdefs.h
+
+elif test "${enable_override_uch}" = "char16_t"
+then
+
+$as_echo "#define HCL_OVERRIDE_UCH_TYPE char16_t" >>confdefs.h
+
+elif test "${enable_override_uch}" = "char32_t"
+then
+
+$as_echo "#define HCL_OVERRIDE_UCH_TYPE char32_t" >>confdefs.h
+
+fi
+
+# Check whether --enable-unicode was given.
+if test "${enable_unicode+set}" = set; then :
+  enableval=$enable_unicode; enable_unicode=$enableval
+else
+  enable_unicode=yes
+
+fi
+
+if test "${enable_unicode}" = "yes"
+then
+
+$as_echo "#define HCL_ENABLE_UNICODE /**/" >>confdefs.h
+
+fi
+
 # Check whether --enable-cxx was given.
 if test "${enable_cxx+set}" = set; then :
   enableval=$enable_cxx; enable_cxx_is=$enableval
@@ -19410,6 +19537,10 @@ fi
 
 
 HCL_SIZEOF_WCHAR_T=$ac_cv_sizeof_wchar_t
+
+HCL_SIZEOF_CHAR16_T=$ac_cv_sizeof_char16_t
+
+HCL_SIZEOF_CHAR32_T=$ac_cv_sizeof_char32_t
 
 HCL_SIZEOF_LONG_LONG=$ac_cv_sizeof_long_long
 

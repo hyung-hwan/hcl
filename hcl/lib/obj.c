@@ -468,31 +468,22 @@ int hcl_equalobjs (hcl_t* hcl, hcl_oop_t rcv, hcl_oop_t arg)
 		case HCL_OOP_TAG_SMOOI:
 			return HCL_OOP_TO_SMOOI(rcv) == HCL_OOP_TO_SMOOI(arg)? 1: 0;
 
-#if 0
 		case HCL_OOP_TAG_SMPTR:
 			return HCL_OOP_TO_SMPTR(rcv) == HCL_OOP_TO_SMPTR(arg)? 1: 0;
-#endif
 
 		case HCL_OOP_TAG_CHAR:
 			return HCL_OOP_TO_CHAR(rcv) == HCL_OOP_TO_CHAR(arg)? 1: 0;
 
-#if 0
 		case HCL_OOP_TAG_ERROR:
 			return HCL_OOP_TO_ERROR(rcv) == HCL_OOP_TO_ERROR(arg)? 1: 0;
-#endif
 
 		default:
 		{
 			HCL_ASSERT (hcl, HCL_OOP_IS_POINTER(rcv));
 
-			if (HCL_OBJ_GET_CLASS(rcv) != HCL_OBJ_GET_CLASS(arg)) return 0; /* different class, not equal */
+			if (HCL_OBJ_GET_FLAGS_BRAND(rcv) != HCL_OBJ_GET_FLAGS_BRAND(arg)) return 0; /* different class, not equal */
 			HCL_ASSERT (hcl, HCL_OBJ_GET_FLAGS_TYPE(rcv) == HCL_OBJ_GET_FLAGS_TYPE(arg));
 
-			if (HCL_OBJ_GET_CLASS(rcv) == hcl->_class && rcv != arg) 
-			{
-				/* a class object are supposed to be unique */
-				return 0;
-			}
 			if (HCL_OBJ_GET_SIZE(rcv) != HCL_OBJ_GET_SIZE(arg)) return 0; /* different size, not equal */
 
 			switch (HCL_OBJ_GET_FLAGS_TYPE(rcv))

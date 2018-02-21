@@ -1006,7 +1006,6 @@ struct hcl_t
 
 	/* == NEVER CHANGE THE ORDER OF FIELDS BELOW == */
 	/* hcl_ignite() assumes this order. make sure to update symnames in ignite_3() */
-	hcl_oop_t _class; /* Class */
 	hcl_oop_t _character;
 	hcl_oop_t _small_integer; /* SmallInteger */
 	hcl_oop_t _large_positive_integer; /* LargePositiveInteger */

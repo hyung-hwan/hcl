@@ -318,19 +318,17 @@ struct hcl_bcs_t
 };
 typedef struct hcl_bcs_t hcl_bcs_t;
 
-
-#if 0
-	typedef hcl_bch_t               hcl_ooch_t;
-	typedef hcl_bci_t               hcl_ooci_t;
-	typedef hcl_bcs_t               hcl_oocs_t;
-#	define HCL_OOCH_IS_BCH
-#else
+#if defined(HCL_ENABLE_UNICODE)
 	typedef hcl_uch_t               hcl_ooch_t;
 	typedef hcl_uci_t               hcl_ooci_t;
 	typedef hcl_ucs_t               hcl_oocs_t;
 #	define HCL_OOCH_IS_UCH
+#else
+	typedef hcl_bch_t               hcl_ooch_t;
+	typedef hcl_bci_t               hcl_ooci_t;
+	typedef hcl_bcs_t               hcl_oocs_t;
+#	define HCL_OOCH_IS_BCH
 #endif
-
 
 /* =========================================================================
  * TIME-RELATED TYPES

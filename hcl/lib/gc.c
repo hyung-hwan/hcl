@@ -321,7 +321,6 @@ void hcl_gc (hcl_t* hcl)
 		*(hcl_oop_t*)((hcl_uint8_t*)hcl + syminfo[i].offset) = tmp;
 	}
 
-	hcl->_class                  = hcl_moveoop (hcl, hcl->_class);
 	hcl->_character              = hcl_moveoop (hcl, hcl->_character);
 	hcl->_small_integer          = hcl_moveoop (hcl, hcl->_small_integer);
 	hcl->_large_positive_integer = hcl_moveoop (hcl, hcl->_large_positive_integer);

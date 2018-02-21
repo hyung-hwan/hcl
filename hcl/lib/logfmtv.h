@@ -436,7 +436,7 @@ reswitch:
 			/* get the length */
 			for (bslen = 0; bsp[bslen]; bslen++);
 
-			if (hcl_convbtooochars (hcl, bsp, &bslen, HCL_NULL, &slen) <= -1) goto oops;
+			if (hcl_convbtooochars(hcl, bsp, &bslen, HCL_NULL, &slen) <= -1) goto oops;
 
 			/* slen holds the length after conversion */
 			n = slen;
@@ -505,7 +505,7 @@ reswitch:
 			/* get the length */
 			for (uslen = 0; usp[uslen]; uslen++);
 
-			if (hcl_convutooochars (hcl, usp, &uslen, HCL_NULL, &slen) <= -1) goto oops;
+			if (hcl_convutooochars(hcl, usp, &uslen, HCL_NULL, &slen) <= -1) goto oops;
 
 			/* slen holds the length after conversion */
 			n = slen;

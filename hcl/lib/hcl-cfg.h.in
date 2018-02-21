@@ -222,6 +222,9 @@
 /* link modules statically into the main library */
 #undef HCL_ENABLE_STATIC_MODULE
 
+/* Use the unicode character type as the default character type */
+#undef HCL_ENABLE_UNICODE
+
 /* Big Endian */
 #undef HCL_ENDIAN_BIG
 
@@ -233,6 +236,9 @@
 
 /* MB_LEN_MAX */
 #undef HCL_MBLEN_MAX
+
+/* unicode character type */
+#undef HCL_OVERRIDE_UCH_TYPE
 
 /* Author */
 #undef HCL_PACKAGE_AUTHOR
@@ -347,6 +353,12 @@
 
 /* The size of `char', as computed by sizeof. */
 #undef SIZEOF_CHAR
+
+/* The size of `char16_t', as computed by sizeof. */
+#undef SIZEOF_CHAR16_T
+
+/* The size of `char32_t', as computed by sizeof. */
+#undef SIZEOF_CHAR32_T
 
 /* The size of `double', as computed by sizeof. */
 #undef SIZEOF_DOUBLE
