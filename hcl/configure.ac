@@ -408,43 +408,20 @@ else
 	AC_SUBST(BUILD_MODE, "release")
 fi
 
-
-AC_ARG_ENABLE([override-uch],
-	[AS_HELP_STRING([--enable-override-uch],[Use the specified unicode character type (default. no)])],
-	enable_override_uch=$enableval,
-	enable_override_uch=no
-)
-if test "${enable_override_uch}" = "wchar_t"
-then
-	test "${ac_cv_sizeof_wchar_t}" = "0" && enable_override_uch=no
-	test "${ac_cv_sizeof_wchar_t}" = "1" && enable_override_uch=no
-elif test "${enable_override_uch}" = "char16_t"
-then
-	test "${ac_cv_sizeof_char16_t}" = "0" && enable_override_uch=no
-elif test "${enable_override_uch}" = "char32_t"
-then
-	test "${ac_cv_sizeof_char32_t}" = "0" && enable_override_uch=no
-fi
-
-if test "${enable_override_uch}" = "wchar_t"
-then
-	AC_DEFINE([HCL_OVERRIDE_UCH_TYPE],[wchar_t],[unicode character type])
-elif test "${enable_override_uch}" = "char16_t"
-then
-	AC_DEFINE([HCL_OVERRIDE_UCH_TYPE],[char16_t],[unicode character type])
-elif test "${enable_override_uch}" = "char32_t"
-then
-	AC_DEFINE([HCL_OVERRIDE_UCH_TYPE],[char32_t],[unicode character type])
-fi
-
 AC_ARG_ENABLE([unicode], 
-	[AS_HELP_STRING([--enable-unicode],[Use the unicode character type as the default character type (default. yes)])],
+	[AS_HELP_STRING([--enable-unicode],[Use the unicode character type as the default character type. one of yes, no, ucs2, ucs4 (default. yes)])],
 	enable_unicode=$enableval,
 	enable_unicode=yes
 )
 if test "${enable_unicode}" = "yes"
 then
 	AC_DEFINE([HCL_ENABLE_UNICODE],[1],[Use the unicode character type as the default character type])	
+elif test "${enable_unicode}" = "ucs2"
+then
+	AC_DEFINE([HCL_ENABLE_UNICODE],[2],[Use the unicode character type as the default character type])	
+elif test "${enable_unicode}" = "ucs4"
+then
+	AC_DEFINE([HCL_ENABLE_UNICODE],[4],[Use the unicode character type as the default character type])	
 fi
 
 AC_ARG_ENABLE([cxx], 

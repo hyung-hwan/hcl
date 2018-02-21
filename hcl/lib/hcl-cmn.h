@@ -280,15 +280,26 @@ typedef unsigned char           hcl_bchu_t; /* unsigned version of hcl_bch_t for
 #define HCL_SIZEOF_BCH_T HCL_SIZEOF_CHAR
 #define HCL_SIZEOF_BCI_T HCL_SIZEOF_INT
 
-#if defined(__GNUC__) && defined(__CHAR16_TYPE__)
-/* TODO ... wchar_t???, char16_t? char32_t? */
-typedef __CHAR16_TYPE__         hcl_uch_t; 
+#if defined(HCL_ENABLE_UNICODE) && (HCL_ENABLE_UNICODE == 4)
+#	if defined(__GNUC__) && defined(__CHAR32_TYPE__)
+	typedef __CHAR32_TYPE__    hcl_uch_t;
+#	else
+	typedef hcl_uint32_t       hcl_uch_t;
+#	endif
+	typedef hcl_uint32_t       hcl_uchu_t; /* same as hcl_uch_t as it is already unsigned */
+#	define HCL_SIZEOF_UCH_T 4
+
+#elif defined(__GNUC__) && defined(__CHAR16_TYPE__)
+	typedef __CHAR16_TYPE__    hcl_uch_t; 
+	typedef hcl_uint16_t       hcl_uchu_t; /* same as hcl_uch_t as it is already unsigned */
+#	define HCL_SIZEOF_UCH_T 2
 #else
-typedef hcl_uint16_t            hcl_uch_t;
+	typedef hcl_uint16_t       hcl_uch_t;
+	typedef hcl_uint16_t       hcl_uchu_t; /* same as hcl_uch_t as it is already unsigned */
+#	define HCL_SIZEOF_UCH_T 2
 #endif
+
 typedef hcl_int32_t             hcl_uci_t;
-typedef hcl_uint16_t            hcl_uchu_t; /* same as hcl_uch_t as it is already unsigned */
-#define HCL_SIZEOF_UCH_T 2
 #define HCL_SIZEOF_UCI_T 4
 
 typedef hcl_uint8_t             hcl_oob_t;
