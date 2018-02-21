@@ -165,7 +165,7 @@ typedef enum hcl_option_dflval_t hcl_option_dflval_t;
 
 enum hcl_trait_t
 {
-#if !defined(NDEBUG)
+#if defined(HCL_BUILD_DEBUG)
 	HCL_DEBUG_GC     = (1 << 0),
 	HCL_DEBUG_BIGINT = (1 << 1),
 #endif
@@ -963,8 +963,10 @@ struct hcl_t
 		hcl_oow_t dfl_sysdic_size;
 		hcl_oow_t dfl_procstk_size; 
 
+	#if defined(HCL_BUILD_DEBUG)
 		/* set automatically when trait is set */
-		int karatsuba_cutoff; /* used when NDEBUG is not set only. but keep it here regardless */
+		int karatsuba_cutoff;
+	#endif
 	} option;
 
 	hcl_vmprim_t vmprim;
@@ -1181,7 +1183,7 @@ typedef enum hcl_log_mask_t hcl_log_mask_t;
 #define HCL_LOG5(hcl,mask,fmt,a1,a2,a3,a4,a5) do { if (HCL_LOG_ENABLED(hcl,mask)) hcl_logbfmt(hcl, mask, fmt, a1, a2, a3, a4, a5); } while(0)
 #define HCL_LOG6(hcl,mask,fmt,a1,a2,a3,a4,a5,a6) do { if (HCL_LOG_ENABLED(hcl,mask)) hcl_logbfmt(hcl, mask, fmt, a1, a2, a3, a4, a5, a6); } while(0)
 
-#if defined(NDEBUG)
+#if defined(HCL_BUILD_RELEASE)
 	/* [NOTE]
 	 *  get rid of debugging message totally regardless of
 	 *  the log mask in the release build.
@@ -1215,7 +1217,7 @@ typedef enum hcl_log_mask_t hcl_log_mask_t;
 /* =========================================================================
  * HCL ASSERTION
  * ========================================================================= */
-#if defined(NDEBUG)
+#if defined(HCL_BUILD_RELEASE)
 #	define HCL_ASSERT(hcl,expr) ((void)0)
 #else
 #	define HCL_ASSERT(hcl,expr) ((void)((expr) || (hcl_assertfailed (hcl, #expr, __FILE__, __LINE__), 0)))

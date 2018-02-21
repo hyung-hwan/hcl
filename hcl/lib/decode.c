@@ -28,7 +28,7 @@
 
 #define DECODE_LOG_MASK (HCL_LOG_MNEMONIC | HCL_LOG_INFO)
 
-#if defined(NDEBUG)
+#if defined(HCL_BUILD_RELEASE)
 	/* get rid of instruction logging regardless of the log mask
 	 * in the release build */
 #	define LOG_INST_0(hcl,fmt)

@@ -397,12 +397,14 @@ AC_ARG_ENABLE([debug], [AS_HELP_STRING([--enable-debug],[build the library in th
 	enable_debug_is=$enableval,enable_debug_is=no)
 if test "$enable_debug_is" = "yes"
 then
-	[CFLAGS="$CFLAGS -g -D_DEBUG -UNDEBUG -DHCL_BUILD_DEBUG -U_FORTIFY_SOURCE"]
-	[CXXFLAGS="$CXXFLAGS -g -D_DEBUG -UNDEBUG -DHCL_BUILD_DEBUG -U_FORTIFY_SOURCE"]
+	[CFLAGS="$CFLAGS -g -D_DEBUG -UNDEBUG -U_FORTIFY_SOURCE"]
+	[CXXFLAGS="$CXXFLAGS -g -D_DEBUG -UNDEBUG -U_FORTIFY_SOURCE"]
+	AC_DEFINE([HCL_BUILD_DEBUG],[1],[build release/debug])
 	AC_SUBST(BUILD_MODE, "debug")
 else
-	[CFLAGS="$CFLAGS -DNDEBUG -U_DEBUG -DHCL_BUILD_RELEASE -U_FORTIFY_SOURCE"]
-	[CXXFLAGS="$CXXFLAGS -DNDEBUG -U_DEBUG -DHCL_BUILD_RELEASE -U_FORTIFY_SOURCE"]
+	[CFLAGS="$CFLAGS -DNDEBUG -U_DEBUG -U_FORTIFY_SOURCE"]
+	[CXXFLAGS="$CXXFLAGS -DNDEBUG -U_DEBUG -U_FORTIFY_SOURCE"]
+	AC_DEFINE([HCL_BUILD_RELEASE],[1],[build release/debug])
 	AC_SUBST(BUILD_MODE, "release")
 fi
 
@@ -442,7 +444,7 @@ AC_ARG_ENABLE([unicode],
 )
 if test "${enable_unicode}" = "yes"
 then
-	AC_DEFINE([HCL_ENABLE_UNICODE],[],[Use the unicode character type as the default character type])	
+	AC_DEFINE([HCL_ENABLE_UNICODE],[1],[Use the unicode character type as the default character type])	
 fi
 
 AC_ARG_ENABLE([cxx], 
@@ -469,7 +471,7 @@ test "${enable_shared}" = "no" && enable_dynamic_module_is="no"
 
 if test "${enable_dynamic_module_is}" = "yes"
 then
-	AC_DEFINE([HCL_ENABLE_DYNAMIC_MODULE],[],[enable dynamic module capability])
+	AC_DEFINE([HCL_ENABLE_DYNAMIC_MODULE],[1],[enable dynamic module capability])
 fi
 AM_CONDITIONAL(ENABLE_DYNAMIC_MODULE, test "${enable_dynamic_module_is}" = "yes")
 
@@ -483,7 +485,7 @@ test "${enable_shared}" = "no" -a "${enable_static}" = "yes" && enable_static_mo
 
 if test "${enable_static_module_is}" = "yes"
 then
-	AC_DEFINE([HCL_ENABLE_STATIC_MODULE],[],[link modules statically into the main library])
+	AC_DEFINE([HCL_ENABLE_STATIC_MODULE],[1],[link modules statically into the main library])
 fi
 AM_CONDITIONAL(ENABLE_STATIC_MODULE, test "${enable_static_module_is}" = "yes")
 

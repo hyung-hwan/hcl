@@ -103,7 +103,9 @@ int hcl_init (hcl_t* hcl, hcl_mmgr_t* mmgr, hcl_oow_t heapsz, const hcl_vmprim_t
 	hcl->option.dfl_symtab_size = HCL_DFL_SYMTAB_SIZE;
 	hcl->option.dfl_sysdic_size = HCL_DFL_SYSDIC_SIZE;
 	hcl->option.dfl_procstk_size = HCL_DFL_PROCSTK_SIZE;
+#if defined(HCL_BUILD_DEBUG)
 	hcl->option.karatsuba_cutoff = HCL_KARATSUBA_CUTOFF; /* this won't be used when NDEBUG is set */
+#endif
 
 	hcl->log.capa = HCL_ALIGN_POW2(1, HCL_LOG_CAPA_ALIGN); /* TODO: is this a good initial size? */
 	/* alloate the log buffer in advance though it may get reallocated
@@ -265,7 +267,7 @@ int hcl_setoption (hcl_t* hcl, hcl_option_t id, const void* value)
 	{
 		case HCL_TRAIT:
 			hcl->option.trait = *(const unsigned int*)value;
-		#if !defined(NDEBUG)
+		#if defined(HCL_BUILD_DEBUG)
 			hcl->option.karatsuba_cutoff = ((hcl->option.trait & HCL_DEBUG_BIGINT)? HCL_KARATSUBA_CUTOFF_DEBUG: HCL_KARATSUBA_CUTOFF);
 		#endif
 			return 0;

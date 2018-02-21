@@ -31,7 +31,7 @@ void* hcl_allocbytes (hcl_t* hcl, hcl_oow_t size)
 {
 	hcl_uint8_t* ptr;
 
-#if !defined(NDEBUG)
+#if defined(HCL_BUILD_DEBUG)
 	if ((hcl->option.trait & HCL_DEBUG_GC) && !(hcl->option.trait & HCL_NOGC)) hcl_gc (hcl);
 #endif
 

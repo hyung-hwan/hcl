@@ -58,7 +58,7 @@
 
 
 
-#if !defined(NDEBUG)
+#if defined(HCL_BUILD_DEBUG)
 #define HCL_DEBUG_VM_PROCESSOR 1
 #define HCL_DEBUG_VM_EXEC 1
 #define HCL_DEBUG_BIGINT 1

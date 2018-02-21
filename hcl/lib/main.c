@@ -1242,7 +1242,7 @@ static int handle_logopt (hcl_t* hcl, const hcl_bch_t* str)
 	return 0;
 }
 
-#if !defined(NDEBUG)
+#if defined(HCL_BUILD_DEBUG)
 static int handle_dbgopt (hcl_t* hcl, const hcl_bch_t* str)
 {
 	xtn_t* xtn = hcl_getxtn (hcl);
@@ -1435,7 +1435,7 @@ int main (int argc, char* argv[])
 	{
 		{ ":log",         'l' },
 		{ ":memsize",     'm' },
-#if !defined(NDEBUG)
+#if defined(HCL_BUILD_DEBUG)
 		{ ":debug",       '\0' }, /* NOTE: there is no short option for --debug */
 #endif
 		{ HCL_NULL,       '\0' }
@@ -1449,7 +1449,7 @@ int main (int argc, char* argv[])
 	const char* logopt = HCL_NULL;
 	hcl_oow_t memsize = MIN_MEMSIZE;
 
-#if !defined(NDEBUG)
+#if defined(HCL_BUILD_DEBUG)
 	const char* dbgopt = HCL_NULL;
 #endif
 
@@ -1478,7 +1478,7 @@ int main (int argc, char* argv[])
 
 			case '\0':
 				
-			#if !defined(NDEBUG)
+			#if defined(HCL_BUILD_DEBUG)
 				if (hcl_compbcstr(opt.lngopt, "debug") == 0)
 				{
 					dbgopt = opt.arg;
@@ -1568,7 +1568,7 @@ int main (int argc, char* argv[])
 		xtn->logmask = HCL_LOG_ALL_TYPES | HCL_LOG_ERROR | HCL_LOG_FATAL;
 	}
 
-#if !defined(NDEBUG)
+#if defined(HCL_BUILD_DEBUG)
 	if (dbgopt)
 	{
 		if (handle_dbgopt (hcl, dbgopt) <= -1)

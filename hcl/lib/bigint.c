@@ -1060,7 +1060,7 @@ static HCL_INLINE void multiply_unsigned_array (const hcl_liw_t* x, hcl_oow_t xs
  * --------------------------------------------------------------------
  */
  
-#if !defined(NDEBUG)
+#if defined(HCL_BUILD_DEBUG)
 #define CANNOT_KARATSUBA(hcl,xs,ys) \
 	((xs) < (hcl)->option.karatsuba_cutoff || (ys) < (hcl)->option.karatsuba_cutoff || \
 	((xs) > (ys) && (ys) <= (((xs) + 1) / 2)) || \

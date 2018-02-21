@@ -19400,13 +19400,19 @@ fi
 
 if test "$enable_debug_is" = "yes"
 then
-	CFLAGS="$CFLAGS -g -D_DEBUG -UNDEBUG -DHCL_BUILD_DEBUG -U_FORTIFY_SOURCE"
-	CXXFLAGS="$CXXFLAGS -g -D_DEBUG -UNDEBUG -DHCL_BUILD_DEBUG -U_FORTIFY_SOURCE"
+	CFLAGS="$CFLAGS -g -D_DEBUG -UNDEBUG -U_FORTIFY_SOURCE"
+	CXXFLAGS="$CXXFLAGS -g -D_DEBUG -UNDEBUG -U_FORTIFY_SOURCE"
+
+$as_echo "#define HCL_BUILD_DEBUG 1" >>confdefs.h
+
 	BUILD_MODE="debug"
 
 else
-	CFLAGS="$CFLAGS -DNDEBUG -U_DEBUG -DHCL_BUILD_RELEASE -U_FORTIFY_SOURCE"
-	CXXFLAGS="$CXXFLAGS -DNDEBUG -U_DEBUG -DHCL_BUILD_RELEASE -U_FORTIFY_SOURCE"
+	CFLAGS="$CFLAGS -DNDEBUG -U_DEBUG -U_FORTIFY_SOURCE"
+	CXXFLAGS="$CXXFLAGS -DNDEBUG -U_DEBUG -U_FORTIFY_SOURCE"
+
+$as_echo "#define HCL_BUILD_RELEASE 1" >>confdefs.h
+
 	BUILD_MODE="release"
 
 fi
@@ -19460,7 +19466,7 @@ fi
 if test "${enable_unicode}" = "yes"
 then
 
-$as_echo "#define HCL_ENABLE_UNICODE /**/" >>confdefs.h
+$as_echo "#define HCL_ENABLE_UNICODE 1" >>confdefs.h
 
 fi
 
@@ -19499,7 +19505,7 @@ test "${enable_shared}" = "no" && enable_dynamic_module_is="no"
 if test "${enable_dynamic_module_is}" = "yes"
 then
 
-$as_echo "#define HCL_ENABLE_DYNAMIC_MODULE /**/" >>confdefs.h
+$as_echo "#define HCL_ENABLE_DYNAMIC_MODULE 1" >>confdefs.h
 
 fi
  if test "${enable_dynamic_module_is}" = "yes"; then
@@ -19524,7 +19530,7 @@ test "${enable_shared}" = "no" -a "${enable_static}" = "yes" && enable_static_mo
 if test "${enable_static_module_is}" = "yes"
 then
 
-$as_echo "#define HCL_ENABLE_STATIC_MODULE /**/" >>confdefs.h
+$as_echo "#define HCL_ENABLE_STATIC_MODULE 1" >>confdefs.h
 
 fi
  if test "${enable_static_module_is}" = "yes"; then
