@@ -284,7 +284,6 @@ next:
 				if (outbfmt(hcl, mask, "\"") <= -1) return -1;
 				for (i = 0; i < HCL_OBJ_GET_SIZE(obj); i++)
 				{
-					
 					ch = ((hcl_oop_char_t)obj)->slot[i];
 					if (print_single_char(hcl, mask, ch, outbfmt) <= -1) return -1;
 				}
@@ -363,7 +362,7 @@ next:
 					 * label. */
 					ps.type = PRINT_STACK_CONS;
 					ps.obj = hcl->_nil;
-					x = push (hcl, &ps);
+					x = push(hcl, &ps);
 					if (x <= -1) return -1;
 
 					/* Make a jump to 'next' to print the CDR part */
@@ -570,7 +569,6 @@ next:
 		case HCL_BRAND_PRIM:
 			word_index = WORD_PRIM;
 			goto print_word;
-			
 
 		case HCL_BRAND_CONTEXT:
 			word_index = WORD_CONTEXT;

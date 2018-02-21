@@ -405,7 +405,7 @@ static HCL_INLINE hcl_ooi_t write_output (hcl_t* hcl, hcl_iooutarg_t* arg)
 		ucslen = arg->len - donelen;
 		if (ucslen > bcslen) ucslen = bcslen;
 		else if (ucslen < bcslen) bcslen = ucslen;
-		hcl_copybchars (&arg->ptr[donelen], bcsbuf, bcslen);
+		hcl_copybchars (bcsbuf, &arg->ptr[donelen], bcslen);
 #endif
 
 		if (fwrite (bcsbuf, HCL_SIZEOF(bcsbuf[0]), bcslen, (FILE*)arg->handle) < bcslen)

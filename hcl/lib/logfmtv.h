@@ -73,16 +73,20 @@
 
 #define PUT_OOCH(c,n) do { \
 	int xx; \
-	if ((xx = data->putch (hcl, data->mask, c, n)) <= -1) goto oops; \
-	if (xx == 0) goto done; \
-	data->count += n; \
+	if (n > 0) { \
+		if ((xx = data->putch (hcl, data->mask, c, n)) <= -1) goto oops; \
+		if (xx == 0) goto done; \
+		data->count += n; \
+	} \
 } while (0)
 
 #define PUT_OOCS(ptr,len) do { \
 	int xx; \
-	if ((xx = data->putcs (hcl, data->mask, ptr, len)) <= -1) goto oops; \
-	if (xx == 0) goto done; \
-	data->count += len; \
+	if (len > 0) { \
+		if ((xx = data->putcs (hcl, data->mask, ptr, len)) <= -1) goto oops; \
+		if (xx == 0) goto done; \
+		data->count += len; \
+	} \
 } while (0)
 
 static int logfmtv (hcl_t* hcl, const fmtchar_t* fmt, hcl_fmtout_t* data, va_list ap, hcl_outbfmt_t outbfmt)
@@ -119,7 +123,6 @@ static int logfmtv (hcl_t* hcl, const fmtchar_t* fmt, hcl_fmtout_t* data, va_lis
 	fltout->capa = HCL_COUNTOF(fltout->buf) - 1;
 #endif
 
-
 	while (1)
 	{
 	#if defined(FMTCHAR_IS_OOCH)
@@ -134,6 +137,7 @@ static int logfmtv (hcl_t* hcl, const fmtchar_t* fmt, hcl_fmtout_t* data, va_lis
 		}
 		PUT_OOCS (checkpoint, fmt - checkpoint - 1);
 	#else
+
 		while ((ch = *fmt++) != '%' || stop) 
 		{
 			if (ch == '\0') goto done;
@@ -141,6 +145,7 @@ static int logfmtv (hcl_t* hcl, const fmtchar_t* fmt, hcl_fmtout_t* data, va_lis
 		}
 	#endif
 		percent = fmt - 1;
+
 
 		padc = ' '; 
 		width = 0; precision = 0;
@@ -384,6 +389,7 @@ reswitch:
 			if (lm_flag & LF_J) goto uppercase_c;
 		#endif
 		lowercase_c:
+
 			bch = HCL_SIZEOF(hcl_bch_t) < HCL_SIZEOF(int)? va_arg(ap, int): va_arg(ap, hcl_bch_t);
 
 		print_lowercase_c:
