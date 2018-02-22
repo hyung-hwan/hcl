@@ -309,56 +309,53 @@ void hcl_gc (hcl_t* hcl)
 	old_nil = hcl->_nil;
 
 	/* move _nil and the root object table */
-	hcl->_nil               = hcl_moveoop (hcl, hcl->_nil);
-	hcl->_true              = hcl_moveoop (hcl, hcl->_true);
-	hcl->_false             = hcl_moveoop (hcl, hcl->_false);
+	hcl->_nil               = hcl_moveoop(hcl, hcl->_nil);
+	hcl->_true              = hcl_moveoop(hcl, hcl->_true);
+	hcl->_false             = hcl_moveoop(hcl, hcl->_false);
 
 	for (i = 0; i < HCL_COUNTOF(syminfo); i++)
 	{
 		hcl_oop_t tmp;
 		tmp = *(hcl_oop_t*)((hcl_uint8_t*)hcl + syminfo[i].offset);
-		tmp = hcl_moveoop (hcl, tmp);
+		tmp = hcl_moveoop(hcl, tmp);
 		*(hcl_oop_t*)((hcl_uint8_t*)hcl + syminfo[i].offset) = tmp;
 	}
 
-	hcl->_character              = hcl_moveoop (hcl, hcl->_character);
-	hcl->_small_integer          = hcl_moveoop (hcl, hcl->_small_integer);
-	hcl->_large_positive_integer = hcl_moveoop (hcl, hcl->_large_positive_integer);
-	hcl->_large_negative_integer = hcl_moveoop (hcl, hcl->_large_negative_integer);
-
-	hcl->sysdic = (hcl_oop_dic_t) hcl_moveoop (hcl, (hcl_oop_t)hcl->sysdic);
-	hcl->processor = (hcl_oop_process_scheduler_t) hcl_moveoop (hcl, (hcl_oop_t)hcl->processor);
-	hcl->nil_process = (hcl_oop_process_t) hcl_moveoop (hcl, (hcl_oop_t)hcl->nil_process);
+	hcl->sysdic = (hcl_oop_dic_t)hcl_moveoop(hcl, (hcl_oop_t)hcl->sysdic);
+	hcl->processor = (hcl_oop_process_scheduler_t)hcl_moveoop(hcl, (hcl_oop_t)hcl->processor);
+	hcl->nil_process = (hcl_oop_process_t)hcl_moveoop(hcl, (hcl_oop_t)hcl->nil_process);
 
 	for (i = 0; i < hcl->code.lit.len; i++)
 	{
 		/* the literal array ia a NGC object. but the literal objects 
 		 * pointed by the elements of this array must be gabage-collected. */
 		((hcl_oop_oop_t)hcl->code.lit.arr)->slot[i] =
-			hcl_moveoop (hcl, ((hcl_oop_oop_t)hcl->code.lit.arr)->slot[i]);
+			hcl_moveoop(hcl, ((hcl_oop_oop_t)hcl->code.lit.arr)->slot[i]);
 	}
 
 	hcl->p.e = hcl_moveoop (hcl, hcl->p.e);
 
 	for (i = 0; i < hcl->sem_list_count; i++)
 	{
-		hcl->sem_list[i] = (hcl_oop_semaphore_t)hcl_moveoop (hcl, (hcl_oop_t)hcl->sem_list[i]);
+		hcl->sem_list[i] = (hcl_oop_semaphore_t)hcl_moveoop(hcl, (hcl_oop_t)hcl->sem_list[i]);
 	}
 
 	for (i = 0; i < hcl->sem_heap_count; i++)
 	{
-		hcl->sem_heap[i] = (hcl_oop_semaphore_t)hcl_moveoop (hcl, (hcl_oop_t)hcl->sem_heap[i]);
+		hcl->sem_heap[i] = (hcl_oop_semaphore_t)hcl_moveoop(hcl, (hcl_oop_t)hcl->sem_heap[i]);
 	}
 
 	for (i = 0; i < hcl->tmp_count; i++)
 	{
-		*hcl->tmp_stack[i] = hcl_moveoop (hcl, *hcl->tmp_stack[i]);
+		*hcl->tmp_stack[i] = hcl_moveoop(hcl, *hcl->tmp_stack[i]);
 	}
 
 	if (hcl->initial_context)
-		hcl->initial_context = (hcl_oop_context_t)hcl_moveoop (hcl, (hcl_oop_t)hcl->initial_context);
+		hcl->initial_context = (hcl_oop_context_t)hcl_moveoop(hcl, (hcl_oop_t)hcl->initial_context);
 	if (hcl->active_context)
-		hcl->active_context = (hcl_oop_context_t)hcl_moveoop (hcl, (hcl_oop_t)hcl->active_context);
+		hcl->active_context = (hcl_oop_context_t)hcl_moveoop(hcl, (hcl_oop_t)hcl->active_context);
+
+	if (hcl->last_retv) hcl->last_retv = hcl_moveoop(hcl, hcl->last_retv);
 
 	for (cb = hcl->cblist; cb; cb = cb->next)
 	{

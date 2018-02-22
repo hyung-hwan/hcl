@@ -1427,7 +1427,7 @@ static HCL_INLINE hcl_oop_t leave_list (hcl_t* hcl, int* flagv, int* oldflagv)
 		}
 
 		hcl_pushtmp (hcl, &head);
-		arr = (hcl_oop_oop_t)hcl_makearray(hcl, count);
+		arr = (hcl_oop_oop_t)hcl_makearray(hcl, count, 0);
 		hcl_poptmp (hcl);
 		if (!arr) return HCL_NULL;
 
@@ -1468,7 +1468,7 @@ done:
 		switch (concode)
 		{
 			case HCL_CONCODE_ARRAY:
-				return (hcl_oop_t)hcl_makearray(hcl, 0);
+				return (hcl_oop_t)hcl_makearray(hcl, 0, 0);
 			case HCL_CONCODE_BYTEARRAY:
 				return (hcl_oop_t)hcl_makebytearray(hcl, HCL_NULL, 0); 
 			case HCL_CONCODE_DIC:
@@ -1711,7 +1711,7 @@ static int get_symbol_array_literal (hcl_t* hcl, hcl_oop_t* xlit)
 		return -1;
 	}
 
-	sa = hcl_makearray (hcl, hcl->c->r.salit.size);
+	sa = hcl_makearray(hcl, hcl->c->r.salit.size, 0);
 	if (!sa) 
 	{
 		hcl->c->r.salit.size = 0; /* reset literal count... */

@@ -1007,14 +1007,6 @@ struct hcl_t
 	hcl_oop_t _until;  /* symbol */
 	hcl_oop_t _while;  /* symbol */
 
-	/* == NEVER CHANGE THE ORDER OF FIELDS BELOW == */
-	/* hcl_ignite() assumes this order. make sure to update symnames in ignite_3() */
-	hcl_oop_t _character;
-	hcl_oop_t _small_integer; /* SmallInteger */
-	hcl_oop_t _large_positive_integer; /* LargePositiveInteger */
-	hcl_oop_t _large_negative_integer; /* LargeNegativeInteger */
-	/* == NEVER CHANGE THE ORDER OF FIELDS ABOVE == */
-
 	hcl_oop_dic_t symtab; /* system-wide symbol table. */
 	hcl_oop_dic_t sysdic; /* system dictionary. */
 	hcl_oop_process_scheduler_t processor; /* instance of ProcessScheduler */
@@ -1045,6 +1037,7 @@ struct hcl_t
 	hcl_ooi_t ip;
 	int proc_switched; /* TODO: this is temporary. implement something else to skip immediate context switching */
 	int switch_proc;
+	hcl_oop_t last_retv;
 
 	hcl_ntime_t exec_start_time;
 	hcl_ntime_t exec_end_time;
@@ -1466,16 +1459,11 @@ HCL_EXPORT int hcl_executefromip (
 	hcl_ooi_t initial_ip
 );
 
-/**
- * The hcl_invoke() function sends a message named \a mthname to an object
- * named \a objname.
- */
-HCL_EXPORT int hcl_invoke (
-	hcl_t*            hcl,
-	const hcl_oocs_t* objname,
-	const hcl_oocs_t* mthname
-);
-
+#if defined(HCL_HAVE_INLINE)
+	static HCL_INLINE hcl_oop_t hcl_getlastretv (hcl_t* hcl) { return hcl->last_retv; }
+#else
+#	define hcl_getlastretv(hcl) ((hcl)->last_retv)
+#endif
 
 HCL_EXPORT int hcl_attachio (
 	hcl_t*       hcl,
@@ -1646,7 +1634,8 @@ HCL_EXPORT hcl_oop_t hcl_makecons (
 
 HCL_EXPORT hcl_oop_t hcl_makearray (
 	hcl_t*     hcl,
-	hcl_oow_t  size
+	hcl_oow_t  size,
+	int        ngc
 );
 
 HCL_EXPORT hcl_oop_t hcl_makebytearray (

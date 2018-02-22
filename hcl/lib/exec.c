@@ -1798,7 +1798,7 @@ static int execute (hcl_t* hcl)
 				LOG_INST_1 (hcl, "make_array %zu", b1);
 
 				/* create an empty array */
-				t = hcl_makearray (hcl, b1);
+				t = hcl_makearray (hcl, b1, 0);
 				if (!t) goto oops;
 
 				HCL_STACK_PUSH (hcl, t); /* push the array created */
@@ -1894,6 +1894,12 @@ static int execute (hcl_t* hcl)
 			case HCL_CODE_POP_STACKTOP:
 				LOG_INST_0 (hcl, "pop_stacktop");
 				HCL_ASSERT (hcl, !HCL_STACK_ISEMPTY(hcl));
+
+				/* at the top level, the value is just popped off the stack
+				 * after evaluation of an expressio. so it's likely the
+				 * return value of the last expression unless explicit
+				 * returning is performed */
+				hcl->last_retv = HCL_STACK_GETTOP(hcl);
 				HCL_STACK_POP (hcl);
 				break;
 
@@ -1917,7 +1923,6 @@ static int execute (hcl_t* hcl)
 					/* decrement the instruction pointer back to the return instruction.
 					 * even if the context is reentered, it will just return.
 					 *hcl->ip--;*/
-
 					terminate_process (hcl, hcl->processor->active);
 				}
 				else 
@@ -2009,6 +2014,7 @@ static int execute (hcl_t* hcl)
 				LOG_INST_0 (hcl, "return_from_block");
 
 				HCL_ASSERT(hcl, HCL_IS_CONTEXT(hcl, hcl->active_context));
+				hcl->last_retv = HCL_STACK_GETTOP(hcl);
 				if (hcl->active_context == hcl->processor->active->initial_context)
 				{
 					/* the active context to return from is an initial context of
@@ -2183,7 +2189,7 @@ static int execute (hcl_t* hcl)
 done:
 	vm_cleanup (hcl);
 #if defined(HCL_PROFILE_VM)
-	HCL_LOG1 (hcl, HCL_LOG_IC | HCL_LOG_INFO, "TOTAL_INST_COUTNER = %zu\n", inst_counter);
+	HCL_LOG1 (hcl, HCL_LOG_IC | HCL_LOG_INFO, "TOTAL INST COUTNER = %zu\n", inst_counter);
 #endif
 	return 0;
 
@@ -2191,7 +2197,7 @@ oops:
 	/* TODO: anything to do here? */
 	if (hcl->processor->active != hcl->nil_process) 
 	{
-HCL_LOG1 (hcl, HCL_LOG_IC | HCL_LOG_INFO, "TERMINATING ACTIVE PROCESS ... = %zd\n", HCL_OOP_TO_SMOOI(hcl->processor->active->id));
+		HCL_LOG1 (hcl, HCL_LOG_IC | HCL_LOG_INFO, "TERMINATING ACTIVE PROCESS %zd for execution error\n", HCL_OOP_TO_SMOOI(hcl->processor->active->id));
 		terminate_process (hcl, hcl->processor->active);
 	}
 	return -1;
@@ -2199,8 +2205,7 @@ HCL_LOG1 (hcl, HCL_LOG_IC | HCL_LOG_INFO, "TERMINATING ACTIVE PROCESS ... = %zd\
 
 int hcl_executefromip (hcl_t* hcl, hcl_ooi_t initial_ip)
 {
-	int n;
-	int log_default_type_mask;
+	int n, log_default_type_mask;
 
 	log_default_type_mask = hcl->log.default_type_mask;
 	hcl->log.default_type_mask |= HCL_LOG_VM;
@@ -2208,10 +2213,14 @@ int hcl_executefromip (hcl_t* hcl, hcl_ooi_t initial_ip)
 	HCL_ASSERT (hcl, hcl->initial_context == HCL_NULL);
 	HCL_ASSERT (hcl, hcl->active_context == HCL_NULL);
 
+	hcl->last_retv = hcl->_nil;
+
 	if (start_initial_process_and_context(hcl, initial_ip) <= -1) return -1;
 	hcl->initial_context = hcl->processor->active->initial_context;
 
 	n = execute (hcl);
+
+	HCL_INFO1 (hcl, "RETURNED VALUE - %O\n", hcl->last_retv);
 
 /* TODO: reset processor fields. set processor->tally to zero. processor->active to nil_process... */
 	hcl->initial_context = HCL_NULL;

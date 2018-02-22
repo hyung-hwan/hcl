@@ -64,7 +64,7 @@ static hcl_oop_oop_t expand_bucket (hcl_t* hcl, hcl_oop_oop_t oldbuc)
 	}
 
 	hcl_pushtmp (hcl, (hcl_oop_t*)&oldbuc);
-	newbuc = (hcl_oop_oop_t)hcl_makearray (hcl, newsz); 
+	newbuc = (hcl_oop_oop_t)hcl_makearray (hcl, newsz, 0); 
 	hcl_poptmp (hcl);
 	if (!newbuc) return HCL_NULL;
 
@@ -268,7 +268,7 @@ hcl_oop_t hcl_makedic (hcl_t* hcl, hcl_oow_t inisize)
 		obj->tally = HCL_SMOOI_TO_OOP(0);
 
 		hcl_pushtmp (hcl, (hcl_oop_t*)&obj);
-		bucket = (hcl_oop_oop_t)hcl_makearray(hcl, inisize);
+		bucket = (hcl_oop_oop_t)hcl_makearray(hcl, inisize, 0);
 		hcl_poptmp (hcl);
 
 		if (!bucket) obj = HCL_NULL;

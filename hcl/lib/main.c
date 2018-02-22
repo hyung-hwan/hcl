@@ -1663,6 +1663,10 @@ int main (int argc, char* argv[])
 				{
 					hcl_logbfmt (hcl, HCL_LOG_STDERR, "ERROR: cannot execute - [%d] %js\n", hcl_geterrnum(hcl), hcl_geterrmsg(hcl));
 				}
+				else
+				{
+					hcl_logbfmt (hcl, HCL_LOG_STDERR, "OK: EXITED WITH %O\n", hcl_getlastretv(hcl));
+				}
 				//cancel_tick();
 				g_hcl = HCL_NULL;
 			}
@@ -1680,11 +1684,14 @@ int main (int argc, char* argv[])
 		{
 			hcl_logbfmt (hcl, HCL_LOG_STDERR, "ERROR: cannot execute - [%d] %js\n", hcl_geterrnum(hcl), hcl_geterrmsg(hcl));
 		}
+		else
+		{
+			hcl_logbfmt (hcl, HCL_LOG_STDERR, "OK: EXITED WITH %O\n", hcl_getlastretv(hcl));
+		}
 		//cancel_tick();
 		g_hcl = HCL_NULL;
 		/*hcl_dumpsymtab (hcl);*/
 	}
-
 
 	hcl_close (hcl);
 	return 0;
