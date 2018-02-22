@@ -645,6 +645,15 @@ typedef hcl_ooi_t (*hcl_outbfmt_t) (
 );
 
 
+/* i don't want an error raised inside the callback to override 
+ * the existing error number and message. */
+#define vmprim_log_write(hcl,mask,ptr,len) do { \
+		int shuterr = (hcl)->shuterr; \
+		(hcl)->shuterr = 1; \
+		(hcl)->vmprim.log_write (hcl, mask, ptr, len); \
+		(hcl)->shuterr = shuterr; \
+	} while(0)
+
 #if defined(__cplusplus)
 extern "C" {
 #endif

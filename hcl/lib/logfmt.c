@@ -200,7 +200,7 @@ static int put_ooch (hcl_t* hcl, hcl_oow_t mask, hcl_ooch_t ch, hcl_oow_t len)
 			/* no line ending - append a line terminator */
 			hcl->log.ptr[hcl->log.len++] = '\n';
 		}
-		hcl->vmprim.log_write (hcl, hcl->log.last_mask, hcl->log.ptr, hcl->log.len);
+		vmprim_log_write (hcl, hcl->log.last_mask, hcl->log.ptr, hcl->log.len);
 		hcl->log.len = 0;
 	}
 
@@ -244,7 +244,7 @@ redo:
 					/* no line ending - append a line terminator */
 					hcl->log.ptr[hcl->log.len++] = '\n';
 				}
-				hcl->vmprim.log_write (hcl, hcl->log.last_mask, hcl->log.ptr, hcl->log.len);
+				vmprim_log_write (hcl, hcl->log.last_mask, hcl->log.ptr, hcl->log.len);
 				hcl->log.len = 0;
 			}
 
@@ -294,7 +294,7 @@ static int put_oocs (hcl_t* hcl, hcl_oow_t mask, const hcl_ooch_t* ptr, hcl_oow_
 			hcl->log.ptr[hcl->log.len++] = '\n';
 		}
 
-		hcl->vmprim.log_write (hcl, hcl->log.last_mask, hcl->log.ptr, hcl->log.len);
+		vmprim_log_write (hcl, hcl->log.last_mask, hcl->log.ptr, hcl->log.len);
 		hcl->log.len = 0;
 	}
 
@@ -338,7 +338,7 @@ redo:
 					/* no line ending - append a line terminator */
 					hcl->log.ptr[hcl->log.len++] = '\n';
 				}
-				hcl->vmprim.log_write (hcl, hcl->log.last_mask, hcl->log.ptr, hcl->log.len);
+				vmprim_log_write (hcl, hcl->log.last_mask, hcl->log.ptr, hcl->log.len);
 				hcl->log.len = 0;
 			}
 
@@ -435,7 +435,7 @@ hcl_ooi_t hcl_logbfmt (hcl_t* hcl, hcl_oow_t mask, const hcl_bch_t* fmt, ...)
 
 	if (hcl->log.len > 0 && hcl->log.ptr[hcl->log.len - 1] == '\n')
 	{
-		hcl->vmprim.log_write (hcl, hcl->log.last_mask, hcl->log.ptr, hcl->log.len);
+		vmprim_log_write (hcl, hcl->log.last_mask, hcl->log.ptr, hcl->log.len);
 		hcl->log.len = 0;
 	}
 	return (x <= -1)? -1: fo.count;
@@ -463,7 +463,7 @@ hcl_ooi_t hcl_logufmt (hcl_t* hcl, hcl_oow_t mask, const hcl_uch_t* fmt, ...)
 
 	if (hcl->log.len > 0 && hcl->log.ptr[hcl->log.len - 1] == '\n')
 	{
-		hcl->vmprim.log_write (hcl, hcl->log.last_mask, hcl->log.ptr, hcl->log.len);
+		vmprim_log_write (hcl, hcl->log.last_mask, hcl->log.ptr, hcl->log.len);
 		hcl->log.len = 0;
 	}
 

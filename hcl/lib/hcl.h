@@ -940,8 +940,8 @@ struct hcl_t
 {
 	hcl_mmgr_t*  mmgr;
 	hcl_cmgr_t*  cmgr;
-	hcl_errnum_t errnum;
 
+	hcl_errnum_t errnum;
 	struct
 	{
 		union
@@ -953,6 +953,7 @@ struct hcl_t
 		hcl_ooch_t buf[2048];
 		hcl_oow_t len;
 	} errmsg;
+	int shuterr;
 
 	struct
 	{
@@ -1342,11 +1343,11 @@ HCL_EXPORT void hcl_fini (
 	static HCL_INLINE hcl_mmgr_t* hcl_getmmgr (hcl_t* hcl) { return hcl->mmgr; }
 	static HCL_INLINE void* hcl_getxtn (hcl_t* hcl) { return (void*)(hcl + 1); }
 
-	/*static HCL_INLINE hcl_cmgr_t* hcl_getcmgr (hcl_t* hcl) { return hcl->cmgr; }
-	static HCL_INLINE void hcl_setcmgr (hcl_t* hcl, hcl_cmgr_t* cmgr) { hcl->cmgr = cmgr; }*/
+	static HCL_INLINE hcl_cmgr_t* hcl_getcmgr (hcl_t* hcl) { return hcl->cmgr; }
+	static HCL_INLINE void hcl_setcmgr (hcl_t* hcl, hcl_cmgr_t* cmgr) { hcl->cmgr = cmgr; }
 
 	static HCL_INLINE hcl_errnum_t hcl_geterrnum (hcl_t* hcl) { return hcl->errnum; }
-	static HCL_INLINE void hcl_seterrnum (hcl_t* hcl, hcl_errnum_t errnum) { hcl->errnum = errnum; hcl->errmsg.len = 0; }
+	
 #else
 #	define hcl_getmmgr(hcl) ((hcl)->mmgr)
 #	define hcl_getxtn(hcl) ((void*)((hcl) + 1))
@@ -1355,8 +1356,17 @@ HCL_EXPORT void hcl_fini (
 #	define hcl_setcmgr(hcl,mgr) ((hcl)->cmgr = (mgr))
 
 #	define hcl_geterrnum(hcl) ((hcl)->errnum)
-#	define hcl_seterrnum(hcl,num) ((hcl)->errmsg.len = 0, (hcl)->errnum = (num))
 #endif
+
+HCL_EXPORT void hcl_seterrnum (
+	hcl_t*       hcl, 
+	hcl_errnum_t errnum
+);
+
+HCL_EXPORT void hcl_seterrwithsyserr (
+	hcl_t* hcl,
+	int    syserr
+);
 
 HCL_EXPORT void hcl_seterrbfmt (
 	hcl_t*           hcl,
@@ -1370,11 +1380,6 @@ HCL_EXPORT void hcl_seterrufmt (
 	hcl_errnum_t     errnum,
 	const hcl_uch_t* fmt,
 	...
-);
-
-HCL_EXPORT void hcl_seterrwithsyserr (
-	hcl_t* hcl,
-	int    syserr
 );
 
 HCL_EXPORT const hcl_ooch_t* hcl_geterrstr (

@@ -297,8 +297,17 @@ const hcl_ooch_t* hcl_backuperrmsg (hcl_t* hcl)
 	return hcl->errmsg.tmpbuf.ooch;
 }
 
+void hcl_seterrnum (hcl_t* hcl, hcl_errnum_t errnum)
+{
+	if (hcl->shuterr) return;
+	hcl->errnum = errnum; 
+	hcl->errmsg.len = 0; 
+}
+
 void hcl_seterrwithsyserr (hcl_t* hcl, int syserr)
 {
+	if (hcl->shuterr) return;
+
 	if (hcl->vmprim.syserrstrb)
 	{
 		hcl->vmprim.syserrstrb (hcl, syserr, hcl->errmsg.tmpbuf.bch, HCL_COUNTOF(hcl->errmsg.tmpbuf.bch));
@@ -322,6 +331,8 @@ void hcl_getsynerr (hcl_t* hcl, hcl_synerr_t* synerr)
 void hcl_setsynerrbfmt (hcl_t* hcl, hcl_synerrnum_t num, const hcl_ioloc_t* loc, const hcl_oocs_t* tgt, const hcl_bch_t* msgfmt, ...)
 {
 	static hcl_bch_t syntax_error[] = "syntax error - ";
+
+	if (hcl->shuterr) return;
 
 	if (msgfmt) 
 	{
@@ -371,6 +382,8 @@ void hcl_setsynerrbfmt (hcl_t* hcl, hcl_synerrnum_t num, const hcl_ioloc_t* loc,
 void hcl_setsynerrufmt (hcl_t* hcl, hcl_synerrnum_t num, const hcl_ioloc_t* loc, const hcl_oocs_t* tgt, const hcl_uch_t* msgfmt, ...)
 {
 	static hcl_bch_t syntax_error[] = "syntax error - ";
+
+	if (hcl->shuterr) return;
 
 	if (msgfmt) 
 	{
