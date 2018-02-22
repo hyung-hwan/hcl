@@ -641,6 +641,8 @@ void hcl_seterrbfmt (hcl_t* hcl, hcl_errnum_t errnum, const hcl_bch_t* fmt, ...)
 	va_list ap;
 	hcl_fmtout_t fo;
 
+	if (hcl->shuterr) return;
+
 	hcl->errnum = errnum;
 	hcl->errmsg.len = 0;
 
@@ -657,6 +659,8 @@ void hcl_seterrufmt (hcl_t* hcl, hcl_errnum_t errnum, const hcl_uch_t* fmt, ...)
 {
 	va_list ap;
 	hcl_fmtout_t fo;
+
+	if (hcl->shuterr) return;
 
 	hcl->errnum = errnum;
 	hcl->errmsg.len = 0;
@@ -675,6 +679,8 @@ void hcl_seterrbfmtv (hcl_t* hcl, hcl_errnum_t errnum, const hcl_bch_t* fmt, va_
 {
 	hcl_fmtout_t fo;
 
+	if (hcl->shuterr) return;
+
 	hcl->errnum = errnum;
 	hcl->errmsg.len = 0;
 
@@ -688,6 +694,8 @@ void hcl_seterrbfmtv (hcl_t* hcl, hcl_errnum_t errnum, const hcl_bch_t* fmt, va_
 void hcl_seterrufmtv (hcl_t* hcl, hcl_errnum_t errnum, const hcl_uch_t* fmt, va_list ap)
 {
 	hcl_fmtout_t fo;
+
+	if (hcl->shuterr) return;
 
 	hcl->errnum = errnum;
 	hcl->errmsg.len = 0;
