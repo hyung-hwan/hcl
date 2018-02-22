@@ -89,7 +89,7 @@ enum hcl_synerrnum_t
 	HCL_SYNERR_NOERR,
 	HCL_SYNERR_ILCHR,         /* illegal character */
 	HCL_SYNERR_CMTNC,         /* comment not closed */
-	HCL_SYNERR_STRNC,         /* string not closed */
+	HCL_SYNERR_STRCHRNC,      /* string/character not closed */
 	HCL_SYNERR_HASHLIT,       /* wrong hashed literal */
 	HCL_SYNERR_CHARLIT,       /* wrong character literal */
 	HCL_SYNERR_RADNUMLIT ,    /* invalid numeric literal with radix */
@@ -1271,7 +1271,7 @@ enum hcl_concode_t
 	HCL_CONCODE_ARRAY,      /* #() */
 	HCL_CONCODE_BYTEARRAY,  /* #[] */
 	HCL_CONCODE_DIC,        /* #{} */
-	HCL_CONCODE_QLIST       /* '() - quoted list, data list */
+	HCL_CONCODE_QLIST       /* [] - data list */
 };
 typedef enum hcl_concode_t hcl_concode_t;
 

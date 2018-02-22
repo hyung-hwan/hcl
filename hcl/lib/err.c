@@ -78,7 +78,7 @@ static char* synerrstr[] =
 	"no error",
 	"illegal character",
 	"comment not closed",
-	"string not closed",
+	"string/character not closed",
 	"invalid hashed literal",
 	"wrong character literal",
 	"invalid numeric literal",

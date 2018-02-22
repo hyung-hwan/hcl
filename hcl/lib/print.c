@@ -304,7 +304,7 @@ next:
 				"#(",  /*HCL_CONCODE_ARRAY */
 				"#[",  /*HCL_CONCODE_BYTEARRAY */
 				"#{",  /*HCL_CONCODE_DIC */
-				"'("   /*HCL_CONCODE_QLIST */
+				"["   /*HCL_CONCODE_QLIST */
 			};
 
 			static hcl_bch_t *closing_paren[] =
@@ -313,7 +313,7 @@ next:
 				")",   /*HCL_CONCODE_ARRAY */
 				"]",   /*HCL_CONCODE_BYTEARRAY */
 				"}",   /*HCL_CONCODE_DIC */
-				")"    /*HCL_CONCODE_QLIST */
+				"]"    /*HCL_CONCODE_QLIST */
 			};
 
 			int concode;

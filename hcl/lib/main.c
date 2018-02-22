@@ -1686,7 +1686,7 @@ int main (int argc, char* argv[])
 		}
 		else
 		{
-			hcl_logbfmt (hcl, HCL_LOG_STDERR, "OK: EXITED WITH %O\n", hcl_getlastretv(hcl));
+			hcl_logbfmt (hcl, HCL_LOG_STDERR, "EXECUTION OK - EXITED WITH %O\n", hcl_getlastretv(hcl));
 		}
 		//cancel_tick();
 		g_hcl = HCL_NULL;
