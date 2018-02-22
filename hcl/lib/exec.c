@@ -2203,7 +2203,7 @@ oops:
 	return -1;
 }
 
-int hcl_executefromip (hcl_t* hcl, hcl_ooi_t initial_ip)
+hcl_oop_t hcl_executefromip (hcl_t* hcl, hcl_ooi_t initial_ip)
 {
 	int n, log_default_type_mask;
 
@@ -2215,7 +2215,7 @@ int hcl_executefromip (hcl_t* hcl, hcl_ooi_t initial_ip)
 
 	hcl->last_retv = hcl->_nil;
 
-	if (start_initial_process_and_context(hcl, initial_ip) <= -1) return -1;
+	if (start_initial_process_and_context(hcl, initial_ip) <= -1) return HCL_NULL;
 	hcl->initial_context = hcl->processor->active->initial_context;
 
 	n = execute (hcl);
@@ -2227,11 +2227,10 @@ int hcl_executefromip (hcl_t* hcl, hcl_ooi_t initial_ip)
 	hcl->active_context = HCL_NULL;
 
 	hcl->log.default_type_mask = log_default_type_mask;
-	return n;
+	return (n <= -1)? HCL_NULL: hcl->last_retv;
 }
 
-
-int hcl_execute (hcl_t* hcl)
+hcl_oop_t hcl_execute (hcl_t* hcl)
 {
 	return hcl_executefromip (hcl, 0);
 }

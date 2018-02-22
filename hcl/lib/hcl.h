@@ -1450,20 +1450,14 @@ HCL_EXPORT int hcl_ignite (
 /**
  * The hcl_execute() function executes an activated context.
  */
-HCL_EXPORT int hcl_execute (
+HCL_EXPORT hcl_oop_t hcl_execute (
 	hcl_t* hcl
 );
 
-HCL_EXPORT int hcl_executefromip (
+HCL_EXPORT hcl_oop_t hcl_executefromip (
 	hcl_t*    hcl,
 	hcl_ooi_t initial_ip
 );
-
-#if defined(HCL_HAVE_INLINE)
-	static HCL_INLINE hcl_oop_t hcl_getlastretv (hcl_t* hcl) { return hcl->last_retv; }
-#else
-#	define hcl_getlastretv(hcl) ((hcl)->last_retv)
-#endif
 
 HCL_EXPORT int hcl_attachio (
 	hcl_t*       hcl,

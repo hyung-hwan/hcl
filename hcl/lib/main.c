@@ -1655,17 +1655,21 @@ int main (int argc, char* argv[])
 			}
 			else if (xtn->reader_istty)
 			{
+				hcl_oop_t retv;
+
 				hcl_decode (hcl, code_offset, hcl->code.bc.len);
 				HCL_LOG0 (hcl, HCL_LOG_MNEMONIC, "------------------------------------------\n");
 				g_hcl = hcl;
 				//setup_tick ();
-				if (hcl_executefromip(hcl, code_offset) <= -1)
+
+				retv = hcl_executefromip(hcl, code_offset);
+				if (!retv)
 				{
 					hcl_logbfmt (hcl, HCL_LOG_STDERR, "ERROR: cannot execute - [%d] %js\n", hcl_geterrnum(hcl), hcl_geterrmsg(hcl));
 				}
 				else
 				{
-					hcl_logbfmt (hcl, HCL_LOG_STDERR, "OK: EXITED WITH %O\n", hcl_getlastretv(hcl));
+					hcl_logbfmt (hcl, HCL_LOG_STDERR, "OK: EXITED WITH %O\n", retv);
 				}
 				//cancel_tick();
 				g_hcl = HCL_NULL;
@@ -1675,19 +1679,24 @@ int main (int argc, char* argv[])
 
 	if (!xtn->reader_istty)
 	{
+		hcl_oop_t retv;
+
 		hcl_decode (hcl, 0, hcl->code.bc.len);
 		HCL_LOG2 (hcl, HCL_LOG_MNEMONIC, "BYTECODES hcl->code.bc.len = > %lu hcl->code.lit.len => %lu\n", 
 			(unsigned long int)hcl->code.bc.len, (unsigned long int)hcl->code.lit.len);
 		g_hcl = hcl;
 		//setup_tick ();
-		if (hcl_execute(hcl) <= -1)
+
+		retv = hcl_execute(hcl);
+		if (!retv)
 		{
 			hcl_logbfmt (hcl, HCL_LOG_STDERR, "ERROR: cannot execute - [%d] %js\n", hcl_geterrnum(hcl), hcl_geterrmsg(hcl));
 		}
 		else
 		{
-			hcl_logbfmt (hcl, HCL_LOG_STDERR, "EXECUTION OK - EXITED WITH %O\n", hcl_getlastretv(hcl));
+			hcl_logbfmt (hcl, HCL_LOG_STDERR, "EXECUTION OK - EXITED WITH %O\n", retv);
 		}
+
 		//cancel_tick();
 		g_hcl = HCL_NULL;
 		/*hcl_dumpsymtab (hcl);*/
