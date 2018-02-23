@@ -653,6 +653,7 @@ enum
 
 static int compile_break (hcl_t* hcl, hcl_oop_t src)
 {
+	/* (break) */
 	hcl_oop_t obj;
 	hcl_ooi_t i;
 
@@ -1116,6 +1117,14 @@ static int compile_do (hcl_t* hcl, hcl_oop_t src)
 {
 	hcl_oop_t obj;
 
+	/* (do 
+	 *   (+ 10 20)
+	 *   (* 2 30)
+	 *  ...
+	 * ) 
+	 * you can use this to combine multiple expressions to a single expression
+	 */
+
 	HCL_ASSERT (hcl, HCL_CONS_CAR(src) == hcl->_do);
 
 	obj = HCL_CONS_CDR(src);
@@ -1141,7 +1150,8 @@ static int compile_do (hcl_t* hcl, hcl_oop_t src)
 
 static int compile_while (hcl_t* hcl, hcl_oop_t src, int next_cop)
 {
-	/* (while (xxxx) ... ) */
+	/* (while (xxxx) ... ) 
+      * (until (xxxx) ... ) */
 	hcl_oop_t obj, cond;
 	hcl_oow_t cond_pos;
 	hcl_cframe_t* cf;
