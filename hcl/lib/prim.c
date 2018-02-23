@@ -196,6 +196,21 @@ static hcl_pfrc_t pf_eql (hcl_t* hcl, hcl_ooi_t nargs)
 	return HCL_PF_SUCCESS;
 }
 
+static hcl_pfrc_t pf_eqk (hcl_t* hcl, hcl_ooi_t nargs)
+{
+	/* equal kind? */
+	hcl_oop_t a0, a1, rv;
+
+	a0 = HCL_STACK_GETARG(hcl, nargs, 0);
+	a1 = HCL_STACK_GETARG(hcl, nargs, 1);
+
+	rv = (HCL_BRANDOF(hcl, a0) == HCL_BRANDOF(hcl, a1)? hcl->_true: hcl->_false);
+
+	HCL_STACK_SETRET (hcl, nargs, rv);
+	return HCL_PF_SUCCESS;
+}
+
+
 static hcl_pfrc_t pf_not (hcl_t* hcl, hcl_ooi_t nargs)
 {
 	hcl_oop_t arg, rv;
@@ -381,6 +396,7 @@ static pf_t builtin_prims[] =
 
 	{ 2, 2,                       pf_eqv,   4,  { 'e','q','v','?' } },
 	{ 2, 2,                       pf_eql,   4,  { 'e','q','l','?' } },
+	{ 2, 2,                       pf_eqk,   4,  { 'e','q','k','?' } },
 
 	/*
 	{ 2, 2,                       pf_gt,    1,  { '>' } },

@@ -93,7 +93,7 @@ static void compact_symbol_table (hcl_t* hcl, hcl_oop_t _nil)
 			 * at the current hash index */
 			symbol = (hcl_oop_char_t)hcl->symtab->bucket->slot[y];
 
-			HCL_ASSERT (hcl, HCL_BRANDOF(hcl,symbol) == HCL_BRAND_SYMBOL);
+			HCL_ASSERT (hcl, HCL_IS_SYMBOL(hcl, symbol));
 
 			z = hcl_hashoochars(symbol->slot, HCL_OBJ_GET_SIZE(symbol)) % bucket_size;
 

@@ -176,32 +176,29 @@ int hcl_outfmtobj (hcl_t* hcl, hcl_oow_t mask, hcl_oop_t obj, hcl_outbfmt_t outb
 	int word_index;
 
 next:
-	if (HCL_OOP_IS_SMOOI(obj))
+	switch ((brand = HCL_BRANDOF(hcl, obj))) 
 	{
-		if (outbfmt(hcl, mask, "%zd", HCL_OOP_TO_SMOOI(obj)) <= -1) return -1;
-		goto done;
-	}
-	else if (HCL_OOP_IS_SMPTR(obj))
-	{
-		if (outbfmt(hcl, mask, "#\\p%zX", (hcl_oow_t)HCL_OOP_TO_SMPTR(obj)) <= -1) return -1;
-		goto done;
-	}
-	else if (HCL_OOP_IS_CHAR(obj))
-	{
-		hcl_ooch_t ch = HCL_OOP_TO_CHAR(obj);
-		if (outbfmt(hcl, mask, "\'") <= -1 ||
-		    print_single_char(hcl, mask, ch, outbfmt) <= -1 ||
-		    outbfmt(hcl, mask, "\'") <= -1) return -1;
-		goto done;
-	}
-	else if (HCL_OOP_IS_ERROR(obj))
-	{
-		if (outbfmt(hcl, mask, "#\\e%zd", (hcl_ooi_t)HCL_OOP_TO_ERROR(obj)) <= -1) return -1;
-		goto done;
-	}
- 
-	switch ((brand = HCL_OBJ_GET_FLAGS_BRAND(obj))) 
-	{
+		case HCL_BRAND_SMOOI:
+			if (outbfmt(hcl, mask, "%zd", HCL_OOP_TO_SMOOI(obj)) <= -1) return -1;
+			goto done;
+
+		case HCL_BRAND_SMPTR:
+			if (outbfmt(hcl, mask, "#\\p%zX", (hcl_oow_t)HCL_OOP_TO_SMPTR(obj)) <= -1) return -1;
+			goto done;
+
+		case HCL_BRAND_ERROR:
+			if (outbfmt(hcl, mask, "#\\e%zd", (hcl_ooi_t)HCL_OOP_TO_ERROR(obj)) <= -1) return -1;
+			goto done;
+
+		case HCL_BRAND_CHARACTER:
+		{
+			hcl_ooch_t ch = HCL_OOP_TO_CHAR(obj);
+			if (outbfmt(hcl, mask, "\'") <= -1 ||
+			    print_single_char(hcl, mask, ch, outbfmt) <= -1 ||
+			    outbfmt(hcl, mask, "\'") <= -1) return -1;
+			goto done;
+		}
+
 		case HCL_BRAND_NIL:
 			word_index = WORD_NIL;
 			goto print_word;
@@ -213,12 +210,6 @@ next:
 		case HCL_BRAND_FALSE:
 			word_index = WORD_FALSE;
 			goto print_word;
-
-		case HCL_BRAND_SMOOI:
-			/* this type should not appear here as the actual small integer is 
-			 * encoded in an object pointer */
-			hcl_seterrbfmt (hcl, HCL_EINTERN, "internal error - unexpected object type %d", (int)brand);
-			return -1;
 
 		case HCL_BRAND_PBIGINT:
 		case HCL_BRAND_NBIGINT:

@@ -70,7 +70,7 @@ static hcl_oop_oop_t expand_bucket (hcl_t* hcl, hcl_oop_oop_t oldbuc)
 		symbol = (hcl_oop_char_t)oldbuc->slot[--oldsz];
 		if ((hcl_oop_t)symbol != hcl->_nil)
 		{
-			HCL_ASSERT (hcl, HCL_BRANDOF(hcl,symbol) == HCL_BRAND_SYMBOL);
+			HCL_ASSERT (hcl, HCL_IS_SYMBOL(hcl, symbol));
 			/*HCL_ASSERT (hcl, sym->size > 0);*/
 
 			index = hcl_hashoochars(symbol->slot, HCL_OBJ_GET_SIZE(symbol)) % newsz;
@@ -96,14 +96,14 @@ static hcl_oop_t find_or_make_symbol (hcl_t* hcl, const hcl_ooch_t* ptr, hcl_oow
 		return HCL_NULL;
 	}
 
-	HCL_ASSERT (hcl, HCL_BRANDOF(hcl,hcl->symtab->bucket) == HCL_BRAND_ARRAY);
+	HCL_ASSERT (hcl, HCL_IS_ARRAY(hcl, hcl->symtab->bucket));
 	index = hcl_hashoochars(ptr, len) % HCL_OBJ_GET_SIZE(hcl->symtab->bucket);
 
 	/* find a matching symbol in the open-addressed symbol table */
 	while (hcl->symtab->bucket->slot[index] != hcl->_nil) 
 	{
 		symbol = (hcl_oop_char_t)hcl->symtab->bucket->slot[index];
-		HCL_ASSERT (hcl, HCL_BRANDOF(hcl,symbol) == HCL_BRAND_SYMBOL);
+		HCL_ASSERT (hcl, HCL_IS_SYMBOL(hcl, symbol));
 
 		if (len == HCL_OBJ_GET_SIZE(symbol) &&
 		    hcl_equaloochars (ptr, symbol->slot, len))
@@ -140,8 +140,8 @@ static hcl_oop_t find_or_make_symbol (hcl_t* hcl, const hcl_ooch_t* ptr, hcl_oow
 		hcl_oop_oop_t bucket;
 
 		/* TODO: make the growth policy configurable instead of growing
-			     it just before it gets full. The polcy can be grow it
-			     if it's 70% full */
+		         it just before it gets full. The polcy can be grow it
+		         if it's 70% full */
 
 		/* enlarge the symbol table before it gets full to
 		 * make sure that it has at least one free slot left

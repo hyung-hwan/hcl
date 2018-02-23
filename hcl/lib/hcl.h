@@ -649,22 +649,11 @@ struct hcl_process_scheduler_t
 };
 
 /**
- * The HCL_CLASSOF() macro return the class of an object including a numeric
- * object encoded into a pointer.
- */
-#define HCL_CLASSOF(hcl,oop) ( \
-	HCL_OOP_IS_SMOOI(oop)? (hcl)->_small_integer: \
-	HCL_OOP_IS_CHAR(oop)? (hcl)->_character: HCL_OBJ_GET_CLASS(oop) \
-)
-
-/**
  * The HCL_BRANDOF() macro return the brand of an object including a numeric
  * object encoded into a pointer.
  */
-#define HCL_BRANDOF(hcl,oop) ( \
-	HCL_OOP_IS_SMOOI(oop)? HCL_BRAND_SMOOI: \
-	HCL_OOP_IS_CHAR(oop)? HCL_BRAND_CHARACTER: HCL_OBJ_GET_FLAGS_BRAND(oop) \
-)
+#define HCL_BRANDOF(moo,oop) \
+	(HCL_OOP_GET_TAG(oop)? ((hcl)->tagged_brands[HCL_OOP_GET_TAG(oop)]): HCL_OBJ_GET_FLAGS_BRAND(oop))
 
 /**
  * The HCL_BYTESOF() macro returns the size of the payload of
@@ -673,6 +662,7 @@ struct hcl_process_scheduler_t
  */
 #define HCL_BYTESOF(hcl,oop) \
 	(HCL_OOP_IS_NUMERIC(oop)? HCL_SIZEOF(hcl_oow_t): HCL_OBJ_BYTESOF(oop))
+
 
 /**
  * The HCL_ISTYPEOF() macro is a safe replacement for HCL_OBJ_GET_FLAGS_TYPE()
@@ -1030,6 +1020,11 @@ struct hcl_t
 	hcl_ooi_t proc_map_free_first;
 	hcl_ooi_t proc_map_free_last;
 
+	/* 2 tag bits(lo) + 2 extended tag bits(hi). not all slots are used
+	 * because the 2 high extended bits are used only if the low tag bits
+	 * are 3 */
+	int tagged_brands[16];
+
 	/* == EXECUTION REGISTERS == */
 	hcl_oop_context_t initial_context; /* fake initial context */
 	hcl_oop_context_t active_context;
@@ -1222,11 +1217,15 @@ typedef enum hcl_log_mask_t hcl_log_mask_t;
  * ========================================================================= */
 enum hcl_brand_t
 {
-	HCL_BRAND_NIL = 1,
+	HCL_BRAND_SMOOI = 1, /* never used as a small integer is encoded in an object pointer */
+	HCL_BRAND_SMPTR,
+	HCL_BRAND_ERROR,
+	HCL_BRAND_CHARACTER,
+
+	HCL_BRAND_NIL,
 	HCL_BRAND_TRUE,
 	HCL_BRAND_FALSE,
-	HCL_BRAND_CHARACTER,
-	HCL_BRAND_SMOOI, /* never used as a small integer is encoded in an object pointer */
+
 	HCL_BRAND_PBIGINT, /* positive big integer */
 	HCL_BRAND_NBIGINT, /* negative big integer */
 	HCL_BRAND_CONS,

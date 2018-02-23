@@ -341,11 +341,11 @@ hcl_oow_t hcl_countcons (hcl_t* hcl, hcl_oop_t cons)
 	/* this function ignores the last cdr */
 	hcl_oow_t count = 1;
 
-	HCL_ASSERT (hcl, HCL_BRANDOF(hcl, cons));
+	HCL_ASSERT (hcl, HCL_IS_CONS(hcl, cons));
 	do
 	{
 		cons = HCL_CONS_CDR(cons);
-		if (HCL_BRANDOF(hcl, cons) != HCL_BRAND_CONS) break;
+		if (!HCL_IS_CONS(hcl, cons)) break;
 		count++;
 	}
 	while (1);
@@ -355,11 +355,11 @@ hcl_oow_t hcl_countcons (hcl_t* hcl, hcl_oop_t cons)
 
 hcl_oop_t hcl_getlastconscdr (hcl_t* hcl, hcl_oop_t cons)
 {
-	HCL_ASSERT (hcl, HCL_BRANDOF(hcl, cons));
+	HCL_ASSERT (hcl, HCL_IS_CONS(hcl, cons));
 	do
 	{
 		cons = HCL_CONS_CDR(cons);
-		if (HCL_BRANDOF(hcl, cons) != HCL_BRAND_CONS) break;
+		if (!HCL_IS_CONS(hcl, cons)) break;
 	}
 	while (1);
 
@@ -373,7 +373,7 @@ hcl_oop_t hcl_reversecons (hcl_t* hcl, hcl_oop_t cons)
 	/* Note: The non-nil cdr in the last cons cell gets lost.
 	 *  e.g.) Reversing (1 2 3 . 4) results in (3 2 1) */
 
-	HCL_ASSERT (hcl, HCL_BRANDOF(hcl, cons));
+	HCL_ASSERT (hcl, HCL_IS_CONS(hcl, cons));
 
 	prev = hcl->_nil;
 	ptr = cons;
@@ -383,7 +383,7 @@ hcl_oop_t hcl_reversecons (hcl_t* hcl, hcl_oop_t cons)
 		next = HCL_CONS_CDR(ptr);
 		HCL_CONS_CDR(ptr) = prev;
 		prev = ptr;
-		if (HCL_BRANDOF(hcl,next) != HCL_BRAND_CONS) break;
+		if (!HCL_IS_CONS(hcl, next)) break;
 		ptr = next;
 	}
 	while (1);

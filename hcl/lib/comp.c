@@ -1380,7 +1380,7 @@ static int compile_cons_xlist_expression (hcl_t* hcl, hcl_oop_t obj)
 		{
 			hcl_oop_cons_t sdc;
 
-			if (HCL_BRANDOF(hcl, cdr) != HCL_BRAND_CONS)
+			if (!HCL_IS_CONS(hcl, cdr))
 			{
 				/* (funname . 10) */
 				hcl_setsynerrbfmt (hcl, HCL_SYNERR_DOTBANNED, HCL_NULL, HCL_NULL, "redundant cdr in function call - %O", obj); /* TODO: error location */
@@ -1465,7 +1465,7 @@ static HCL_INLINE int compile_symbol (hcl_t* hcl, hcl_oop_t obj)
 {
 	hcl_oow_t index;
 
-	HCL_ASSERT (hcl, HCL_BRANDOF(hcl,obj) == HCL_BRAND_SYMBOL);
+	HCL_ASSERT (hcl, HCL_IS_SYMBOL(hcl, obj));
 
 	if (HCL_OBJ_GET_FLAGS_SYNCODE(obj))
 	{
