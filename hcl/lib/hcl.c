@@ -266,6 +266,11 @@ void hcl_fini (hcl_t* hcl)
 	}
 }
 
+void hcl_clear (hcl_t* hcl, int flags)
+{
+	/* TODO */
+}
+
 int hcl_setoption (hcl_t* hcl, hcl_option_t id, const void* value)
 {
 	switch (id)

@@ -477,23 +477,34 @@ hcl_ooi_t hcl_logufmt (hcl_t* hcl, hcl_oow_t mask, const hcl_uch_t* fmt, ...)
 static int put_prch (hcl_t* hcl, hcl_oow_t mask, hcl_ooch_t ch, hcl_oow_t len)
 {
 /* TODO: better error handling, buffering.
- * buffer should be done by the printer callback? */
+ *       should buffering be done by the printer callback? */
 	hcl_ooi_t n;
+	hcl_ooch_t str[256];
+	hcl_oow_t seglen, i;
 
-	hcl->c->outarg.ptr = &ch;
-	hcl->c->outarg.len = 1;
+	while (len > 0)
+	{
+		seglen = (len > HCL_COUNTOF(str))? len = HCL_COUNTOF(str): len;
+		for (i = 0; i < seglen; i++) str[i] = ch;
 
-	n = hcl->c->printer(hcl, HCL_IO_WRITE, &hcl->c->outarg);
+		hcl->c->outarg.ptr = str;
+		hcl->c->outarg.len = seglen;
 
-	if (n <= -1) return -1;
-	if (n == 0) return 0;
+		n = hcl->c->printer(hcl, HCL_IO_WRITE, &hcl->c->outarg);
+
+		if (n <= -1) return -1;
+		if (n == 0) return 0;
+
+		len -= seglen;
+	}
+
 	return 1; /* success */
 }
 
 static int put_prcs (hcl_t* hcl, hcl_oow_t mask, const hcl_ooch_t* ptr, hcl_oow_t len)
 {
 /* TODO: better error handling, buffering 
- * buffer should be done by the printer callback? */
+ *       should buffering be done by the printer callback? */
 	hcl_ooi_t n;
 
 	hcl->c->outarg.ptr = (hcl_ooch_t*)ptr;

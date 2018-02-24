@@ -74,7 +74,7 @@
 #define PUT_OOCH(c,n) do { \
 	if (n > 0) { \
 		int xx; \
-		if ((xx = data->putch (hcl, data->mask, c, n)) <= -1) goto oops; \
+		if ((xx = data->putch(hcl, data->mask, c, n)) <= -1) goto oops; \
 		if (xx == 0) goto done; \
 		data->count += n; \
 	} \
@@ -83,7 +83,7 @@
 #define PUT_OOCS(ptr,len) do { \
 	if (len > 0) { \
 		int xx; \
-		if ((xx = data->putcs (hcl, data->mask, ptr, len)) <= -1) goto oops; \
+		if ((xx = data->putcs(hcl, data->mask, ptr, len)) <= -1) goto oops; \
 		if (xx == 0) goto done; \
 		data->count += len; \
 	} \
@@ -137,10 +137,17 @@ static int logfmtv (hcl_t* hcl, const fmtchar_t* fmt, hcl_fmtout_t* data, va_lis
 		}
 		PUT_OOCS (checkpoint, fmt - checkpoint - 1);
 	#else
-
 		while ((ch = *fmt++) != '%' || stop) 
 		{
 			if (ch == '\0') goto done;
+
+	#if defined(HCL_OOCH_IS_UCH)
+		/* ooch is uch. fmtchar is bch */
+		/* TODO: convert bch to uch */
+	#else
+		/* ooch is bch. fmtchar is uch */
+		/* TODO: convert uch to bch */
+	#endif
 			PUT_OOCH (ch, 1);
 		}
 	#endif
