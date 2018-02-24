@@ -1365,6 +1365,7 @@ static int compile_cons_xlist_expression (hcl_t* hcl, hcl_oop_t obj)
 		hcl_ooi_t oldtop;
 		hcl_cframe_t* cf;
 		hcl_oop_t cdr;
+		hcl_oop_cons_t sdc;
 
 		/* NOTE: cframe management functions don't use the object memory.
 		 *       many operations can be performed without taking GC into account */
@@ -1382,15 +1383,14 @@ static int compile_cons_xlist_expression (hcl_t* hcl, hcl_oop_t obj)
 
 		/* compile <operand1> ... etc */
 		cdr = HCL_CONS_CDR(obj);
+
 		if (HCL_IS_NIL(hcl, cdr)) 
 		{
 			nargs = 0;
 		}
 		else
 		{
-			hcl_oop_cons_t sdc;
-
-			if (!HCL_IS_CONS(hcl, cdr))
+			if (!HCL_IS_NIL(hcl, cdr) && !HCL_IS_CONS(hcl, cdr))
 			{
 				/* (funname . 10) */
 				hcl_setsynerrbfmt (hcl, HCL_SYNERR_DOTBANNED, HCL_NULL, HCL_NULL, "redundant cdr in function call - %O", obj); /* TODO: error location */
@@ -1403,23 +1403,24 @@ static int compile_cons_xlist_expression (hcl_t* hcl, hcl_oop_t obj)
 				hcl_setsynerrbfmt (hcl, HCL_SYNERR_ARGFLOOD, HCL_NULL, HCL_NULL, "too many(%zd) parameters in function call - %O", nargs, obj); 
 				return -1;
 			}
-
-			sdc = hcl_getatsysdic(hcl, car);
-			if (sdc)
-			{
-				hcl_oop_word_t sdv;
-				sdv = (hcl_oop_word_t)HCL_CONS_CDR(sdc);
-				if (HCL_IS_PRIM(hcl, sdv))
-				{
-					if (nargs < sdv->slot[1] || nargs > sdv->slot[2])
-					{
-						hcl_setsynerrbfmt (hcl, HCL_SYNERR_ARGCOUNT, HCL_NULL, HCL_NULL, 
-							"parameters count(%zd) mismatch in function call - %O - expecting %zu-%zu parameters", nargs, obj, sdv->slot[1], sdv->slot[2]); 
-						return -1;
-					}
-				}
-			};
 		}
+
+		sdc = hcl_getatsysdic(hcl, car);
+		if (sdc)
+		{
+			hcl_oop_word_t sdv;
+			sdv = (hcl_oop_word_t)HCL_CONS_CDR(sdc);
+			if (HCL_IS_PRIM(hcl, sdv))
+			{
+				if (nargs < sdv->slot[1] || nargs > sdv->slot[2])
+				{
+					hcl_setsynerrbfmt (hcl, HCL_SYNERR_ARGCOUNT, HCL_NULL, HCL_NULL, 
+						"parameters count(%zd) mismatch in function call - %O - expecting %zu-%zu parameters", nargs, obj, sdv->slot[1], sdv->slot[2]); 
+					return -1;
+				}
+			}
+		};
+
 		/* redundant cdr check is performed inside compile_object_list() */
 		PUSH_SUBCFRAME (hcl, COP_COMPILE_ARGUMENT_LIST, cdr);
 
