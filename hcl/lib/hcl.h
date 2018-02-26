@@ -692,7 +692,7 @@ typedef void* (*hcl_vmprim_dlopen_t) (hcl_t* hcl, const hcl_ooch_t* name, int fl
 typedef void (*hcl_vmprim_dlclose_t) (hcl_t* hcl, void* handle);
 typedef void* (*hcl_vmprim_dlgetsym_t) (hcl_t* hcl, void* handle, const hcl_ooch_t* name);
 
-typedef void (*hcl_log_write_t) (hcl_t* hcl, hcl_oow_t mask, const hcl_ooch_t* msg, hcl_oow_t len);
+typedef void (*hcl_log_write_t) (hcl_t* hcl, int mask, const hcl_ooch_t* msg, hcl_oow_t len);
 typedef void (*hcl_syserrstrb_t) (hcl_t* hcl, int syserr, hcl_bch_t* buf, hcl_oow_t len);
 typedef void (*hcl_syserrstru_t) (hcl_t* hcl, int syserr, hcl_uch_t* buf, hcl_oow_t len);
 
@@ -885,7 +885,7 @@ typedef void (*hcl_mod_gc_t) (
 struct hcl_mod_t
 {
 	/* input */
-	const hcl_ooch_t name[HCL_MOD_NAME_LEN_MAX + 1];
+	/*const*/ hcl_ooch_t name[HCL_MOD_NAME_LEN_MAX + 1];
 
 	/* user-defined data */
 	hcl_mod_query_t  query;
@@ -948,7 +948,7 @@ struct hcl_t
 	struct
 	{
 		int trait;
-		unsigned int log_mask;
+		int log_mask;
 		hcl_oow_t log_maxcapa;
 		hcl_oow_t dfl_symtab_size;
 		hcl_oow_t dfl_sysdic_size;
@@ -1049,7 +1049,7 @@ struct hcl_t
 	{
 		struct
 		{
-			hcl_uch_t* ptr;
+			hcl_ooch_t* ptr;
 			hcl_oow_t capa;
 			hcl_oow_t len;
 		} xbuf;
@@ -1517,7 +1517,7 @@ HCL_EXPORT void hcl_setsynerrufmt (
 );
 
 #if defined(HCL_HAVE_INLINE)
-	static HCL_INLINE void hcl_setsynerr (hcl_t* hcl,	hcl_synerrnum_t num, const hcl_ioloc_t* loc,	const hcl_oocs_t* tgt)
+	static HCL_INLINE void hcl_setsynerr (hcl_t* hcl, hcl_synerrnum_t num, const hcl_ioloc_t* loc, const hcl_oocs_t* tgt)
 	{
 		hcl_setsynerrbfmt (hcl, num, loc, tgt, HCL_NULL);
 	}
@@ -1584,14 +1584,14 @@ HCL_EXPORT hcl_pfbase_t* hcl_findpfbase (
  * ========================================================================= */
 HCL_EXPORT hcl_ooi_t hcl_logbfmt (
 	hcl_t*           hcl,
-	hcl_oow_t        mask,
+	int              mask,
 	const hcl_bch_t* fmt,
 	...
 );
 
 HCL_EXPORT hcl_ooi_t hcl_logufmt (
 	hcl_t*           hcl,
-	hcl_oow_t        mask,
+	int              mask,
 	const hcl_uch_t* fmt,
 	...
 );

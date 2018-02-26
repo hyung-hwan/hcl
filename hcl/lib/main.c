@@ -193,7 +193,7 @@ static const hcl_bch_t* get_base_name (const hcl_bch_t* path)
 
 static HCL_INLINE hcl_ooi_t open_input (hcl_t* hcl, hcl_ioinarg_t* arg)
 {
-	xtn_t* xtn = hcl_getxtn(hcl);
+	xtn_t* xtn = (xtn_t*)hcl_getxtn(hcl);
 	bb_t* bb = HCL_NULL;
 
 /* TOOD: support predefined include directory as well */
@@ -214,7 +214,7 @@ static HCL_INLINE hcl_ooi_t open_input (hcl_t* hcl, hcl_ioinarg_t* arg)
 		fb = get_base_name (fn);
 		parlen = fb - fn;
 
-		bb = hcl_callocmem (hcl, HCL_SIZEOF(*bb) + (HCL_SIZEOF(hcl_bch_t) * (parlen + bcslen + 1)));
+		bb = (bb_t*)hcl_callocmem (hcl, HCL_SIZEOF(*bb) + (HCL_SIZEOF(hcl_bch_t) * (parlen + bcslen + 1)));
 		if (!bb) goto oops;
 
 		bb->fn = (hcl_bch_t*)(bb + 1);
@@ -232,7 +232,7 @@ static HCL_INLINE hcl_ooi_t open_input (hcl_t* hcl, hcl_ioinarg_t* arg)
 
 		pathlen = hcl_countbcstr (xtn->read_path);
 
-		bb = hcl_callocmem (hcl, HCL_SIZEOF(*bb) + (HCL_SIZEOF(hcl_bch_t) * (pathlen + 1)));
+		bb = (bb_t*)hcl_callocmem (hcl, HCL_SIZEOF(*bb) + (HCL_SIZEOF(hcl_bch_t) * (pathlen + 1)));
 		if (!bb) goto oops;
 
 		bb->fn = (hcl_bch_t*)(bb + 1);
@@ -269,7 +269,7 @@ oops:
 
 static HCL_INLINE hcl_ooi_t close_input (hcl_t* hcl, hcl_ioinarg_t* arg)
 {
-	/*xtn_t* xtn = hcl_getxtn(hcl);*/
+	/*xtn_t* xtn = (xtn_t*)hcl_getxtn(hcl);*/
 	bb_t* bb;
 
 	bb = (bb_t*)arg->handle;
@@ -285,7 +285,7 @@ static HCL_INLINE hcl_ooi_t close_input (hcl_t* hcl, hcl_ioinarg_t* arg)
 
 static HCL_INLINE hcl_ooi_t read_input (hcl_t* hcl, hcl_ioinarg_t* arg)
 {
-	/*xtn_t* xtn = hcl_getxtn(hcl);*/
+	/*xtn_t* xtn = (xtn_t*)hcl_getxtn(hcl);*/
 	bb_t* bb;
 	hcl_oow_t bcslen, ucslen, remlen;
 	int x;
@@ -350,7 +350,7 @@ static hcl_ooi_t read_handler (hcl_t* hcl, hcl_iocmd_t cmd, void* arg)
 
 static HCL_INLINE hcl_ooi_t open_output(hcl_t* hcl, hcl_iooutarg_t* arg)
 {
-	xtn_t* xtn = hcl_getxtn(hcl);
+	xtn_t* xtn = (xtn_t*)hcl_getxtn(hcl);
 	FILE* fp;
 
 #if defined(__MSDOS__) || defined(_WIN32) || defined(__OS2__)
@@ -372,7 +372,7 @@ static HCL_INLINE hcl_ooi_t open_output(hcl_t* hcl, hcl_iooutarg_t* arg)
   
 static HCL_INLINE hcl_ooi_t close_output (hcl_t* hcl, hcl_iooutarg_t* arg)
 {
-	/*xtn_t* xtn = hcl_getxtn(hcl);*/
+	/*xtn_t* xtn = (xtn_t*)hcl_getxtn(hcl);*/
 	FILE* fp;
 
 	fp = (FILE*)arg->handle;
@@ -386,7 +386,7 @@ static HCL_INLINE hcl_ooi_t close_output (hcl_t* hcl, hcl_iooutarg_t* arg)
 
 static HCL_INLINE hcl_ooi_t write_output (hcl_t* hcl, hcl_iooutarg_t* arg)
 {
-	/*xtn_t* xtn = hcl_getxtn(hcl);*/
+	/*xtn_t* xtn = (xtn_t*)hcl_getxtn(hcl);*/
 	hcl_bch_t bcsbuf[1024];
 	hcl_oow_t bcslen, ucslen, donelen;
 	int x;
@@ -462,7 +462,7 @@ static void* dl_open (hcl_t* hcl, const hcl_ooch_t* name, int flags)
 	if (bufcapa <= HCL_COUNTOF(stabuf)) bufptr = stabuf;
 	else
 	{
-		bufptr = hcl_allocmem(hcl, bufcapa * HCL_SIZEOF(*bufptr));
+		bufptr = (hcl_bch_t*)hcl_allocmem(hcl, bufcapa * HCL_SIZEOF(*bufptr));
 		if (!bufptr) return HCL_NULL;
 	}
 
@@ -608,7 +608,7 @@ static void* dl_getsym (hcl_t* hcl, void* handle, const hcl_ooch_t* name)
 	if (bcslen >= HCL_COUNTOF(stabuf) - 2)
 	{
 		bufcapa = bcslen + 3;
-		bufptr = hcl_allocmem(hcl, bufcapa * HCL_SIZEOF(*bufptr));
+		bufptr = (hcl_bch_t*)hcl_allocmem(hcl, bufcapa * HCL_SIZEOF(*bufptr));
 		if (!bufptr) return HCL_NULL;
 	}
 	else
@@ -705,7 +705,7 @@ static int write_all (int fd, const char* ptr, hcl_oow_t len)
 	return 0;
 }
 
-static void log_write (hcl_t* hcl, hcl_oow_t mask, const hcl_ooch_t* msg, hcl_oow_t len)
+static void log_write (hcl_t* hcl, int mask, const hcl_ooch_t* msg, hcl_oow_t len)
 {
 #if defined(_WIN32)
 #	error NOT IMPLEMENTED 
@@ -717,7 +717,7 @@ static void log_write (hcl_t* hcl, hcl_oow_t mask, const hcl_ooch_t* msg, hcl_oo
 	hcl_oow_t ucslen, bcslen, msgidx;
 	int n;
 
-	xtn_t* xtn = hcl_getxtn(hcl);
+	xtn_t* xtn = (xtn_t*)hcl_getxtn(hcl);
 	int logfd;
 
 	if (mask & HCL_LOG_STDERR)
@@ -1076,7 +1076,7 @@ static void vm_gettime (hcl_t* hcl, hcl_ntime_t* now)
 static void vm_sleep (hcl_t* hcl, const hcl_ntime_t* dur)
 {
 #if defined(_WIN32)
-	xtn_t* xtn = hcl_getxtn(hcl);
+	xtn_t* xtn = (xtn_t*)hcl_getxtn(hcl);
 	if (xtn->waitable_timer)
 	{
 		LARGE_INTEGER li;
@@ -1150,7 +1150,7 @@ static void vm_sleep (hcl_t* hcl, const hcl_ntime_t* dur)
 
 static void fini_hcl (hcl_t* hcl)
 {
-	xtn_t* xtn = hcl_getxtn(hcl);
+	xtn_t* xtn = (xtn_t*)hcl_getxtn(hcl);
 	if (xtn->logfd >= 0)
 	{
 		close (xtn->logfd);
@@ -1162,7 +1162,7 @@ static void fini_hcl (hcl_t* hcl)
 
 static int handle_logopt (hcl_t* hcl, const hcl_bch_t* str)
 {
-	xtn_t* xtn = hcl_getxtn (hcl);
+	xtn_t* xtn = (xtn_t*)hcl_getxtn (hcl);
 	hcl_bch_t* xstr = (hcl_bch_t*)str;
 	hcl_bch_t* cm, * flt;
 
@@ -1245,7 +1245,7 @@ static int handle_logopt (hcl_t* hcl, const hcl_bch_t* str)
 #if defined(HCL_BUILD_DEBUG)
 static int handle_dbgopt (hcl_t* hcl, const hcl_bch_t* str)
 {
-	xtn_t* xtn = hcl_getxtn (hcl);
+	xtn_t* xtn = (xtn_t*)hcl_getxtn (hcl);
 	const hcl_bch_t* cm, * flt;
 	hcl_oow_t len;
 	unsigned int trait, dbgopt = 0;
@@ -1395,7 +1395,7 @@ static void print_synerr (hcl_t* hcl)
 	hcl_synerr_t synerr;
 	xtn_t* xtn;
 
-	xtn = hcl_getxtn (hcl);
+	xtn = (xtn_t*)hcl_getxtn (hcl);
 	hcl_getsynerr (hcl, &synerr);
 
 	hcl_logbfmt (hcl,HCL_LOG_STDERR, "ERROR: ");
@@ -1545,7 +1545,7 @@ int main (int argc, char* argv[])
 		hcl_setoption (hcl, HCL_LOG_MASK, &trait);*/
 	}
 
-	xtn = hcl_getxtn (hcl);
+	xtn = (xtn_t*)hcl_getxtn (hcl);
 	xtn->logfd = -1;
 	xtn->logfd_istty = 0;
 

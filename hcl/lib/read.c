@@ -311,7 +311,7 @@ static int copy_string_to (hcl_t* hcl, const hcl_oocs_t* src, hcl_oocs_t* dst, h
 
 		capa = HCL_ALIGN(len, BUFFER_ALIGN);
 
-		tmp = hcl_reallocmem (hcl, dst->ptr, HCL_SIZEOF(*tmp) * capa);
+		tmp = (hcl_ooch_t*)hcl_reallocmem (hcl, dst->ptr, HCL_SIZEOF(*tmp) * capa);
 		if (!tmp)  return -1;
 
 		dst->ptr = tmp;
@@ -1915,8 +1915,8 @@ static int read_object (hcl_t* hcl)
 			{
 				static struct 
 				{
-					int closer;
-					int synerr;
+					int             closer;
+					hcl_synerrnum_t synerr;
 				} req[] =
 				{
 					{ HCL_IOTOK_RPAREN, HCL_SYNERR_RPAREN }, /* XLIST     ()  */
@@ -2268,7 +2268,7 @@ int hcl_attachio (hcl_t* hcl, hcl_ioimpl_t reader, hcl_ioimpl_t printer)
 		cbp = hcl_regcb (hcl, &cb);
 		if (!cbp) return -1;
 
-		hcl->c = hcl_callocmem (hcl, HCL_SIZEOF(*hcl->c));
+		hcl->c = (hcl_compiler_t*)hcl_callocmem (hcl, HCL_SIZEOF(*hcl->c));
 		if (!hcl->c) 
 		{
 			hcl_deregcb (hcl, cbp);

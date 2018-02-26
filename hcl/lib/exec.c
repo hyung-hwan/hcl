@@ -165,7 +165,7 @@ static HCL_INLINE int prepare_to_alloc_pid (hcl_t* hcl)
 		new_capa = HCL_SMOOI_MAX;
 	}
 
-	tmp = hcl_reallocmem (hcl, hcl->proc_map, HCL_SIZEOF(hcl_oop_t) * new_capa);
+	tmp = (hcl_oop_t*)hcl_reallocmem (hcl, hcl->proc_map, HCL_SIZEOF(hcl_oop_t) * new_capa);
 	if (!tmp) return -1;
 
 	hcl->proc_map_free_first = hcl->proc_map_capa;
@@ -1022,7 +1022,7 @@ static int start_initial_process_and_context (hcl_t* hcl, hcl_ooi_t initial_ip)
 	ctx->method_or_nargs = HCL_SMOOI_TO_OOP(0);
 /* TODO: XXXXX */
 	ctx->ntmprs = HCL_SMOOI_TO_OOP(0);
-	ctx->home = ctx; /*  is this correct??? */
+	ctx->home = (hcl_oop_t)ctx; /*  is this correct??? */
 /* END XXXXX */
 
 	/* [NOTE]

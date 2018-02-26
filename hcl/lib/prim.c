@@ -56,7 +56,7 @@ hcl_oop_t hcl_makeprim (hcl_t* hcl, hcl_pfimpl_t primimpl, hcl_oow_t minargs, hc
 
 /* ------------------------------------------------------------------------- */
 
-static void log_char_object (hcl_t* hcl, hcl_oow_t mask, hcl_oop_char_t msg)
+static void log_char_object (hcl_t* hcl, int mask, hcl_oop_char_t msg)
 {
 	hcl_ooi_t n;
 	hcl_oow_t rem;
@@ -98,7 +98,7 @@ static hcl_pfrc_t pf_log (hcl_t* hcl, hcl_ooi_t nargs)
 {
 /* TODO: accept log level */
 	hcl_oop_t msg;
-	hcl_oow_t mask;
+	int mask;
 	hcl_ooi_t k;
 
 	/*level = HCL_STACK_GET(hcl, hcl->sp - nargs + 1);
@@ -378,7 +378,7 @@ static hcl_pfrc_t pf_integer_rem (hcl_t* hcl, hcl_ooi_t nargs)
 
 
 
-static int put_formatted_chars (hcl_t* hcl, hcl_oow_t mask, const hcl_ooch_t ch, hcl_oow_t len)
+static int put_formatted_chars (hcl_t* hcl, int mask, const hcl_ooch_t ch, hcl_oow_t len)
 {
 /* TODO: better error handling, buffering.
  *       should buffering be done by the printer callback? */
@@ -405,7 +405,7 @@ static int put_formatted_chars (hcl_t* hcl, hcl_oow_t mask, const hcl_ooch_t ch,
 	return 1; /* success */
 }
 
-static int put_formatted_string (hcl_t* hcl, hcl_oow_t mask, const hcl_ooch_t* ptr, hcl_oow_t len)
+static int put_formatted_string (hcl_t* hcl, int mask, const hcl_ooch_t* ptr, hcl_oow_t len)
 {
 /* TODO: better error handling, buffering 
  *       should be done by the printer callback? */

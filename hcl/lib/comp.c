@@ -98,7 +98,7 @@ static int add_temporary_variable (hcl_t* hcl, hcl_oop_t name, hcl_oow_t dup_che
 		hcl_oow_t newcapa;
 
 		newcapa = HCL_ALIGN (hcl->c->tv.capa + 1, TV_BUFFER_ALIGN); /* TODO: set a better resizing policy */
-		tmp = hcl_reallocmem (hcl, hcl->c->tv.ptr, newcapa);
+		tmp = (hcl_oop_t*)hcl_reallocmem (hcl, hcl->c->tv.ptr, newcapa);
 		if (!tmp) return -1;
 
 		hcl->c->tv.capa = newcapa;
@@ -495,7 +495,7 @@ static HCL_INLINE int _insert_cframe (hcl_t* hcl, hcl_ooi_t index, int opcode, h
 		hcl_oow_t newcapa;
 
 		newcapa = HCL_ALIGN (hcl->c->cfs.top + 256, 256); /* TODO: adjust this capacity */
-		tmp = hcl_reallocmem (hcl, hcl->c->cfs.ptr, newcapa * HCL_SIZEOF(hcl_cframe_t));
+		tmp = (hcl_cframe_t*)hcl_reallocmem (hcl, hcl->c->cfs.ptr, newcapa * HCL_SIZEOF(hcl_cframe_t));
 		if (!tmp) 
 		{
 			hcl->c->cfs.top--;

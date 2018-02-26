@@ -182,7 +182,7 @@ hcl_oop_t hcl_moveoop (hcl_t* hcl, hcl_oop_t oop)
 		nbytes_aligned = get_payload_bytes (hcl, oop);
 
 		/* allocate space in the new heap */
-		tmp = hcl_allocheapmem (hcl, hcl->newheap, HCL_SIZEOF(hcl_obj_t) + nbytes_aligned);
+		tmp = (hcl_oop_t)hcl_allocheapmem (hcl, hcl->newheap, HCL_SIZEOF(hcl_obj_t) + nbytes_aligned);
 
 		/* allocation here must not fail because
 		 * i'm allocating the new space in a new heap for 
@@ -447,7 +447,7 @@ hcl_oop_t hcl_shallowcopy (hcl_t* hcl, hcl_oop_t oop)
 		total_bytes = HCL_SIZEOF(hcl_obj_t) + get_payload_bytes(hcl, oop);
 
 		hcl_pushtmp (hcl, &oop);
-		z = hcl_allocbytes (hcl, total_bytes);
+		z = (hcl_oop_t)hcl_allocbytes (hcl, total_bytes);
 		hcl_poptmp(hcl);
 
 		HCL_MEMCPY (z, oop, total_bytes);

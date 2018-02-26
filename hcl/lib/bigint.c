@@ -40,7 +40,7 @@
 #define IS_SIGN_DIFF(x,y) (((x) ^ (y)) < 0)
 
 /* digit character array */
-static char* _digitc = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+static char _digitc[] = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ";
 
 /* exponent table */
 static hcl_uint8_t _exp_tab[] = 
@@ -1114,12 +1114,12 @@ static HCL_INLINE hcl_oow_t multiply_unsigned_array_karatsuba (hcl_t* hcl, const
 	tmplen[0] = ndigits_xh + ndigits_yh;
 	tmplen[1] = ndigits_yl + ndigits_yh + 1; 
 	if (tmplen[1] < tmplen[0]) tmplen[1] = tmplen[0];
-	tmp[1] = hcl_callocmem (hcl, HCL_SIZEOF(hcl_liw_t) * tmplen[1]); /* TODO: should i use the object memory? */
+	tmp[1] = (hcl_liw_t*)hcl_callocmem(hcl, HCL_SIZEOF(hcl_liw_t) * tmplen[1]); /* TODO: should i use the object memory? */
 	if (!tmp[1]) goto oops;
 
 	/* make a temporary for (a0 + a1) and (a0 * b0) */
 	tmplen[0] = ndigits_xl + ndigits_yl + 1;
-	tmp[0] = hcl_callocmem (hcl, HCL_SIZEOF(hcl_liw_t) * tmplen[0]);
+	tmp[0] = (hcl_liw_t*)hcl_callocmem(hcl, HCL_SIZEOF(hcl_liw_t) * tmplen[0]);
 	if (!tmp[0]) goto oops;
 
 	/* tmp[0] = a0 + a1 */
@@ -3619,7 +3619,7 @@ hcl_oop_t hcl_strtoint (hcl_t* hcl, const hcl_ooch_t* str, hcl_oow_t len, int ra
 
 		if (outlen > HCL_COUNTOF(hw)) 
 		{
-			hwp = hcl_allocmem (hcl, outlen * HCL_SIZEOF(hw[0]));
+			hwp = (hcl_liw_t*)hcl_allocmem(hcl, outlen * HCL_SIZEOF(hw[0]));
 			if (!hwp) return HCL_NULL;
 		}
 		else
@@ -3667,7 +3667,7 @@ hcl_oop_t hcl_strtoint (hcl_t* hcl, const hcl_ooch_t* str, hcl_oow_t len, int ra
 		outlen = (end - str) / safe_ndigits + 1;
 		if (outlen > HCL_COUNTOF(hw)) 
 		{
-			hwp = hcl_allocmem (hcl, outlen * HCL_SIZEOF(hcl_liw_t));
+			hwp = (hcl_liw_t*)hcl_allocmem(hcl, outlen * HCL_SIZEOF(hcl_liw_t));
 			if (!hwp) return HCL_NULL;
 		}
 		else

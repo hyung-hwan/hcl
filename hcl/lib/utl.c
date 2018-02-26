@@ -370,7 +370,7 @@ int hcl_concatoocstrtosbuf (hcl_t* hcl, const hcl_ooch_t* str, int id)
 		newcapa = HCL_ALIGN(p->len + len, 512); /* TODO: adjust this capacity */
 
 		/* +1 to handle line ending injection more easily */
-		tmp = hcl_reallocmem (hcl, p->ptr, (newcapa + 1) * HCL_SIZEOF(*tmp)); 
+		tmp = (hcl_ooch_t*)hcl_reallocmem(hcl, p->ptr, (newcapa + 1) * HCL_SIZEOF(*tmp)); 
 		if (!tmp) return -1;
 
 		p->ptr = tmp;
@@ -802,7 +802,7 @@ HCL_INLINE hcl_uch_t* hcl_dupbtoucharswithheadroom (hcl_t* hcl, hcl_oow_t headro
 		return HCL_NULL;
 	}
 
-	ptr = hcl_allocmem (hcl, headroom_bytes + ((outlen + 1) * HCL_SIZEOF(hcl_uch_t)));
+	ptr = (hcl_uch_t*)hcl_allocmem(hcl, headroom_bytes + ((outlen + 1) * HCL_SIZEOF(hcl_uch_t)));
 	if (!ptr) return HCL_NULL;
 
 	inlen = bcslen;
@@ -835,7 +835,7 @@ HCL_INLINE hcl_bch_t* hcl_duputobcharswithheadroom (hcl_t* hcl, hcl_oow_t headro
 		return HCL_NULL;
 	}
 
-	ptr = hcl_allocmem (hcl, headroom_bytes + ((outlen + 1) * HCL_SIZEOF(hcl_bch_t)));
+	ptr = (hcl_bch_t*)hcl_allocmem(hcl, headroom_bytes + ((outlen + 1) * HCL_SIZEOF(hcl_bch_t)));
 	if (!ptr) return HCL_NULL;
 
 	inlen = ucslen;
@@ -867,7 +867,7 @@ HCL_INLINE hcl_uch_t* hcl_dupbtoucstrwithheadroom (hcl_t* hcl, hcl_oow_t headroo
 	}
 
 	outlen++;
-	ptr = hcl_allocmem (hcl, headroom_bytes + (outlen * HCL_SIZEOF(hcl_uch_t)));
+	ptr = (hcl_uch_t*)hcl_allocmem (hcl, headroom_bytes + (outlen * HCL_SIZEOF(hcl_uch_t)));
 	if (!ptr) return HCL_NULL;
 
 	hcl_convbtoucstr (hcl, bcs, &inlen, ptr, &outlen);
@@ -892,7 +892,7 @@ HCL_INLINE hcl_bch_t* hcl_duputobcstrwithheadroom (hcl_t* hcl, hcl_oow_t headroo
 	}
 
 	outlen++;
-	ptr = hcl_allocmem (hcl, headroom_bytes + (outlen * HCL_SIZEOF(hcl_bch_t)));
+	ptr = (hcl_bch_t*)hcl_allocmem (hcl, headroom_bytes + (outlen * HCL_SIZEOF(hcl_bch_t)));
 	if (!ptr) return HCL_NULL;
 
 	ptr = (hcl_bch_t*)((hcl_oob_t*)ptr + headroom_bytes);
@@ -912,7 +912,7 @@ hcl_uch_t* hcl_dupuchars (hcl_t* hcl, const hcl_uch_t* ucs, hcl_oow_t ucslen)
 {
 	hcl_uch_t* ptr;
 
-	ptr = hcl_allocmem (hcl, (ucslen + 1) * HCL_SIZEOF(hcl_uch_t));
+	ptr = (hcl_uch_t*)hcl_allocmem (hcl, (ucslen + 1) * HCL_SIZEOF(hcl_uch_t));
 	if (!ptr) return HCL_NULL;
 
 	hcl_copyuchars (ptr, ucs, ucslen);
@@ -924,7 +924,7 @@ hcl_bch_t* hcl_dupbchars (hcl_t* hcl, const hcl_bch_t* bcs, hcl_oow_t bcslen)
 {
 	hcl_bch_t* ptr;
 
-	ptr = hcl_allocmem (hcl, (bcslen + 1) * HCL_SIZEOF(hcl_bch_t));
+	ptr = (hcl_bch_t*)hcl_allocmem (hcl, (bcslen + 1) * HCL_SIZEOF(hcl_bch_t));
 	if (!ptr) return HCL_NULL;
 
 	hcl_copybchars (ptr, bcs, bcslen);

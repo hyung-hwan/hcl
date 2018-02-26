@@ -111,7 +111,7 @@ static hcl_oop_cons_t find_or_upsert (hcl_t* hcl, hcl_oop_dic_t dic, hcl_oop_cha
 #if defined(SYMBOL_ONLY_KEY)
 	index = hcl_hashoochars(key->slot, HCL_OBJ_GET_SIZE(key)) % HCL_OBJ_GET_SIZE(dic->bucket);
 #else
-	if (hcl_hashobj(hcl, key, &index) <= -1) return HCL_NULL;
+	if (hcl_hashobj(hcl, (hcl_oop_t)key, &index) <= -1) return HCL_NULL;
 	index %= HCL_OBJ_GET_SIZE(dic->bucket);
 #endif
 
@@ -136,7 +136,7 @@ static hcl_oop_cons_t find_or_upsert (hcl_t* hcl, hcl_oop_dic_t dic, hcl_oop_cha
 		ass = (hcl_oop_cons_t)dic->bucket->slot[index];
 		HCL_ASSERT (hcl, HCL_IS_CONS(hcl,ass));
 
-		n = hcl_equalobjs(hcl, key, ass->car);
+		n = hcl_equalobjs(hcl, (hcl_oop_t)key, ass->car);
 		if (n <= -1) return HCL_NULL;
 		if (n >= 1)
 		{
@@ -197,7 +197,7 @@ static hcl_oop_cons_t find_or_upsert (hcl_t* hcl, hcl_oop_dic_t dic, hcl_oop_cha
 		/* recalculate the index for the expanded bucket */
 		index = hcl_hashoochars(key->slot, HCL_OBJ_GET_SIZE(key)) % HCL_OBJ_GET_SIZE(dic->bucket);
 	#else
-		hcl_hashobj(hcl, key, &index); /* this must succeed as i know 'key' is hashable */
+		hcl_hashobj(hcl, (hcl_oop_t)key, &index); /* this must succeed as i know 'key' is hashable */
 		index %= HCL_OBJ_GET_SIZE(dic->bucket);
 	#endif
 

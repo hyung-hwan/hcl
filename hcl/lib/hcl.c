@@ -34,7 +34,7 @@ hcl_t* hcl_open (hcl_mmgr_t* mmgr, hcl_oow_t xtnsize, hcl_oow_t heapsize, const 
 	/* if this assertion fails, correct the type definition in hcl.h */
 	HCL_ASSERT (hcl, HCL_SIZEOF(hcl_oow_t) == HCL_SIZEOF(hcl_oop_t));
 
-	hcl = HCL_MMGR_ALLOC (mmgr, HCL_SIZEOF(*hcl) + xtnsize);
+	hcl = (hcl_t*)HCL_MMGR_ALLOC(mmgr, HCL_SIZEOF(*hcl) + xtnsize);
 	if (hcl)
 	{
 		if (hcl_init(hcl, mmgr, heapsize, vmprim) <= -1)
@@ -113,7 +113,7 @@ int hcl_init (hcl_t* hcl, hcl_mmgr_t* mmgr, hcl_oow_t heapsz, const hcl_vmprim_t
 	 * routine still function despite some side-effects when
 	 * reallocation fails */
 	/* +1 required for consistency with put_oocs and put_ooch in logfmt.c */
-	hcl->log.ptr = hcl_allocmem (hcl, (hcl->log.capa + 1) * HCL_SIZEOF(*hcl->log.ptr)); 
+	hcl->log.ptr = (hcl_ooch_t*)hcl_allocmem (hcl, (hcl->log.capa + 1) * HCL_SIZEOF(*hcl->log.ptr)); 
 	if (!hcl->log.ptr) goto oops;
 
 	/*hcl->permheap = hcl_makeheap (hcl, what is the best size???);
@@ -154,7 +154,7 @@ static hcl_rbt_walk_t unload_module (hcl_rbt_t* rbt, hcl_rbt_pair_t* pair, void*
 	hcl_t* hcl = (hcl_t*)ctx;
 	hcl_mod_data_t* mdp;
 
-	mdp = HCL_RBT_VPTR(pair);
+	mdp = (hcl_mod_data_t*)HCL_RBT_VPTR(pair);
 	HCL_ASSERT (hcl, mdp != HCL_NULL);
 
 	mdp->pair = HCL_NULL; /* to prevent hcl_closemod() from calling  hcl_rbt_delete() */
@@ -283,7 +283,7 @@ int hcl_setoption (hcl_t* hcl, hcl_option_t id, const void* value)
 			return 0;
 
 		case HCL_LOG_MASK:
-			hcl->option.log_mask = *(const unsigned int*)value;
+			hcl->option.log_mask = *(const int*)value;
 			return 0;
 
 		case HCL_LOG_MAXCAPA:
@@ -338,7 +338,7 @@ int hcl_getoption (hcl_t* hcl, hcl_option_t id, void* value)
 			return 0;
 
 		case HCL_LOG_MASK:
-			*(unsigned int*)value = hcl->option.log_mask;
+			*(int*)value = hcl->option.log_mask;
 			return 0;
 
 		case HCL_LOG_MAXCAPA:
@@ -367,7 +367,7 @@ hcl_cb_t* hcl_regcb (hcl_t* hcl, hcl_cb_t* tmpl)
 {
 	hcl_cb_t* actual;
 
-	actual = hcl_allocmem (hcl, HCL_SIZEOF(*actual));
+	actual = (hcl_cb_t*)hcl_allocmem(hcl, HCL_SIZEOF(*actual));
 	if (!actual) return HCL_NULL;
 
 	*actual = *tmpl;
@@ -556,7 +556,7 @@ hcl_mod_data_t* hcl_openmod (hcl_t* hcl, const hcl_ooch_t* name, hcl_oow_t namel
 	}
 
 	/* attempt to get hcl_mod_xxx where xxx is the module name*/
-	load = hcl->vmprim.dl_getsym(hcl, md.handle, buf);
+	load = (hcl_mod_load_t)hcl->vmprim.dl_getsym(hcl, md.handle, buf);
 	if (!load) 
 	{
 		hcl_seterrbfmt (hcl, hcl_geterrnum(hcl), "unable to get module symbol [%js] in [%.*js]", buf, namelen, name);

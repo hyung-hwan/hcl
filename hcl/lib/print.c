@@ -57,7 +57,7 @@ static HCL_INLINE int push (hcl_t* hcl, print_stack_t* info)
 		hcl_oow_t new_capa;
 
 		new_capa = HCL_ALIGN (hcl->p.s.capa + 1, PRINT_STACK_ALIGN);
-		tmp = hcl_reallocmem (hcl, hcl->p.s.ptr, new_capa * HCL_SIZEOF(*info));
+		tmp = (print_stack_t*)hcl_reallocmem(hcl, hcl->p.s.ptr, new_capa * HCL_SIZEOF(*info));
 		if (!tmp) return -1;
 
 		hcl->p.s.ptr = tmp;
@@ -114,7 +114,7 @@ static struct
 };
 
 
-static HCL_INLINE int print_single_char (hcl_t* hcl, hcl_oow_t mask, hcl_ooch_t ch, hcl_outbfmt_t outbfmt)
+static HCL_INLINE int print_single_char (hcl_t* hcl, int mask, hcl_ooch_t ch, hcl_outbfmt_t outbfmt)
 {
 	if (ch < ' ') 
 	{
@@ -168,7 +168,7 @@ static HCL_INLINE int print_single_char (hcl_t* hcl, hcl_oow_t mask, hcl_ooch_t 
 	return 0;
 }
 
-int hcl_outfmtobj (hcl_t* hcl, hcl_oow_t mask, hcl_oop_t obj, hcl_outbfmt_t outbfmt)
+int hcl_outfmtobj (hcl_t* hcl, int mask, hcl_oop_t obj, hcl_outbfmt_t outbfmt)
 {
 	hcl_oop_t cur;
 	print_stack_t ps;

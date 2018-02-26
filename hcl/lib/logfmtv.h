@@ -63,7 +63,7 @@
  * SUCH DAMAGE.
  *
  */
-
+#include <stdio.h>
 
 /* NOTE: data output is aborted if the data limit is reached or 
  *       I/O error occurs  */
@@ -92,9 +92,7 @@
 static int logfmtv (hcl_t* hcl, const fmtchar_t* fmt, hcl_fmtout_t* data, va_list ap, hcl_outbfmt_t outbfmt)
 {
 	const fmtchar_t* percent;
-#if defined(FMTCHAR_IS_OOCH)
 	const fmtchar_t* checkpoint;
-#endif
 	hcl_bch_t nbuf[MAXNBUF], bch;
 	const hcl_bch_t* nbufp;
 	int n, base, neg, sign;
@@ -138,26 +136,38 @@ static int logfmtv (hcl_t* hcl, const fmtchar_t* fmt, hcl_fmtout_t* data, va_lis
 		}
 		PUT_OOCS (checkpoint, fmt - checkpoint - 1);
 	#else
+		#if defined(HCL_OOCH_IS_UCH)
+		/* fmtchar is bch. ooch is uch. convert bch to uch */
+		checkpoint = fmt;
 		while ((fch = *fmt++) != '%' || stop) 
 		{
-		#if defined(HCL_OOCH_IS_UCH)
-			if (fch == '\0') goto done;
-			/* ooch is uch. fmtchar is bch */
-			/* TODO: convert bch to uch */
+			if (fch == '\0') break;
+		}
+		while (checkpoint < fmt - 1)
+		{
+			hcl_oow_t cvlen, bclen;
+			bclen = fmt - checkpoint - 1;
+			cvlen = hcl->cmgr->bctouc(checkpoint, bclen, &ch);
+			if (cvlen == 0 || cvlen > bclen) goto oops;
+			checkpoint += cvlen;
 			PUT_OOCH (ch, 1);
+		}
+		if (fch == '\0') goto done;
 		#else
+		while ((fch = *fmt++) != '%' || stop) 
+		{
 			hcl_bch_t bcsbuf[HCL_MBLEN_MAX + 1];
 			hcl_oow_t ucslen, bcslen;
 
 			if (fch == '\0') goto done;
 
-			/* ooch is bch. fmtchar is uch */
+			/* fmtchar is uch. ooch is bch. convert uch to bch */
 			ucslen = 1;
-			bcslen = 1;
-			if (hcl_convutooochars (hcl, &fch, &ucslen, bcsbuf, &bcslen) <= -1) goto oops;
+			bcslen = HCL_COUNTOF(bcsbuf);
+			if (hcl_convutooochars(hcl, &fch, &ucslen, bcsbuf, &bcslen) <= -1) goto oops;
 			PUT_OOCS (bcsbuf, bcslen);
-		#endif
 		}
+		#endif
 	#endif
 		percent = fmt - 1;
 

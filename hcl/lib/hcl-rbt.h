@@ -167,6 +167,14 @@ typedef hcl_rbt_pair_t* (*hcl_rbt_cbserter_t) (
 	void*           ctx     /**< callback context */
 );
 
+
+enum hcl_rbt_pair_color_t
+{
+	HCL_RBT_RED,
+	HCL_RBT_BLACK
+};
+typedef enum hcl_rbt_pair_color_t hcl_rbt_pair_color_t;
+
 /**
  * The hcl_rbt_pair_t type defines red-black tree pair. A pair is composed 
  * of a key and a value. It maintains pointers to the beginning of a key and 
@@ -188,11 +196,7 @@ struct hcl_rbt_pair_t
 	} val;
 
 	/* management information below */
-	enum
-	{
-		HCL_RBT_RED,
-		HCL_RBT_BLACK
-	} color;
+	hcl_rbt_pair_color_t color;
 	hcl_rbt_pair_t* parent;
 	hcl_rbt_pair_t* child[2]; /* left and right */
 };

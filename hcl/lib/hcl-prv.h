@@ -138,42 +138,43 @@
 /* ========================================================================= */
 /* SOURCE CODE I/O FOR COMPILER                                              */
 /* ========================================================================= */
+enum hcl_iotok_type_t
+{
+	HCL_IOTOK_EOF,
+	HCL_IOTOK_CHARLIT,
+	HCL_IOTOK_STRLIT,
+	HCL_IOTOK_NUMLIT,
+	HCL_IOTOK_RADNUMLIT,
+	HCL_IOTOK_SMPTRLIT,
+	HCL_IOTOK_ERRORLIT,
+	HCL_IOTOK_NIL,
+	HCL_IOTOK_TRUE,
+	HCL_IOTOK_FALSE,
+
+	HCL_IOTOK_IDENT,
+	HCL_IOTOK_IDENT_DOTTED,
+	HCL_IOTOK_DOT,
+	HCL_IOTOK_LPAREN,
+	HCL_IOTOK_RPAREN,
+	HCL_IOTOK_APAREN,   /* #( */
+	HCL_IOTOK_BAPAREN,  /* #[ */
+	HCL_IOTOK_DPAREN,   /* #{ */
+	HCL_IOTOK_LBRACK,   /* [ */
+	HCL_IOTOK_RBRACK,
+	HCL_IOTOK_LBRACE,
+	HCL_IOTOK_RBRACE,
+	HCL_IOTOK_VBAR,
+
+	HCL_IOTOK_INCLUDE
+};
+typedef enum hcl_iotok_type_t hcl_iotok_type_t;
+
 typedef struct hcl_iotok_t hcl_iotok_t;
 struct hcl_iotok_t
 {
-	enum
-	{
-		HCL_IOTOK_EOF,
-		HCL_IOTOK_CHARLIT,
-		HCL_IOTOK_STRLIT,
-		HCL_IOTOK_NUMLIT,
-		HCL_IOTOK_RADNUMLIT,
-		HCL_IOTOK_SMPTRLIT,
-		HCL_IOTOK_ERRORLIT,
-		HCL_IOTOK_NIL,
-		HCL_IOTOK_TRUE,
-		HCL_IOTOK_FALSE,
-
-		HCL_IOTOK_IDENT,
-		HCL_IOTOK_IDENT_DOTTED,
-		HCL_IOTOK_DOT,
-		HCL_IOTOK_LPAREN,
-		HCL_IOTOK_RPAREN,
-		HCL_IOTOK_APAREN,   /* #( */
-		HCL_IOTOK_BAPAREN,  /* #[ */
-		HCL_IOTOK_DPAREN,   /* #{ */
-		HCL_IOTOK_LBRACK,   /* [ */
-		HCL_IOTOK_RBRACK,
-		HCL_IOTOK_LBRACE,
-		HCL_IOTOK_RBRACE,
-		HCL_IOTOK_VBAR,
-
-		HCL_IOTOK_INCLUDE
-	} type;
-
+	hcl_iotok_type_t type;
 	hcl_oocs_t name;
 	hcl_oow_t name_capa;
-
 	hcl_ioloc_t loc;
 };
 
@@ -638,7 +639,7 @@ enum hcl_bcode_t
 
 typedef hcl_ooi_t (*hcl_outbfmt_t) (
 	hcl_t*           hcl,
-	hcl_oow_t        mask,
+	int              mask,
 	const hcl_bch_t* fmt,
 	...
 );
@@ -1042,21 +1043,21 @@ int hcl_addbuiltinprims (
 /* ========================================================================= */
 hcl_ooi_t hcl_proutbfmt (
 	hcl_t*           hcl,
-	hcl_oow_t        mask,
+	int              mask,
 	const hcl_bch_t* fmt,
 	...
 );
 
 hcl_ooi_t hcl_proutufmt (
 	hcl_t*           hcl,
-	hcl_oow_t        mask,
+	int              mask,
 	const hcl_uch_t* fmt,
 	...
 );
 
 int hcl_outfmtobj (
 	hcl_t*        hcl,
-	hcl_oow_t     mask,
+	int           mask,
 	hcl_oop_t     obj,
 	hcl_outbfmt_t outbfmt
 );

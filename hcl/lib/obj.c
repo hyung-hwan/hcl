@@ -35,7 +35,7 @@ void* hcl_allocbytes (hcl_t* hcl, hcl_oow_t size)
 	if ((hcl->option.trait & HCL_DEBUG_GC) && !(hcl->option.trait & HCL_NOGC)) hcl_gc (hcl);
 #endif
 
-	ptr = hcl_allocheapmem(hcl, hcl->curheap, size);
+	ptr = (hcl_uint8_t*)hcl_allocheapmem(hcl, hcl->curheap, size);
 	if (!ptr && hcl->errnum == HCL_EOOMEM && !(hcl->option.trait & HCL_NOGC))
 	{
 		hcl_gc (hcl);
@@ -45,7 +45,7 @@ void* hcl_allocbytes (hcl_t* hcl, hcl_oow_t size)
 			(hcl_oow_t)(hcl->curheap->limit - hcl->curheap->base),
 			(hcl_oow_t)(hcl->curheap->limit - hcl->curheap->ptr)
 		);
-		ptr = hcl_allocheapmem (hcl, hcl->curheap, size);
+		ptr = (hcl_uint8_t*)hcl_allocheapmem (hcl, hcl->curheap, size);
 /* TODO: grow heap if ptr is still null. */
 	}
 
@@ -65,7 +65,7 @@ static HCL_INLINE hcl_oop_t alloc_oop_array (hcl_t* hcl, int brand, hcl_oow_t si
 
 	if (HCL_UNLIKELY(ngc))
 	{
-		hdr = hcl_callocmem(hcl, HCL_SIZEOF(hcl_obj_t) + nbytes_aligned);
+		hdr = (hcl_oop_oop_t)hcl_callocmem(hcl, HCL_SIZEOF(hcl_obj_t) + nbytes_aligned);
 	}
 	else
 	{
@@ -73,7 +73,7 @@ static HCL_INLINE hcl_oop_t alloc_oop_array (hcl_t* hcl, int brand, hcl_oow_t si
 		 * HCL_SIZEOF(hcl_oop_t) will guarantee the starting address
 		 * of the allocated space to be an even number. 
 		 * see HCL_OOP_IS_NUMERIC() and HCL_OOP_IS_POINTER() */
-		hdr = hcl_allocbytes(hcl, HCL_SIZEOF(hcl_obj_t) + nbytes_aligned);
+		hdr = (hcl_oop_oop_t)hcl_allocbytes(hcl, HCL_SIZEOF(hcl_obj_t) + nbytes_aligned);
 	}
 	if (!hdr) return HCL_NULL;
 
@@ -104,7 +104,7 @@ hcl_oop_t hcl_allocoopobjwithtrailer (hcl_t* hcl, hcl_oow_t size, const hcl_oob_
 	nbytes = (size + 1) * HCL_SIZEOF(hcl_oop_t) + blen;
 	nbytes_aligned = HCL_ALIGN(nbytes, HCL_SIZEOF(hcl_oop_t)); 
 
-	hdr = hcl_allocbytes(hcl, HCL_SIZEOF(hcl_obj_t) + nbytes_aligned);
+	hdr = (hcl_oop_oop_t)hcl_allocbytes(hcl, HCL_SIZEOF(hcl_obj_t) + nbytes_aligned);
 	if (!hdr) return HCL_NULL;
 
 	hdr->_flags = HCL_OBJ_MAKE_FLAGS(HCL_OBJ_TYPE_OOP, HCL_SIZEOF(hcl_oop_t), 0, 0, 0, 0, 1, 0);
@@ -148,9 +148,9 @@ static HCL_INLINE hcl_oop_t alloc_numeric_array (hcl_t* hcl, int brand, const vo
 	 * of the allocated space to be an even number. 
 	 * see HCL_OOP_IS_NUMERIC() and HCL_OOP_IS_POINTER() */
 	if (HCL_UNLIKELY(ngc))
-		hdr = hcl_callocmem(hcl, HCL_SIZEOF(hcl_obj_t) + nbytes_aligned);
+		hdr = (hcl_oop_t)hcl_callocmem(hcl, HCL_SIZEOF(hcl_obj_t) + nbytes_aligned);
 	else
-		hdr = hcl_allocbytes(hcl, HCL_SIZEOF(hcl_obj_t) + nbytes_aligned);
+		hdr = (hcl_oop_t)hcl_allocbytes(hcl, HCL_SIZEOF(hcl_obj_t) + nbytes_aligned);
 	if (!hdr) return HCL_NULL;
 
 	hdr->_flags = HCL_OBJ_MAKE_FLAGS(type, unit, extra, 0, 0, ngc, 0, 0);
