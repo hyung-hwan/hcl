@@ -956,7 +956,7 @@ struct hcl_t
 
 	#if defined(HCL_BUILD_DEBUG)
 		/* set automatically when trait is set */
-		int karatsuba_cutoff;
+		hcl_oow_t karatsuba_cutoff;
 	#endif
 	} option;
 

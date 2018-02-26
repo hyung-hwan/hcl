@@ -98,7 +98,9 @@ static int logfmtv (hcl_t* hcl, const fmtchar_t* fmt, hcl_fmtout_t* data, va_lis
 	int n, base, neg, sign;
 	hcl_ooi_t tmp, width, precision;
 	hcl_ooch_t ch, padc;
+#if !defined(FMTCHAR_IS_OOCH)
 	fmtchar_t fch;
+#endif
 	int lm_flag, lm_dflag, flagc, numlen;
 	hcl_uintmax_t num = 0;
 	int stop = 0;
