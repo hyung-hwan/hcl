@@ -1589,10 +1589,10 @@ HCL_EXPORT hcl_ooi_t hcl_logbfmt (
 	...
 );
 
-HCL_EXPORT hcl_ooi_t hcl_logoofmt (
-	hcl_t*            hcl,
-	hcl_oow_t         mask,
-	const hcl_ooch_t* fmt,
+HCL_EXPORT hcl_ooi_t hcl_logufmt (
+	hcl_t*           hcl,
+	hcl_oow_t        mask,
+	const hcl_uch_t* fmt,
 	...
 );
 
@@ -1796,10 +1796,10 @@ HCL_EXPORT int hcl_equalobjs (
 #	define hcl_convootobcstr(hcl,oocs,oocslen,bcs,bcslen) hcl_convutobcstr(hcl,oocs,oocslen,bcs,bcslen)
 #	define hcl_convbtooocstr(hcl,bcs,bcslen,oocs,oocslen) hcl_convbtoucstr(hcl,bcs,bcslen,oocs,oocslen)
 #else
-#	define hcl_convootouchars(hcl,oocs,oocslen,bcs,bcslen) hcl_convbtouchars(hcl,oocs,oocslen,bcs,bcslen)
-#	define hcl_convutooochars(hcl,bcs,bcslen,oocs,oocslen) hcl_convutobchars(hcl,bcs,bcslen,oocs,oocslen)
-#	define hcl_convootoucstr(hcl,oocs,oocslen,bcs,bcslen) hcl_convbtoucstr(hcl,oocs,oocslen,bcs,bcslen)
-#	define hcl_convutooocstr(hcl,bcs,bcslen,oocs,oocslen) hcl_convutobcstr(hcl,bcs,bcslen,oocs,oocslen)
+#	define hcl_convootouchars(hcl,oocs,oocslen,ucs,ucslen) hcl_convbtouchars(hcl,oocs,oocslen,ucs,ucslen)
+#	define hcl_convutooochars(hcl,ucs,ucslen,oocs,oocslen) hcl_convutobchars(hcl,ucs,ucslen,oocs,oocslen)
+#	define hcl_convootoucstr(hcl,oocs,oocslen,ucs,ucslen) hcl_convbtoucstr(hcl,oocs,oocslen,ucs,ucslen)
+#	define hcl_convutooocstr(hcl,ucs,ucslen,oocs,oocslen) hcl_convutobcstr(hcl,ucs,ucslen,oocs,oocslen)
 #endif
 
 HCL_EXPORT int hcl_convbtouchars (

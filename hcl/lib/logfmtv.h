@@ -100,6 +100,7 @@ static int logfmtv (hcl_t* hcl, const fmtchar_t* fmt, hcl_fmtout_t* data, va_lis
 	int n, base, neg, sign;
 	hcl_ooi_t tmp, width, precision;
 	hcl_ooch_t ch, padc;
+	fmtchar_t fch;
 	int lm_flag, lm_dflag, flagc, numlen;
 	hcl_uintmax_t num = 0;
 	int stop = 0;
@@ -137,22 +138,28 @@ static int logfmtv (hcl_t* hcl, const fmtchar_t* fmt, hcl_fmtout_t* data, va_lis
 		}
 		PUT_OOCS (checkpoint, fmt - checkpoint - 1);
 	#else
-		while ((ch = *fmt++) != '%' || stop) 
+		while ((fch = *fmt++) != '%' || stop) 
 		{
-			if (ch == '\0') goto done;
-
-	#if defined(HCL_OOCH_IS_UCH)
-		/* ooch is uch. fmtchar is bch */
-		/* TODO: convert bch to uch */
-	#else
-		/* ooch is bch. fmtchar is uch */
-		/* TODO: convert uch to bch */
-	#endif
+		#if defined(HCL_OOCH_IS_UCH)
+			if (fch == '\0') goto done;
+			/* ooch is uch. fmtchar is bch */
+			/* TODO: convert bch to uch */
 			PUT_OOCH (ch, 1);
+		#else
+			hcl_bch_t bcsbuf[HCL_MBLEN_MAX + 1];
+			hcl_oow_t ucslen, bcslen;
+
+			if (fch == '\0') goto done;
+
+			/* ooch is bch. fmtchar is uch */
+			ucslen = 1;
+			bcslen = 1;
+			if (hcl_convutooochars (hcl, &fch, &ucslen, bcsbuf, &bcslen) <= -1) goto oops;
+			PUT_OOCS (bcsbuf, bcslen);
+		#endif
 		}
 	#endif
 		percent = fmt - 1;
-
 
 		padc = ' '; 
 		width = 0; precision = 0;
