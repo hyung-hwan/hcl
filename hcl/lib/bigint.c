@@ -40,7 +40,8 @@
 #define IS_SIGN_DIFF(x,y) (((x) ^ (y)) < 0)
 
 /* digit character array */
-static char _digitc[] = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+static char _digitc_upper[] = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+static char _digitc_lower[] = "0123456789abcdefghijklmnopqrstuvwxyz";
 
 /* exponent table */
 static hcl_uint8_t _exp_tab[] = 
@@ -3761,6 +3762,19 @@ oops_einval:
 static hcl_oow_t oow_to_text (hcl_t* hcl, hcl_oow_t w, int radix, hcl_ooch_t* buf)
 {
 	hcl_ooch_t* ptr;
+	const char* _digitc;
+
+	if (radix < 0) 
+	{
+
+		_digitc = _digitc_lower;
+		radix = -radix;
+	}
+	else
+	{
+		_digitc = _digitc_upper;
+	}
+
 	HCL_ASSERT (hcl, radix >= 2 && radix <= 36);
 
 	ptr = buf;
@@ -3955,6 +3969,18 @@ hcl_oop_t hcl_inttostr (hcl_t* hcl, hcl_oop_t num, int radix, int ngc)
 	hcl_ooch_t* xbuf = HCL_NULL;
 	hcl_oow_t xlen = 0, seglen, reqcapa;
 
+	const char* _digitc;
+	int orgradix = radix;
+
+	if (radix < 0) 
+	{
+		_digitc = _digitc_lower;
+		radix = -radix;
+	}
+	else
+	{
+		_digitc = _digitc_upper;
+	}
 	HCL_ASSERT (hcl, radix >= 2 && radix <= 36);
 
 	if (!hcl_isint(hcl,num)) goto oops_einval;
@@ -3980,7 +4006,7 @@ hcl_oop_t hcl_inttostr (hcl_t* hcl, hcl_oop_t num, int radix, int ngc)
 			xbuf = hcl->inttostr.xbuf.ptr;
 		}
 
-		xlen = oow_to_text(hcl, w, radix, xbuf);
+		xlen = oow_to_text(hcl, w, orgradix, xbuf);
 		if (v < 0) xbuf[xlen++] = '-';
 
 		reverse_string (xbuf, xlen);
@@ -4144,7 +4170,7 @@ hcl_oop_t hcl_inttostr (hcl_t* hcl, hcl_oop_t num, int radix, int ngc)
 	#else
 	#	error UNSUPPORTED LIW BIT SIZE
 	#endif
-		seglen = oow_to_text (hcl, w, radix, &xbuf[xlen]);
+		seglen = oow_to_text (hcl, w, orgradix, &xbuf[xlen]);
 		xlen += seglen;
 		if (r == a) break; /* reached the last block */
 

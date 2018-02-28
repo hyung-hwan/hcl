@@ -724,6 +724,9 @@ void hcl_seterrufmtv (hcl_t* hcl, hcl_errnum_t errnum, const hcl_uch_t* fmt, va_
  * -------------------------------------------------------------------------- */
 
 #if 1
+
+
+#if 0
 static int put_formatted_chars (hcl_t* hcl, int mask, const hcl_ooch_t ch, hcl_oow_t len)
 {
 /* TODO: better error handling, buffering.
@@ -766,12 +769,12 @@ static int put_formatted_string (hcl_t* hcl, int mask, const hcl_ooch_t* ptr, hc
 	if (n == 0) return 0; /* eof. stop printing */
 	return 1; /* success */
 }
-
+#endif
 
 #define PRINT_OOCH(c,n) do { \
 	if (n > 0) { \
 		int xx; \
-		if ((xx = put_formatted_chars(hcl, data->mask, c, n)) <= -1) goto oops; \
+		if ((xx = put_prch(hcl, data->mask, c, n)) <= -1) goto oops; \
 		if (xx == 0) goto done; \
 		data->count += n; \
 	} \
@@ -780,7 +783,7 @@ static int put_formatted_string (hcl_t* hcl, int mask, const hcl_ooch_t* ptr, hc
 #define PRINT_OOCS(ptr,len) do { \
 	if (len > 0) { \
 		int xx; \
-		if ((xx = put_formatted_string(hcl, data->mask, ptr, len)) <= -1) goto oops; \
+		if ((xx = put_prcs(hcl, data->mask, ptr, len)) <= -1) goto oops; \
 		if (xx == 0) goto done; \
 		data->count += len; \
 	} \
@@ -789,17 +792,15 @@ static int put_formatted_string (hcl_t* hcl, int mask, const hcl_ooch_t* ptr, hc
 static HCL_INLINE int print_formatted (hcl_t* hcl, hcl_ooi_t nargs, hcl_fmtout_t* data)
 {
 	hcl_oop_char_t fmtoop;
+	hcl_ooch_t* fmt, * fmtend;
+	const hcl_ooch_t* checkpoint, * percent;
 
-	//hcl_bch_t nbuf[MAXNBUF], bch;
 	int n, base, neg, sign;
 	hcl_ooi_t tmp, width, precision;
 	hcl_ooch_t ch, padc, ooch;
 	int lm_flag, lm_dflag, flagc;
 	hcl_uintmax_t num = 0;
 	int stop = 0;
-
-	hcl_ooch_t* fmt, * fmtend;
-	const hcl_ooch_t* checkpoint, * percent;
 
 	hcl_oop_t arg;
 	hcl_ooi_t argidx = 0;
@@ -833,7 +834,6 @@ static HCL_INLINE int print_formatted (hcl_t* hcl, hcl_ooi_t nargs, hcl_fmtout_t
 		neg = 0; sign = 0;
 
 		lm_flag = 0; lm_dflag = 0; flagc = 0; 
-		//sprintn = sprintn_lower;
 
 reswitch:
 		switch (ch = *fmt++) 
@@ -963,9 +963,10 @@ reswitch:
 			base = 10;
 			goto number;
 		case 'X':
-			//sprintn = sprintn_upper; /* TODO: handle this */
-		case 'x':
 			base = 16;
+			goto number;
+		case 'x':
+			base = -16;
 			goto number;
 		case 'b':
 			base = 2;
@@ -979,7 +980,6 @@ reswitch:
 			/* zeropad must not take effect for 'c' */
 			if (flagc & FLAGC_ZEROPAD) padc = ' '; 
 
-			//bch = HCL_SIZEOF(hcl_bch_t) < HCL_SIZEOF(int)? va_arg(ap, int): va_arg(ap, hcl_bch_t);
 			arg = HCL_STACK_GETARG(hcl, nargs, argidx); argidx++;
 			if (!HCL_OOP_IS_CHAR(arg))
 			{
@@ -1038,7 +1038,7 @@ reswitch:
 			arg = HCL_STACK_GETARG(hcl, nargs, argidx); argidx++;
 
 			if (HCL_OOP_IS_CHAR(arg)) arg = HCL_SMOOI_TO_OOP(HCL_OOP_TO_CHAR(arg));
-			
+
 			if (!hcl_inttostr(hcl, arg, base, -1)) 
 			{
 				hcl_seterrbfmt (hcl, HCL_EINVAL, "not a valid number - %O", arg);
@@ -1116,7 +1116,7 @@ reswitch:
 				PRINT_OOCH (padc, width);
 			}
 
-			//while (*nbufp) PRINT_OOCH (*nbufp--, 1); /* output actual digits */
+			/*while (*nbufp) PRINT_OOCH (*nbufp--, 1);*/ /* output actual digits */
 			PRINT_OOCS (nsptr, nslen);
 
 			if ((flagc & FLAGC_LEFTADJ) && width > 0 && (width -= tmp) > 0)
@@ -1158,10 +1158,11 @@ oops:
 	return -1;
 }
 
-int hcl_print_formatted (hcl_t* hcl, hcl_ooi_t nargs)
+int hcl_printfmt (hcl_t* hcl, hcl_ooi_t nargs)
 {
 	hcl_fmtout_t fo;
 	HCL_MEMSET (&fo, 0, HCL_SIZEOF(fo));
-	return print_formatted (hcl, nargs, &fo);
+	return print_formatted(hcl, nargs, &fo);
 }
+
 #endif

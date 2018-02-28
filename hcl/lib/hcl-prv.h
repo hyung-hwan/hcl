@@ -1063,6 +1063,10 @@ int hcl_outfmtobj (
 	hcl_outbfmt_t outbfmt
 );
 
+int hcl_printfmt (
+	hcl_t*    hcl,
+	hcl_ooi_t nargs
+);
 
 #if defined(__cplusplus)
 }

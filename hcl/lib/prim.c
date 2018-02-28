@@ -394,7 +394,7 @@ static hcl_pfrc_t pf_printf (hcl_t* hcl, hcl_mod_t* mod, hcl_ooi_t nargs)
 		return HCL_PF_SUCCESS;
 	}
 
-	if (hcl_print_formatted(hcl, nargs) <= -1)
+	if (hcl_printfmt(hcl, nargs) <= -1)
 	{
 		HCL_STACK_SETRETTOERRNUM (hcl, nargs);
 	}
