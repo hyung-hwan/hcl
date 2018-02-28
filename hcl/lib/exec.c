@@ -960,7 +960,8 @@ static HCL_INLINE int call_primitive (hcl_t* hcl, hcl_ooi_t nargs)
 	hcl_oop_word_t rcv;
 
 	rcv = (hcl_oop_word_t)HCL_STACK_GETRCV(hcl, nargs);
-	HCL_ASSERT (hcl, HCL_IS_PRIM (hcl, rcv));
+	HCL_ASSERT (hcl, HCL_IS_PRIM(hcl, rcv));
+	HCL_ASSERT (hcl, HCL_OBJ_GET_SIZE(rcv) == 4);
 
 	if (nargs < rcv->slot[1] && nargs > rcv->slot[2])
 	{
@@ -972,7 +973,7 @@ static HCL_INLINE int call_primitive (hcl_t* hcl, hcl_ooi_t nargs)
 		return -1;
 	}
 
-	return ((hcl_pfimpl_t)rcv->slot[0]) (hcl, (hcl_mod_t*)rcv->slot[4], nargs);
+	return ((hcl_pfimpl_t)rcv->slot[0]) (hcl, (hcl_mod_t*)rcv->slot[3], nargs);
 }
 
 /* ------------------------------------------------------------------------- */

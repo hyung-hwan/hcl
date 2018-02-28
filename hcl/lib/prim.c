@@ -49,7 +49,7 @@ hcl_oop_t hcl_makeprim (hcl_t* hcl, hcl_pfimpl_t primimpl, hcl_oow_t minargs, hc
 		obj->slot[0] = (hcl_oow_t)primimpl;
 		obj->slot[1] = minargs;
 		obj->slot[2] = maxargs;
-		obj->slot[4] = (hcl_oow_t)mod;
+		obj->slot[3] = (hcl_oow_t)mod;
 	}
 
 	return (hcl_oop_t)obj;
