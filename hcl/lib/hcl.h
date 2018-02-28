@@ -1720,6 +1720,18 @@ HCL_EXPORT hcl_oop_t hcl_oowtoint (
 	hcl_oow_t  w
 );
 
+
+HCL_EXPORT int hcl_inttoooi (
+	hcl_t*     hcl,
+	hcl_oop_t  x,
+	hcl_ooi_t* i
+);
+
+HCL_EXPORT hcl_oop_t hcl_ooitoint (
+	hcl_t*    hcl,
+	hcl_ooi_t i
+);
+
 /* =========================================================================
  * CONS OBJECT UTILITIES
  * ========================================================================= */

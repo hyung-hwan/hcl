@@ -331,14 +331,18 @@ typedef struct hcl_bcs_t hcl_bcs_t;
 
 #if defined(HCL_ENABLE_UNICODE)
 	typedef hcl_uch_t               hcl_ooch_t;
+	typedef hcl_uchu_t              hcl_oochu_t;
 	typedef hcl_uci_t               hcl_ooci_t;
 	typedef hcl_ucs_t               hcl_oocs_t;
 #	define HCL_OOCH_IS_UCH
+#	define HCL_SIZEOF_OOCH_T HCL_SIZEOF_UCH_T
 #else
 	typedef hcl_bch_t               hcl_ooch_t;
+	typedef hcl_bchu_t              hcl_oochu_t;
 	typedef hcl_bci_t               hcl_ooci_t;
 	typedef hcl_bcs_t               hcl_oocs_t;
 #	define HCL_OOCH_IS_BCH
+#	define HCL_SIZEOF_OOCH_T HCL_SIZEOF_BCH_T
 #endif
 
 /* =========================================================================

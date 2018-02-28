@@ -394,9 +394,16 @@ static hcl_pfrc_t pf_printf (hcl_t* hcl, hcl_mod_t* mod, hcl_ooi_t nargs)
 		return HCL_PF_SUCCESS;
 	}
 
-//	print_formatted (hcl, nargs);
+	if (hcl_print_formatted(hcl, nargs) <= -1)
+	{
+		HCL_STACK_SETRETTOERRNUM (hcl, nargs);
+	}
+	else
+	{
+/* TODO: better return code? */
+		HCL_STACK_SETRET (hcl, nargs, hcl->_nil);
+	}
 
-	HCL_STACK_SETRET (hcl, nargs, hcl->_nil);
 	return HCL_PF_SUCCESS;
 }
 

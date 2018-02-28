@@ -113,14 +113,18 @@ static struct
 	{  12, { '#','<','S','E','M','A','P','H','O','R','E','>' } }
 };
 
-
 static HCL_INLINE int print_single_char (hcl_t* hcl, int mask, hcl_ooch_t ch, hcl_outbfmt_t outbfmt)
 {
-	if (ch < ' ') 
+	hcl_oochu_t chu = (hcl_oochu_t)ch;
+#if defined(HCL_OOCH_IS_UCH)
+	if (chu < ' ') 
+#else
+	if (chu < ' ' || chu >= 0x80) 
+#endif
 	{
 		hcl_ooch_t escaped;
 
-		switch (ch)
+		switch (chu)
 		{
 			case '\0':
 				escaped = '0';
@@ -153,7 +157,7 @@ static HCL_INLINE int print_single_char (hcl_t* hcl, int mask, hcl_ooch_t ch, hc
 
 		if (escaped == ch)
 		{
-			if (outbfmt(hcl, mask, "\\x%X", ch) <= -1) return -1;
+			if (outbfmt(hcl, mask, "\\x%X", chu) <= -1) return -1;
 		}
 		else
 		{

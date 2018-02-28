@@ -803,6 +803,7 @@ static int get_sharp_token (hcl_t* hcl)
 								"invalid hexadecimal character in %.*js", TOKEN_NAME_LEN(hcl), TOKEN_NAME_PTR(hcl));
 							return -1;
 						}
+/* TODO: check for the max charcter value and raise an error... */
 						c = c * 16 + CHAR_TO_NUM(hcl->c->tok.name.ptr[i], 16); /* don't care if it is for 'p' */
 					}
 				}
