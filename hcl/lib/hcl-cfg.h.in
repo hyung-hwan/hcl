@@ -327,6 +327,9 @@
 /* sizeof(__uint128_t) */
 #undef HCL_SIZEOF___UINT128_T
 
+/* Unicode character type size */
+#undef HCL_UNICODE_SIZE
+
 /* Define to the sub-directory where libtool stores uninstalled libraries. */
 #undef LT_OBJDIR
 

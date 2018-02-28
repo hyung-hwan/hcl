@@ -280,7 +280,7 @@ typedef unsigned char           hcl_bchu_t; /* unsigned version of hcl_bch_t for
 #define HCL_SIZEOF_BCH_T HCL_SIZEOF_CHAR
 #define HCL_SIZEOF_BCI_T HCL_SIZEOF_INT
 
-#if defined(HCL_ENABLE_UNICODE) && (HCL_ENABLE_UNICODE == 4)
+#if defined(HCL_UNICODE_SIZE) && (HCL_UNICODE_SIZE >= 4)
 #	if defined(__GNUC__) && defined(__CHAR32_TYPE__)
 	typedef __CHAR32_TYPE__    hcl_uch_t;
 #	else

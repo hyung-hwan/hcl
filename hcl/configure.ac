@@ -409,19 +409,30 @@ else
 fi
 
 AC_ARG_ENABLE([unicode], 
-	[AS_HELP_STRING([--enable-unicode],[Use the unicode character type as the default character type. one of yes, no, ucs2, ucs4 (default. yes)])],
+	[AS_HELP_STRING([--enable-unicode],[Use the unicode character type as the default character type. one of yes, no, yes:2, yes:4, no:2, no:4 (default. yes)])],
 	enable_unicode=$enableval,
 	enable_unicode=yes
 )
-if test "${enable_unicode}" = "yes"
+if test "${enable_unicode}" = "yes:4"
 then
-	AC_DEFINE([HCL_ENABLE_UNICODE],[1],[Use the unicode character type as the default character type])	
-elif test "${enable_unicode}" = "ucs2"
+	AC_DEFINE([HCL_UNICODE_SIZE],[4],[Unicode character type size])
+	AC_DEFINE([HCL_ENABLE_UNICODE],[1],[Use the unicode character type as the default character type])
+elif test "${enable_unicode}" = "yes:2"
 then
-	AC_DEFINE([HCL_ENABLE_UNICODE],[2],[Use the unicode character type as the default character type])	
-elif test "${enable_unicode}" = "ucs4"
+	AC_DEFINE([HCL_UNICODE_SIZE],[2],[Unicode character type size])
+	AC_DEFINE([HCL_ENABLE_UNICODE],[1],[Use the unicode character type as the default character type])
+elif test "${enable_unicode}" = "yes"
 then
-	AC_DEFINE([HCL_ENABLE_UNICODE],[4],[Use the unicode character type as the default character type])	
+	AC_DEFINE([HCL_UNICODE_SIZE],[1],[Unicode character type size])
+	AC_DEFINE([HCL_ENABLE_UNICODE],[1],[Use the unicode character type as the default character type])
+elif test "${enable_unicode}" = "no:4"
+then
+	AC_DEFINE([HCL_UNICODE_SIZE],[4],[Unicode character type size])
+elif test "${enable_unicode}" = "no:2"
+then
+	AC_DEFINE([HCL_UNICODE_SIZE],[2],[Unicode character type size])
+else
+	AC_DEFINE([HCL_UNICODE_SIZE],[1],[Unicode character type size])
 fi
 
 AC_ARG_ENABLE([cxx], 
