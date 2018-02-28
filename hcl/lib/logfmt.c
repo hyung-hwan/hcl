@@ -789,7 +789,6 @@ static int put_formatted_string (hcl_t* hcl, int mask, const hcl_ooch_t* ptr, hc
 static HCL_INLINE int print_formatted (hcl_t* hcl, hcl_ooi_t nargs, hcl_fmtout_t* data)
 {
 	hcl_oop_char_t fmtoop;
-	hcl_ooi_t i;
 
 	//hcl_bch_t nbuf[MAXNBUF], bch;
 	int n, base, neg, sign;
@@ -813,6 +812,7 @@ static HCL_INLINE int print_formatted (hcl_t* hcl, hcl_ooi_t nargs, hcl_fmtout_t
 
 	data->count = 0;
 
+/* TODO: traverse until fmtend... */
 	while (1)
 	{
 		checkpoint = fmt;
@@ -949,29 +949,6 @@ reswitch:
 				flagc |= FLAGC_WIDTH;
 			}
 			goto reswitch;
-
-#if 0
-		case 'n': /* number of characters printed so far */
-			if (lm_flag & LF_J) /* j */
-				*(va_arg(ap, hcl_intmax_t*)) = data->count;
-			else if (lm_flag & LF_Z) /* z */
-				*(va_arg(ap, hcl_ooi_t*)) = data->count;
-		#if (HCL_SIZEOF_LONG_LONG > 0)
-			else if (lm_flag & LF_Q) /* ll */
-				*(va_arg(ap, long long int*)) = data->count;
-		#endif
-			else if (lm_flag & LF_L) /* l */
-				*(va_arg(ap, long int*)) = data->count;
-			else if (lm_flag & LF_H) /* h */
-				*(va_arg(ap, short int*)) = data->count;
-			else if (lm_flag & LF_C) /* hh */
-				*(va_arg(ap, char*)) = data->count;
-			else if (flagc & FLAGC_LENMOD) 
-				goto invalid_format;
-			else
-				*(va_arg(ap, int*)) = data->count;
-			break;
-#endif
  
 		/* integer conversions */
 		case 'd':
@@ -986,7 +963,7 @@ reswitch:
 			base = 10;
 			goto number;
 		case 'X':
-			//sprintn = sprintn_upper;
+			//sprintn = sprintn_upper; /* TODO: handle this */
 		case 'x':
 			base = 16;
 			goto number;
