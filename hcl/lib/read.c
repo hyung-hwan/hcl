@@ -2077,9 +2077,10 @@ static int read_object (hcl_t* hcl)
 				if (obj)
 				{
 					hcl_pfbase_t* pfbase;
+					hcl_mod_t* mod;
 					hcl_oop_t prim;
 
-					pfbase = hcl_querymod(hcl, TOKEN_NAME_PTR(hcl), TOKEN_NAME_LEN(hcl));
+					pfbase = hcl_querymod(hcl, TOKEN_NAME_PTR(hcl), TOKEN_NAME_LEN(hcl), &mod);
 					if (!pfbase)
 					{
 						/* TODO switch to syntax error */
@@ -2087,7 +2088,7 @@ static int read_object (hcl_t* hcl)
 					}
 
 					hcl_pushtmp (hcl, &obj);
-					prim = hcl_makeprim(hcl, pfbase->handler, pfbase->minargs, pfbase->maxargs);
+					prim = hcl_makeprim(hcl, pfbase->handler, pfbase->minargs, pfbase->maxargs, mod);
 
 					if (!prim || !hcl_putatsysdic(hcl, obj, prim))
 					{

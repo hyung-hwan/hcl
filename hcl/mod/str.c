@@ -27,7 +27,7 @@
 
 #include "_str.h"
 
-static hcl_pfrc_t pf_str_length (hcl_t* hcl, hcl_ooi_t nargs)
+static hcl_pfrc_t pf_str_length (hcl_t* hcl, hcl_mod_t* mod, hcl_ooi_t nargs)
 {
 	hcl_oop_t str;
 	hcl_ooi_t size;

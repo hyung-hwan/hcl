@@ -27,7 +27,7 @@
 
 #include "_arr.h"
 
-static hcl_pfrc_t pf_arr_get (hcl_t* hcl, hcl_ooi_t nargs)
+static hcl_pfrc_t pf_arr_get (hcl_t* hcl, hcl_mod_t* mod, hcl_ooi_t nargs)
 {
 	hcl_oop_oop_t arr;
 	hcl_oop_t idx;
@@ -54,7 +54,7 @@ static hcl_pfrc_t pf_arr_get (hcl_t* hcl, hcl_ooi_t nargs)
 	return HCL_PF_SUCCESS;
 }
 
-static hcl_pfrc_t pf_arr_put (hcl_t* hcl, hcl_ooi_t nargs)
+static hcl_pfrc_t pf_arr_put (hcl_t* hcl, hcl_mod_t* mod, hcl_ooi_t nargs)
 {
 	hcl_oop_oop_t arr;
 	hcl_oop_t idx, val;
@@ -83,7 +83,7 @@ static hcl_pfrc_t pf_arr_put (hcl_t* hcl, hcl_ooi_t nargs)
 	return HCL_PF_SUCCESS;
 }
 
-static hcl_pfrc_t pf_arr_size (hcl_t* hcl, hcl_ooi_t nargs)
+static hcl_pfrc_t pf_arr_size (hcl_t* hcl, hcl_mod_t* mod, hcl_ooi_t nargs)
 {
 	hcl_oop_oop_t arr;
 	hcl_oop_t size;

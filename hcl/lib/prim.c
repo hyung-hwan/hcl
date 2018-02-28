@@ -39,16 +39,17 @@ typedef struct pf_t pf_t;
 
 /* ------------------------------------------------------------------------- */
 
-hcl_oop_t hcl_makeprim (hcl_t* hcl, hcl_pfimpl_t primimpl, hcl_oow_t minargs, hcl_oow_t maxargs)
+hcl_oop_t hcl_makeprim (hcl_t* hcl, hcl_pfimpl_t primimpl, hcl_oow_t minargs, hcl_oow_t maxargs, hcl_mod_t* mod)
 {
 	hcl_oop_word_t obj;
 
-	obj = (hcl_oop_word_t)hcl_allocwordobj (hcl, HCL_BRAND_PRIM, HCL_NULL, 3);
+	obj = (hcl_oop_word_t)hcl_allocwordobj (hcl, HCL_BRAND_PRIM, HCL_NULL, 4);
 	if (obj)
 	{
 		obj->slot[0] = (hcl_oow_t)primimpl;
 		obj->slot[1] = minargs;
 		obj->slot[2] = maxargs;
+		obj->slot[4] = (hcl_oow_t)mod;
 	}
 
 	return (hcl_oop_t)obj;
@@ -94,7 +95,7 @@ start_over:
 	}
 }
 
-static hcl_pfrc_t pf_log (hcl_t* hcl, hcl_ooi_t nargs)
+static hcl_pfrc_t pf_log (hcl_t* hcl, hcl_mod_t* mod, hcl_ooi_t nargs)
 {
 /* TODO: accept log level */
 	hcl_oop_t msg;
@@ -166,7 +167,7 @@ static hcl_pfrc_t pf_log (hcl_t* hcl, hcl_ooi_t nargs)
 	return HCL_PF_SUCCESS;
 }
 
-static hcl_pfrc_t pf_gc (hcl_t* hcl, hcl_ooi_t nargs)
+static hcl_pfrc_t pf_gc (hcl_t* hcl, hcl_mod_t* mod, hcl_ooi_t nargs)
 {
 	hcl_gc (hcl);
 	HCL_STACK_SETRET (hcl, nargs, hcl->_nil);
@@ -174,7 +175,7 @@ static hcl_pfrc_t pf_gc (hcl_t* hcl, hcl_ooi_t nargs)
 }
 
 /* ------------------------------------------------------------------------- */
-static hcl_pfrc_t pf_eqv (hcl_t* hcl, hcl_ooi_t nargs)
+static hcl_pfrc_t pf_eqv (hcl_t* hcl, hcl_mod_t* mod, hcl_ooi_t nargs)
 {
 	hcl_oop_t a0, a1, rv;
 
@@ -187,7 +188,7 @@ static hcl_pfrc_t pf_eqv (hcl_t* hcl, hcl_ooi_t nargs)
 	return HCL_PF_SUCCESS;
 }
 
-static hcl_pfrc_t pf_eql (hcl_t* hcl, hcl_ooi_t nargs)
+static hcl_pfrc_t pf_eql (hcl_t* hcl, hcl_mod_t* mod, hcl_ooi_t nargs)
 {
 	int n;
 	n = hcl_equalobjs(hcl, HCL_STACK_GETARG(hcl, nargs, 0), HCL_STACK_GETARG(hcl, nargs, 1));
@@ -197,7 +198,7 @@ static hcl_pfrc_t pf_eql (hcl_t* hcl, hcl_ooi_t nargs)
 	return HCL_PF_SUCCESS;
 }
 
-static hcl_pfrc_t pf_eqk (hcl_t* hcl, hcl_ooi_t nargs)
+static hcl_pfrc_t pf_eqk (hcl_t* hcl, hcl_mod_t* mod, hcl_ooi_t nargs)
 {
 	/* equal kind? */
 	hcl_oop_t a0, a1, rv;
@@ -211,7 +212,7 @@ static hcl_pfrc_t pf_eqk (hcl_t* hcl, hcl_ooi_t nargs)
 	return HCL_PF_SUCCESS;
 }
 
-static hcl_pfrc_t pf_not (hcl_t* hcl, hcl_ooi_t nargs)
+static hcl_pfrc_t pf_not (hcl_t* hcl, hcl_mod_t* mod, hcl_ooi_t nargs)
 {
 	hcl_oop_t arg, rv;
 
@@ -228,7 +229,7 @@ static hcl_pfrc_t pf_not (hcl_t* hcl, hcl_ooi_t nargs)
 	return HCL_PF_SUCCESS;
 }
 
-static hcl_pfrc_t pf_and (hcl_t* hcl, hcl_ooi_t nargs)
+static hcl_pfrc_t pf_and (hcl_t* hcl, hcl_mod_t* mod, hcl_ooi_t nargs)
 {
 	hcl_oop_t arg, rv;
 	hcl_ooi_t i;
@@ -257,7 +258,7 @@ static hcl_pfrc_t pf_and (hcl_t* hcl, hcl_ooi_t nargs)
 	return HCL_PF_SUCCESS;
 }
 
-static hcl_pfrc_t pf_or (hcl_t* hcl, hcl_ooi_t nargs)
+static hcl_pfrc_t pf_or (hcl_t* hcl, hcl_mod_t* mod, hcl_ooi_t nargs)
 {
 	hcl_oop_t arg, rv;
 	hcl_ooi_t i;
@@ -288,7 +289,7 @@ static hcl_pfrc_t pf_or (hcl_t* hcl, hcl_ooi_t nargs)
 
 /* ------------------------------------------------------------------------- */
 
-static hcl_pfrc_t pf_integer_add (hcl_t* hcl, hcl_ooi_t nargs)
+static hcl_pfrc_t pf_integer_add (hcl_t* hcl, hcl_mod_t* mod, hcl_ooi_t nargs)
 {
 	hcl_ooi_t i;
 	hcl_oop_t arg, ret;
@@ -305,7 +306,7 @@ static hcl_pfrc_t pf_integer_add (hcl_t* hcl, hcl_ooi_t nargs)
 	return HCL_PF_SUCCESS;
 }
 
-static hcl_pfrc_t pf_integer_sub (hcl_t* hcl, hcl_ooi_t nargs)
+static hcl_pfrc_t pf_integer_sub (hcl_t* hcl, hcl_mod_t* mod, hcl_ooi_t nargs)
 {
 	hcl_ooi_t i;
 	hcl_oop_t arg, ret;
@@ -322,7 +323,7 @@ static hcl_pfrc_t pf_integer_sub (hcl_t* hcl, hcl_ooi_t nargs)
 	return HCL_PF_SUCCESS;
 }
 
-static hcl_pfrc_t pf_integer_mul (hcl_t* hcl, hcl_ooi_t nargs)
+static hcl_pfrc_t pf_integer_mul (hcl_t* hcl, hcl_mod_t* mod, hcl_ooi_t nargs)
 {
 	hcl_ooi_t i;
 	hcl_oop_t arg, ret;
@@ -339,7 +340,7 @@ static hcl_pfrc_t pf_integer_mul (hcl_t* hcl, hcl_ooi_t nargs)
 	return HCL_PF_SUCCESS;
 }
 
-static hcl_pfrc_t pf_integer_quo (hcl_t* hcl, hcl_ooi_t nargs)
+static hcl_pfrc_t pf_integer_quo (hcl_t* hcl, hcl_mod_t* mod, hcl_ooi_t nargs)
 {
 	hcl_ooi_t i;
 	hcl_oop_t arg, ret;
@@ -356,7 +357,7 @@ static hcl_pfrc_t pf_integer_quo (hcl_t* hcl, hcl_ooi_t nargs)
 	return HCL_PF_SUCCESS;
 }
 
-static hcl_pfrc_t pf_integer_rem (hcl_t* hcl, hcl_ooi_t nargs)
+static hcl_pfrc_t pf_integer_rem (hcl_t* hcl, hcl_mod_t* mod, hcl_ooi_t nargs)
 {
 	hcl_ooi_t i;
 	hcl_oop_t arg, ret, rem;
@@ -377,7 +378,7 @@ static hcl_pfrc_t pf_integer_rem (hcl_t* hcl, hcl_ooi_t nargs)
 /* ------------------------------------------------------------------------- */
 
 
-static hcl_pfrc_t pf_printf (hcl_t* hcl, hcl_ooi_t nargs)
+static hcl_pfrc_t pf_printf (hcl_t* hcl, hcl_mod_t* mod, hcl_ooi_t nargs)
 {
 	hcl_oop_char_t fmt;
 
@@ -444,7 +445,7 @@ int hcl_addbuiltinprims (hcl_t* hcl)
 
 	for (i = 0; i < HCL_COUNTOF(builtin_prims); i++)
 	{
-		prim = hcl_makeprim(hcl, builtin_prims[i].impl, builtin_prims[i].minargs, builtin_prims[i].maxargs);
+		prim = hcl_makeprim(hcl, builtin_prims[i].impl, builtin_prims[i].minargs, builtin_prims[i].maxargs, HCL_NULL);
 		if (!prim) return -1;
 
 		hcl_pushtmp (hcl, &prim);

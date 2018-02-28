@@ -1623,7 +1623,6 @@ int main (int argc, char* argv[])
 			else
 			{
 				hcl_logbfmt (hcl, HCL_LOG_STDERR, "ERROR: cannot read object - [%d] %js\n", hcl_geterrnum(hcl), hcl_geterrmsg(hcl));
-				
 			}
 			goto oops;
 		}

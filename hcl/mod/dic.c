@@ -27,7 +27,7 @@
 
 #include "_dic.h"
 
-static hcl_pfrc_t pf_dic_get (hcl_t* hcl, hcl_ooi_t nargs)
+static hcl_pfrc_t pf_dic_get (hcl_t* hcl, hcl_mod_t* mod, hcl_ooi_t nargs)
 {
 	hcl_oop_t dic;
 	hcl_oop_t key;
@@ -54,7 +54,7 @@ static hcl_pfrc_t pf_dic_get (hcl_t* hcl, hcl_ooi_t nargs)
 }
 
 
-static hcl_pfrc_t pf_dic_put (hcl_t* hcl, hcl_ooi_t nargs)
+static hcl_pfrc_t pf_dic_put (hcl_t* hcl, hcl_mod_t* mod, hcl_ooi_t nargs)
 {
 	hcl_oop_t dic;
 	hcl_oop_t key, val;
@@ -88,7 +88,7 @@ static int walker (hcl_t* hcl, hcl_oop_dic_t dic, hcl_oop_cons_t pair, void* ctx
 	return 0;
 }
 
-static hcl_pfrc_t pf_dic_walk (hcl_t* hcl, hcl_ooi_t nargs)
+static hcl_pfrc_t pf_dic_walk (hcl_t* hcl, hcl_mod_t* mod, hcl_ooi_t nargs)
 {
 /* TODO: write a proper function 
  * (dic.apply #{ ... } callable-or-lambda)

@@ -35,6 +35,10 @@
 
 /* ========================================================================== */
 
+typedef struct hcl_mod_t hcl_mod_t;
+
+/* ========================================================================== */
+
 /**
  * The hcl_errnum_t type defines the error codes.
  */
@@ -835,7 +839,10 @@ enum hcl_pfrc_t
 };
 typedef enum hcl_pfrc_t hcl_pfrc_t;
 
-typedef hcl_pfrc_t (*hcl_pfimpl_t) (hcl_t* hcl, hcl_ooi_t nargs);
+typedef hcl_pfrc_t (*hcl_pfimpl_t) (
+	hcl_t*     hcl,
+	hcl_mod_t* mod,
+	hcl_ooi_t  nargs);
 
 
 typedef struct hcl_pfbase_t hcl_pfbase_t;
@@ -857,8 +864,6 @@ struct hcl_pfinfo_t
  * PRIMITIVE MODULE MANIPULATION
  * ========================================================================= */
 #define HCL_MOD_NAME_LEN_MAX 120
-
-typedef struct hcl_mod_t hcl_mod_t;
 
 typedef int (*hcl_mod_load_t) (
 	hcl_t*     hcl,
@@ -1692,7 +1697,8 @@ HCL_EXPORT hcl_oop_t hcl_makeprim (
 	hcl_t*          hcl,
 	hcl_pfimpl_t    primimpl,
 	hcl_oow_t       minargs,
-	hcl_oow_t       maxargs
+	hcl_oow_t       maxargs,
+	hcl_mod_t*      mod
 );
 
 

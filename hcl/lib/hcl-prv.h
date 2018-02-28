@@ -1028,7 +1028,8 @@ void hcl_closemod (
 hcl_pfbase_t* hcl_querymod (
 	hcl_t*            hcl,
 	const hcl_ooch_t* pfid,
-	hcl_oow_t         pfidlen
+	hcl_oow_t         pfidlen,
+	hcl_mod_t**       mod
 );
 
 /* ========================================================================= */

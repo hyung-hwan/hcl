@@ -619,7 +619,7 @@ void hcl_closemod (hcl_t* hcl, hcl_mod_data_t* mdp)
 	}
 }
 
-hcl_pfbase_t* hcl_querymod (hcl_t* hcl, const hcl_ooch_t* pfid, hcl_oow_t pfidlen)
+hcl_pfbase_t* hcl_querymod (hcl_t* hcl, const hcl_ooch_t* pfid, hcl_oow_t pfidlen, hcl_mod_t** mod)
 {
 	/* primitive function identifier
 	 *   _funcname
@@ -650,7 +650,7 @@ hcl_pfbase_t* hcl_querymod (hcl_t* hcl, const hcl_ooch_t* pfid, hcl_oow_t pfidle
 	 * module id. the last segment is the primitive function name.
 	 * for instance, in con.window.open, con.window is a module id and
 	 * open is the primitive function name. */
-	pair = hcl_rbt_search (&hcl->modtab, pfid, mod_name_len);
+	pair = hcl_rbt_search(&hcl->modtab, pfid, mod_name_len);
 	if (pair)
 	{
 		mdp = (hcl_mod_data_t*)HCL_RBT_VPTR(pair);
@@ -659,17 +659,19 @@ hcl_pfbase_t* hcl_querymod (hcl_t* hcl, const hcl_ooch_t* pfid, hcl_oow_t pfidle
 	else
 	{
 		/* open a module using the part before the last period */
-		mdp = hcl_openmod (hcl, pfid, mod_name_len);
+		mdp = hcl_openmod(hcl, pfid, mod_name_len);
 		if (!mdp) return HCL_NULL;
 	}
 
-	if ((pfbase = mdp->mod.query (hcl, &mdp->mod, sep + 1, pfidlen - mod_name_len - 1)) == HCL_NULL) 
+	if ((pfbase = mdp->mod.query(hcl, &mdp->mod, sep + 1, pfidlen - mod_name_len - 1)) == HCL_NULL) 
 	{
 		/* the primitive function is not found. but keep the module open even if it's opened above */
 		HCL_DEBUG3 (hcl, "Cannot find a primitive function [%.*js] in a module [%js]\n", pfidlen - mod_name_len - 1, sep + 1, mdp->mod.name);
 		hcl_seterrbfmt (hcl, HCL_ENOENT, "unable to find a primitive function [%.*js] in a module [%js]", pfidlen - mod_name_len - 1, sep + 1, mdp->mod.name);
 		return HCL_NULL;
 	}
+
+	*mod = &mdp->mod;
 
 	HCL_DEBUG4 (hcl, "Found a primitive function [%.*js] in a module [%js] - %p\n",
 		pfidlen - mod_name_len - 1, sep + 1, mdp->mod.name, pfbase);
