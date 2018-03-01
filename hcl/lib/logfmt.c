@@ -192,7 +192,6 @@ static int put_ooch (hcl_t* hcl, int mask, hcl_ooch_t ch, hcl_oow_t len)
 	if (hcl->log.len > 0 && hcl->log.last_mask != mask)
 	{
 		/* the mask has changed. commit the buffered text */
-
 /* TODO: HANDLE LINE ENDING CONVENTION BETTER... */
 		if (hcl->log.ptr[hcl->log.len - 1] != '\n')
 		{
@@ -725,7 +724,7 @@ void hcl_seterrufmtv (hcl_t* hcl, hcl_errnum_t errnum, const hcl_uch_t* fmt, va_
 #define PRINT_OOCH(c,n) do { \
 	if (n > 0) { \
 		int xx; \
-		if ((xx = put_prch(hcl, data->mask, c, n)) <= -1) goto oops; \
+		if ((xx = data->putch(hcl, data->mask, c, n)) <= -1) goto oops; \
 		if (xx == 0) goto done; \
 		data->count += n; \
 	} \
@@ -734,7 +733,7 @@ void hcl_seterrufmtv (hcl_t* hcl, hcl_errnum_t errnum, const hcl_uch_t* fmt, va_
 #define PRINT_OOCS(ptr,len) do { \
 	if (len > 0) { \
 		int xx; \
-		if ((xx = put_prcs(hcl, data->mask, ptr, len)) <= -1) goto oops; \
+		if ((xx = data->putcs(hcl, data->mask, ptr, len)) <= -1) goto oops; \
 		if (xx == 0) goto done; \
 		data->count += len; \
 	} \
@@ -751,7 +750,7 @@ void hcl_seterrufmtv (hcl_t* hcl, hcl_errnum_t errnum, const hcl_uch_t* fmt, va_
 	else { ch = *(fmt); (fmt)++; }\
 } while(0)
 	
-static HCL_INLINE int print_formatted (hcl_t* hcl, hcl_ooi_t nargs, hcl_fmtout_t* data)
+static HCL_INLINE int print_formatted (hcl_t* hcl, hcl_ooi_t nargs, hcl_fmtout_t* data, hcl_outbfmt_t outbfmt)
 {
 	const hcl_ooch_t* fmt, * fmtend;
 	const hcl_ooch_t* checkpoint, * percent;
@@ -772,6 +771,7 @@ static HCL_INLINE int print_formatted (hcl_t* hcl, hcl_ooi_t nargs, hcl_fmtout_t
 	arg = HCL_STACK_GETARG(hcl, nargs, 0);
 	if (!HCL_OOP_IS_POINTER(arg) || HCL_OBJ_GET_FLAGS_TYPE(arg) != HCL_OBJ_TYPE_CHAR)
 	{
+#if 0
 		hcl_ooi_t i;
 		/* if the first argument is not a valid formatting string, 
 		 * print all arguments as objects */
@@ -782,6 +782,7 @@ static HCL_INLINE int print_formatted (hcl_t* hcl, hcl_ooi_t nargs, hcl_fmtout_t
 			if (hcl_print(hcl, arg) <= -1) goto oops;
 		}
 		return 0;
+#endif
 	}
 
 	fmt = HCL_OBJ_GET_CHAR_SLOT(arg);
@@ -1000,7 +1001,7 @@ static HCL_INLINE int print_formatted (hcl_t* hcl, hcl_ooi_t nargs, hcl_fmtout_t
 
 		case 'O': /* object - ignore precision, width, adjustment */
 			GET_NEXT_ARG_TO (hcl, nargs, &arg_state, arg);
-			if (hcl_outfmtobj(hcl, 0, arg, hcl_proutbfmt) <= -1) goto oops;
+			if (hcl_outfmtobj(hcl, data->mask, arg, outbfmt) <= -1) goto oops;
 			break;
 
 		number:
@@ -1111,10 +1112,34 @@ oops:
 	return -1;
 }
 
-int hcl_printfmt (hcl_t* hcl, hcl_ooi_t nargs)
+int hcl_printfmtst (hcl_t* hcl, hcl_ooi_t nargs)
 {
 	hcl_fmtout_t fo;
 	HCL_MEMSET (&fo, 0, HCL_SIZEOF(fo));
-	return print_formatted(hcl, nargs, &fo);
+	fo.putch = put_prch;
+	fo.putcs = put_prcs;
+	return print_formatted(hcl, nargs, &fo, hcl_proutbfmt);
 }
 
+int hcl_logfmtst (hcl_t* hcl, hcl_ooi_t nargs)
+{
+	hcl_fmtout_t fo;
+
+	HCL_MEMSET (&fo, 0, HCL_SIZEOF(fo));
+	fo.mask = HCL_LOG_FATAL | HCL_LOG_APP;
+
+	if (hcl->log.default_type_mask & HCL_LOG_ALL_TYPES) 
+	{
+		/* if a type is given, it's not untyped any more.
+		 * mask off the UNTYPED bit */
+		fo.mask &= ~HCL_LOG_UNTYPED; 
+
+		/* if the default_type_mask has the UNTYPED bit on,
+		 * it'll get turned back on */
+		fo.mask |= (hcl->log.default_type_mask & HCL_LOG_ALL_TYPES);
+	}
+
+	fo.putch = put_ooch;
+	fo.putcs = put_oocs;
+	return print_formatted(hcl, nargs, &fo, hcl_logbfmt);
+}

@@ -1053,7 +1053,12 @@ int hcl_outfmtobj (
 	hcl_outbfmt_t outbfmt
 );
 
-int hcl_printfmt (
+int hcl_printfmtst (
+	hcl_t*    hcl,
+	hcl_ooi_t nargs
+);
+
+int hcl_logfmtst (
 	hcl_t*    hcl,
 	hcl_ooi_t nargs
 );

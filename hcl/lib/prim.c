@@ -167,6 +167,37 @@ static hcl_pfrc_t pf_log (hcl_t* hcl, hcl_mod_t* mod, hcl_ooi_t nargs)
 	return HCL_PF_SUCCESS;
 }
 
+static hcl_pfrc_t pf_logf (hcl_t* hcl, hcl_mod_t* mod, hcl_ooi_t nargs)
+{
+	if (hcl_logfmtst(hcl, nargs) <= -1)
+	{
+		HCL_STACK_SETRETTOERRNUM (hcl, nargs);
+	}
+	else
+	{
+/* TODO: better return code? */
+		HCL_STACK_SETRET (hcl, nargs, hcl->_nil);
+	}
+
+	return HCL_PF_SUCCESS;
+}
+
+static hcl_pfrc_t pf_printf (hcl_t* hcl, hcl_mod_t* mod, hcl_ooi_t nargs)
+{
+	if (hcl_printfmtst(hcl, nargs) <= -1)
+	{
+		HCL_STACK_SETRETTOERRNUM (hcl, nargs);
+	}
+	else
+	{
+/* TODO: better return code? */
+		HCL_STACK_SETRET (hcl, nargs, hcl->_nil);
+	}
+
+	return HCL_PF_SUCCESS;
+}
+
+
 static hcl_pfrc_t pf_gc (hcl_t* hcl, hcl_mod_t* mod, hcl_ooi_t nargs)
 {
 	hcl_gc (hcl);
@@ -377,26 +408,12 @@ static hcl_pfrc_t pf_integer_rem (hcl_t* hcl, hcl_mod_t* mod, hcl_ooi_t nargs)
 
 /* ------------------------------------------------------------------------- */
 
-static hcl_pfrc_t pf_printf (hcl_t* hcl, hcl_mod_t* mod, hcl_ooi_t nargs)
-{
-	if (hcl_printfmt(hcl, nargs) <= -1)
-	{
-		HCL_STACK_SETRETTOERRNUM (hcl, nargs);
-	}
-	else
-	{
-/* TODO: better return code? */
-		HCL_STACK_SETRET (hcl, nargs, hcl->_nil);
-	}
-
-	return HCL_PF_SUCCESS;
-}
-
-/* ------------------------------------------------------------------------- */
-
 static pf_t builtin_prims[] =
 {
 	{ 0, HCL_TYPE_MAX(hcl_oow_t), pf_log,           3,  { 'l','o','g' } },
+	{ 1, HCL_TYPE_MAX(hcl_oow_t), pf_logf,          4,  { 'l','o','g','f' } },
+	{ 1, HCL_TYPE_MAX(hcl_oow_t), pf_printf,        6,  { 'p','r','i','n','t','f' } },
+
 	{ 0, 0,                       pf_gc,            2,  { 'g','c' } },
 
 	{ 1, 1,                       pf_not,           3,  { 'n','o','t' } }, 
@@ -424,8 +441,6 @@ static pf_t builtin_prims[] =
 	{ 1, HCL_TYPE_MAX(hcl_oow_t), pf_integer_mul,   1,  { '*' } },
 	{ 1, HCL_TYPE_MAX(hcl_oow_t), pf_integer_quo,   1,  { '/' } },
 	{ 2, HCL_TYPE_MAX(hcl_oow_t), pf_integer_rem,   3,  { 'm','o','d' } },
-
-	{ 1, HCL_TYPE_MAX(hcl_oow_t), pf_printf,        6,  { 'p','r','i','n','t','f' } },
 };
 
 
