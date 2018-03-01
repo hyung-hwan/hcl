@@ -722,54 +722,6 @@ void hcl_seterrufmtv (hcl_t* hcl, hcl_errnum_t errnum, const hcl_uch_t* fmt, va_
  * SUPPORT FOR THE BUILTIN PRINTF PRIMITIVE FUNCTION
  * -------------------------------------------------------------------------- */
 
-#if 1
-
-
-#if 0
-static int put_formatted_chars (hcl_t* hcl, int mask, const hcl_ooch_t ch, hcl_oow_t len)
-{
-/* TODO: better error handling, buffering.
- *       should buffering be done by the printer callback? */
-	hcl_ooi_t n;
-	hcl_ooch_t str[256];
-	hcl_oow_t seglen, i;
-
-	while (len > 0)
-	{
-		seglen = (len > HCL_COUNTOF(str))? len = HCL_COUNTOF(str): len;
-		for (i = 0; i < seglen; i++) str[i] = ch;
-
-		hcl->c->outarg.ptr = str;
-		hcl->c->outarg.len = seglen;
-
-		n = hcl->c->printer(hcl, HCL_IO_WRITE, &hcl->c->outarg);
-
-		if (n <= -1) return -1;
-		if (n == 0) return 0; /* eof. stop printign */
-
-		len -= seglen;
-	}
-
-	return 1; /* success */
-}
-
-static int put_formatted_string (hcl_t* hcl, int mask, const hcl_ooch_t* ptr, hcl_oow_t len)
-{
-/* TODO: better error handling, buffering 
- *       should be done by the printer callback? */
-	hcl_ooi_t n;
-
-	hcl->c->outarg.ptr = (hcl_ooch_t*)ptr;
-	hcl->c->outarg.len = len;
-
-	n = hcl->c->printer(hcl, HCL_IO_WRITE, &hcl->c->outarg);
-
-	if (n <= -1) return -1;
-	if (n == 0) return 0; /* eof. stop printing */
-	return 1; /* success */
-}
-#endif
-
 #define PRINT_OOCH(c,n) do { \
 	if (n > 0) { \
 		int xx; \
@@ -1168,4 +1120,3 @@ int hcl_printfmt (hcl_t* hcl, hcl_ooi_t nargs)
 	return print_formatted(hcl, nargs, &fo);
 }
 
-#endif
