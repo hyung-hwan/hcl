@@ -37,8 +37,7 @@
 #if defined(HAVE_QUADMATH_H)
 #	include <quadmath.h> /* for quadmath_snprintf() */
 #endif
-/* TODO: remove stdio.h and quadmath.h once snprintf gets replaced by own 
-floting-point conversion implementation*/
+
 
 /* Max number conversion buffer length: 
  * hcl_intmax_t in base 2, plus NUL byte. */
@@ -787,41 +786,73 @@ static int put_formatted_string (hcl_t* hcl, int mask, const hcl_ooch_t* ptr, hc
 		if (xx == 0) goto done; \
 		data->count += len; \
 	} \
-} while (0)
+} while(0)
 
+#define GET_NEXT_ARG_TO(hcl,nargs,arg_state,arg) do { \
+	if ((arg_state)->idx >= nargs) { (arg_state)->stop = 1;  goto invalid_format; } \
+	arg = HCL_STACK_GETARG(hcl, nargs, (arg_state)->idx); \
+	(arg_state)->idx++; \
+} while(0)
+
+#define GET_NEXT_CHAR_TO(hcl,fmt,fmtend,ch) do { \
+	if (fmt >= fmtend) ch = HCL_OOCI_EOF; \
+	else { ch = *(fmt); (fmt)++; }\
+} while(0)
+	
 static HCL_INLINE int print_formatted (hcl_t* hcl, hcl_ooi_t nargs, hcl_fmtout_t* data)
 {
-	hcl_oop_char_t fmtoop;
-	hcl_ooch_t* fmt, * fmtend;
+	const hcl_ooch_t* fmt, * fmtend;
 	const hcl_ooch_t* checkpoint, * percent;
 
 	int n, base, neg, sign;
-	hcl_ooi_t tmp, width, precision;
-	hcl_ooch_t ch, padc, ooch;
-	int lm_flag, lm_dflag, flagc;
-	hcl_uintmax_t num = 0;
-	int stop = 0;
+	hcl_ooi_t extra, width, precision;
+	hcl_ooch_t padc, ooch;
+	hcl_ooci_t ch;
+	int flagc;
 
+	struct 
+	{
+		hcl_ooi_t idx;
+		int stop;
+	} arg_state;
 	hcl_oop_t arg;
-	hcl_ooi_t argidx = 0;
 
-	fmtoop = (hcl_oop_char_t)HCL_STACK_GETARG(hcl, nargs, argidx); argidx++;
-	HCL_ASSERT (hcl, HCL_IS_STRING(hcl, fmtoop));
+	arg = HCL_STACK_GETARG(hcl, nargs, 0);
+	if (!HCL_OOP_IS_POINTER(arg) || HCL_OBJ_GET_FLAGS_TYPE(arg) != HCL_OBJ_TYPE_CHAR)
+	{
+		hcl_ooi_t i;
+		/* if the first argument is not a valid formatting string, 
+		 * print all arguments as objects */
+		if (hcl_print(hcl, arg) <= -1) goto oops;
+		for (i = 1; i < nargs; i++)
+		{
+			arg = HCL_STACK_GETARG(hcl, nargs, i);
+			if (hcl_print(hcl, arg) <= -1) goto oops;
+		}
+		return 0;
+	}
 
-	fmt = HCL_OBJ_GET_CHAR_SLOT(fmtoop);
-	fmtend = fmt + HCL_OBJ_GET_SIZE(fmtoop);
+	fmt = HCL_OBJ_GET_CHAR_SLOT(arg);
+	fmtend = fmt + HCL_OBJ_GET_SIZE(arg);
+
+	arg_state.idx = 1;
+	arg_state.stop = 0;
 
 	data->count = 0;
 
-/* TODO: traverse until fmtend... */
 	while (1)
 	{
 		checkpoint = fmt;
-		while ((ch = *fmt++) != '%' || stop) 
+
+		while (1)
 		{
-			if (ch == '\0') 
+			GET_NEXT_CHAR_TO (hcl, fmt, fmtend, ch);
+			if (ch == '%' && !arg_state.stop) break;
+
+			if (ch == HCL_OOCI_EOF) 
 			{
-				PRINT_OOCS (checkpoint, fmt - checkpoint - 1);
+				/* fmt is not advanced when it is length-bounded. so not fmt - checkpoint - 1 */
+				PRINT_OOCS (checkpoint, fmt - checkpoint); 
 				goto done;
 			}
 		}
@@ -833,10 +864,11 @@ static HCL_INLINE int print_formatted (hcl_t* hcl, hcl_ooi_t nargs, hcl_fmtout_t
 		width = 0; precision = 0;
 		neg = 0; sign = 0;
 
-		lm_flag = 0; lm_dflag = 0; flagc = 0; 
+		flagc = 0; 
 
 reswitch:
-		switch (ch = *fmt++) 
+		GET_NEXT_CHAR_TO (hcl, fmt, fmtend, ch);
+		switch (ch) 
 		{
 		case '%': /* %% */
 			ooch = ch;
@@ -887,8 +919,8 @@ reswitch:
 				if (flagc & (FLAGC_STAR2 | FLAGC_PRECISION)) goto invalid_format;
 				flagc |= FLAGC_STAR2;
 
-				arg = HCL_STACK_GETARG(hcl, nargs, argidx); argidx++;
-				if (hcl_inttoooi(hcl, arg, &precision) <= -1) goto oops;
+				GET_NEXT_ARG_TO (hcl, nargs, &arg_state, arg);
+				if (hcl_inttoooi(hcl, arg, &precision) <= -1) goto invalid_format;
 				if (precision < 0) 
 				{
 					/* if precision is less than 0, 
@@ -902,16 +934,11 @@ reswitch:
 				if (flagc & (FLAGC_STAR1 | FLAGC_WIDTH)) goto invalid_format;
 				flagc |= FLAGC_STAR1;
 
-				arg = HCL_STACK_GETARG(hcl, nargs, argidx); argidx++;
-				if (hcl_inttoooi(hcl, arg, &width) <= -1) goto oops;
+				GET_NEXT_ARG_TO (hcl, nargs, &arg_state, arg);
+				if (hcl_inttoooi(hcl, arg, &width) <= -1) goto invalid_format;
 				if (width < 0) 
 				{
-					/*
-					if (flagc & FLAGC_LEFTADJ) 
-						flagc  &= ~FLAGC_LEFTADJ;
-					else
-					*/
-						flagc |= FLAGC_LEFTADJ;
+					flagc |= FLAGC_LEFTADJ;
 					width = -width;
 				}
 			}
@@ -980,12 +1007,9 @@ reswitch:
 			/* zeropad must not take effect for 'c' */
 			if (flagc & FLAGC_ZEROPAD) padc = ' '; 
 
-			arg = HCL_STACK_GETARG(hcl, nargs, argidx); argidx++;
-			if (!HCL_OOP_IS_CHAR(arg))
-			{
-				/* TODO: error code ... */
-				goto oops;
-			}
+			GET_NEXT_ARG_TO (hcl, nargs, &arg_state, arg);
+			if (HCL_OOP_IS_SMOOI(arg)) arg = HCL_CHAR_TO_OOP(HCL_OOP_TO_SMOOI(arg));
+			if (!HCL_OOP_IS_CHAR(arg)) goto invalid_format;
 			ooch = HCL_OOP_TO_CHAR(arg);
 
 			/* precision 0 doesn't kill the letter */
@@ -1004,11 +1028,8 @@ reswitch:
 			/* zeropad must not take effect for 'S' */
 			if (flagc & FLAGC_ZEROPAD) padc = ' ';
 
-			arg = HCL_STACK_GETARG(hcl, nargs, argidx); argidx++;
-			if (!HCL_OOP_IS_POINTER(arg) || HCL_OBJ_GET_FLAGS_TYPE(arg) != HCL_OBJ_TYPE_CHAR)
-			{
-				goto oops;
-			}
+			GET_NEXT_ARG_TO (hcl, nargs, &arg_state, arg);
+			if (!HCL_OOP_IS_POINTER(arg) || HCL_OBJ_GET_FLAGS_TYPE(arg) != HCL_OBJ_TYPE_CHAR) goto invalid_format;
 
 			oosp = HCL_OBJ_GET_CHAR_SLOT(arg);
 			oosl = HCL_OBJ_GET_SIZE(arg);
@@ -1025,9 +1046,8 @@ reswitch:
 			break;
 		}
 
-
 		case 'O': /* object - ignore precision, width, adjustment */
-			arg = HCL_STACK_GETARG(hcl, nargs, argidx); argidx++;
+			GET_NEXT_ARG_TO (hcl, nargs, &arg_state, arg);
 			if (hcl_outfmtobj(hcl, 0, arg, hcl_proutbfmt) <= -1) goto oops;
 			break;
 
@@ -1035,49 +1055,40 @@ reswitch:
 		{
 			const hcl_ooch_t* nsptr;
 			hcl_oow_t nslen;
-			arg = HCL_STACK_GETARG(hcl, nargs, argidx); argidx++;
 
+			GET_NEXT_ARG_TO (hcl, nargs, &arg_state, arg);
 			if (HCL_OOP_IS_CHAR(arg)) arg = HCL_SMOOI_TO_OOP(HCL_OOP_TO_CHAR(arg));
 
 			if (!hcl_inttostr(hcl, arg, base, -1)) 
 			{
-				hcl_seterrbfmt (hcl, HCL_EINVAL, "not a valid number - %O", arg);
-				goto oops;
+				/*hcl_seterrbfmt (hcl, HCL_EINVAL, "not a valid number - %O", arg);
+				goto oops;*/
+				goto invalid_format;
 			}
 
 			nsptr = hcl->inttostr.xbuf.ptr;
 			nslen = hcl->inttostr.xbuf.len;
 
-			tmp = nslen;
-/*
-			if (sign && (hcl_intmax_t)num < 0) 
+			extra = nslen;
+			if (sign && ((HCL_OOP_IS_SMOOI(arg) && HCL_OOP_TO_SMOOI(arg) < 0) || HCL_IS_NBIGINT(hcl,arg))) neg = 1;
+
+
+			if ((flagc & FLAGC_SHARP) && arg != HCL_SMOOI_TO_OOP(0)) 
 			{
-				neg = 1;
-				num = -(hcl_intmax_t)num;
+				if (base == 8) extra++;
+				else if (base == 16 || base == -16) extra += 2;
 			}
+			if (neg) extra++;
+			else if (flagc & FLAGC_SIGN) extra++;
+			else if (flagc & FLAGC_SPACE) extra++;
 
-			nbufp = sprintn (nbuf, num, base, &tmp);
-*/
-
-			if ((flagc & FLAGC_SHARP) && num != 0) 
-			{
-				if (base == 8) tmp++;
-				else if (base == 16) tmp += 2;
-			}
-			if (neg) tmp++;
-			else if (flagc & FLAGC_SIGN) tmp++;
-			else if (flagc & FLAGC_SPACE) tmp++;
-
-/*
-			numlen = (int)((const hcl_bch_t*)nbufp - (const hcl_bch_t*)nbuf);
-*/
 			if ((flagc & FLAGC_DOT) && precision > nslen) 
 			{
 				/* extra zeros for precision specified */
-				tmp += (precision - nslen);
+				extra += (precision - nslen);
 			}
 
-			if (!(flagc & FLAGC_LEFTADJ) && !(flagc & FLAGC_ZEROPAD) && width > 0 && (width -= tmp) > 0)
+			if (!(flagc & FLAGC_LEFTADJ) && !(flagc & FLAGC_ZEROPAD) && width > 0 && (width -= extra) > 0)
 			{
 				PRINT_OOCH (padc, width);
 				width = 0;
@@ -1087,8 +1098,9 @@ reswitch:
 			else if (flagc & FLAGC_SIGN) PRINT_OOCH ('+', 1);
 			else if (flagc & FLAGC_SPACE) PRINT_OOCH (' ', 1);
 
-			if ((flagc & FLAGC_SHARP) && num != 0) 
+			if ((flagc & FLAGC_SHARP) && arg != HCL_SMOOI_TO_OOP(0)) 
 			{
+
 				if (base == 2) 
 				{
 					PRINT_OOCH ('0', 1);
@@ -1098,7 +1110,7 @@ reswitch:
 				{
 					PRINT_OOCH ('0', 1);
 				} 
-				else if (base == 16) 
+				else if (base == 16 || base == -16) 
 				{
 					PRINT_OOCH ('0', 1);
 					PRINT_OOCH ('x', 1);
@@ -1111,42 +1123,33 @@ reswitch:
 				PRINT_OOCH ('0', precision - nslen);
 			}
 
-			if (!(flagc & FLAGC_LEFTADJ) && width > 0 && (width -= tmp) > 0)
+			if (!(flagc & FLAGC_LEFTADJ) && width > 0 && (width -= extra) > 0)
 			{
 				PRINT_OOCH (padc, width);
 			}
 
-			/*while (*nbufp) PRINT_OOCH (*nbufp--, 1);*/ /* output actual digits */
 			PRINT_OOCS (nsptr, nslen);
 
-			if ((flagc & FLAGC_LEFTADJ) && width > 0 && (width -= tmp) > 0)
+			if ((flagc & FLAGC_LEFTADJ) && width > 0 && (width -= extra) > 0)
 			{
 				PRINT_OOCH (padc, width);
 			}
 			break;
 		}
 
-invalid_format:
-		#if defined(FMTCHAR_IS_OOCH)
+		invalid_format:
 			PRINT_OOCS (percent, fmt - percent);
-		#else
-			while (percent < fmt) PRINT_OOCH (*percent++, 1);
-		#endif
 			break;
 
 		default:
-		#if defined(FMTCHAR_IS_OOCH)
 			PRINT_OOCS (percent, fmt - percent);
-		#else
-			while (percent < fmt) PRINT_OOCH (*percent++, 1);
-		#endif
 			/*
 			 * Since we ignore an formatting argument it is no
 			 * longer safe to obey the remaining formatting
 			 * arguments as the arguments will no longer match
 			 * the format specs.
 			 */
-			stop = 1;
+			arg_state.stop = 1;
 			break;
 		}
 	}

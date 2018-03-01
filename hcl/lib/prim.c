@@ -377,23 +377,8 @@ static hcl_pfrc_t pf_integer_rem (hcl_t* hcl, hcl_mod_t* mod, hcl_ooi_t nargs)
 
 /* ------------------------------------------------------------------------- */
 
-
 static hcl_pfrc_t pf_printf (hcl_t* hcl, hcl_mod_t* mod, hcl_ooi_t nargs)
 {
-	hcl_oop_char_t fmt;
-
-	fmt = (hcl_oop_char_t)HCL_STACK_GETARG(hcl, nargs, 0);
-	if (!HCL_IS_STRING(hcl, fmt))
-	{
-		/* if the first argument is not a string, it just prints the 
-		 * argument and ignore the remaining arguments */
-		if (hcl_print(hcl, (hcl_oop_t)fmt) <= -1)
-			HCL_STACK_SETRETTOERRNUM (hcl, nargs);
-		else
-			HCL_STACK_SETRET (hcl, nargs, hcl->_nil);
-		return HCL_PF_SUCCESS;
-	}
-
 	if (hcl_printfmt(hcl, nargs) <= -1)
 	{
 		HCL_STACK_SETRETTOERRNUM (hcl, nargs);

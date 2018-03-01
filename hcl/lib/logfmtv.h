@@ -63,7 +63,6 @@
  * SUCH DAMAGE.
  *
  */
-#include <stdio.h>
 
 /* NOTE: data output is aborted if the data limit is reached or 
  *       I/O error occurs  */

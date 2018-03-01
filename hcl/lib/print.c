@@ -172,7 +172,7 @@ static HCL_INLINE int print_single_char (hcl_t* hcl, int mask, hcl_ooch_t ch, hc
 	return 0;
 }
 
-int hcl_outfmtobj (hcl_t* hcl, int mask, hcl_oop_t obj, hcl_outbfmt_t outbfmt)
+static HCL_INLINE int outfmt_obj (hcl_t* hcl, int mask, hcl_oop_t obj, hcl_outbfmt_t outbfmt)
 {
 	hcl_oop_t cur;
 	print_stack_t ps;
@@ -625,17 +625,15 @@ done:
 	return 0;
 }
 
-int hcl_print (hcl_t* hcl, hcl_oop_t obj)
+int hcl_outfmtobj (hcl_t* hcl, int mask, hcl_oop_t obj, hcl_outbfmt_t outbfmt)
 {
 	int n;
-
-	HCL_ASSERT (hcl, hcl->c->printer != HCL_NULL);
 
 	/* the printer stack must be empty. buggy if not. */
 	HCL_ASSERT (hcl, hcl->p.s.size == 0); 
 
 	hcl->p.e = obj; /* remember the head of the object to print */
-	n = hcl_outfmtobj (hcl, HCL_LOG_APP | HCL_LOG_FATAL, obj, hcl_proutbfmt);
+	n = outfmt_obj(hcl, mask, obj, outbfmt);
 	hcl->p.e = hcl->_nil; /* reset what's remembered */
 
 	/* clear the printing stack if an error has occurred for GC not to keep
@@ -646,4 +644,10 @@ int hcl_print (hcl_t* hcl, hcl_oop_t obj)
 	HCL_ASSERT (hcl, hcl->p.s.size == 0); 
 
 	return n;
+}
+
+int hcl_print (hcl_t* hcl, hcl_oop_t obj)
+{
+	HCL_ASSERT (hcl, hcl->c->printer != HCL_NULL);
+	return hcl_outfmtobj (hcl, HCL_LOG_APP | HCL_LOG_FATAL, obj, hcl_proutbfmt);
 }
