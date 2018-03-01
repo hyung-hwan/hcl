@@ -122,7 +122,7 @@ static HCL_INLINE int print_single_char (hcl_t* hcl, int mask, hcl_ooch_t ch, hc
 	if (chu < ' ' || chu >= 0x80) 
 #endif
 	{
-		hcl_ooch_t escaped;
+		hcl_oochu_t escaped;
 
 		switch (chu)
 		{
@@ -151,13 +151,31 @@ static HCL_INLINE int print_single_char (hcl_t* hcl, int mask, hcl_ooch_t ch, hc
 				escaped = 'a';
 				break;
 			default:
-				escaped = ch;
+				escaped = chu;
 				break;
 		}
 
-		if (escaped == ch)
+		if (escaped == chu)
 		{
-			if (outbfmt(hcl, mask, "\\x%X", chu) <= -1) return -1;
+		#if (HCL_SIZEOF_OOCH_T >= 4)
+			if (chu >= 0x10000u)
+			{
+				if (outbfmt(hcl, mask, "\\U%X", chu) <= -1) return -1;
+			}
+			else 
+		#endif
+			{
+		#if (HCL_SIZEOF_OOCH_T >= 2)
+				if (chu >= 0x100u)
+				{
+					if (outbfmt(hcl, mask, "\\u%X", chu) <= -1) return -1;
+				}
+				else
+		#endif
+				{
+					if (outbfmt(hcl, mask, "\\x%X", chu) <= -1) return -1;
+				}
+			}
 		}
 		else
 		{

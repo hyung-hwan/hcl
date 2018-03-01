@@ -179,7 +179,7 @@ static int logfmtv (hcl_t* hcl, const fmtchar_t* fmt, hcl_fmtout_t* data, va_lis
 		lm_flag = 0; lm_dflag = 0; flagc = 0; 
 		sprintn = sprintn_lower;
 
-reswitch:
+	reswitch:
 		switch (ch = *fmt++) 
 		{
 		case '%': /* %% */
@@ -800,7 +800,7 @@ reswitch:
 #endif
 
 
-handle_nosign:
+		handle_nosign:
 			sign = 0;
 			if (lm_flag & LF_J)
 			{
@@ -845,7 +845,7 @@ handle_nosign:
 				num = va_arg (ap, unsigned int);
 			goto number;
 
-handle_sign:
+		handle_sign:
 			if (lm_flag & LF_J)
 			{
 			#if defined(__GNUC__) && \
@@ -889,7 +889,7 @@ handle_sign:
 			else
 				num = va_arg (ap, int);
 
-number:
+		number:
 			if (sign && (hcl_intmax_t)num < 0) 
 			{
 				neg = 1;
@@ -899,8 +899,7 @@ number:
 			nbufp = sprintn (nbuf, num, base, &tmp);
 			if ((flagc & FLAGC_SHARP) && num != 0) 
 			{
-				if (base == 8) tmp++;
-				else if (base == 16) tmp += 2;
+				if (base == 2 || base == 8 || base == 16) tmp += 2;
 			}
 			if (neg) tmp++;
 			else if (flagc & FLAGC_SIGN) tmp++;
@@ -925,18 +924,20 @@ number:
 
 			if ((flagc & FLAGC_SHARP) && num != 0) 
 			{
+				/* it follows the HCL's number notation, not C's */
 				if (base == 2) 
 				{
-					PUT_OOCH ('0', 1);
+					PUT_OOCH ('#', 1);
 					PUT_OOCH ('b', 1);
 				}
 				if (base == 8) 
 				{
-					PUT_OOCH ('0', 1);
+					PUT_OOCH ('#', 1);
+					PUT_OOCH ('o', 1);
 				} 
 				else if (base == 16) 
 				{
-					PUT_OOCH ('0', 1);
+					PUT_OOCH ('#', 1);
 					PUT_OOCH ('x', 1);
 				}
 			}
@@ -960,7 +961,7 @@ number:
 			}
 			break;
 
-invalid_format:
+		invalid_format:
 		#if defined(FMTCHAR_IS_OOCH)
 			PUT_OOCS (percent, fmt - percent);
 		#else

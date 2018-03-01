@@ -421,7 +421,7 @@ static int get_char (hcl_t* hcl)
 		if (n == 0)
 		{
 		return_eof:
-			hcl->c->curinp->lxc.c = HCL_UCI_EOF;
+			hcl->c->curinp->lxc.c = HCL_OOCI_EOF;
 			hcl->c->curinp->lxc.l.line = hcl->c->curinp->line;
 			hcl->c->curinp->lxc.l.colm = hcl->c->curinp->colm;
 			hcl->c->curinp->lxc.l.file = hcl->c->curinp->name;
@@ -490,7 +490,7 @@ static int skip_comment (hcl_t* hcl)
 		do 
 		{
 			GET_CHAR_TO (hcl, c);
-			if (c == HCL_UCI_EOF)
+			if (c == HCL_OOCI_EOF)
 			{
 				break;
 			}
@@ -526,7 +526,7 @@ static int get_string (hcl_t* hcl, hcl_ooch_t end_char, hcl_ooch_t esc_char, int
 	{
 		GET_CHAR_TO (hcl, c);
 
-		if (c == HCL_UCI_EOF)
+		if (c == HCL_OOCI_EOF)
 		{
 			hcl_setsynerr (hcl, HCL_SYNERR_STRCHRNC, TOKEN_LOC(hcl) /*LEXER_LOC(hcl)*/, HCL_NULL);
 			return -1;
@@ -536,6 +536,7 @@ static int get_string (hcl_t* hcl, hcl_ooch_t end_char, hcl_ooch_t esc_char, int
 		{
 			if (c >= '0' && c <= '7')
 			{
+				/* more octal digits */
 				c_acc = c_acc * 8 + c - '0';
 				digit_count++;
 				if (digit_count >= escaped) 
@@ -640,20 +641,24 @@ static int get_string (hcl_t* hcl, hcl_ooch_t end_char, hcl_ooch_t esc_char, int
 				c_acc = 0;
 				continue;
 			}
-			else if (c == 'u' && HCL_SIZEOF(hcl_ooch_t) >= 2) 
+		#if (HCL_SIZEOF_OOCH_T >= 2)
+			else if (c == 'u')
 			{
 				escaped = 4;
 				digit_count = 0;
 				c_acc = 0;
 				continue;
 			}
-			else if (c == 'U' && HCL_SIZEOF(hcl_ooch_t) >= 4) 
+		#endif
+		#if (HCL_SIZEOF_OOCH_T >= 4)
+			else if (c == 'U') 
 			{
 				escaped = 8;
 				digit_count = 0;
 				c_acc = 0;
 				continue;
 			}
+		#endif
 			else if (regex) 
 			{
 				/* if the following character doesn't compose a proper
@@ -734,7 +739,6 @@ static int get_sharp_token (hcl_t* hcl)
 	 * #false
 	 * #include
 	 * #\C      character
-	 * #\XHHHH  unicode character
 	 * #\xHHHH  unicode character
 	 * #\UHHHH  unicode character
 	 * #\uHHHH  unicode character
@@ -783,17 +787,20 @@ static int get_sharp_token (hcl_t* hcl)
 
 			if (TOKEN_NAME_LEN(hcl) >= 4)
 			{
-				if (TOKEN_NAME_CHAR(hcl, 2) == 'P' || TOKEN_NAME_CHAR(hcl, 2) == 'p')
-				{
-					SET_TOKEN_TYPE (hcl, HCL_IOTOK_SMPTRLIT);
-					goto hexcharlit;
-				}
-				else if (TOKEN_NAME_CHAR(hcl, 2) == 'X' || TOKEN_NAME_CHAR(hcl, 2) == 'x' ||
-				         TOKEN_NAME_CHAR(hcl, 2) == 'U' || TOKEN_NAME_CHAR(hcl, 2) == 'u')
+				int max_digit_count = 0;
+
+				if (TOKEN_NAME_CHAR(hcl, 2) == 'x')
 				{
 					hcl_oow_t i;
+					max_digit_count = 2;
 
 				hexcharlit:
+					if (TOKEN_NAME_LEN(hcl) - 3 > max_digit_count)
+					{
+						hcl_setsynerrbfmt (hcl, HCL_SYNERR_CHARLIT, TOKEN_LOC(hcl), TOKEN_NAME(hcl),
+							"invalid hexadecimal character in %.*js", TOKEN_NAME_LEN(hcl), TOKEN_NAME_PTR(hcl));
+						return -1;
+					}
 					c = 0;
 					for (i = 3; i < TOKEN_NAME_LEN(hcl); i++)
 					{
@@ -803,9 +810,29 @@ static int get_sharp_token (hcl_t* hcl)
 								"invalid hexadecimal character in %.*js", TOKEN_NAME_LEN(hcl), TOKEN_NAME_PTR(hcl));
 							return -1;
 						}
-/* TODO: check for the max charcter value and raise an error... */
+
 						c = c * 16 + CHAR_TO_NUM(hcl->c->tok.name.ptr[i], 16); /* don't care if it is for 'p' */
 					}
+					
+				}
+			#if (HCL_SIZEOF_OOCH_T >= 2)
+				else if (TOKEN_NAME_CHAR(hcl, 2) == 'u')
+				{
+					max_digit_count = 4;
+					goto hexcharlit;
+				}
+			#endif
+			#if (HCL_SIZEOF_OOCH_T >= 4)
+				else if (TOKEN_NAME_CHAR(hcl, 2) == 'U')
+				{
+					max_digit_count = 8;
+					goto hexcharlit;
+				}
+			#endif
+				else if (TOKEN_NAME_CHAR(hcl, 2) == 'P' || TOKEN_NAME_CHAR(hcl, 2) == 'p')
+				{
+					SET_TOKEN_TYPE (hcl, HCL_IOTOK_SMPTRLIT);
+					goto hexcharlit;
 				}
 				else if (TOKEN_NAME_CHAR(hcl, 2) == 'E' || TOKEN_NAME_CHAR(hcl, 2) == 'e')
 				{
@@ -976,7 +1003,7 @@ retry:
 
 	switch (c)
 	{
-		case HCL_UCI_EOF:
+		case HCL_OOCI_EOF:
 		{
 			int n;
 

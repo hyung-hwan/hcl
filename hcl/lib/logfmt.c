@@ -803,7 +803,8 @@ static HCL_INLINE int print_formatted (hcl_t* hcl, hcl_ooi_t nargs, hcl_fmtout_t
 
 			if (ch == HCL_OOCI_EOF) 
 			{
-				/* fmt is not advanced when it is length-bounded. so not fmt - checkpoint - 1 */
+				/* fmt is not advanced when it is length-bounded.
+				 * so not fmt - checkpoint - 1 */
 				PRINT_OOCS (checkpoint, fmt - checkpoint); 
 				goto done;
 			}
@@ -818,7 +819,7 @@ static HCL_INLINE int print_formatted (hcl_t* hcl, hcl_ooi_t nargs, hcl_fmtout_t
 
 		flagc = 0; 
 
-reswitch:
+	reswitch:
 		GET_NEXT_CHAR_TO (hcl, fmt, fmtend, ch);
 		switch (ch) 
 		{
@@ -954,15 +955,14 @@ reswitch:
 
 		case 'c':
 		case 'C':
-		print_char:
-
-			/* zeropad must not take effect for 'c' */
-			if (flagc & FLAGC_ZEROPAD) padc = ' '; 
-
 			GET_NEXT_ARG_TO (hcl, nargs, &arg_state, arg);
 			if (HCL_OOP_IS_SMOOI(arg)) arg = HCL_CHAR_TO_OOP(HCL_OOP_TO_SMOOI(arg));
 			if (!HCL_OOP_IS_CHAR(arg)) goto invalid_format;
 			ooch = HCL_OOP_TO_CHAR(arg);
+
+		print_char:
+			/* zeropad must not take effect for 'c' */
+			if (flagc & FLAGC_ZEROPAD) padc = ' '; 
 
 			/* precision 0 doesn't kill the letter */
 			width--;
@@ -1024,11 +1024,9 @@ reswitch:
 			extra = nslen;
 			if (sign && ((HCL_OOP_IS_SMOOI(arg) && HCL_OOP_TO_SMOOI(arg) < 0) || HCL_IS_NBIGINT(hcl,arg))) neg = 1;
 
-
 			if ((flagc & FLAGC_SHARP) && arg != HCL_SMOOI_TO_OOP(0)) 
 			{
-				if (base == 8) extra++;
-				else if (base == 16 || base == -16) extra += 2;
+				if (base == 2 || base == 8 || base == 16 || base == -16) extra += 2;
 			}
 			if (neg) extra++;
 			else if (flagc & FLAGC_SIGN) extra++;
@@ -1052,19 +1050,19 @@ reswitch:
 
 			if ((flagc & FLAGC_SHARP) && arg != HCL_SMOOI_TO_OOP(0)) 
 			{
-
 				if (base == 2) 
 				{
-					PRINT_OOCH ('0', 1);
+					PRINT_OOCH ('#', 1);
 					PRINT_OOCH ('b', 1);
 				}
 				if (base == 8) 
 				{
-					PRINT_OOCH ('0', 1);
+					PRINT_OOCH ('#', 1);
+					PRINT_OOCH ('o', 1);
 				} 
 				else if (base == 16 || base == -16) 
 				{
-					PRINT_OOCH ('0', 1);
+					PRINT_OOCH ('#', 1);
 					PRINT_OOCH ('x', 1);
 				}
 			}
