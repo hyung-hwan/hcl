@@ -771,18 +771,16 @@ static HCL_INLINE int print_formatted (hcl_t* hcl, hcl_ooi_t nargs, hcl_fmtout_t
 	arg = HCL_STACK_GETARG(hcl, nargs, 0);
 	if (!HCL_OOP_IS_POINTER(arg) || HCL_OBJ_GET_FLAGS_TYPE(arg) != HCL_OBJ_TYPE_CHAR)
 	{
-#if 0
 		hcl_ooi_t i;
 		/* if the first argument is not a valid formatting string, 
 		 * print all arguments as objects */
-		if (hcl_print(hcl, arg) <= -1) goto oops;
+		if (hcl_outfmtobj(hcl, data->mask, arg, outbfmt) <= -1) goto oops;
 		for (i = 1; i < nargs; i++)
 		{
 			arg = HCL_STACK_GETARG(hcl, nargs, i);
-			if (hcl_print(hcl, arg) <= -1) goto oops;
+			if (hcl_outfmtobj(hcl, data->mask, arg, outbfmt) <= -1) goto oops;
 		}
 		return 0;
-#endif
 	}
 
 	fmt = HCL_OBJ_GET_CHAR_SLOT(arg);

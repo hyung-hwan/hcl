@@ -30,7 +30,7 @@ hcl_heap_t* hcl_makeheap (hcl_t* hcl, hcl_oow_t size)
 {
 	hcl_heap_t* heap;
 
-	heap = (hcl_heap_t*)HCL_MMGR_ALLOC(hcl->mmgr, HCL_SIZEOF(*heap) + size);
+	heap = (hcl_heap_t*)hcl->vmprim.alloc_heap(hcl, HCL_SIZEOF(*heap) + size);
 	if (!heap)
 	{
 		hcl_seterrnum (hcl, HCL_ESYSMEM);
@@ -58,7 +58,7 @@ hcl_heap_t* hcl_makeheap (hcl_t* hcl, hcl_oow_t size)
 
 void hcl_killheap (hcl_t* hcl, hcl_heap_t* heap)
 {
-	HCL_MMGR_FREE (hcl->mmgr, heap);
+	hcl->vmprim.free_heap (hcl, heap);
 }
 
 void* hcl_allocheapmem (hcl_t* hcl, hcl_heap_t* heap, hcl_oow_t size)

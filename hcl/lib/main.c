@@ -88,6 +88,7 @@
 #	include <unistd.h>
 #	include <fcntl.h>
 
+#	include <sys/mman.h>
 #endif
 
 #if !defined(HCL_DEFAULT_PFMODPREFIX)
@@ -146,14 +147,16 @@ struct xtn_t
 
 /* ========================================================================= */
 
+#define MB_1 (256UL*1024*1024)
+
 static void* sys_alloc (hcl_mmgr_t* mmgr, hcl_oow_t size)
 {
-	return malloc (size);
+	return malloc(size);
 }
 
 static void* sys_realloc (hcl_mmgr_t* mmgr, void* ptr, hcl_oow_t size)
 {
-	return realloc (ptr, size);
+	return realloc(ptr, size);
 }
 
 static void sys_free (hcl_mmgr_t* mmgr, void* ptr)
@@ -378,7 +381,7 @@ static HCL_INLINE hcl_ooi_t close_output (hcl_t* hcl, hcl_iooutarg_t* arg)
 	fp = (FILE*)arg->handle;
 	HCL_ASSERT (hcl, fp != HCL_NULL);
 
-	fclose (fp);
+	if (fp != stdout) fclose (fp);
 	arg->handle = HCL_NULL;
 	return 0;
 }
@@ -395,18 +398,18 @@ static HCL_INLINE hcl_ooi_t write_output (hcl_t* hcl, hcl_iooutarg_t* arg)
 
 	do 
 	{
-#if defined(HCL_OOCH_IS_UCH)
+	#if defined(HCL_OOCH_IS_UCH)
 		bcslen = HCL_COUNTOF(bcsbuf);
 		ucslen = arg->len - donelen;
 		x = hcl_convootobchars (hcl, &arg->ptr[donelen], &ucslen, bcsbuf, &bcslen);
 		if (x <= -1 && ucslen <= 0) return -1;
-#else
+	#else
 		bcslen = HCL_COUNTOF(bcsbuf);
 		ucslen = arg->len - donelen;
 		if (ucslen > bcslen) ucslen = bcslen;
 		else if (ucslen < bcslen) bcslen = ucslen;
 		hcl_copybchars (bcsbuf, &arg->ptr[donelen], bcslen);
-#endif
+	#endif
 
 		if (fwrite (bcsbuf, HCL_SIZEOF(bcsbuf[0]), bcslen, (FILE*)arg->handle) < bcslen)
 		{
@@ -438,6 +441,212 @@ static hcl_ooi_t print_handler (hcl_t* hcl, hcl_iocmd_t cmd, void* arg)
 			hcl_seterrnum (hcl, HCL_EINTERN);
 			return -1;
 	}
+}
+
+/* ========================================================================= */
+
+static void* alloc_heap (hcl_t* hcl, hcl_oow_t size)
+{
+	/* It's called when HCL creates a GC heap.
+	 * The heap is large in size. I can use a different memory allocation
+	 * function instead of an ordinary malloc */
+	hcl_oow_t* ptr;
+	int flags;
+	hcl_oow_t actual_size;
+
+	flags = MAP_PRIVATE | MAP_ANONYMOUS | MAP_HUGETLB;
+#if defined(MAP_UNINITIALIZED)
+	flags |= MAP_UNINITIALIZED;
+#endif
+
+	
+	actual_size = HCL_SIZEOF(hcl_oow_t) + size;
+	actual_size = HCL_ALIGN_POW2(actual_size, 2 * 1024 * 1024);
+	ptr = (hcl_oow_t*)mmap(NULL, actual_size, PROT_READ | PROT_WRITE, flags, -1, 0);
+	if (ptr == MAP_FAILED) 
+	{
+		flags &= ~MAP_HUGETLB;
+		ptr = (hcl_oow_t*)mmap(NULL, actual_size, PROT_READ | PROT_WRITE, flags, -1, 0);
+		if (ptr == MAP_FAILED) return HCL_NULL;
+	}
+	*ptr = size;
+
+	return (void*)(ptr + 1);
+	/*return HCL_MMGR_ALLOC(hcl->mmgr, size);*/
+}
+
+static void free_heap (hcl_t* hcl, void* ptr)
+{
+	hcl_oow_t* actual_ptr;
+	actual_ptr = (hcl_oow_t*)ptr - 1;
+	munmap (actual_ptr, *actual_ptr);
+	/*return HCL_MMGR_FREE(hcl->mmgr, ptr);*/
+}
+
+static int write_all (int fd, const char* ptr, hcl_oow_t len)
+{
+	while (len > 0)
+	{
+		hcl_ooi_t wr;
+
+		wr = write (1, ptr, len);
+
+		if (wr <= -1)
+		{
+		#if defined(EAGAIN) && defined(EWOULDBLOCK) && (EAGAIN == EWOULDBLOCK)
+			if (errno == EAGAIN) continue;
+		#else
+			#	if defined(EAGAIN)
+			if (errno == EAGAIN) continue;
+			#elif defined(EWOULDBLOCK)
+			if (errno == EWOULDBLOCK) continue;
+			#endif
+		#endif
+
+		#if defined(EINTR)
+			/* TODO: would this interfere with non-blocking nature of this VM? */
+			if (errno == EINTR) continue;
+		#endif
+			return -1;
+		}
+
+		ptr += wr;
+		len -= wr;
+	}
+
+	return 0;
+}
+
+static void log_write (hcl_t* hcl, int mask, const hcl_ooch_t* msg, hcl_oow_t len)
+{
+#if defined(_WIN32)
+#	error NOT IMPLEMENTED 
+	
+#elif defined(macintosh)
+#	error NOT IMPLEMENTED
+#else
+	hcl_bch_t buf[256];
+	hcl_oow_t ucslen, bcslen, msgidx;
+	int n;
+
+	xtn_t* xtn = (xtn_t*)hcl_getxtn(hcl);
+	int logfd;
+
+	if (mask & HCL_LOG_STDERR)
+	{
+		/* the messages that go to STDERR don't get masked out */
+		logfd = 2;
+	}
+	else
+	{
+		if (!(xtn->logmask & mask & ~HCL_LOG_ALL_LEVELS)) return;  /* check log types */
+		if (!(xtn->logmask & mask & ~HCL_LOG_ALL_TYPES)) return;  /* check log levels */
+
+		if (mask & HCL_LOG_STDOUT) logfd = 1;
+		else
+		{
+
+			logfd = xtn->logfd;
+			if (logfd <= -1) return;
+		}
+	}
+
+/* TODO: beautify the log message.
+ *       do classification based on mask. */
+	if (!(mask & (HCL_LOG_STDOUT | HCL_LOG_STDERR)))
+	{
+		time_t now;
+		char ts[32];
+		size_t tslen;
+		struct tm tm, *tmp;
+
+		now = time(NULL);
+	#if defined(__DOS__)
+		tmp = localtime (&now);
+		tslen = strftime (ts, sizeof(ts), "%Y-%m-%d %H:%M:%S ", tmp); /* no timezone info */
+		if (tslen == 0) 
+		{
+			strcpy (ts, "0000-00-00 00:00:00");
+			tslen = 19; 
+		}
+	#else
+		tmp = localtime_r (&now, &tm);
+		#if defined(HAVE_STRFTIME_SMALL_Z)
+		tslen = strftime (ts, sizeof(ts), "%Y-%m-%d %H:%M:%S %z ", tmp);
+		#else
+		tslen = strftime (ts, sizeof(ts), "%Y-%m-%d %H:%M:%S %Z ", tmp); 
+		#endif
+		if (tslen == 0) 
+		{
+			strcpy (ts, "0000-00-00 00:00:00 +0000");
+			tslen = 25; 
+		}
+	#endif
+		write_all (logfd, ts, tslen);
+	}
+
+	if (xtn->logfd_istty)
+	{
+		if (mask & HCL_LOG_FATAL) write_all (logfd, "\x1B[1;31m", 7);
+		else if (mask & HCL_LOG_ERROR) write_all (logfd, "\x1B[1;32m", 7);
+		else if (mask & HCL_LOG_WARN) write_all (logfd, "\x1B[1;33m", 7);
+	}
+
+#if defined(HCL_OOCH_IS_UCH)
+	msgidx = 0;
+	while (len > 0)
+	{
+		ucslen = len;
+		bcslen = HCL_COUNTOF(buf);
+
+		n = hcl_convootobchars (hcl, &msg[msgidx], &ucslen, buf, &bcslen);
+		if (n == 0 || n == -2)
+		{
+			/* n = 0: 
+			 *   converted all successfully 
+			 * n == -2: 
+			 *    buffer not sufficient. not all got converted yet.
+			 *    write what have been converted this round. */
+
+			HCL_ASSERT (hcl, ucslen > 0); /* if this fails, the buffer size must be increased */
+
+			/* attempt to write all converted characters */
+			if (write_all (logfd, buf, bcslen) <= -1) break;
+
+			if (n == 0) break;
+			else
+			{
+				msgidx += ucslen;
+				len -= ucslen;
+			}
+		}
+		else if (n <= -1)
+		{
+			/* conversion error */
+			break;
+		}
+	}
+#else
+	write_all (logfd, msg, len);
+#endif
+
+	if (xtn->logfd_istty)
+	{
+		if (mask & (HCL_LOG_FATAL | HCL_LOG_ERROR | HCL_LOG_WARN)) write_all (logfd, "\x1B[0m", 4);
+	}
+
+#endif
+}
+
+
+static void syserrstrb (hcl_t* hcl, int syserr, hcl_bch_t* buf, hcl_oow_t len)
+{
+#if defined(HAVE_STRERROR_R)
+	strerror_r (syserr, buf, len);
+#else
+	/* this is not thread safe */
+	hcl_copybcstr (buf, len, strerror(syserr));
+#endif
 }
 
 /* ========================================================================= */
@@ -671,172 +880,7 @@ static void* dl_getsym (hcl_t* hcl, void* handle, const hcl_ooch_t* name)
 #endif
 }
 
-static int write_all (int fd, const char* ptr, hcl_oow_t len)
-{
-	while (len > 0)
-	{
-		hcl_ooi_t wr;
-
-		wr = write (1, ptr, len);
-
-		if (wr <= -1)
-		{
-		#if defined(EAGAIN) && defined(EWOULDBLOCK) && (EAGAIN == EWOULDBLOCK)
-			if (errno == EAGAIN) continue;
-		#else
-			#	if defined(EAGAIN)
-			if (errno == EAGAIN) continue;
-			#elif defined(EWOULDBLOCK)
-			if (errno == EWOULDBLOCK) continue;
-			#endif
-		#endif
-
-		#if defined(EINTR)
-			/* TODO: would this interfere with non-blocking nature of this VM? */
-			if (errno == EINTR) continue;
-		#endif
-			return -1;
-		}
-
-		ptr += wr;
-		len -= wr;
-	}
-
-	return 0;
-}
-
-static void log_write (hcl_t* hcl, int mask, const hcl_ooch_t* msg, hcl_oow_t len)
-{
-#if defined(_WIN32)
-#	error NOT IMPLEMENTED 
-	
-#elif defined(macintosh)
-#	error NOT IMPLEMENTED
-#else
-	hcl_bch_t buf[256];
-	hcl_oow_t ucslen, bcslen, msgidx;
-	int n;
-
-	xtn_t* xtn = (xtn_t*)hcl_getxtn(hcl);
-	int logfd;
-
-	if (mask & HCL_LOG_STDERR)
-	{
-		/* the messages that go to STDERR don't get masked out */
-		logfd = 2;
-	}
-	else
-	{
-		if (!(xtn->logmask & mask & ~HCL_LOG_ALL_LEVELS)) return;  /* check log types */
-		if (!(xtn->logmask & mask & ~HCL_LOG_ALL_TYPES)) return;  /* check log levels */
-
-		if (mask & HCL_LOG_STDOUT) logfd = 1;
-		else
-		{
-
-			logfd = xtn->logfd;
-			if (logfd <= -1) return;
-		}
-	}
-
-/* TODO: beautify the log message.
- *       do classification based on mask. */
-	if (!(mask & (HCL_LOG_STDOUT | HCL_LOG_STDERR)))
-	{
-		time_t now;
-		char ts[32];
-		size_t tslen;
-		struct tm tm, *tmp;
-
-		now = time(NULL);
-	#if defined(__DOS__)
-		tmp = localtime (&now);
-		tslen = strftime (ts, sizeof(ts), "%Y-%m-%d %H:%M:%S ", tmp); /* no timezone info */
-		if (tslen == 0) 
-		{
-			strcpy (ts, "0000-00-00 00:00:00");
-			tslen = 19; 
-		}
-	#else
-		tmp = localtime_r (&now, &tm);
-		#if defined(HAVE_STRFTIME_SMALL_Z)
-		tslen = strftime (ts, sizeof(ts), "%Y-%m-%d %H:%M:%S %z ", tmp);
-		#else
-		tslen = strftime (ts, sizeof(ts), "%Y-%m-%d %H:%M:%S %Z ", tmp); 
-		#endif
-		if (tslen == 0) 
-		{
-			strcpy (ts, "0000-00-00 00:00:00 +0000");
-			tslen = 25; 
-		}
-	#endif
-		write_all (logfd, ts, tslen);
-	}
-
-	if (xtn->logfd_istty)
-	{
-		if (mask & HCL_LOG_FATAL) write_all (logfd, "\x1B[1;31m", 7);
-		else if (mask & HCL_LOG_ERROR) write_all (logfd, "\x1B[1;32m", 7);
-		else if (mask & HCL_LOG_WARN) write_all (logfd, "\x1B[1;33m", 7);
-	}
-
-#if defined(HCL_OOCH_IS_UCH)
-	msgidx = 0;
-	while (len > 0)
-	{
-		ucslen = len;
-		bcslen = HCL_COUNTOF(buf);
-
-		n = hcl_convootobchars (hcl, &msg[msgidx], &ucslen, buf, &bcslen);
-		if (n == 0 || n == -2)
-		{
-			/* n = 0: 
-			 *   converted all successfully 
-			 * n == -2: 
-			 *    buffer not sufficient. not all got converted yet.
-			 *    write what have been converted this round. */
-
-			HCL_ASSERT (hcl, ucslen > 0); /* if this fails, the buffer size must be increased */
-
-			/* attempt to write all converted characters */
-			if (write_all (logfd, buf, bcslen) <= -1) break;
-
-			if (n == 0) break;
-			else
-			{
-				msgidx += ucslen;
-				len -= ucslen;
-			}
-		}
-		else if (n <= -1)
-		{
-			/* conversion error */
-			break;
-		}
-	}
-#else
-	write_all (logfd, msg, len);
-#endif
-
-	if (xtn->logfd_istty)
-	{
-		if (mask & (HCL_LOG_FATAL | HCL_LOG_ERROR | HCL_LOG_WARN)) write_all (logfd, "\x1B[0m", 4);
-	}
-
-#endif
-}
-
-
-static void syserrstrb (hcl_t* hcl, int syserr, hcl_bch_t* buf, hcl_oow_t len)
-{
-#if defined(HAVE_STRERROR_R)
-	strerror_r (syserr, buf, len);
-#else
-	/* this is not thread safe */
-	hcl_copybcstr (buf, len, strerror(syserr));
-#endif
-}
-
+/* ========================================================================= */
 
 static int vm_startup (hcl_t* hcl)
 {
@@ -925,7 +969,6 @@ static int vm_startup (hcl_t* hcl)
 	xtn->iothr_up = 0;
 	/*pthread_create (&xtn->iothr, HCL_NULL, iothr_main, hcl);*/
 
-	
 #endif /* USE_THREAD */
 
 	xtn->vm_running = 1;
@@ -1435,6 +1478,7 @@ int main (int argc, char* argv[])
 	{
 		{ ":log",         'l' },
 		{ ":memsize",     'm' },
+		{ "large-pages",  '\0' },
 #if defined(HCL_BUILD_DEBUG)
 		{ ":debug",       '\0' }, /* NOTE: there is no short option for --debug */
 #endif
@@ -1448,6 +1492,7 @@ int main (int argc, char* argv[])
 
 	const char* logopt = HCL_NULL;
 	hcl_oow_t memsize = MIN_MEMSIZE;
+	int large_pages = 0;
 
 #if defined(HCL_BUILD_DEBUG)
 	const char* dbgopt = HCL_NULL;
@@ -1477,9 +1522,13 @@ int main (int argc, char* argv[])
 				break;
 
 			case '\0':
-				
+				if (hcl_compbcstr(opt.lngopt, "large-pages") == 0)
+				{
+					large_pages = 1;
+					break;
+				}
 			#if defined(HCL_BUILD_DEBUG)
-				if (hcl_compbcstr(opt.lngopt, "debug") == 0)
+				else if (hcl_compbcstr(opt.lngopt, "debug") == 0)
 				{
 					dbgopt = opt.arg;
 					break;
@@ -1504,19 +1553,23 @@ int main (int argc, char* argv[])
 	if (opt.ind >= argc) goto print_usage;
 #endif
 
-
 	memset (&vmprim, 0, HCL_SIZEOF(vmprim));
+	if (large_pages)
+	{
+		vmprim.alloc_heap = alloc_heap;
+		vmprim.free_heap = free_heap;
+	}
+	vmprim.log_write = log_write;
+	vmprim.syserrstrb = syserrstrb;
 	vmprim.dl_open = dl_open;
 	vmprim.dl_close = dl_close;
 	vmprim.dl_getsym = dl_getsym;
-	vmprim.log_write = log_write;
-	vmprim.syserrstrb = syserrstrb;
 	vmprim.vm_startup = vm_startup;
 	vmprim.vm_cleanup = vm_cleanup;
 	vmprim.vm_gettime = vm_gettime;
 	vmprim.vm_sleep = vm_sleep;
 
-	hcl = hcl_open (&sys_mmgr, HCL_SIZEOF(xtn_t), 2048000lu, &vmprim, HCL_NULL);
+	hcl = hcl_open (&sys_mmgr, HCL_SIZEOF(xtn_t), memsize, &vmprim, HCL_NULL);
 	if (!hcl)
 	{
 		printf ("cannot open hcl\n");

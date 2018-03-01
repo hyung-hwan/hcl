@@ -686,6 +686,14 @@ struct hcl_heap_t
 /* =========================================================================
  * VIRTUAL MACHINE PRIMITIVES
  * ========================================================================= */
+
+typedef void* (*hcl_alloc_heap_t) (hcl_t* hcl, hcl_oow_t size);
+typedef void (*hcl_free_heap_t) (hcl_t* hcl, void* ptr);
+
+typedef void (*hcl_log_write_t) (hcl_t* hcl, int mask, const hcl_ooch_t* msg, hcl_oow_t len);
+typedef void (*hcl_syserrstrb_t) (hcl_t* hcl, int syserr, hcl_bch_t* buf, hcl_oow_t len);
+typedef void (*hcl_syserrstru_t) (hcl_t* hcl, int syserr, hcl_uch_t* buf, hcl_oow_t len);
+
 enum hcl_vmprim_opendl_flag_t
 {
 	HCL_VMPRIM_OPENDL_PFMOD = (1 << 0)
@@ -696,26 +704,33 @@ typedef void* (*hcl_vmprim_dlopen_t) (hcl_t* hcl, const hcl_ooch_t* name, int fl
 typedef void (*hcl_vmprim_dlclose_t) (hcl_t* hcl, void* handle);
 typedef void* (*hcl_vmprim_dlgetsym_t) (hcl_t* hcl, void* handle, const hcl_ooch_t* name);
 
-typedef void (*hcl_log_write_t) (hcl_t* hcl, int mask, const hcl_ooch_t* msg, hcl_oow_t len);
-typedef void (*hcl_syserrstrb_t) (hcl_t* hcl, int syserr, hcl_bch_t* buf, hcl_oow_t len);
-typedef void (*hcl_syserrstru_t) (hcl_t* hcl, int syserr, hcl_uch_t* buf, hcl_oow_t len);
-
 typedef int (*hcl_vmprim_startup_t) (hcl_t* hcl);
 typedef void (*hcl_vmprim_cleanup_t) (hcl_t* hcl);
 typedef void (*hcl_vmprim_gettime_t) (hcl_t* hcl, hcl_ntime_t* now);
-
 
 typedef void (*hcl_vmprim_sleep_t) (hcl_t* hcl, const hcl_ntime_t* duration);
 
 struct hcl_vmprim_t
 {
-	hcl_vmprim_dlopen_t   dl_open;
-	hcl_vmprim_dlclose_t  dl_close;
-	hcl_vmprim_dlgetsym_t dl_getsym;
+	/* The alloc_heap callback function is called very earlier
+	 * before hcl is fully initialized. so few features are availble
+	 * in this callback function. If it's not provided, the default
+	 * implementation is used. */
+	hcl_alloc_heap_t      alloc_heap;
+
+	/* If you customize the heap allocator by providing the alloc_heap
+	 * callback, you should implement the heap freer. otherwise the default
+	 * implementation doesn't know how to free the heap allocated by 
+	 * the allocator callback. */
+	hcl_free_heap_t       free_heap;
 
 	hcl_log_write_t       log_write;
 	hcl_syserrstrb_t      syserrstrb;
 	hcl_syserrstru_t      syserrstru;
+
+	hcl_vmprim_dlopen_t   dl_open;
+	hcl_vmprim_dlclose_t  dl_close;
+	hcl_vmprim_dlgetsym_t dl_getsym;
 
 	hcl_vmprim_startup_t  vm_startup;
 	hcl_vmprim_cleanup_t  vm_cleanup;

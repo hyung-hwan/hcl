@@ -321,7 +321,6 @@ void hcl_seterrwithsyserr (hcl_t* hcl, int syserr)
 	}
 }
 
-
 void hcl_getsynerr (hcl_t* hcl, hcl_synerr_t* synerr)
 {
 	HCL_ASSERT (hcl, hcl->c != HCL_NULL);
@@ -444,7 +443,6 @@ void hcl_assertfailed (hcl_t* hcl, const hcl_bch_t* expr, const hcl_bch_t* file,
 #endif
 
 	hcl_logbfmt (hcl, HCL_LOG_UNTYPED | HCL_LOG_FATAL, "ASSERTION FAILURE: %s at %s:%zu\n", expr, file, line);
-
 
 #if defined(HAVE_BACKTRACE)
 	btsize = backtrace (btarray, HCL_COUNTOF(btarray));

@@ -83,6 +83,16 @@ static void fill_bigint_tables (hcl_t* hcl)
 	}
 }
 
+static void* alloc_heap (hcl_t* hcl, hcl_oow_t size)
+{
+	return HCL_MMGR_ALLOC(hcl->mmgr, size);
+}
+
+static void free_heap (hcl_t* hcl, void* ptr)
+{
+	return HCL_MMGR_FREE(hcl->mmgr, ptr);
+}
+
 int hcl_init (hcl_t* hcl, hcl_mmgr_t* mmgr, hcl_oow_t heapsz, const hcl_vmprim_t* vmprim)
 {
 	int modtab_inited = 0;
@@ -97,6 +107,8 @@ int hcl_init (hcl_t* hcl, hcl_mmgr_t* mmgr, hcl_oow_t heapsz, const hcl_vmprim_t
 	hcl->mmgr = mmgr;
 	hcl->cmgr = hcl_getutf8cmgr();
 	hcl->vmprim = *vmprim;
+	if (!hcl->vmprim.alloc_heap) hcl->vmprim.alloc_heap = alloc_heap;
+	if (!hcl->vmprim.free_heap) hcl->vmprim.free_heap = free_heap;
 
 	hcl->option.log_mask = ~0u;
 	hcl->option.log_maxcapa = HCL_DFL_LOG_MAXCAPA;
@@ -113,19 +125,19 @@ int hcl_init (hcl_t* hcl, hcl_mmgr_t* mmgr, hcl_oow_t heapsz, const hcl_vmprim_t
 	 * routine still function despite some side-effects when
 	 * reallocation fails */
 	/* +1 required for consistency with put_oocs and put_ooch in logfmt.c */
-	hcl->log.ptr = (hcl_ooch_t*)hcl_allocmem (hcl, (hcl->log.capa + 1) * HCL_SIZEOF(*hcl->log.ptr)); 
+	hcl->log.ptr = (hcl_ooch_t*)hcl_allocmem(hcl, (hcl->log.capa + 1) * HCL_SIZEOF(*hcl->log.ptr)); 
 	if (!hcl->log.ptr) goto oops;
 
 	/*hcl->permheap = hcl_makeheap (hcl, what is the best size???);
 	if (!hcl->curheap) goto oops; */
-	hcl->curheap = hcl_makeheap (hcl, heapsz);
+	hcl->curheap = hcl_makeheap(hcl, heapsz);
 	if (!hcl->curheap) goto oops;
-	hcl->newheap = hcl_makeheap (hcl, heapsz);
+	hcl->newheap = hcl_makeheap(hcl, heapsz);
 	if (!hcl->newheap) goto oops;
 
-	if (hcl_rbt_init (&hcl->modtab, hcl, HCL_SIZEOF(hcl_ooch_t), 1) <= -1) goto oops;
+	if (hcl_rbt_init(&hcl->modtab, hcl, HCL_SIZEOF(hcl_ooch_t), 1) <= -1) goto oops;
 	modtab_inited = 1;
-	hcl_rbt_setstyle (&hcl->modtab, hcl_getrbtstyle(HCL_RBT_STYLE_INLINE_COPIERS));
+	hcl_rbt_setstyle(&hcl->modtab, hcl_getrbtstyle(HCL_RBT_STYLE_INLINE_COPIERS));
 
 	fill_bigint_tables (hcl);
 
@@ -241,7 +253,7 @@ void hcl_fini (hcl_t* hcl)
 
 	hcl_killheap (hcl, hcl->newheap);
 	hcl_killheap (hcl, hcl->curheap);
-	hcl_killheap (hcl, hcl->permheap);
+	if (hcl->permheap) hcl_killheap (hcl, hcl->permheap);
 
 	if (hcl->log.ptr) 
 	{
