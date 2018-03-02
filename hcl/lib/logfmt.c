@@ -95,7 +95,7 @@ static struct
 };
 
 
-enum 
+enum
 {
 	FLAGC_DOT       = (1 << 0),
 	FLAGC_SPACE     = (1 << 1),
@@ -1000,6 +1000,11 @@ static HCL_INLINE int print_formatted (hcl_t* hcl, hcl_ooi_t nargs, hcl_fmtout_t
 		case 'O': /* object - ignore precision, width, adjustment */
 			GET_NEXT_ARG_TO (hcl, nargs, &arg_state, arg);
 			if (hcl_outfmtobj(hcl, data->mask, arg, outbfmt) <= -1) goto oops;
+			break;
+
+		case 'J':
+			GET_NEXT_ARG_TO (hcl, nargs, &arg_state, arg);
+			if (hcl_outfmtobj(hcl, data->mask | HCL_LOG_PREFER_JSON, arg, outbfmt) <= -1) goto oops;
 			break;
 
 		number:

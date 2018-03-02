@@ -588,6 +588,10 @@ static int logfmtv (hcl_t* hcl, const fmtchar_t* fmt, hcl_fmtout_t* data, va_lis
 			if (hcl_outfmtobj(hcl, data->mask, va_arg(ap, hcl_oop_t), outbfmt) <= -1) goto oops;
 			break;
 
+		case 'J':
+			if (hcl_outfmtobj(hcl, data->mask | HCL_LOG_PREFER_JSON, va_arg(ap, hcl_oop_t), outbfmt) <= -1) goto oops;
+			break;
+
 #if 0
 		case 'e':
 		case 'E':

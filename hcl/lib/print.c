@@ -196,6 +196,34 @@ static HCL_INLINE int outfmt_obj (hcl_t* hcl, int mask, hcl_oop_t obj, hcl_outbf
 	print_stack_t ps;
 	int brand;
 	int word_index;
+	int word_offset;
+	int json;
+
+	static const hcl_bch_t *opening_parens[][2] =
+	{
+		{ "(",  "(" },   /*HCL_CONCODE_XLIST */
+		{ "#(", "[" },  /*HCL_CONCODE_ARRAY */
+		{ "#[", "[" },  /*HCL_CONCODE_BYTEARRAY */
+		{ "#{", "{" },  /*HCL_CONCODE_DIC */
+		{ "[",  "]" }  /*HCL_CONCODE_QLIST */
+	};
+
+	static const hcl_bch_t *closing_parens[][2] =
+	{
+		{ ")",  ")" },   /*HCL_CONCODE_XLIST */
+		{ ")",  "]" },   /*HCL_CONCODE_ARRAY */
+		{ "]",  "]" },   /*HCL_CONCODE_BYTEARRAY */
+		{ "}",  "}" },   /*HCL_CONCODE_DIC */
+		{ "]",  "]" }    /*HCL_CONCODE_QLIST */
+	};
+
+	static const hcl_bch_t* breakers[][2] = 
+	{
+		{ " ", "," }, /* item breaker */
+		{ " ", ":" }  /* key value breaker */
+	};
+
+	json = !!(mask & HCL_LOG_PREFER_JSON);
 
 next:
 	switch ((brand = HCL_BRANDOF(hcl, obj))) 
@@ -223,14 +251,17 @@ next:
 
 		case HCL_BRAND_NIL:
 			word_index = WORD_NIL;
+			word_offset = json;
 			goto print_word;
 
 		case HCL_BRAND_TRUE:
 			word_index = WORD_TRUE;
+			word_offset = json;
 			goto print_word;
 
 		case HCL_BRAND_FALSE:
 			word_index = WORD_FALSE;
+			word_offset = json;
 			goto print_word;
 
 		case HCL_BRAND_PBIGINT:
@@ -311,28 +342,13 @@ next:
 
 		case HCL_BRAND_CONS:
 		{
-			static hcl_bch_t *opening_paren[] =
-			{
-				"(",   /*HCL_CONCODE_XLIST */
-				"#(",  /*HCL_CONCODE_ARRAY */
-				"#[",  /*HCL_CONCODE_BYTEARRAY */
-				"#{",  /*HCL_CONCODE_DIC */
-				"["   /*HCL_CONCODE_QLIST */
-			};
-
-			static hcl_bch_t *closing_paren[] =
-			{
-				")",   /*HCL_CONCODE_XLIST */
-				")",   /*HCL_CONCODE_ARRAY */
-				"]",   /*HCL_CONCODE_BYTEARRAY */
-				"}",   /*HCL_CONCODE_DIC */
-				"]"    /*HCL_CONCODE_QLIST */
-			};
-
 			int concode;
 
+			/* this part is to print a linked list of cells. ignore the
+			 * request to output in the json format */
+
 			concode = HCL_OBJ_GET_FLAGS_SYNCODE(obj);
-			if (outbfmt(hcl, mask, opening_paren[concode]) <= -1) return -1;
+			if (outbfmt(hcl, mask, opening_parens[concode][0]) <= -1) return -1;
 			cur = obj;
 
 			do
@@ -384,11 +400,11 @@ next:
 				}
 
 				/* The CDR part points to a pair. proceed to it */
-				if (outbfmt(hcl, mask, " ") <= -1) return -1;
+				if (outbfmt(hcl, mask, breakers[0][0]) <= -1) return -1;
 			}
 			while (1);
 
-			if (outbfmt(hcl, mask, closing_paren[concode]) <= -1) return -1;
+			if (outbfmt(hcl, mask, closing_parens[concode][0]) <= -1) return -1;
 			break;
 		}
 
@@ -396,11 +412,11 @@ next:
 		{
 			hcl_oow_t arridx;
 
-			if (outbfmt(hcl, mask, "#(") <= -1) return -1;
+			if (outbfmt(hcl, mask, opening_parens[HCL_CONCODE_ARRAY][json]) <= -1) return -1;
 
 			if (HCL_OBJ_GET_SIZE(obj) <= 0) 
 			{
-				if (outbfmt(hcl, mask, ")") <= -1) return -1;
+				if (outbfmt(hcl, mask, closing_parens[HCL_CONCODE_ARRAY][json]) <= -1) return -1;
 				break;
 			}
 			arridx = 0;
@@ -428,7 +444,7 @@ next:
 				obj = ((hcl_oop_oop_t)obj)->slot[arridx];
 				if (arridx > 0) 
 				{
-					if (outbfmt(hcl, mask, " ") <= -1) return -1;
+					if (outbfmt(hcl, mask, breakers[0][json]) <= -1) return -1;
 				}
 				/* Jump to the 'next' label so that the object 
 				 * pointed to by 'obj' is printed. Once it 
@@ -448,14 +464,16 @@ next:
 		case HCL_BRAND_BYTE_ARRAY:
 		{
 			hcl_oow_t i;
-
-			if (outbfmt(hcl, mask, "#[") <= -1) return -1;
-
-			for (i = 0; i < HCL_OBJ_GET_SIZE(obj); i++)
+			if (outbfmt(hcl, mask, opening_parens[HCL_CONCODE_BYTEARRAY][json]) <= -1) return -1;
+			if (HCL_OBJ_GET_SIZE(obj) > 0)
 			{
-				if (outbfmt(hcl, mask, "%hs%d", ((i > 0)? " ": ""), ((hcl_oop_byte_t)obj)->slot[i]) <= -1) return -1;
+				if (outbfmt(hcl, mask, "%d", ((hcl_oop_byte_t)obj)->slot[0]) <= -1) return -1;
+				for (i = 1; i < HCL_OBJ_GET_SIZE(obj); i++)
+				{
+					if (outbfmt(hcl, mask, "%hs%d", breakers[0][json], ((hcl_oop_byte_t)obj)->slot[i]) <= -1) return -1;
+				}
 			}
-			if (outbfmt(hcl, mask, "]") <= -1) return -1;
+			if (outbfmt(hcl, mask, closing_parens[HCL_CONCODE_BYTEARRAY][json]) <= -1) return -1;
 			break;
 		}
 
@@ -464,13 +482,13 @@ next:
 			hcl_oow_t bucidx, bucsize, buctally;
 			hcl_oop_dic_t dic;
 
-			if (outbfmt(hcl, mask, "#{") <= -1) return -1;
+			if (outbfmt(hcl, mask, opening_parens[HCL_CONCODE_DIC][json]) <= -1) return -1;
 
 			dic = (hcl_oop_dic_t)obj;
 			HCL_ASSERT (hcl, HCL_OOP_IS_SMOOI(dic->tally));
 			if (HCL_OOP_TO_SMOOI(dic->tally) <= 0) 
 			{
-				if (outbfmt(hcl, mask, "}") <= -1) return -1;
+				if (outbfmt(hcl, mask, closing_parens[HCL_CONCODE_DIC][json]) <= -1) return -1;
 				break;
 			}
 			bucidx = 0;
@@ -496,7 +514,7 @@ next:
 					if (bucidx >= bucsize)
 					{
 						/* done. scanned the entire bucket */
-						if (outbfmt(hcl, mask, "}") <= -1) return -1;
+						if (outbfmt(hcl, mask, closing_parens[HCL_CONCODE_DIC][json]) <= -1) return -1;
 						break;
 					}
 
@@ -537,7 +555,7 @@ next:
 
 				if (buctally > 0) 
 				{
-					if (outbfmt(hcl, mask, " ") <= -1) return -1;
+					if (outbfmt(hcl, mask, breakers[buctally & 1][json]) <= -1) return -1;
 				}
 				
 				/* Jump to the 'next' label so that the object 
@@ -606,7 +624,7 @@ next:
 			return -1;
 
 		print_word:
-			if (outbfmt(hcl, mask, "%.*js", word[word_index].len, word[word_index].ptr) <= -1) return -1;
+			if (outbfmt(hcl, mask, "%.*js", word[word_index].len - word_offset, word[word_index].ptr + word_offset) <= -1) return -1;
 			break;
 	}
 

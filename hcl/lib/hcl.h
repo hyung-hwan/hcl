@@ -1011,7 +1011,6 @@ struct hcl_t
 	hcl_oop_t _else;   /* symbol */
 	hcl_oop_t _if;     /* symbol */
 	hcl_oop_t _lambda; /* symbol */
-	hcl_oop_t _quote;  /* symbol */
 	hcl_oop_t _return; /* symbol */
 	hcl_oop_t _set;    /* symbol */
 	hcl_oop_t _until;  /* symbol */
@@ -1156,28 +1155,29 @@ struct hcl_t
 
 enum hcl_log_mask_t
 {
-	HCL_LOG_DEBUG      = (1 << 0),
-	HCL_LOG_INFO       = (1 << 1),
-	HCL_LOG_WARN       = (1 << 2),
-	HCL_LOG_ERROR      = (1 << 3),
-	HCL_LOG_FATAL      = (1 << 4),
+	HCL_LOG_DEBUG       = (1 << 0),
+	HCL_LOG_INFO        = (1 << 1),
+	HCL_LOG_WARN        = (1 << 2),
+	HCL_LOG_ERROR       = (1 << 3),
+	HCL_LOG_FATAL       = (1 << 4),
 
-	HCL_LOG_UNTYPED    = (1 << 6), /* only to be used by HCL_DEBUGx() and HCL_INFOx() */
-	HCL_LOG_COMPILER   = (1 << 7),
-	HCL_LOG_VM         = (1 << 8),
-	HCL_LOG_MNEMONIC   = (1 << 9), /* bytecode mnemonic */
-	HCL_LOG_GC         = (1 << 10),
-	HCL_LOG_IC         = (1 << 11), /* instruction cycle, fetch-decode-execute */
-	HCL_LOG_PRIMITIVE  = (1 << 12),
-	HCL_LOG_APP        = (1 << 13), /* hcl applications, set by hcl logging primitive */
+	HCL_LOG_UNTYPED     = (1 << 6), /* only to be used by HCL_DEBUGx() and HCL_INFOx() */
+	HCL_LOG_COMPILER    = (1 << 7),
+	HCL_LOG_VM          = (1 << 8),
+	HCL_LOG_MNEMONIC    = (1 << 9), /* bytecode mnemonic */
+	HCL_LOG_GC          = (1 << 10),
+	HCL_LOG_IC          = (1 << 11), /* instruction cycle, fetch-decode-execute */
+	HCL_LOG_PRIMITIVE   = (1 << 12),
+	HCL_LOG_APP         = (1 << 13), /* hcl applications, set by hcl logging primitive */
 
-	HCL_LOG_ALL_LEVELS = (HCL_LOG_DEBUG  | HCL_LOG_INFO | HCL_LOG_WARN | HCL_LOG_ERROR | HCL_LOG_FATAL),
-	HCL_LOG_ALL_TYPES  = (HCL_LOG_UNTYPED | HCL_LOG_COMPILER | HCL_LOG_VM | HCL_LOG_MNEMONIC | HCL_LOG_GC | HCL_LOG_IC | HCL_LOG_PRIMITIVE | HCL_LOG_APP),
+	HCL_LOG_ALL_LEVELS  = (HCL_LOG_DEBUG  | HCL_LOG_INFO | HCL_LOG_WARN | HCL_LOG_ERROR | HCL_LOG_FATAL),
+	HCL_LOG_ALL_TYPES   = (HCL_LOG_UNTYPED | HCL_LOG_COMPILER | HCL_LOG_VM | HCL_LOG_MNEMONIC | HCL_LOG_GC | HCL_LOG_IC | HCL_LOG_PRIMITIVE | HCL_LOG_APP),
 
 
-	HCL_LOG_STDOUT     = (1 << 14), /* write log messages to stdout without timestamp. HCL_LOG_STDOUT wins over HCL_LOG_STDERR. */
-	HCL_LOG_STDERR     = (1 << 15)  /* write log messages to stderr without timestamp. */
+	HCL_LOG_STDOUT      = (1 << 14),  /* write log messages to stdout without timestamp. HCL_LOG_STDOUT wins over HCL_LOG_STDERR. */
+	HCL_LOG_STDERR      = (1 << 15),  /* write log messages to stderr without timestamp. */
 
+	HCL_LOG_PREFER_JSON = (1 << 30)   /* write a object in the json format. don't set this explicitly. use %J instead */
 };
 typedef enum hcl_log_mask_t hcl_log_mask_t;
 
