@@ -83,6 +83,10 @@ enum
 	WORD_TRUE,
 	WORD_FALSE,
 
+	WORD_NIL_JSON, /* this must be greater than WORD_NIL by 3 */
+	WORD_TRUE_JSON,  /* this must be greater than WORD_TRUE by 3 */
+	WORD_FALSE_JSON, /* this must be greater than WORD_FALSE by 3 */
+
 	WORD_SET,
 	WORD_CFRAME,
 	WORD_PRIM,
@@ -102,6 +106,10 @@ static struct
 	{  4,  { '#','n', 'i', 'l' } },
 	{  5,  { '#','t', 'r', 'u', 'e' } },
 	{  6,  { '#','f', 'a', 'l', 's', 'e' } },
+
+	{  4,  { 'n', 'u', 'l', 'l' } },
+	{  4,  { 't', 'r', 'u', 'e' } },
+	{  5,  { 'f', 'a', 'l', 's', 'e' } },
 
 	{  6,  { '#','<','S','E','T','>' } },
 	{  9,  { '#','<','C','F','R','A','M','E','>' } },
@@ -196,7 +204,6 @@ static HCL_INLINE int outfmt_obj (hcl_t* hcl, int mask, hcl_oop_t obj, hcl_outbf
 	print_stack_t ps;
 	int brand;
 	int word_index;
-	int word_offset;
 	int json;
 
 	static const hcl_bch_t *opening_parens[][2] =
@@ -250,18 +257,15 @@ next:
 		}
 
 		case HCL_BRAND_NIL:
-			word_index = WORD_NIL;
-			word_offset = json;
+			word_index = WORD_NIL + (json * 3);
 			goto print_word;
 
 		case HCL_BRAND_TRUE:
-			word_index = WORD_TRUE;
-			word_offset = json;
+			word_index = WORD_TRUE + (json * 3);
 			goto print_word;
 
 		case HCL_BRAND_FALSE:
-			word_index = WORD_FALSE;
-			word_offset = json;
+			word_index = WORD_FALSE + (json * 3);
 			goto print_word;
 
 		case HCL_BRAND_PBIGINT:
@@ -624,7 +628,7 @@ next:
 			return -1;
 
 		print_word:
-			if (outbfmt(hcl, mask, "%.*js", word[word_index].len - word_offset, word[word_index].ptr + word_offset) <= -1) return -1;
+			if (outbfmt(hcl, mask, "%.*js", word[word_index].len, word[word_index].ptr) <= -1) return -1;
 			break;
 	}
 

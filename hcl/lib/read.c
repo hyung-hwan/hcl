@@ -284,9 +284,10 @@ static HCL_INLINE int is_alnumchar (hcl_ooci_t c)
 
 static HCL_INLINE int is_delimiter (hcl_ooci_t c)
 {
-	return c == '(' || c == ')' || c == '[' || c == ']' || c == '{' || c == '}' || c == '\"' || c == '\'' || c == '#' || c == ';' || c == '|' || c == '.' || is_spacechar(c) || c == HCL_UCI_EOF;
+	return c == '(' || c == ')' || c == '[' || c == ']' || c == '{' || c == '}' ||
+	       c == '\"' || c == '\'' || c == '#' || c == ';' || c == '|' || c == '.' ||
+	       c == ',' || c == ':' || is_spacechar(c) || c == HCL_UCI_EOF;
 }
-
 
 static int copy_string_to (hcl_t* hcl, const hcl_oocs_t* src, hcl_oocs_t* dst, hcl_oow_t* dst_capa, int append, hcl_ooch_t add_delim)
 {
