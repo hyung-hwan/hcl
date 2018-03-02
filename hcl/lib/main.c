@@ -454,7 +454,10 @@ static void* alloc_heap (hcl_t* hcl, hcl_oow_t size)
 	int flags;
 	hcl_oow_t actual_size;
 
-	flags = MAP_PRIVATE | MAP_ANONYMOUS | MAP_HUGETLB;
+	flags = MAP_PRIVATE | MAP_ANONYMOUS;
+#if defined(MAP_HUGETLB)
+	flags |= MAP_HUGETLB;
+#endif
 #if defined(MAP_UNINITIALIZED)
 	flags |= MAP_UNINITIALIZED;
 #endif
@@ -465,11 +468,15 @@ static void* alloc_heap (hcl_t* hcl, hcl_oow_t size)
 	ptr = (hcl_oow_t*)mmap(NULL, actual_size, PROT_READ | PROT_WRITE, flags, -1, 0);
 	if (ptr == MAP_FAILED) 
 	{
+#if defined(MAP_HUGETLB)
 		flags &= ~MAP_HUGETLB;
 		ptr = (hcl_oow_t*)mmap(NULL, actual_size, PROT_READ | PROT_WRITE, flags, -1, 0);
 		if (ptr == MAP_FAILED) return HCL_NULL;
+#else
+		return HCL_NULL;
+#endif
 	}
-	*ptr = size;
+	*ptr = actual_size;
 
 	return (void*)(ptr + 1);
 	/*return HCL_MMGR_ALLOC(hcl->mmgr, size);*/
