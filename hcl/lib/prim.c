@@ -417,8 +417,8 @@ static pf_t builtin_prims[] =
 	{ 0, 0,                       pf_gc,            2,  { 'g','c' } },
 
 	{ 1, 1,                       pf_not,           3,  { 'n','o','t' } }, 
-	{ 2, HCL_TYPE_MAX(hcl_oow_t), pf_and,           3,  { 'a','n','d' } },
-	{ 2, HCL_TYPE_MAX(hcl_oow_t), pf_or,            2,  { 'o','r' } },
+	{ 2, HCL_TYPE_MAX(hcl_oow_t), pf_and,           4,  { '_','a','n','d' } },
+	{ 2, HCL_TYPE_MAX(hcl_oow_t), pf_or,            3,  { '_','o','r' } },
 
 	{ 2, 2,                       pf_eqv,           4,  { 'e','q','v','?' } },
 	{ 2, 2,                       pf_eql,           4,  { 'e','q','l','?' } },

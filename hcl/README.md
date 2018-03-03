@@ -7,6 +7,7 @@ A HCL program is composed of 0 or more expressions.
 
 ## Special Form Expression
 
+* and
 * break
 * defun
 * do
@@ -14,6 +15,7 @@ A HCL program is composed of 0 or more expressions.
 * else
 * if
 * lambda
+* or
 * return
 * set
 * until

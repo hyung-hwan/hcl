@@ -638,6 +638,12 @@ enum
 	COP_EMIT_RETURN,
 	COP_EMIT_SET,
 
+	COP_SUBCOMPILE_AND_EXPR,
+	COP_SUBCOMPILE_OR_EXPR,
+	
+	COP_POST_AND_EXPR,
+	COP_POST_OR_EXPR,
+
 	COP_POST_IF_COND,
 	COP_POST_IF_BODY,
 
@@ -652,14 +658,68 @@ enum
 /* ========================================================================= */
 static int compile_and (hcl_t* hcl, hcl_oop_t src)
 {
-	hcl_seterrbfmt (hcl, HCL_ENOIMPL, "and not implemented");
-	return -1;
+	hcl_oop_t expr, obj;
+
+	HCL_ASSERT (hcl, HCL_IS_CONS(hcl, src));
+	HCL_ASSERT (hcl, HCL_CONS_CAR(src) == hcl->_and);
+
+	obj = HCL_CONS_CDR(src);
+
+	if (HCL_IS_NIL(hcl, obj))
+	{
+		/* no value */
+		hcl_setsynerrbfmt (hcl, HCL_SYNERR_ARGCOUNT, HCL_NULL, HCL_NULL,
+			"no expression specified in and - %O", src); /* TODO: error location */
+		return -1;
+	}
+	else if (!HCL_IS_CONS(hcl, obj))
+	{
+		hcl_setsynerrbfmt (hcl, HCL_SYNERR_DOTBANNED, HCL_NULL, HCL_NULL,
+			"redundant cdr in and - %O", src); /* TODO: error location */
+		return -1;
+	}
+
+/* TODO: optimization - eat away all truee expressions */
+	expr = HCL_CONS_CAR(obj);
+	obj = HCL_CONS_CDR(obj);
+
+	SWITCH_TOP_CFRAME (hcl, COP_COMPILE_OBJECT, expr); /* 1 */
+	PUSH_SUBCFRAME (hcl, COP_SUBCOMPILE_AND_EXPR, obj); /* 2 */
+
+	return 0;
 }
 
 static int compile_or (hcl_t* hcl, hcl_oop_t src)
 {
-	hcl_seterrbfmt (hcl, HCL_ENOIMPL, "or not implemented");
-	return -1;
+	hcl_oop_t expr, obj;
+
+	HCL_ASSERT (hcl, HCL_IS_CONS(hcl, src));
+	HCL_ASSERT (hcl, HCL_CONS_CAR(src) == hcl->_or);
+
+	obj = HCL_CONS_CDR(src);
+
+	if (HCL_IS_NIL(hcl, obj))
+	{
+		/* no value */
+		hcl_setsynerrbfmt (hcl, HCL_SYNERR_ARGCOUNT, HCL_NULL, HCL_NULL,
+			"no expression specified in or - %O", src); /* TODO: error location */
+		return -1;
+	}
+	else if (!HCL_IS_CONS(hcl, obj))
+	{
+		hcl_setsynerrbfmt (hcl, HCL_SYNERR_DOTBANNED, HCL_NULL, HCL_NULL,
+			"redundant cdr in or - %O", src); /* TODO: error location */
+		return -1;
+	}
+
+/* TODO: optimization - eat away all false expressions */
+	expr = HCL_CONS_CAR(obj);
+	obj = HCL_CONS_CDR(obj);
+
+	SWITCH_TOP_CFRAME (hcl, COP_COMPILE_OBJECT, expr); /* 1 */
+	PUSH_SUBCFRAME (hcl, COP_SUBCOMPILE_OR_EXPR, obj); /* 2 */
+
+	return 0;
 }
 
 static int compile_break (hcl_t* hcl, hcl_oop_t src)
@@ -1978,6 +2038,140 @@ static HCL_INLINE int subcompile_else (hcl_t* hcl)
 
 /* ========================================================================= */
 
+static HCL_INLINE int subcompile_and_expr (hcl_t* hcl)
+{
+	hcl_oop_t obj, expr;
+	hcl_cframe_t* cf;
+	hcl_ooi_t jump_inst_pos;
+	
+	cf = GET_TOP_CFRAME(hcl);
+	HCL_ASSERT (hcl, cf->opcode == COP_SUBCOMPILE_AND_EXPR);
+
+	obj = cf->operand;
+
+/* TODO: optimization - eat away all true expressions */
+	if (HCL_IS_NIL(hcl, obj))
+	{
+		/* no more */
+		POP_CFRAME (hcl);
+		return 0;
+	}
+	else if (!HCL_IS_CONS(hcl, obj))
+	{
+		hcl_setsynerrbfmt (hcl, HCL_SYNERR_DOTBANNED, HCL_NULL, HCL_NULL,
+			"redundant cdr in and - %O", obj); /* TODO: error location */
+		return -1;
+	}
+
+	HCL_ASSERT (hcl, hcl->code.bc.len < HCL_SMOOI_MAX);
+	jump_inst_pos = hcl->code.bc.len;
+
+	if (emit_single_param_instruction(hcl, HCL_CODE_JUMP_FORWARD_IF_FALSE, MAX_CODE_JUMP) <= -1) return -1;
+	if (emit_byte_instruction(hcl, HCL_CODE_POP_STACKTOP) <= -1) return -1; 
+
+	expr = HCL_CONS_CAR(obj);
+	obj = HCL_CONS_CDR(obj);
+
+	SWITCH_TOP_CFRAME (hcl, COP_COMPILE_OBJECT, expr); /* 1 */
+	
+	PUSH_SUBCFRAME (hcl, COP_POST_AND_EXPR, obj); /* 3 */
+	cf = GET_SUBCFRAME(hcl);
+	cf->operand = HCL_SMOOI_TO_OOP(jump_inst_pos);
+	
+	PUSH_SUBCFRAME (hcl, COP_SUBCOMPILE_AND_EXPR, obj); /* 2 */
+
+	return 0;
+}
+
+static HCL_INLINE int post_and_expr (hcl_t* hcl)
+{
+	hcl_cframe_t* cf;
+	hcl_ooi_t jip;
+	hcl_oow_t jump_offset;
+
+	cf = GET_TOP_CFRAME(hcl);
+	HCL_ASSERT (hcl, cf->opcode == COP_POST_AND_EXPR);
+
+	HCL_ASSERT (hcl, hcl->code.bc.len < HCL_SMOOI_MAX);
+	jip = HCL_OOP_TO_SMOOI(cf->operand);
+
+	/* patch the jump insruction emitted after each expression inside the 'and' expression */
+	jump_offset = hcl->code.bc.len - jip - (HCL_BCODE_LONG_PARAM_SIZE + 1);
+	patch_long_jump (hcl, jip, jump_offset);
+
+	POP_CFRAME(hcl);
+	return 0;
+}
+
+/* ========================================================================= */
+
+static HCL_INLINE int subcompile_or_expr (hcl_t* hcl)
+{
+	hcl_oop_t obj, expr;
+	hcl_cframe_t* cf;
+	hcl_ooi_t jump_inst_pos;
+	
+	cf = GET_TOP_CFRAME(hcl);
+	HCL_ASSERT (hcl, cf->opcode == COP_SUBCOMPILE_OR_EXPR);
+
+	obj = cf->operand;
+
+/* TODO: optimization - eat away all false expressions */
+	if (HCL_IS_NIL(hcl, obj))
+	{
+		/* no more */
+		POP_CFRAME (hcl);
+		return 0;
+	}
+	else if (!HCL_IS_CONS(hcl, obj))
+	{
+		hcl_setsynerrbfmt (hcl, HCL_SYNERR_DOTBANNED, HCL_NULL, HCL_NULL,
+			"redundant cdr in or - %O", obj); /* TODO: error location */
+		return -1;
+	}
+
+	HCL_ASSERT (hcl, hcl->code.bc.len < HCL_SMOOI_MAX);
+	jump_inst_pos = hcl->code.bc.len;
+
+	if (emit_single_param_instruction(hcl, HCL_CODE_JUMP_FORWARD_IF_TRUE, MAX_CODE_JUMP) <= -1) return -1;
+	if (emit_byte_instruction(hcl, HCL_CODE_POP_STACKTOP) <= -1) return -1; 
+
+	expr = HCL_CONS_CAR(obj);
+	obj = HCL_CONS_CDR(obj);
+
+	SWITCH_TOP_CFRAME (hcl, COP_COMPILE_OBJECT, expr); /* 1 */
+	
+	PUSH_SUBCFRAME (hcl, COP_POST_OR_EXPR, obj); /* 3 */
+	cf = GET_SUBCFRAME(hcl);
+	cf->operand = HCL_SMOOI_TO_OOP(jump_inst_pos);
+	
+	PUSH_SUBCFRAME (hcl, COP_SUBCOMPILE_OR_EXPR, obj); /* 2 */
+
+	return 0;
+}
+
+static HCL_INLINE int post_or_expr (hcl_t* hcl)
+{
+	hcl_cframe_t* cf;
+	hcl_ooi_t jip;
+	hcl_oow_t jump_offset;
+
+	cf = GET_TOP_CFRAME(hcl);
+	HCL_ASSERT (hcl, cf->opcode == COP_POST_OR_EXPR);
+
+	HCL_ASSERT (hcl, hcl->code.bc.len < HCL_SMOOI_MAX);
+	jip = HCL_OOP_TO_SMOOI(cf->operand);
+
+	/* patch the jump insruction emitted after each expression inside the 'and' expression */
+	jump_offset = hcl->code.bc.len - jip - (HCL_BCODE_LONG_PARAM_SIZE + 1);
+	patch_long_jump (hcl, jip, jump_offset);
+
+	POP_CFRAME(hcl);
+	return 0;
+}
+
+/* ========================================================================= */
+
 static HCL_INLINE int post_if_cond (hcl_t* hcl)
 {
 	hcl_cframe_t* cf;
@@ -2465,6 +2659,22 @@ int hcl_compile (hcl_t* hcl, hcl_oop_t obj)
 
 			case COP_EMIT_SET:
 				if (emit_set(hcl) <= -1) goto oops;
+				break;
+
+			case COP_SUBCOMPILE_AND_EXPR:
+				if (subcompile_and_expr(hcl) <= -1) goto oops;
+				break;
+				
+			case COP_SUBCOMPILE_OR_EXPR:
+				if (subcompile_or_expr(hcl) <= -1) goto oops;
+				break;
+				
+			case COP_POST_AND_EXPR:
+				if (post_and_expr(hcl) <= -1) goto oops;
+				break;
+				
+			case COP_POST_OR_EXPR:
+				if (post_or_expr(hcl) <= -1) goto oops;
 				break;
 
 			case COP_POST_IF_COND:
