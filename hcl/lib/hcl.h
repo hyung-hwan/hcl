@@ -1004,13 +1004,15 @@ struct hcl_t
 	hcl_oop_t _true;
 	hcl_oop_t _false;
 
+	hcl_oop_t _and;    /* symbol */
 	hcl_oop_t _break;  /* symbol */
 	hcl_oop_t _defun;  /* symbol */
-	hcl_oop_t _do;  /* symbol */
+	hcl_oop_t _do;     /* symbol */
 	hcl_oop_t _elif;   /* symbol */
 	hcl_oop_t _else;   /* symbol */
 	hcl_oop_t _if;     /* symbol */
 	hcl_oop_t _lambda; /* symbol */
+	hcl_oop_t _or;     /* symbol */
 	hcl_oop_t _return; /* symbol */
 	hcl_oop_t _set;    /* symbol */
 	hcl_oop_t _until;  /* symbol */
@@ -1269,13 +1271,15 @@ typedef enum hcl_brand_t hcl_brand_t;
 enum hcl_syncode_t
 {
 	/* SYNCODE 0 means it's not a syncode object. so it begins with 1 */
-	HCL_SYNCODE_BREAK = 1,
+	HCL_SYNCODE_AND = 1,
+	HCL_SYNCODE_BREAK,
 	HCL_SYNCODE_DEFUN,
 	HCL_SYNCODE_DO,
 	HCL_SYNCODE_ELIF,
 	HCL_SYNCODE_ELSE,
 	HCL_SYNCODE_IF,
 	HCL_SYNCODE_LAMBDA,
+	HCL_SYNCODE_OR,
 	HCL_SYNCODE_RETURN,
 	HCL_SYNCODE_SET,
 	HCL_SYNCODE_UNTIL,

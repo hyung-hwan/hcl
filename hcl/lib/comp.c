@@ -650,6 +650,17 @@ enum
 };
 
 /* ========================================================================= */
+static int compile_and (hcl_t* hcl, hcl_oop_t src)
+{
+	hcl_seterrbfmt (hcl, HCL_ENOIMPL, "and not implemented");
+	return -1;
+}
+
+static int compile_or (hcl_t* hcl, hcl_oop_t src)
+{
+	hcl_seterrbfmt (hcl, HCL_ENOIMPL, "or not implemented");
+	return -1;
+}
 
 static int compile_break (hcl_t* hcl, hcl_oop_t src)
 {
@@ -1301,6 +1312,10 @@ static int compile_cons_xlist_expression (hcl_t* hcl, hcl_oop_t obj)
 	{
 		switch (syncode)
 		{
+			case HCL_SYNCODE_AND:
+				if (compile_and(hcl, obj) <= -1) return -1;
+				break;
+
 			case HCL_SYNCODE_BREAK:
 				/* break */
 				if (compile_break(hcl, obj) <= -1) return -1;
@@ -1329,6 +1344,10 @@ static int compile_cons_xlist_expression (hcl_t* hcl, hcl_oop_t obj)
 			case HCL_SYNCODE_LAMBDA:
 				/* (lambda (x y) (+ x y)) */
 				if (compile_lambda(hcl, obj, 0) <= -1) return -1;
+				break;
+
+			case HCL_SYNCODE_OR:
+				if (compile_or(hcl, obj) <= -1) return -1;
 				break;
 
 			case HCL_SYNCODE_SET:

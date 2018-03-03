@@ -34,7 +34,7 @@ static struct
 	hcl_oow_t  offset;
 } syminfo[] =
 {
-	
+	{  3, { 'a','n','d' },                 HCL_SYNCODE_AND,     HCL_OFFSETOF(hcl_t,_and)  },
 	{  5, { 'b','r','e','a','k' },         HCL_SYNCODE_BREAK,   HCL_OFFSETOF(hcl_t,_break)  },
 	{  5, { 'd','e','f','u','n' },         HCL_SYNCODE_DEFUN,   HCL_OFFSETOF(hcl_t,_defun)  },
 	{  2, { 'd','o' },                     HCL_SYNCODE_DO,      HCL_OFFSETOF(hcl_t,_do)  },
@@ -42,6 +42,7 @@ static struct
 	{  4, { 'e','l','s','e' },             HCL_SYNCODE_ELSE,    HCL_OFFSETOF(hcl_t,_else)   },
 	{  2, { 'i','f' },                     HCL_SYNCODE_IF,      HCL_OFFSETOF(hcl_t,_if)     },
 	{  6, { 'l','a','m','b','d','a' },     HCL_SYNCODE_LAMBDA,  HCL_OFFSETOF(hcl_t,_lambda) },
+	{  2, { 'o','r' },                     HCL_SYNCODE_OR,      HCL_OFFSETOF(hcl_t,_or)  },
 	{  6, { 'r','e','t','u','r','n'},      HCL_SYNCODE_RETURN,  HCL_OFFSETOF(hcl_t,_return) },
 	{  3, { 's','e','t' },                 HCL_SYNCODE_SET,     HCL_OFFSETOF(hcl_t,_set)    },
 	{  5, { 'u','n','t','i','l' },         HCL_SYNCODE_UNTIL,   HCL_OFFSETOF(hcl_t,_until)  },
