@@ -1497,6 +1497,7 @@ HCL_EXPORT hcl_oop_t hcl_read (
 	hcl_t*       hcl
 );
 
+
 HCL_EXPORT int hcl_print (
 	hcl_t*       hcl,
 	hcl_oop_t    obj
@@ -1511,6 +1512,21 @@ HCL_EXPORT int hcl_decode (
 	hcl_t*            hcl,
 	hcl_ooi_t         start,
 	hcl_ooi_t         end
+);
+
+
+/* if you should read charcters from the input stream before hcl_read(), 
+ * you can call hcl_readchar() */
+HCL_EXPORT hcl_iolxc_t* hcl_readchar (
+	hcl_t* hcl
+);
+
+/* If you use hcl_readchar() to read the input stream, you may use 
+ * hcl_unreadchar() to put back characters read for hcl_readchar() 
+ * to return before reading the stream again. */
+HCL_EXPORT int hcl_unreadchar (
+	hcl_t*             hcl,
+	const hcl_iolxc_t* c
 );
 
 /* =========================================================================

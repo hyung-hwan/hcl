@@ -2402,3 +2402,22 @@ void hcl_detachio (hcl_t* hcl)
 		}
 	}
 }
+
+hcl_iolxc_t* hcl_readchar (hcl_t* hcl)
+{
+	int n = get_char(hcl);
+	if (n <= -1) return HCL_NULL;
+	return &hcl->c->lxc;
+}
+
+int hcl_unreadchar (hcl_t* hcl, const hcl_iolxc_t* c)
+{
+	if (hcl->c->nungots >= HCL_COUNTOF(hcl->c->ungot))
+	{
+		hcl_seterrnum (hcl, HCL_EBUFFULL);
+		return -1;
+	}
+
+	unget_char (hcl, c);
+	return 0;
+}
