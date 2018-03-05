@@ -90,7 +90,7 @@ static void* alloc_heap (hcl_t* hcl, hcl_oow_t size)
 
 static void free_heap (hcl_t* hcl, void* ptr)
 {
-	return HCL_MMGR_FREE(hcl->mmgr, ptr);
+	HCL_MMGR_FREE(hcl->mmgr, ptr);
 }
 
 int hcl_init (hcl_t* hcl, hcl_mmgr_t* mmgr, hcl_oow_t heapsz, const hcl_vmprim_t* vmprim)

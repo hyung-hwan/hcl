@@ -136,7 +136,13 @@ AC_CHECK_FUNCS([snprintf _vsnprintf _vsnwprintf])
 AC_CHECK_FUNCS([isatty mmap munmap])
 
 save_LIBS="$LIBS"
-AC_SEARCH_LIBS([dlopen], [dl dld], [DL_LIBS="$ac_cv_search_dlopen"])
+AC_SEARCH_LIBS([dlopen], [dl dld], [
+	DL_LIBS="$ac_cv_search_dlopen"
+	if test "x${DL_LIBS}" = "xnone required"
+	then
+		DL_LIBS=""
+	fi
+])
 LIBS="$save_LIBS"
 AC_SUBST(DL_LIBS)
 

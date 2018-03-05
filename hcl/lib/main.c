@@ -450,7 +450,7 @@ static hcl_ooi_t print_handler (hcl_t* hcl, hcl_iocmd_t cmd, void* arg)
 
 static void* alloc_heap (hcl_t* hcl, hcl_oow_t size)
 {
-#if defined(HAVE_MMAP) && defined(HAVE_MUNMAP)
+#if defined(HAVE_MMAP) && defined(HAVE_MUNMAP) && defined(MAP_ANONYMOUS)
 	/* It's called via hcl_makeheap() when HCL creates a GC heap.
 	 * The heap is large in size. I can use a different memory allocation
 	 * function instead of an ordinary malloc.
