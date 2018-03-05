@@ -276,6 +276,14 @@ void hcl_fini (hcl_t* hcl)
 		hcl->inttostr.t.ptr = HCL_NULL;
 		hcl->inttostr.t.capa = 0;
 	}
+
+	if (hcl->sprintf.xbuf.ptr)
+	{
+		hcl_freemem (hcl, hcl->sprintf.xbuf.ptr);
+		hcl->sprintf.xbuf.ptr = HCL_NULL;
+		hcl->sprintf.xbuf.capa = 0;
+		hcl->sprintf.xbuf.len = 0;
+	}
 }
 
 void hcl_clear (hcl_t* hcl, int flags)

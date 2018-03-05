@@ -197,6 +197,25 @@ static hcl_pfrc_t pf_printf (hcl_t* hcl, hcl_mod_t* mod, hcl_ooi_t nargs)
 	return HCL_PF_SUCCESS;
 }
 
+static hcl_pfrc_t pf_sprintf (hcl_t* hcl, hcl_mod_t* mod, hcl_ooi_t nargs)
+{
+	if (hcl_sprintfmtst(hcl, nargs) <= -1)
+	{
+		HCL_STACK_SETRETTOERRNUM (hcl, nargs);
+	}
+	else
+	{
+		hcl_oop_t str;
+		str = hcl_makestring (hcl, hcl->sprintf.xbuf.ptr, hcl->sprintf.xbuf.len, 0);
+		if (!str) return HCL_PF_FAILURE;
+
+		HCL_STACK_SETRET (hcl, nargs, str);
+	}
+
+	return HCL_PF_SUCCESS;
+}
+
+
 
 static hcl_pfrc_t pf_gc (hcl_t* hcl, hcl_mod_t* mod, hcl_ooi_t nargs)
 {
@@ -413,6 +432,7 @@ static pf_t builtin_prims[] =
 	{ 0, HCL_TYPE_MAX(hcl_oow_t), pf_log,           3,  { 'l','o','g' } },
 	{ 1, HCL_TYPE_MAX(hcl_oow_t), pf_logf,          4,  { 'l','o','g','f' } },
 	{ 1, HCL_TYPE_MAX(hcl_oow_t), pf_printf,        6,  { 'p','r','i','n','t','f' } },
+	{ 1, HCL_TYPE_MAX(hcl_oow_t), pf_sprintf,       7,  { 's','p','r','i','n','t','f' } },
 
 	{ 0, 0,                       pf_gc,            2,  { 'g','c' } },
 

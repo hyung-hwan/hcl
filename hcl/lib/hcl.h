@@ -1082,6 +1082,16 @@ struct hcl_t
 	} inttostr;
 	/* == END BIGINT CONVERSION == */
 
+	struct
+	{
+		struct
+		{
+			hcl_ooch_t* ptr;
+			hcl_oow_t capa;
+			hcl_oow_t len;
+		} xbuf; /* buffer to support sprintf */
+	} sprintf;
+
 	hcl_sbuf_t sbuf[64];
 
 	struct

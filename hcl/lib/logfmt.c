@@ -532,7 +532,7 @@ static hcl_ooi_t __prbfmtv (hcl_t* hcl, int mask, const hcl_bch_t* fmt, ...)
 	va_list ap;
 	hcl_fmtout_t fo;
 
-	fo.mask = 0; /* not used */
+	fo.mask = mask;
 	fo.putch = put_prch;
 	fo.putcs = put_prcs;
 
@@ -549,7 +549,7 @@ hcl_ooi_t hcl_proutbfmt (hcl_t* hcl, int mask, const hcl_bch_t* fmt, ...)
 	va_list ap;
 	hcl_fmtout_t fo;
 
-	fo.mask = 0; /* not used */
+	fo.mask = mask;
 	fo.putch = put_prch;
 	fo.putcs = put_prcs;
 
@@ -566,7 +566,7 @@ hcl_ooi_t hcl_proutufmt (hcl_t* hcl, int mask, const hcl_uch_t* fmt, ...)
 	va_list ap;
 	hcl_fmtout_t fo;
 
-	fo.mask = 0; /* not used */
+	fo.mask = mask;
 	fo.putch = put_prch;
 	fo.putcs = put_prcs;
 
@@ -634,7 +634,7 @@ static hcl_ooi_t __errbfmtv (hcl_t* hcl, int mask, const hcl_bch_t* fmt, ...)
 	va_list ap;
 	hcl_fmtout_t fo;
 
-	fo.mask = 0; /* not used */
+	fo.mask = mask;
 	fo.putch = put_errch;
 	fo.putcs = put_errcs;
 
@@ -1145,4 +1145,135 @@ int hcl_logfmtst (hcl_t* hcl, hcl_ooi_t nargs)
 	fo.putch = put_ooch;
 	fo.putcs = put_oocs;
 	return print_formatted(hcl, nargs, &fo, hcl_logbfmt);
+}
+
+
+
+
+
+
+/* -------------------------------------------------------------------------- 
+ * SUPPORT FOR THE BUILTIN PRINTF PRIMITIVE FUNCTION
+ * -------------------------------------------------------------------------- */
+
+static int put_sprch (hcl_t* hcl, int mask, hcl_ooch_t ch, hcl_oow_t len)
+{
+	if (hcl->sprintf.xbuf.len >= hcl->sprintf.xbuf.capa)
+	{
+		hcl_ooch_t* tmp;
+		hcl_oow_t newcapa;
+
+		newcapa = hcl->sprintf.xbuf.len + len + 1;
+		newcapa = HCL_ALIGN_POW2(newcapa, 256);
+
+		tmp = (hcl_ooch_t*)hcl_reallocmem(hcl, hcl->sprintf.xbuf.ptr, newcapa * HCL_SIZEOF(*tmp));
+		if (!tmp) return -1;
+
+		hcl->sprintf.xbuf.ptr = tmp;
+		hcl->sprintf.xbuf.capa = newcapa;
+	}
+
+	while (len > 0)
+	{
+		--len;
+		hcl->sprintf.xbuf.ptr[hcl->sprintf.xbuf.len++] = ch;
+	}
+
+	return 1; /* success */
+}
+
+static int put_sprcs (hcl_t* hcl, int mask, const hcl_ooch_t* ptr, hcl_oow_t len)
+{
+	if (hcl->sprintf.xbuf.len >= hcl->sprintf.xbuf.capa)
+	{
+		hcl_ooch_t* tmp;
+		hcl_oow_t newcapa;
+
+		newcapa = hcl->sprintf.xbuf.len + len + 1;
+		newcapa = HCL_ALIGN_POW2(newcapa, 256);
+
+		tmp = (hcl_ooch_t*)hcl_reallocmem(hcl, hcl->sprintf.xbuf.ptr, newcapa * HCL_SIZEOF(*tmp));
+		if (!tmp) return -1;
+
+		hcl->sprintf.xbuf.ptr = tmp;
+		hcl->sprintf.xbuf.capa = newcapa;
+	}
+
+	HCL_MEMCPY (&hcl->sprintf.xbuf.ptr[hcl->sprintf.xbuf.len], ptr, len * HCL_SIZEOF(*ptr));
+	hcl->sprintf.xbuf.len += len;
+	return 1; /* success */
+}
+
+static hcl_ooi_t __sprbfmtv (hcl_t* hcl, int mask, const hcl_bch_t* fmt, ...);
+
+static int _sprbfmtv (hcl_t* hcl, const hcl_bch_t* fmt, hcl_fmtout_t* data, va_list ap)
+{
+	return __logbfmtv (hcl, fmt, data, ap, __sprbfmtv);
+}
+
+/*
+static int _sprufmtv (hcl_t* hcl, const hcl_uch_t* fmt, hcl_fmtout_t* data, va_list ap)
+{
+	return __logufmtv (hcl, fmt, data, ap, __sprbfmtv);
+}*/
+
+static hcl_ooi_t __sprbfmtv (hcl_t* hcl, int mask, const hcl_bch_t* fmt, ...)
+{
+	va_list ap;
+	hcl_fmtout_t fo;
+
+	fo.mask = mask; /* not used */
+	fo.putch = put_sprch;
+	fo.putcs = put_sprcs;
+
+	va_start (ap, fmt);
+	_sprbfmtv (hcl, fmt, &fo, ap);
+	va_end (ap);
+
+	return fo.count;
+}
+
+hcl_ooi_t hcl_sproutbfmt (hcl_t* hcl, int mask, const hcl_bch_t* fmt, ...)
+{
+	int x;
+	va_list ap;
+	hcl_fmtout_t fo;
+
+	fo.mask = mask;
+	fo.putch = put_sprch;
+	fo.putcs = put_sprcs;
+
+	va_start (ap, fmt);
+	x = _sprbfmtv (hcl, fmt, &fo, ap);
+	va_end (ap);
+
+	return (x <= -1)? -1: fo.count;
+}
+
+/*
+hcl_ooi_t hcl_sproutufmt (hcl_t* hcl, int mask, const hcl_uch_t* fmt, ...)
+{
+	int x;
+	va_list ap;
+	hcl_fmtout_t fo;
+
+	fo.mask = mask;
+	fo.putch = put_sprch;
+	fo.putcs = put_sprcs;
+
+	va_start (ap, fmt);
+	x = _sprufmtv (hcl, fmt, &fo, ap);
+	va_end (ap);
+
+	return (x <= -1)? -1: fo.count;
+}*/
+
+int hcl_sprintfmtst (hcl_t* hcl, hcl_ooi_t nargs)
+{
+	hcl_fmtout_t fo;
+	HCL_MEMSET (&fo, 0, HCL_SIZEOF(fo));
+	fo.putch = put_sprch;
+	fo.putcs = put_sprcs;
+	hcl->sprintf.xbuf.len = 0;
+	return print_formatted(hcl, nargs, &fo, hcl_sproutbfmt);
 }

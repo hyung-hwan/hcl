@@ -1063,6 +1063,11 @@ int hcl_logfmtst (
 	hcl_ooi_t nargs
 );
 
+int hcl_sprintfmtst (
+	hcl_t*    hcl,
+	hcl_ooi_t nargs
+);
+
 #if defined(__cplusplus)
 }
 #endif
