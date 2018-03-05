@@ -128,13 +128,6 @@ int hcl_init (hcl_t* hcl, hcl_mmgr_t* mmgr, hcl_oow_t heapsz, const hcl_vmprim_t
 	hcl->log.ptr = (hcl_ooch_t*)hcl_allocmem(hcl, (hcl->log.capa + 1) * HCL_SIZEOF(*hcl->log.ptr)); 
 	if (!hcl->log.ptr) goto oops;
 
-	/*hcl->permheap = hcl_makeheap (hcl, what is the best size???);
-	if (!hcl->curheap) goto oops; */
-	hcl->curheap = hcl_makeheap(hcl, heapsz);
-	if (!hcl->curheap) goto oops;
-	hcl->newheap = hcl_makeheap(hcl, heapsz);
-	if (!hcl->newheap) goto oops;
-
 	if (hcl_rbt_init(&hcl->modtab, hcl, HCL_SIZEOF(hcl_ooch_t), 1) <= -1) goto oops;
 	modtab_inited = 1;
 	hcl_rbt_setstyle(&hcl->modtab, hcl_getrbtstyle(HCL_RBT_STYLE_INLINE_COPIERS));
@@ -149,13 +142,20 @@ int hcl_init (hcl_t* hcl, hcl_mmgr_t* mmgr, hcl_oow_t heapsz, const hcl_vmprim_t
 	hcl->proc_map_free_first = -1;
 	hcl->proc_map_free_last = -1;
 
+	/*hcl->permheap = hcl_makeheap (hcl, what is the best size???);
+	if (!hcl->curheap) goto oops; */
+	hcl->curheap = hcl_makeheap(hcl, heapsz);
+	if (!hcl->curheap) goto oops;
+	hcl->newheap = hcl_makeheap(hcl, heapsz);
+	if (!hcl->newheap) goto oops;
+
 	return 0;
 
 oops:
-	if (modtab_inited) hcl_rbt_fini (&hcl->modtab);
 	if (hcl->newheap) hcl_killheap (hcl, hcl->newheap);
 	if (hcl->curheap) hcl_killheap (hcl, hcl->curheap);
 	if (hcl->permheap) hcl_killheap (hcl, hcl->permheap);
+	if (modtab_inited) hcl_rbt_fini (&hcl->modtab);
 	if (hcl->log.ptr) hcl_freemem (hcl, hcl->log.ptr);
 	hcl->log.capa = 0;
 	return -1;

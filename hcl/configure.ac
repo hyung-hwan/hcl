@@ -1,9 +1,5 @@
 dnl AC_PREREQ([2.67])
 
-dnl Make sure you change the version information
-dnl in include/hcl/conf_*.h whenever you change the version 
-dnl here. Those files don't depend on autoconf, thus requiring
-dnl manual change.
 AC_INIT([hcl],[0.1.0],[Chung, Hyung-Hwan (hyunghwan.chung@gmail.com)],[],[http://code.abiyo.net/@hcl])
 
 AC_CONFIG_HEADER([lib/hcl-cfg.h])
@@ -121,7 +117,7 @@ dnl check header files.
 AC_HEADER_STDC
 AC_CHECK_HEADERS([stddef.h wchar.h wctype.h errno.h signal.h fcntl.h dirent.h])
 AC_CHECK_HEADERS([time.h sys/time.h utime.h spawn.h execinfo.h ucontext.h])
-AC_CHECK_HEADERS([dlfcn.h])
+AC_CHECK_HEADERS([dlfcn.h sys/mman.h])
 
 dnl check data types
 dnl AC_CHECK_TYPE([wchar_t], 
@@ -137,7 +133,7 @@ AC_CHECK_FUNCS([backtrace backtrace_symbols])
 AC_CHECK_FUNCS([makecontext swapcontext getcontext setcontext])
 AC_CHECK_FUNCS([clock_nanosleep nanosleep usleep])
 AC_CHECK_FUNCS([snprintf _vsnprintf _vsnwprintf])
-AC_CHECK_FUNCS([isatty])
+AC_CHECK_FUNCS([isatty mmap munmap])
 
 save_LIBS="$LIBS"
 AC_SEARCH_LIBS([dlopen], [dl dld], [DL_LIBS="$ac_cv_search_dlopen"])

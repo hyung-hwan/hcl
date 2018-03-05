@@ -83,12 +83,15 @@
 #	if defined(HAVE_SIGNAL_H)
 #		include <signal.h>
 #	endif
+#	if defined(HAVE_SYS_MMAN_H)
+#		include <sys/mman.h>
+#	endif
 	
 #	include <errno.h>
 #	include <unistd.h>
 #	include <fcntl.h>
 
-#	include <sys/mman.h>
+
 #endif
 
 #if !defined(HCL_DEFAULT_PFMODPREFIX)
@@ -447,47 +450,62 @@ static hcl_ooi_t print_handler (hcl_t* hcl, hcl_iocmd_t cmd, void* arg)
 
 static void* alloc_heap (hcl_t* hcl, hcl_oow_t size)
 {
-	/* It's called when HCL creates a GC heap.
+#if defined(HAVE_MMAP) && defined(HAVE_MUNMAP)
+	/* It's called via hcl_makeheap() when HCL creates a GC heap.
 	 * The heap is large in size. I can use a different memory allocation
-	 * function instead of an ordinary malloc */
+	 * function instead of an ordinary malloc.
+	 * upon failure, it doesn't require to set error information as hcl_makeheap()
+	 * set the error number to HCL_EOOMEM. */
+
+#if !defined(MAP_HUGETLB) && (defined(__amd64__) || defined(__x86_64__))
+#	define MAP_HUGETLB 0x40000
+#endif
+
 	hcl_oow_t* ptr;
 	int flags;
 	hcl_oow_t actual_size;
 
 	flags = MAP_PRIVATE | MAP_ANONYMOUS;
-#if defined(MAP_HUGETLB)
-	flags |= MAP_HUGETLB;
-#endif
-#if defined(MAP_UNINITIALIZED)
-	flags |= MAP_UNINITIALIZED;
-#endif
 
-	
+	#if defined(MAP_HUGETLB)
+	flags |= MAP_HUGETLB;
+	#endif
+
+	#if defined(MAP_UNINITIALIZED)
+	flags |= MAP_UNINITIALIZED;
+	#endif
+
 	actual_size = HCL_SIZEOF(hcl_oow_t) + size;
 	actual_size = HCL_ALIGN_POW2(actual_size, 2 * 1024 * 1024);
 	ptr = (hcl_oow_t*)mmap(NULL, actual_size, PROT_READ | PROT_WRITE, flags, -1, 0);
 	if (ptr == MAP_FAILED) 
 	{
-#if defined(MAP_HUGETLB)
+	#if defined(MAP_HUGETLB)
 		flags &= ~MAP_HUGETLB;
 		ptr = (hcl_oow_t*)mmap(NULL, actual_size, PROT_READ | PROT_WRITE, flags, -1, 0);
 		if (ptr == MAP_FAILED) return HCL_NULL;
-#else
+	#else
 		return HCL_NULL;
-#endif
+	#endif
 	}
 	*ptr = actual_size;
 
 	return (void*)(ptr + 1);
-	/*return HCL_MMGR_ALLOC(hcl->mmgr, size);*/
+
+#else
+	return HCL_MMGR_ALLOC(hcl->mmgr, size);
+#endif
 }
 
 static void free_heap (hcl_t* hcl, void* ptr)
 {
+#if defined(HAVE_MMAP) && defined(HAVE_MUNMAP)
 	hcl_oow_t* actual_ptr;
 	actual_ptr = (hcl_oow_t*)ptr - 1;
 	munmap (actual_ptr, *actual_ptr);
-	/*return HCL_MMGR_FREE(hcl->mmgr, ptr);*/
+#else
+	return HCL_MMGR_FREE(hcl->mmgr, ptr);
+#endif
 }
 
 static int write_all (int fd, const char* ptr, hcl_oow_t len)
