@@ -735,6 +735,8 @@ static int get_sharp_token (hcl_t* hcl)
 	 * #bBBBB binary
 	 * #oOOOO octal 
 	 * #xXXXX hexadecimal
+	 * #eDDD   error
+	 * #pHHH   smptr
 	 * #nil
 	 * #true
 	 * #false
@@ -743,10 +745,6 @@ static int get_sharp_token (hcl_t* hcl)
 	 * #\xHHHH  unicode character
 	 * #\UHHHH  unicode character
 	 * #\uHHHH  unicode character
-	 * #\EDDD   error
-	 * #\eDDD   error
-	 * #\PHHH   smptr
-	 * #\pHHH   smptr
 	 * #( )     array
 	 * #[ ]     byte array
 	 * #{ }     dictionary
@@ -764,6 +762,16 @@ static int get_sharp_token (hcl_t* hcl)
 			radix = 2;
 		radixnum:
 			if (get_radix_number (hcl, c, radix) <= -1) return -1;
+			break;
+
+		case 'e':
+			if (get_radix_number(hcl, c, 10) <= -1) return -1;
+			SET_TOKEN_TYPE (hcl, HCL_IOTOK_ERRORLIT);
+			break;
+
+		case 'p':
+			if (get_radix_number(hcl, c, 16) <= -1) return -1;
+			SET_TOKEN_TYPE (hcl, HCL_IOTOK_SMPTRLIT);
 			break;
 
 		case '\\': /* character literal */
@@ -830,25 +838,6 @@ static int get_sharp_token (hcl_t* hcl)
 					goto hexcharlit;
 				}
 			#endif
-				else if (TOKEN_NAME_CHAR(hcl, 2) == 'P' || TOKEN_NAME_CHAR(hcl, 2) == 'p')
-				{
-					SET_TOKEN_TYPE (hcl, HCL_IOTOK_SMPTRLIT);
-					goto hexcharlit;
-				}
-				else if (TOKEN_NAME_CHAR(hcl, 2) == 'E' || TOKEN_NAME_CHAR(hcl, 2) == 'e')
-				{
-					hcl_oow_t i;
-					for (i = 3; i < TOKEN_NAME_LEN(hcl); i++)
-					{
-						if (!is_digitchar(TOKEN_NAME_CHAR(hcl, i)))
-						{
-							hcl_setsynerrbfmt (hcl, HCL_SYNERR_CHARLIT, TOKEN_LOC(hcl), TOKEN_NAME(hcl),
-								"invalid decimal character in %.*js", TOKEN_NAME_LEN(hcl), TOKEN_NAME_PTR(hcl));
-							return -1;
-						}
-					}
-					SET_TOKEN_TYPE (hcl, HCL_IOTOK_ERRORLIT);
-				}
 				else if (does_token_name_match(hcl, VOCA_SPACE))
 				{
 					c = ' ';
@@ -2038,8 +2027,8 @@ static int read_object (hcl_t* hcl)
 				hcl_oow_t i;
 				hcl_oow_t v = 0;
 
-				HCL_ASSERT (hcl, TOKEN_NAME_LEN(hcl) >= 4);
-				for (i = 3; i < TOKEN_NAME_LEN(hcl); i++)
+				HCL_ASSERT (hcl, TOKEN_NAME_LEN(hcl) >= 3);
+				for (i = 2; i < TOKEN_NAME_LEN(hcl); i++)
 				{
 					HCL_ASSERT (hcl, is_xdigitchar(TOKEN_NAME_CHAR(hcl, i)));
 					v = v * 16 + CHAR_TO_NUM(TOKEN_NAME_CHAR(hcl, i), 16);
@@ -2051,7 +2040,6 @@ static int read_object (hcl_t* hcl)
 					return -1;
 				}
 
-
 				obj = HCL_SMPTR_TO_OOP(v);
 				break;
 			}
@@ -2061,8 +2049,8 @@ static int read_object (hcl_t* hcl)
 				hcl_oow_t i;
 				hcl_ooi_t v = 0;
 
-				HCL_ASSERT (hcl, TOKEN_NAME_LEN(hcl) >= 4);
-				for (i = 3; i < TOKEN_NAME_LEN(hcl); i++)
+				HCL_ASSERT (hcl, TOKEN_NAME_LEN(hcl) >= 3);
+				for (i = 2; i < TOKEN_NAME_LEN(hcl); i++)
 				{
 					HCL_ASSERT (hcl, is_digitchar(TOKEN_NAME_CHAR(hcl, i)));
 					v = v * 10 + CHAR_TO_NUM(TOKEN_NAME_CHAR(hcl, i), 10);

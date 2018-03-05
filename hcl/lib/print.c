@@ -240,11 +240,11 @@ next:
 			goto done;
 
 		case HCL_BRAND_SMPTR:
-			if (outbfmt(hcl, mask, "#\\p%zX", (hcl_oow_t)HCL_OOP_TO_SMPTR(obj)) <= -1) return -1;
+			if (outbfmt(hcl, mask, "#p%zX", (hcl_oow_t)HCL_OOP_TO_SMPTR(obj)) <= -1) return -1;
 			goto done;
 
 		case HCL_BRAND_ERROR:
-			if (outbfmt(hcl, mask, "#\\e%zd", (hcl_ooi_t)HCL_OOP_TO_ERROR(obj)) <= -1) return -1;
+			if (outbfmt(hcl, mask, "#e%zd", (hcl_ooi_t)HCL_OOP_TO_ERROR(obj)) <= -1) return -1;
 			goto done;
 
 		case HCL_BRAND_CHARACTER:
