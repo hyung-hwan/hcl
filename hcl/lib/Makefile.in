@@ -88,13 +88,15 @@ PRE_UNINSTALL = :
 POST_UNINSTALL = :
 build_triplet = @build@
 host_triplet = @host@
-@ENABLE_STATIC_MODULE_TRUE@am__append_1 = -lhcl-arr -lhcl-dic \
+@ENABLE_LIBLTDL_TRUE@am__append_1 = $(LTDL_LIBS)
+@ENABLE_LIBLTDL_FALSE@am__append_2 = $(DL_LIBS)
+@ENABLE_STATIC_MODULE_TRUE@am__append_3 = -lhcl-arr -lhcl-dic \
 @ENABLE_STATIC_MODULE_TRUE@	-lhcl-str
-@ENABLE_STATIC_MODULE_TRUE@am__append_2 = $(abs_builddir)/../mod/libhcl-arr.la \
+@ENABLE_STATIC_MODULE_TRUE@am__append_4 = $(abs_builddir)/../mod/libhcl-arr.la \
 @ENABLE_STATIC_MODULE_TRUE@	$(abs_builddir)/../mod/libhcl-dic.la \
 @ENABLE_STATIC_MODULE_TRUE@	$(abs_builddir)/../mod/libhcl-str.la
 bin_PROGRAMS = hcl$(EXEEXT)
-@ENABLE_STATIC_MODULE_FALSE@hcl_DEPENDENCIES = $(am__DEPENDENCIES_2)
+@ENABLE_STATIC_MODULE_FALSE@hcl_DEPENDENCIES = $(am__DEPENDENCIES_4)
 subdir = lib
 ACLOCAL_M4 = $(top_srcdir)/aclocal.m4
 am__aclocal_m4_deps = $(top_srcdir)/m4/ax_cxx_namespace.m4 \
@@ -141,7 +143,10 @@ am__installdirs = "$(DESTDIR)$(pkglibdir)" "$(DESTDIR)$(bindir)" \
 	"$(DESTDIR)$(pkgincludedir)"
 LTLIBRARIES = $(pkglib_LTLIBRARIES)
 am__DEPENDENCIES_1 =
-am__DEPENDENCIES_2 = $(am__DEPENDENCIES_1) $(am__DEPENDENCIES_1)
+@ENABLE_LIBLTDL_TRUE@am__DEPENDENCIES_2 = $(am__DEPENDENCIES_1)
+@ENABLE_LIBLTDL_FALSE@am__DEPENDENCIES_3 = $(am__DEPENDENCIES_1)
+am__DEPENDENCIES_4 = $(am__DEPENDENCIES_1) $(am__DEPENDENCIES_2) \
+	$(am__DEPENDENCIES_3)
 am_libhcl_la_OBJECTS = libhcl_la-bigint.lo libhcl_la-comp.lo \
 	libhcl_la-debug.lo libhcl_la-decode.lo libhcl_la-dic.lo \
 	libhcl_la-err.lo libhcl_la-exec.lo libhcl_la-gc.lo \
@@ -228,7 +233,6 @@ CTAGS = ctags
 am__DIST_COMMON = $(srcdir)/Makefile.in $(srcdir)/hcl-cfg.h.in \
 	$(top_srcdir)/ac/depcomp
 DISTFILES = $(DIST_COMMON) $(DIST_SOURCES) $(TEXINFOS) $(EXTRA_DIST)
-#endif
 pkgincludedir = $(includedir)
 pkglibdir = $(libdir)
 ACLOCAL = @ACLOCAL@
@@ -294,6 +298,7 @@ LIBTOOL = @LIBTOOL@
 LIBTOOL_DEPS = @LIBTOOL_DEPS@
 LIPO = @LIPO@
 LN_S = @LN_S@
+LTDL_LIBS = @LTDL_LIBS@
 LTLIBOBJS = @LTLIBOBJS@
 LT_SYS_LIBRARY_PATH = @LT_SYS_LIBRARY_PATH@
 MAKEINFO = @MAKEINFO@
@@ -391,12 +396,7 @@ CPPFLAGS_ALL_COMMON = \
 ##################################################
 CPPFLAGS_LIB_COMMON = $(CPPFLAGS_ALL_COMMON)
 LDFLAGS_LIB_COMMON = $(LDFLAGS_ALL_COMMON) -version-info 1:0:0 -no-undefined
-
-#if ENABLE_LIBLTDL
-#CPPFLAGS_LIB_COMMON += $(LTDLINCL)
-#LIBADD_LIB_COMMON += $(LIBLTDL)
-#else
-LIBADD_LIB_COMMON = $(LIBM) $(DL_LIBS)
+LIBADD_LIB_COMMON = $(LIBM) $(am__append_1) $(am__append_2)
 pkginclude_HEADERS = \
 	hcl-cfg.h \
 	hcl-cmn.h \
@@ -432,8 +432,8 @@ libhcl_la_SOURCES = \
 
 libhcl_la_CPPFLAGS = $(CPPFLAGS_LIB_COMMON)
 libhcl_la_LDFLAGS = $(LDFLAGS_LIB_COMMON)
-libhcl_la_LIBADD = $(LIBADD_LIB_COMMON) $(am__append_1)
-libhcl_la_DEPENDENCIES = $(am__append_2)
+libhcl_la_LIBADD = $(LIBADD_LIB_COMMON) $(am__append_3)
+libhcl_la_DEPENDENCIES = $(am__append_4)
 hcl_SOURCES = main.c
 hcl_CPPFLAGS = $(CPPFLAGS_LIB_COMMON)
 hcl_LDFLAGS = $(LDFLAGS_LIB_COMMON)

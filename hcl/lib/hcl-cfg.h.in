@@ -87,6 +87,9 @@
 /* Define to 1 if you have the `logq' function. */
 #undef HAVE_LOGQ
 
+/* Define to 1 if you have the <ltdl.h> header file. */
+#undef HAVE_LTDL_H
+
 /* Define to 1 if you have the `makecontext' function. */
 #undef HAVE_MAKECONTEXT
 
@@ -233,6 +236,9 @@
 
 /* enable dynamic module capability */
 #undef HCL_ENABLE_DYNAMIC_MODULE
+
+/* use libltdl when loading a dynamic module */
+#undef HCL_ENABLE_LIBLTDL
 
 /* link modules statically into the main library */
 #undef HCL_ENABLE_STATIC_MODULE

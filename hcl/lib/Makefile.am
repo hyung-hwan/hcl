@@ -20,12 +20,12 @@ CPPFLAGS_LIB_COMMON = $(CPPFLAGS_ALL_COMMON)
 LDFLAGS_LIB_COMMON = $(LDFLAGS_ALL_COMMON) -version-info 1:0:0 -no-undefined
 LIBADD_LIB_COMMON = $(LIBM)
 
-#if ENABLE_LIBLTDL
-#CPPFLAGS_LIB_COMMON += $(LTDLINCL)
-#LIBADD_LIB_COMMON += $(LIBLTDL)
-#else
+if ENABLE_LIBLTDL
+LIBADD_LIB_COMMON += $(LTDL_LIBS)
+else
 LIBADD_LIB_COMMON += $(DL_LIBS)
-#endif
+endif
+
 
 pkgincludedir = $(includedir)
 pkglibdir = $(libdir)

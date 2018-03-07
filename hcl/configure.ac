@@ -117,7 +117,7 @@ dnl check header files.
 AC_HEADER_STDC
 AC_CHECK_HEADERS([stddef.h wchar.h wctype.h errno.h signal.h fcntl.h dirent.h])
 AC_CHECK_HEADERS([time.h sys/time.h utime.h spawn.h execinfo.h ucontext.h])
-AC_CHECK_HEADERS([dlfcn.h sys/mman.h])
+AC_CHECK_HEADERS([dlfcn.h ltdl.h sys/mman.h])
 
 dnl check data types
 dnl AC_CHECK_TYPE([wchar_t], 
@@ -145,6 +145,17 @@ AC_SEARCH_LIBS([dlopen], [dl dld], [
 ])
 LIBS="$save_LIBS"
 AC_SUBST(DL_LIBS)
+
+save_LIBS="$LIBS"
+AC_SEARCH_LIBS([lt_dlopen], [ltdl], [
+	LTDL_LIBS="$ac_cv_search_lt_dlopen"
+	if test "x${LTDL_LIBS}" = "xnone required"
+	then
+		LTDL_LIBS=""
+	fi
+])
+LIBS="$save_LIBS"
+AC_SUBST(LTDL_LIBS)
 
 dnl check is the import library for unicows.dll exists
 dnl this check doesn't look for a particular symbol
@@ -478,6 +489,23 @@ then
 	AC_DEFINE([HCL_ENABLE_STATIC_MODULE],[1],[link modules statically into the main library])
 fi
 AM_CONDITIONAL(ENABLE_STATIC_MODULE, test "${enable_static_module_is}" = "yes")
+
+dnl ===== enable-libltdl =====
+AC_ARG_ENABLE([libltdl],
+	[AS_HELP_STRING([--enable-libltdl],[use libltdl(default. yes)])],
+	enable_libltdl_is=$enableval,
+	enable_libltdl_is=yes
+)
+if test "${enable_libltdl_is}" = "yes"
+then
+	if test "${ac_cv_header_ltdl_h}" = "yes"  -a "${LTDL_LIBS}" != ""
+	then
+		AC_DEFINE([HCL_ENABLE_LIBLTDL],[],[use libltdl when loading a dynamic module])
+	else
+		enable_libltdl_is="no"
+	fi
+fi
+AM_CONDITIONAL(ENABLE_LIBLTDL, test "${enable_libltdl_is}" = "yes")
 
 AC_SUBST(HCL_SIZEOF_WCHAR_T, $ac_cv_sizeof_wchar_t)
 AC_SUBST(HCL_SIZEOF_CHAR16_T, $ac_cv_sizeof_char16_t)
