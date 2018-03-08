@@ -286,9 +286,26 @@ void hcl_fini (hcl_t* hcl)
 	}
 }
 
-void hcl_clear (hcl_t* hcl, int flags)
+void hcl_clear (hcl_t* hcl)
 {
-	/* TODO */
+	hcl_oop_t v;
+	hcl_oow_t i;
+
+#if 0
+	/* clear global variables -> especially lambdas, because they refer to the byte codes? */
+	for (i = 0; i < hcl->code.lit.len; i++)
+	{
+		v = ((hcl_oop_oop_t)hcl->code.lit.arr)->slot[ip]);
+		if (HCL_IS_CONS(v))
+		{
+			hcl_delat
+		}
+	}
+#endif
+	/* clear the byte code and literals */
+	hcl->code.bc.len = 0;
+	hcl->code.lit.len = 0;
+	hcl_gc (hcl);
 }
 
 int hcl_setoption (hcl_t* hcl, hcl_option_t id, const void* value)

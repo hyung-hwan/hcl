@@ -75,6 +75,13 @@
  */
 #define HCL_LIMIT_OBJ_SIZE
 
+
+#define HCL_BC_BUFFER_INIT  10240
+#define HCL_BC_BUFFER_ALIGN 10240
+
+#define HCL_LIT_BUFFER_INIT 1024
+#define HCL_LIT_BUFFER_ALIGN 1024
+
 #if defined(__has_builtin)
 
 #	if (!__has_builtin(__builtin_memset) || !__has_builtin(__builtin_memcpy) || !__has_builtin(__builtin_memmove) || !__has_builtin(__builtin_memcmp))

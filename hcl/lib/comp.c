@@ -32,7 +32,6 @@ enum
 	VAR_INDEXED
 };
 
-#define CODE_BUFFER_ALIGN 1024 /* TODO: set a bigger value */
 #define TV_BUFFER_ALIGN 256
 #define BLK_TMPRCNT_BUFFER_ALIGN 128
 
@@ -64,8 +63,8 @@ static int add_literal (hcl_t* hcl, hcl_oop_t obj, hcl_oow_t* index)
 		hcl_oop_t tmp;
 		hcl_oow_t newcapa;
 
-		newcapa = capa + 20000; /* TODO: set a better resizing policy */
-		tmp = hcl_remakengcarray (hcl, (hcl_oop_t)hcl->code.lit.arr, newcapa);
+		newcapa = HCL_ALIGN(capa + 1, HCL_LIT_BUFFER_ALIGN);
+		tmp = hcl_remakengcarray(hcl, (hcl_oop_t)hcl->code.lit.arr, newcapa);
 		if (!tmp) return -1;
 
 		hcl->code.lit.arr = (hcl_oop_oop_t)tmp;
@@ -179,7 +178,7 @@ static int emit_byte_instruction (hcl_t* hcl, hcl_oob_t bc)
 		hcl_oop_t tmp;
 		hcl_oow_t newcapa;
 
-		newcapa = HCL_ALIGN (capa + 1, CODE_BUFFER_ALIGN);
+		newcapa = HCL_ALIGN(capa + 1, HCL_BC_BUFFER_ALIGN);
 		tmp = hcl_remakengcbytearray (hcl, (hcl_oop_t)hcl->code.bc.arr, newcapa);
 		if (!tmp) return -1;
 
@@ -2535,10 +2534,10 @@ static HCL_INLINE int emit_set (hcl_t* hcl)
 
 		HCL_ASSERT (hcl, HCL_IS_SYMBOL(hcl, cf->operand));
 
-		cons = (hcl_oop_t)hcl_getatsysdic (hcl, cf->operand);
+		cons = (hcl_oop_t)hcl_getatsysdic(hcl, cf->operand);
 		if (!cons) 
 		{
-			cons = (hcl_oop_t)hcl_putatsysdic (hcl, cf->operand, hcl->_nil);
+			cons = (hcl_oop_t)hcl_putatsysdic(hcl, cf->operand, hcl->_nil);
 			if (!cons) return -1;
 		}
 

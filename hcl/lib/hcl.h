@@ -1354,16 +1354,20 @@ HCL_EXPORT void hcl_close (
 );
 
 HCL_EXPORT int hcl_init (
-	hcl_t*              vm,
+	hcl_t*              hcl,
 	hcl_mmgr_t*         mmgr,
 	hcl_oow_t           heapsize,
 	const hcl_vmprim_t* vmprim
 );
 
 HCL_EXPORT void hcl_fini (
-	hcl_t* vm
+	hcl_t*              hcl
 );
 
+/*
+HCL_EXPORT void hcl_clear (
+	hcl_t*              hcl
+);*/
 
 #if defined(HCL_HAVE_INLINE)
 	static HCL_INLINE hcl_mmgr_t* hcl_getmmgr (hcl_t* hcl) { return hcl->mmgr; }
@@ -1390,8 +1394,8 @@ HCL_EXPORT void hcl_seterrnum (
 );
 
 HCL_EXPORT void hcl_seterrwithsyserr (
-	hcl_t* hcl,
-	int    syserr
+	hcl_t*       hcl,
+	int          syserr
 );
 
 HCL_EXPORT void hcl_seterrbfmt (

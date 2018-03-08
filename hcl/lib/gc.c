@@ -511,14 +511,14 @@ int hcl_ignite (hcl_t* hcl)
 	{
 		/* Create a nil process used to simplify nil check in GC.
 		 * only accessible by VM. not exported via the global dictionary. */
-		hcl->nil_process = (hcl_oop_process_t)hcl_allocoopobj (hcl, HCL_BRAND_PROCESS, HCL_PROCESS_NAMED_INSTVARS);
+		hcl->nil_process = (hcl_oop_process_t)hcl_allocoopobj(hcl, HCL_BRAND_PROCESS, HCL_PROCESS_NAMED_INSTVARS);
 		if (!hcl->nil_process) return -1;
 		hcl->nil_process->sp = HCL_SMOOI_TO_OOP(-1);
 	}
 
 	if (!hcl->processor)
 	{
-		hcl->processor = (hcl_oop_process_scheduler_t)hcl_allocoopobj (hcl, HCL_BRAND_PROCESS_SCHEDULER, HCL_PROCESS_SCHEDULER_NAMED_INSTVARS);
+		hcl->processor = (hcl_oop_process_scheduler_t)hcl_allocoopobj(hcl, HCL_BRAND_PROCESS_SCHEDULER, HCL_PROCESS_SCHEDULER_NAMED_INSTVARS);
 		if (!hcl->processor) return -1;
 		hcl->processor->tally = HCL_SMOOI_TO_OOP(0);
 		hcl->processor->active = hcl->nil_process;
@@ -526,14 +526,16 @@ int hcl_ignite (hcl_t* hcl)
 
 	if (!hcl->code.bc.arr)
 	{
-		hcl->code.bc.arr = (hcl_oop_byte_t)hcl_makengcbytearray (hcl, HCL_NULL, 20000); /* TODO: set a proper intial size */
+		hcl->code.bc.arr = (hcl_oop_byte_t)hcl_makengcbytearray(hcl, HCL_NULL, HCL_BC_BUFFER_INIT); /* TODO: set a proper intial size */
 		if (!hcl->code.bc.arr) return -1;
+		HCL_ASSERT (hcl, hcl->code.bc.len == 0);
 	}
 
 	if (!hcl->code.lit.arr)
 	{
-		hcl->code.lit.arr = (hcl_oop_oop_t)hcl_makengcarray (hcl, 20000); /* TOOD: set a proper initial size */
+		hcl->code.lit.arr = (hcl_oop_oop_t)hcl_makengcarray(hcl, HCL_LIT_BUFFER_INIT); /* TOOD: set a proper initial size */
 		if (!hcl->code.lit.arr) return -1;
+		HCL_ASSERT (hcl, hcl->code.lit.len == 0);
 	}
 
 	hcl->p.e = hcl->_nil;
