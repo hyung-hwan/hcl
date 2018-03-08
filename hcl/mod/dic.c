@@ -110,10 +110,10 @@ static hcl_pfrc_t pf_dic_walk (hcl_t* hcl, hcl_mod_t* mod, hcl_ooi_t nargs)
 
 static hcl_pfinfo_t pfinfos[] =
 {
-	{ { 'g','e','t','\0' },      0, { pf_dic_get,     2,  2 } },
-/*	{ { 'm','a','k','e','\0' },  0, { pf_dic_make,    1,  1 } }, */
-	{ { 'p','u','t','\0' },      0, { pf_dic_put,     3,  3 } },
-	{ { 'w','a','l','k','\0' },  0, { pf_dic_walk,    2,  2 } },
+	{ { 'g','e','t','\0' },      { HCL_PFBASE_FUNC, pf_dic_get,     2,  2 } },
+/*	{ { 'm','a','k','e','\0' },  { HCL_PFBASE_FUNC, pf_dic_make,    1,  1 } }, */
+	{ { 'p','u','t','\0' },      { HCL_PFBASE_FUNC, pf_dic_put,     3,  3 } },
+	{ { 'w','a','l','k','\0' },  { HCL_PFBASE_FUNC, pf_dic_walk,    2,  2 } },
 };
 
 /* ------------------------------------------------------------------------ */

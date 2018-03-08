@@ -488,7 +488,7 @@ int hcl_addbuiltinprims (hcl_t* hcl)
 		/* turn on the kernel bit in the symbol associated with a primitive 
 		 * function. 'set' prevents this symbol from being used as a variable
 		 * name */ 
-		HCL_OBJ_SET_FLAGS_KERNEL (name, 1);
+		HCL_OBJ_SET_FLAGS_KERNEL (name, 2);
 	}
 
 	return 0;

@@ -146,6 +146,8 @@ struct xtn_t
 	int logfd_istty;
 
 	int reader_istty;
+	
+	hcl_oop_t sym_errstr;
 };
 
 /* ========================================================================= */
@@ -1216,6 +1218,12 @@ static void vm_sleep (hcl_t* hcl, const hcl_ntime_t* dur)
 
 /* ========================================================================= */
 
+static void gc_hcl (hcl_t* hcl)
+{
+	xtn_t* xtn = (xtn_t*)hcl_getxtn(hcl);
+	if (xtn->sym_errstr) xtn->sym_errstr = hcl_moveoop(hcl, xtn->sym_errstr);
+}
+
 static void fini_hcl (hcl_t* hcl)
 {
 	xtn_t* xtn = (xtn_t*)hcl_getxtn(hcl);
@@ -1629,6 +1637,7 @@ int main (int argc, char* argv[])
 
 	memset (&hclcb, 0, HCL_SIZEOF(hclcb));
 	hclcb.fini = fini_hcl;
+	hclcb.gc = gc_hcl;
 	hcl_regcb (hcl, &hclcb);
 
 
@@ -1676,14 +1685,31 @@ int main (int argc, char* argv[])
 
 	if (hcl_attachio(hcl, read_handler, print_handler) <= -1)
 	{
-		hcl_logbfmt (hcl, HCL_LOG_STDERR, "ERROR: cannot attache input stream - [%d] %js\n", hcl_geterrnum(hcl), hcl_geterrmsg(hcl));
+		hcl_logbfmt (hcl, HCL_LOG_STDERR, "ERROR: cannot attach input stream - [%d] %js\n", hcl_geterrnum(hcl), hcl_geterrmsg(hcl));
 		hcl_close (hcl);
 		return -1;
+	}
+
+	{
+		hcl_ooch_t errstr[] =  { 'E', 'R', 'R', 'S', 'T', 'R' };
+		xtn->sym_errstr = hcl_makesymbol(hcl, errstr, 6);
+		if (!xtn->sym_errstr)
+		{
+			hcl_logbfmt (hcl, HCL_LOG_STDERR, "ERROR: cannot create the ERRSTR symbol - [%d] %js\n", hcl_geterrnum(hcl), hcl_geterrmsg(hcl));
+			hcl_close (hcl);
+			return -1;
+		}
+		HCL_OBJ_SET_FLAGS_KERNEL (xtn->sym_errstr, 1);
 	}
 
 	while (1)
 	{
 		hcl_oop_t obj;
+/*
+static int count = 0;
+if (count %5 == 0) hcl_reset (hcl);
+count++;
+*/
 
 		obj = hcl_read(hcl);
 		if (!obj)
@@ -1747,6 +1773,17 @@ int main (int argc, char* argv[])
 				else
 				{
 					hcl_logbfmt (hcl, HCL_LOG_STDERR, "OK: EXITED WITH %O\n", retv);
+				
+					/*
+					 * print the value of ERRSTR.
+					hcl_oop_cons_t cons = hcl_getatsysdic(hcl, xtn->sym_errstr);
+					if (cons)
+					{
+						HCL_ASSERT (hcl, HCL_IS_CONS(hcl, cons));
+						HCL_ASSERT (hcl, HCL_CONS_CAR(cons) == xtn->sym_errstr);
+						hcl_print (hcl, HCL_CONS_CDR(cons));
+					}
+					*/
 				}
 				//cancel_tick();
 				g_hcl = HCL_NULL;
@@ -1773,6 +1810,7 @@ int main (int argc, char* argv[])
 		{
 			hcl_logbfmt (hcl, HCL_LOG_STDERR, "EXECUTION OK - EXITED WITH %O\n", retv);
 		}
+
 
 		//cancel_tick();
 		g_hcl = HCL_NULL;

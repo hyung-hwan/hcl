@@ -286,25 +286,29 @@ void hcl_fini (hcl_t* hcl)
 	}
 }
 
-void hcl_clear (hcl_t* hcl)
+void hcl_reset (hcl_t* hcl)
 {
 	hcl_oop_t v;
 	hcl_oow_t i;
 
-#if 0
-	/* clear global variables -> especially lambdas, because they refer to the byte codes? */
+	/* delete all literals shown in the literal frame from the system dictionary 
+	 * excluding special kernel symbols. */
 	for (i = 0; i < hcl->code.lit.len; i++)
 	{
-		v = ((hcl_oop_oop_t)hcl->code.lit.arr)->slot[ip]);
-		if (HCL_IS_CONS(v))
+		v = ((hcl_oop_oop_t)hcl->code.lit.arr)->slot[i];
+		if (HCL_IS_CONS(hcl, v))
 		{
-			hcl_delat
+			hcl_oop_t key = HCL_CONS_CAR(v);
+			if (!HCL_IS_SYMBOL(hcl,key) || !HCL_OBJ_GET_FLAGS_KERNEL(key))
+				hcl_zapatsysdic (hcl, HCL_CONS_CAR(v));
 		}
 	}
-#endif
-	/* clear the byte code and literals */
+
+	/* zap the byte code buffer and the literal frame */
 	hcl->code.bc.len = 0;
 	hcl->code.lit.len = 0;
+
+	/* clean up object memory */
 	hcl_gc (hcl);
 }
 

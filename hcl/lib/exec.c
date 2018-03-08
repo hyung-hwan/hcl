@@ -1165,12 +1165,12 @@ static int execute (hcl_t* hcl)
 		}*/
 
 		/* TODO: implement different process switching scheme - time-slice or clock based??? */
-#if defined(HCL_EXTERNAL_PROCESS_SWITCH)
+	#if defined(HCL_EXTERNAL_PROCESS_SWITCH)
 		if (!hcl->proc_switched && hcl->switch_proc) { switch_to_next_runnable_process (hcl); }
 		hcl->switch_proc = 0;
-#else
+	#else
 		if (!hcl->proc_switched) { switch_to_next_runnable_process (hcl); }
-#endif
+	#endif
 
 		hcl->proc_switched = 0;
 

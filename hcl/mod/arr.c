@@ -105,10 +105,10 @@ static hcl_pfrc_t pf_arr_size (hcl_t* hcl, hcl_mod_t* mod, hcl_ooi_t nargs)
 
 static hcl_pfinfo_t pfinfos[] =
 {
-	{ { 'g','e','t','\0' },      0, { pf_arr_get,     2,  2 } },
-/*	{ { 'm','a','k','e','\0' },  0, { pf_arr_make,    1,  1 } },*/
-	{ { 'p','u','t','\0' },      0, { pf_arr_put,     3,  3 } },
-	{ { 's','i','z','e','\0' },  0, { pf_arr_size,    1,  1 } },
+	{ { 'g','e','t','\0' },      { HCL_PFBASE_FUNC, pf_arr_get,     2,  2 } },
+/*	{ { 'm','a','k','e','\0' },  { HCL_PFBASE_FUNC, pf_arr_make,    1,  1 } },*/
+	{ { 'p','u','t','\0' },      { HCL_PFBASE_FUNC, pf_arr_put,     3,  3 } },
+	{ { 's','i','z','e','\0' },  { HCL_PFBASE_FUNC, pf_arr_size,    1,  1 } },
 };
 
 /* ------------------------------------------------------------------------ */

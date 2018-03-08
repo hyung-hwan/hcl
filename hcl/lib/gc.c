@@ -539,5 +539,6 @@ int hcl_ignite (hcl_t* hcl)
 	}
 
 	hcl->p.e = hcl->_nil;
+
 	return 0;
 }

@@ -92,7 +92,11 @@ static hcl_oop_oop_t expand_bucket (hcl_t* hcl, hcl_oop_oop_t oldbuc)
 	return newbuc;
 }
 
+#if defined(SYMBOL_ONLY_KEY)
 static hcl_oop_cons_t find_or_upsert (hcl_t* hcl, hcl_oop_dic_t dic, hcl_oop_char_t key, hcl_oop_t value)
+#else
+static hcl_oop_cons_t find_or_upsert (hcl_t* hcl, hcl_oop_dic_t dic, hcl_oop_t key, hcl_oop_t value)
+#endif
 {
 	hcl_ooi_t tally;
 	hcl_oow_t index;
@@ -110,7 +114,7 @@ static hcl_oop_cons_t find_or_upsert (hcl_t* hcl, hcl_oop_dic_t dic, hcl_oop_cha
 #if defined(SYMBOL_ONLY_KEY)
 	index = hcl_hashoochars(key->slot, HCL_OBJ_GET_SIZE(key)) % HCL_OBJ_GET_SIZE(dic->bucket);
 #else
-	if (hcl_hashobj(hcl, (hcl_oop_t)key, &index) <= -1) return HCL_NULL;
+	if (hcl_hashobj(hcl, key, &index) <= -1) return HCL_NULL;
 	index %= HCL_OBJ_GET_SIZE(dic->bucket);
 #endif
 
@@ -135,7 +139,7 @@ static hcl_oop_cons_t find_or_upsert (hcl_t* hcl, hcl_oop_dic_t dic, hcl_oop_cha
 		ass = (hcl_oop_cons_t)dic->bucket->slot[index];
 		HCL_ASSERT (hcl, HCL_IS_CONS(hcl,ass));
 
-		n = hcl_equalobjs(hcl, (hcl_oop_t)key, ass->car);
+		n = hcl_equalobjs(hcl, key, ass->car);
 		if (n <= -1) return HCL_NULL;
 		if (n >= 1)
 		{
@@ -196,7 +200,7 @@ static hcl_oop_cons_t find_or_upsert (hcl_t* hcl, hcl_oop_dic_t dic, hcl_oop_cha
 		/* recalculate the index for the expanded bucket */
 		index = hcl_hashoochars(key->slot, HCL_OBJ_GET_SIZE(key)) % HCL_OBJ_GET_SIZE(dic->bucket);
 	#else
-		hcl_hashobj(hcl, (hcl_oop_t)key, &index); /* this must succeed as i know 'key' is hashable */
+		hcl_hashobj(hcl, key, &index); /* this must succeed as i know 'key' is hashable */
 		index %= HCL_OBJ_GET_SIZE(dic->bucket);
 	#endif
 
@@ -206,7 +210,7 @@ static hcl_oop_cons_t find_or_upsert (hcl_t* hcl, hcl_oop_dic_t dic, hcl_oop_cha
 
 	/* create a new assocation of a key and a value since 
 	 * the key isn't found in the root dictionary */
-	ass = (hcl_oop_cons_t)hcl_makecons (hcl, (hcl_oop_t)key, (hcl_oop_t)value);
+	ass = (hcl_oop_cons_t)hcl_makecons (hcl, (hcl_oop_t)key, value);
 	if (!ass) goto oops;
 
 	/* the current tally must be less than the maximum value. otherwise,
@@ -228,7 +232,7 @@ hcl_oop_cons_t hcl_putatsysdic (hcl_t* hcl, hcl_oop_t key, hcl_oop_t value)
 #if defined(SYMBOL_ONLY_KEY)
 	HCL_ASSERT (hcl, HCL_IS_SYMBOL(hcl,key));
 #endif
-	return find_or_upsert (hcl, hcl->sysdic, (hcl_oop_char_t)key, value);
+	return find_or_upsert(hcl, hcl->sysdic, key, value);
 }
 
 hcl_oop_cons_t hcl_getatsysdic (hcl_t* hcl, hcl_oop_t key)
@@ -236,7 +240,15 @@ hcl_oop_cons_t hcl_getatsysdic (hcl_t* hcl, hcl_oop_t key)
 #if defined(SYMBOL_ONLY_KEY)
 	HCL_ASSERT (hcl, HCL_IS_SYMBOL(hcl,key));
 #endif
-	return find_or_upsert (hcl, hcl->sysdic, (hcl_oop_char_t)key, HCL_NULL);
+	return find_or_upsert(hcl, hcl->sysdic, key, HCL_NULL);
+}
+
+int hcl_zapatsysdic (hcl_t* hcl, hcl_oop_t key)
+{
+#if defined(SYMBOL_ONLY_KEY)
+	HCL_ASSERT (hcl, HCL_IS_SYMBOL(hcl,key));
+#endif
+	return hcl_zapatdic(hcl, hcl->sysdic, key);
 }
 
 hcl_oop_cons_t hcl_putatdic (hcl_t* hcl, hcl_oop_dic_t dic, hcl_oop_t key, hcl_oop_t value)
@@ -244,7 +256,7 @@ hcl_oop_cons_t hcl_putatdic (hcl_t* hcl, hcl_oop_dic_t dic, hcl_oop_t key, hcl_o
 #if defined(SYMBOL_ONLY_KEY)
 	HCL_ASSERT (hcl, HCL_IS_SYMBOL(hcl,key));
 #endif
-	return find_or_upsert (hcl, dic, (hcl_oop_char_t)key, value);
+	return find_or_upsert(hcl, dic, key, value);
 }
 
 hcl_oop_cons_t hcl_getatdic (hcl_t* hcl, hcl_oop_dic_t dic, hcl_oop_t key)
@@ -252,13 +264,13 @@ hcl_oop_cons_t hcl_getatdic (hcl_t* hcl, hcl_oop_dic_t dic, hcl_oop_t key)
 #if defined(SYMBOL_ONLY_KEY)
 	HCL_ASSERT (hcl, HCL_IS_SYMBOL(hcl,key));
 #endif
-	return find_or_upsert (hcl, dic, (hcl_oop_char_t)key, HCL_NULL);
+	return find_or_upsert(hcl, dic, key, HCL_NULL);
 }
 
-int hcl_purgeatdic (hcl_t* hcl, hcl_oop_dic_t dic, hcl_oop_t key)
+int hcl_zapatdic (hcl_t* hcl, hcl_oop_dic_t dic, hcl_oop_t key)
 {
 	hcl_ooi_t tally;
-	hcl_oow_t hv, index, bs, i, x, y, z;
+	hcl_oow_t index, bs, i, x, y, z;
 	hcl_oop_cons_t ass;
 
 	tally = HCL_OOP_TO_SMOOI(dic->tally);
@@ -275,7 +287,7 @@ int hcl_purgeatdic (hcl_t* hcl, hcl_oop_dic_t dic, hcl_oop_t key)
 #if defined(SYMBOL_ONLY_KEY)
 	index = hcl_hashoochars(key->slot, HCL_OBJ_GET_SIZE(key)) % bs;
 #else
-	if (hcl_hashobj(hcl, (hcl_oop_t)key, &index) <= -1) return -1;
+	if (hcl_hashobj(hcl, key, &index) <= -1) return -1;
 	index %= bs;
 #endif
 
@@ -288,7 +300,7 @@ int hcl_purgeatdic (hcl_t* hcl, hcl_oop_dic_t dic, hcl_oop_t key)
 		HCL_ASSERT (hcl, HCL_IS_SYMBOL(hcl,ass->car));
 
 		if (HCL_OBJ_GET_SIZE(key) == HCL_OBJ_GET_SIZE(ass->car) &&
-		    hcl_equaloochars(key->slot, ((hcl_oop_char_t)ass->car)->slot, HCL_OBJ_GET_SIZE(key))) 
+		    hcl_equaloochars(HCL_OBJ_GET_CHAR_SLOT(key), HCL_OBJ_GET_CHAR_SLOT(ass->car), HCL_OBJ_GET_SIZE(key))) 
 		{
 			/* the value of HCL_NULL indicates no insertion or update. */
 			goto found;
@@ -304,7 +316,7 @@ int hcl_purgeatdic (hcl_t* hcl, hcl_oop_dic_t dic, hcl_oop_t key)
 		if (n >= 1) goto found;
 	#endif
 
-		index = (index + 1) % HCL_OBJ_GET_SIZE(dic->bucket);
+		index = (index + 1) % bs;
 	}
 
 	hcl_seterrnum (hcl, HCL_ENOENT);
@@ -323,10 +335,10 @@ found:
 	#if defined(SYMBOL_ONLY_KEY)
 		/* get the natural hash index for the data in the slot at
 		 * the current hash index */
-		z = hcl_hashoochars(((hcl_oop_char_t)ass->key)->slot, HCL_OBJ_GET_SIZE(ass->key)) % bs;
+		z = hcl_hashoochars(HCL_OBJ_GET_CHAR_SLOT(ass->car), HCL_OBJ_GET_SIZE(ass->car)) % bs;
 	#else
 		if (hcl_hashobj(hcl, ass->car, &z) <= -1) return -1;
-		index %= bs;
+		z %= bs;
 	#endif
 
 		/* move an element if necesary */

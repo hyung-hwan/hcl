@@ -375,9 +375,11 @@ typedef enum hcl_obj_type_t hcl_obj_type_t;
  *          item than the value of the size field. used for a 
  *          terminating null in a variable-char object. internel
  *          use only.
- *   kernel: 0 or 1. indicates that the object is a kernel object.
- *           VM disallows layout changes of a kernel object.
- *           internal use only.
+ *   kernel: 0 - ordinary object.
+ *           1 - kernel object. can survive hcl_reset().
+ *           2 - kernel object. can survive hcl_reset(). 
+ *               a symbol object with 2 in the kernel bits cannot be assigned a
+ *               value with the 'set' special form.
  *   moved: 0 or 1. used by GC. internal use only.
  *   ngc: 0 or 1, used by GC. internal use only.
  *   trailer: 0 or 1. indicates that there are trailing bytes
@@ -857,22 +859,30 @@ typedef enum hcl_pfrc_t hcl_pfrc_t;
 typedef hcl_pfrc_t (*hcl_pfimpl_t) (
 	hcl_t*     hcl,
 	hcl_mod_t* mod,
-	hcl_ooi_t  nargs);
+	hcl_ooi_t  nargs
+);
 
+enum hcl_pfbase_type_t
+{
+	HCL_PFBASE_FUNC  = 0,
+	HCL_PFBASE_VAR   = 1,
+	HCL_PFBASE_CONST = 2
+};
+typedef enum hcl_pfbase_type_t hcl_pfbase_type_t;
 
 typedef struct hcl_pfbase_t hcl_pfbase_t;
 struct hcl_pfbase_t
 {
-	hcl_pfimpl_t handler;
-	hcl_oow_t    minargs;
-	hcl_oow_t    maxargs;
+	hcl_pfbase_type_t type;
+	hcl_pfimpl_t      handler;
+	hcl_oow_t         minargs;
+	hcl_oow_t         maxargs;
 };
 
 typedef struct hcl_pfinfo_t hcl_pfinfo_t;
 struct hcl_pfinfo_t
 {
 	hcl_ooch_t        mthname[32];
-	int               variadic;
 	hcl_pfbase_t      base;
 };
 /* =========================================================================
@@ -1364,10 +1374,17 @@ HCL_EXPORT void hcl_fini (
 	hcl_t*              hcl
 );
 
-/*
-HCL_EXPORT void hcl_clear (
+/**
+ * The hcl_reset() function some internal states back to the initial state.
+ * The affected internal states include byte code buffer, literal frame,
+ * ordinary global variables. You should take extra precaution as it is
+ * a risky function. For instance, a global variable inserted manually
+ * with hcl_putatsysdic() gets deleted if the kernel bit is not set on
+ * the variable symbol.
+ */
+HCL_EXPORT void hcl_reset (
 	hcl_t*              hcl
-);*/
+);
 
 #if defined(HCL_HAVE_INLINE)
 	static HCL_INLINE hcl_mmgr_t* hcl_getmmgr (hcl_t* hcl) { return hcl->mmgr; }
@@ -1466,6 +1483,19 @@ HCL_EXPORT void hcl_deregcb (
 HCL_EXPORT void hcl_gc (
 	hcl_t* hcl
 );
+
+
+/**
+ * The hcl_moveoop() function is used to move a live object to a new
+ * location in hcl_gc(). When hcl_gc() invokes registered gc callbacks,
+ * you may call this function to protect extra objects you might have
+ * allocated manually.
+ */
+hcl_oop_t hcl_moveoop (
+	hcl_t*     hcl,
+	hcl_oop_t  oop
+);
+
 
 HCL_EXPORT hcl_oow_t hcl_getpayloadbytes (
 	hcl_t*    hcl,
@@ -1814,6 +1844,11 @@ HCL_EXPORT hcl_oop_cons_t hcl_getatsysdic (
 	hcl_oop_t  key
 );
 
+HCL_EXPORT int hcl_zapatsysdic (
+	hcl_t*     hcl,
+	hcl_oop_t  key
+);
+
 HCL_EXPORT hcl_oop_cons_t hcl_putatdic (
 	hcl_t*        hcl,
 	hcl_oop_dic_t dic,
@@ -1822,6 +1857,13 @@ HCL_EXPORT hcl_oop_cons_t hcl_putatdic (
 );
 
 HCL_EXPORT hcl_oop_cons_t hcl_getatdic (
+	hcl_t*        hcl,
+	hcl_oop_dic_t dic,
+	hcl_oop_t     key
+);
+
+
+HCL_EXPORT int hcl_zapatdic (
 	hcl_t*        hcl,
 	hcl_oop_dic_t dic,
 	hcl_oop_t     key

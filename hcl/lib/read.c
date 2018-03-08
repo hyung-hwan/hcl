@@ -2091,31 +2091,59 @@ static int read_object (hcl_t* hcl)
 
 			case HCL_IOTOK_IDENT_DOTTED:
 				obj = hcl_makesymbol(hcl, TOKEN_NAME_PTR(hcl), TOKEN_NAME_LEN(hcl));
-				if (obj)
+				if (obj && !hcl_getatsysdic(hcl, obj))
 				{
+					/* query the module for information if it is the first time 
+					 * when the dotted symbol is seen */
+
 					hcl_pfbase_t* pfbase;
 					hcl_mod_t* mod;
-					hcl_oop_t prim;
-
+					hcl_oop_t val;
+					unsigned int kernel_bits;
+					
 					pfbase = hcl_querymod(hcl, TOKEN_NAME_PTR(hcl), TOKEN_NAME_LEN(hcl), &mod);
 					if (!pfbase)
 					{
 						/* TODO switch to syntax error */
 						return -1;
 					}
-
+				
 					hcl_pushtmp (hcl, &obj);
-					prim = hcl_makeprim(hcl, pfbase->handler, pfbase->minargs, pfbase->maxargs, mod);
+					switch (pfbase->type)
+					{
+						case HCL_PFBASE_FUNC:
+							kernel_bits = 2;
+							val = hcl_makeprim(hcl, pfbase->handler, pfbase->minargs, pfbase->maxargs, mod);
+							break;
 
-					if (!prim || !hcl_putatsysdic(hcl, obj, prim))
+						case HCL_PFBASE_VAR:
+							kernel_bits = 1;
+							val = hcl->_nil;
+							break;
+
+						case HCL_PFBASE_CONST:
+							/* TODO: create a value from the pfbase information. it needs to get extended first
+							 * can i make use of pfbase->handler type-cast to a differnt type? */
+							kernel_bits = 2;
+							val = hcl->_nil;
+							break;
+
+						default:
+							hcl_poptmp (hcl);
+							hcl_seterrbfmt (hcl, HCL_EINVAL, "invalid pfbase type - %d\n", pfbase->type);
+							return -1;
+					}
+
+					if (!val || !hcl_putatsysdic(hcl, obj, val))
 					{
 						hcl_poptmp (hcl);
 						return -1;
 					}
-
 					hcl_poptmp (hcl);
 
-					HCL_OBJ_SET_FLAGS_KERNEL (obj, 1);
+					/* make this dotted symbol special that it can't get changed
+					 * to a different value */
+					HCL_OBJ_SET_FLAGS_KERNEL (obj, kernel_bits);
 				}
 				break;
 		}
