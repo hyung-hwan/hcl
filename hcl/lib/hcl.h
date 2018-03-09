@@ -790,9 +790,14 @@ struct hcl_ioinarg_t
 	void* handle;
 
 	/**
-	 * [OUT] place data here 
+	 * [OUT] place data here for #HCL_IO_READ
 	 */
-	hcl_ooch_t buf[1024];
+	hcl_ooch_t buf[2048];
+
+	/**
+	 * [OUT] place the number of characters read here for #HCL_IO_READ
+	 */
+	hcl_oow_t  xlen;
 
 	/**
 	 * [IN] points to the data of the includer. It is #HCL_NULL for the
@@ -804,7 +809,9 @@ struct hcl_ioinarg_t
 	/*----------- from here down, internal use only -------------------*/
 	struct
 	{
-		int pos, len, state;
+		hcl_oow_t pos;
+		hcl_oow_t len;
+		int state;
 	} b;
 
 	unsigned long int line;
@@ -818,12 +825,36 @@ struct hcl_ioinarg_t
 typedef struct hcl_iooutarg_t hcl_iooutarg_t;
 struct hcl_iooutarg_t
 {
+	/** 
+	 * [OUT] I/O handle set by a handler. 
+	 * The source stream handler can set this field when it opens a stream.
+	 * All subsequent operations on the stream see this field as set
+	 * during opening.
+	 */
 	void*        handle;
+
+	/**
+	 * [IN] the pointer to the beginning of the character string
+	 *      to write
+	 */
 	hcl_ooch_t*  ptr;
-	hcl_oow_t    len;
+
+	/**
+	 * [IN] total number of characters to write
+	 */
+	hcl_oow_t    len; 
+
+	/**
+	 * [OUT] place the number of characters written here for HCL_IO_WRITE
+	 */
+	hcl_oow_t    xlen;
 };
 
-typedef hcl_ooi_t (*hcl_ioimpl_t) (
+/** 
+ * The hcl_ioimpl_t type defines a callback function prototype
+ * for I/O operations.
+ */
+typedef int (*hcl_ioimpl_t) (
 	hcl_t*        hcl,
 	hcl_iocmd_t   cmd,
 	void*         arg /* hcl_ioinarg_t* or hcl_iooutarg_t* */ 

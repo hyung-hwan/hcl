@@ -182,9 +182,9 @@ static hcl_bch_t* sprintn_upper (hcl_bch_t* nbuf, hcl_uintmax_t num, int base, h
 }
 
 /* ------------------------------------------------------------------------- */
-static int put_ooch (hcl_t* hcl, int mask, hcl_ooch_t ch, hcl_oow_t len)
+static int put_logch (hcl_t* hcl, int mask, hcl_ooch_t ch, hcl_oow_t len)
 {
-	/* this is not equivalent to put_oocs(hcl,mask,&ch,1);
+	/* this is not equivalent to put_logcs(hcl,mask,&ch,1);
 	 * this function is to emit a single character multiple times */
 	hcl_oow_t rem;
 
@@ -276,7 +276,7 @@ redo:
 	return 1; /* success */
 }
 
-static int put_oocs (hcl_t* hcl, int mask, const hcl_ooch_t* ptr, hcl_oow_t len)
+static int put_logcs (hcl_t* hcl, int mask, const hcl_ooch_t* ptr, hcl_oow_t len)
 {
 	hcl_oow_t rem;
 
@@ -424,8 +424,8 @@ hcl_ooi_t hcl_logbfmt (hcl_t* hcl, int mask, const hcl_bch_t* fmt, ...)
 	}
 
 	fo.mask = mask;
-	fo.putch = put_ooch;
-	fo.putcs = put_oocs;
+	fo.putch = put_logch;
+	fo.putcs = put_logcs;
 
 	va_start (ap, fmt);
 	x = _logbfmtv (hcl, fmt, &fo, ap);
@@ -452,8 +452,8 @@ hcl_ooi_t hcl_logufmt (hcl_t* hcl, int mask, const hcl_uch_t* fmt, ...)
 	}
 
 	fo.mask = mask;
-	fo.putch = put_ooch;
-	fo.putcs = put_oocs;
+	fo.putch = put_logch;
+	fo.putcs = put_logcs;
 
 	va_start (ap, fmt);
 	x = _logufmtv (hcl, fmt, &fo, ap);
@@ -472,46 +472,44 @@ hcl_ooi_t hcl_logufmt (hcl_t* hcl, int mask, const hcl_uch_t* fmt, ...)
  * HELPER FOR PRINTING
  * -------------------------------------------------------------------------- */
 
+static int put_prcs (hcl_t* hcl, int mask, const hcl_ooch_t* ptr, hcl_oow_t len)
+{
+	hcl_ooch_t* optr;
+
+	optr = (hcl_ooch_t*)ptr;
+	while (len > 0)
+	{
+		hcl->c->outarg.ptr = optr;
+		hcl->c->outarg.len = len;
+
+		if (hcl->c->printer(hcl, HCL_IO_WRITE, &hcl->c->outarg) <= -1) return -1;
+		if (hcl->c->outarg.xlen <= 0) return 0; /* end of stream. but not failure */
+
+		HCL_ASSERT (hcl, hcl->c->outarg.xlen <= len);
+		optr += hcl->c->outarg.xlen;
+		len -= hcl->c->outarg.xlen;
+	}
+
+	return 1; /* success */
+}
+
 static int put_prch (hcl_t* hcl, int mask, hcl_ooch_t ch, hcl_oow_t len)
 {
-/* TODO: better error handling, buffering.
- *       should buffering be done by the printer callback? */
-	hcl_ooi_t n;
 	hcl_ooch_t str[256];
 	hcl_oow_t seglen, i;
+	int n;
 
 	while (len > 0)
 	{
 		seglen = (len > HCL_COUNTOF(str))? len = HCL_COUNTOF(str): len;
 		for (i = 0; i < seglen; i++) str[i] = ch;
 
-		hcl->c->outarg.ptr = str;
-		hcl->c->outarg.len = seglen;
-
-		n = hcl->c->printer(hcl, HCL_IO_WRITE, &hcl->c->outarg);
-
-		if (n <= -1) return -1;
-		if (n == 0) return 0;
+		n = put_prcs (hcl, mask, str, seglen);
+		if (n <= 0) return n;
 
 		len -= seglen;
 	}
 
-	return 1; /* success */
-}
-
-static int put_prcs (hcl_t* hcl, int mask, const hcl_ooch_t* ptr, hcl_oow_t len)
-{
-/* TODO: better error handling, buffering 
- *       should buffering be done by the printer callback? */
-	hcl_ooi_t n;
-
-	hcl->c->outarg.ptr = (hcl_ooch_t*)ptr;
-	hcl->c->outarg.len = len;
-
-	n = hcl->c->printer(hcl, HCL_IO_WRITE, &hcl->c->outarg);
-
-	if (n <= -1) return -1;
-	if (n == 0) return 0;
 	return 1; /* success */
 }
 
@@ -581,6 +579,22 @@ hcl_ooi_t hcl_proutufmt (hcl_t* hcl, int mask, const hcl_uch_t* fmt, ...)
  * ERROR MESSAGE FORMATTING
  * -------------------------------------------------------------------------- */
 
+static int put_errcs (hcl_t* hcl, int mask, const hcl_ooch_t* ptr, hcl_oow_t len)
+{
+	hcl_oow_t max;
+
+	max = HCL_COUNTOF(hcl->errmsg.buf) - hcl->errmsg.len - 1;
+	if (len > max) len = max;
+
+	if (len <= 0) return 1;
+
+	HCL_MEMCPY (&hcl->errmsg.buf[hcl->errmsg.len], ptr, len * HCL_SIZEOF(*ptr));
+	hcl->errmsg.len += len;
+	hcl->errmsg.buf[hcl->errmsg.len] = '\0';
+
+	return 1; /* success */
+}
+
 static int put_errch (hcl_t* hcl, int mask, hcl_ooch_t ch, hcl_oow_t len)
 {
 	hcl_oow_t max;
@@ -599,23 +613,6 @@ static int put_errch (hcl_t* hcl, int mask, hcl_ooch_t ch, hcl_oow_t len)
 
 	return 1; /* success */
 }
-
-static int put_errcs (hcl_t* hcl, int mask, const hcl_ooch_t* ptr, hcl_oow_t len)
-{
-	hcl_oow_t max;
-
-	max = HCL_COUNTOF(hcl->errmsg.buf) - hcl->errmsg.len - 1;
-	if (len > max) len = max;
-
-	if (len <= 0) return 1;
-
-	HCL_MEMCPY (&hcl->errmsg.buf[hcl->errmsg.len], ptr, len * HCL_SIZEOF(*ptr));
-	hcl->errmsg.len += len;
-	hcl->errmsg.buf[hcl->errmsg.len] = '\0';
-
-	return 1; /* success */
-}
-
 
 static hcl_ooi_t __errbfmtv (hcl_t* hcl, int mask, const hcl_bch_t* fmt, ...);
 
@@ -716,9 +713,8 @@ void hcl_seterrufmtv (hcl_t* hcl, hcl_errnum_t errnum, const hcl_uch_t* fmt, va_
 	_errufmtv (hcl, fmt, &fo, ap);
 }
 
-
 /* -------------------------------------------------------------------------- 
- * SUPPORT FOR THE BUILTIN PRINTF PRIMITIVE FUNCTION
+ * SUPPORT FOR FORMATTED OUTPUT TO BE USED BY BUILTIN PRIMITIVE FUNCTIONS
  * -------------------------------------------------------------------------- */
 
 #define PRINT_OOCH(c,n) do { \
@@ -749,7 +745,7 @@ void hcl_seterrufmtv (hcl_t* hcl, hcl_errnum_t errnum, const hcl_uch_t* fmt, va_
 	if (fmt >= fmtend) ch = HCL_OOCI_EOF; \
 	else { ch = *(fmt); (fmt)++; }\
 } while(0)
-	
+
 static HCL_INLINE int print_formatted (hcl_t* hcl, hcl_ooi_t nargs, hcl_fmtout_t* data, hcl_outbfmt_t outbfmt)
 {
 	const hcl_ooch_t* fmt, * fmtend;
@@ -1115,6 +1111,10 @@ oops:
 	return -1;
 }
 
+/* -------------------------------------------------------------------------- 
+ * SUPPORT FOR THE BUILTIN PRINTF PRIMITIVE FUNCTION
+ * -------------------------------------------------------------------------- */
+
 int hcl_printfmtst (hcl_t* hcl, hcl_ooi_t nargs)
 {
 	hcl_fmtout_t fo;
@@ -1123,6 +1123,10 @@ int hcl_printfmtst (hcl_t* hcl, hcl_ooi_t nargs)
 	fo.putcs = put_prcs;
 	return print_formatted(hcl, nargs, &fo, hcl_proutbfmt);
 }
+
+/* -------------------------------------------------------------------------- 
+ * SUPPORT FOR THE BUILTIN LOGF PRIMITIVE FUNCTION
+ * -------------------------------------------------------------------------- */
 
 int hcl_logfmtst (hcl_t* hcl, hcl_ooi_t nargs)
 {
@@ -1142,19 +1146,35 @@ int hcl_logfmtst (hcl_t* hcl, hcl_ooi_t nargs)
 		fo.mask |= (hcl->log.default_type_mask & HCL_LOG_ALL_TYPES);
 	}
 
-	fo.putch = put_ooch;
-	fo.putcs = put_oocs;
+	fo.putch = put_logch;
+	fo.putcs = put_logcs;
 	return print_formatted(hcl, nargs, &fo, hcl_logbfmt);
 }
 
-
-
-
-
-
 /* -------------------------------------------------------------------------- 
- * SUPPORT FOR THE BUILTIN PRINTF PRIMITIVE FUNCTION
+ * SUPPORT FOR THE BUILTIN SPRINTF PRIMITIVE FUNCTION
  * -------------------------------------------------------------------------- */
+static int put_sprcs (hcl_t* hcl, int mask, const hcl_ooch_t* ptr, hcl_oow_t len)
+{
+	if (hcl->sprintf.xbuf.len >= hcl->sprintf.xbuf.capa)
+	{
+		hcl_ooch_t* tmp;
+		hcl_oow_t newcapa;
+
+		newcapa = hcl->sprintf.xbuf.len + len + 1;
+		newcapa = HCL_ALIGN_POW2(newcapa, 256);
+
+		tmp = (hcl_ooch_t*)hcl_reallocmem(hcl, hcl->sprintf.xbuf.ptr, newcapa * HCL_SIZEOF(*tmp));
+		if (!tmp) return -1;
+
+		hcl->sprintf.xbuf.ptr = tmp;
+		hcl->sprintf.xbuf.capa = newcapa;
+	}
+
+	HCL_MEMCPY (&hcl->sprintf.xbuf.ptr[hcl->sprintf.xbuf.len], ptr, len * HCL_SIZEOF(*ptr));
+	hcl->sprintf.xbuf.len += len;
+	return 1; /* success */
+}
 
 static int put_sprch (hcl_t* hcl, int mask, hcl_ooch_t ch, hcl_oow_t len)
 {
@@ -1179,28 +1199,6 @@ static int put_sprch (hcl_t* hcl, int mask, hcl_ooch_t ch, hcl_oow_t len)
 		hcl->sprintf.xbuf.ptr[hcl->sprintf.xbuf.len++] = ch;
 	}
 
-	return 1; /* success */
-}
-
-static int put_sprcs (hcl_t* hcl, int mask, const hcl_ooch_t* ptr, hcl_oow_t len)
-{
-	if (hcl->sprintf.xbuf.len >= hcl->sprintf.xbuf.capa)
-	{
-		hcl_ooch_t* tmp;
-		hcl_oow_t newcapa;
-
-		newcapa = hcl->sprintf.xbuf.len + len + 1;
-		newcapa = HCL_ALIGN_POW2(newcapa, 256);
-
-		tmp = (hcl_ooch_t*)hcl_reallocmem(hcl, hcl->sprintf.xbuf.ptr, newcapa * HCL_SIZEOF(*tmp));
-		if (!tmp) return -1;
-
-		hcl->sprintf.xbuf.ptr = tmp;
-		hcl->sprintf.xbuf.capa = newcapa;
-	}
-
-	HCL_MEMCPY (&hcl->sprintf.xbuf.ptr[hcl->sprintf.xbuf.len], ptr, len * HCL_SIZEOF(*ptr));
-	hcl->sprintf.xbuf.len += len;
 	return 1; /* success */
 }
 

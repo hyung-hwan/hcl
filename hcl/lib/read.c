@@ -393,7 +393,6 @@ static HCL_INLINE void unget_char (hcl_t* hcl, const hcl_iolxc_t* c)
 
 static int get_char (hcl_t* hcl)
 {
-	hcl_ooi_t n;
 	hcl_ooci_t lc;
 
 	if (hcl->c->nungots > 0)
@@ -416,10 +415,9 @@ static int get_char (hcl_t* hcl)
 
 	if (hcl->c->curinp->b.pos >= hcl->c->curinp->b.len)
 	{
-		n = hcl->c->reader (hcl, HCL_IO_READ, hcl->c->curinp);
-		if (n <= -1) return -1;
-		
-		if (n == 0)
+		if (hcl->c->reader(hcl, HCL_IO_READ, hcl->c->curinp) <= -1) return -1;
+
+		if (hcl->c->curinp->xlen <= 0)
 		{
 		return_eof:
 			hcl->c->curinp->lxc.c = HCL_OOCI_EOF;
@@ -433,7 +431,7 @@ static int get_char (hcl_t* hcl)
 		}
 
 		hcl->c->curinp->b.pos = 0;
-		hcl->c->curinp->b.len = n;
+		hcl->c->curinp->b.len = hcl->c->curinp->xlen;
 	}
 
 	if (hcl->c->curinp->lxc.c == '\n' || hcl->c->curinp->lxc.c == '\r')

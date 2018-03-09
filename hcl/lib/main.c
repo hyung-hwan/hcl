@@ -333,7 +333,9 @@ static HCL_INLINE hcl_ooi_t read_input (hcl_t* hcl, hcl_ioinarg_t* arg)
 	remlen = bb->len - bcslen;
 	if (remlen > 0) memmove (bb->buf, &bb->buf[bcslen], remlen);
 	bb->len = remlen;
-	return ucslen;
+
+	arg->xlen = ucslen;
+	return 0;
 }
 
 
@@ -406,7 +408,7 @@ static HCL_INLINE hcl_ooi_t write_output (hcl_t* hcl, hcl_iooutarg_t* arg)
 	#if defined(HCL_OOCH_IS_UCH)
 		bcslen = HCL_COUNTOF(bcsbuf);
 		ucslen = arg->len - donelen;
-		x = hcl_convootobchars (hcl, &arg->ptr[donelen], &ucslen, bcsbuf, &bcslen);
+		x = hcl_convootobchars(hcl, &arg->ptr[donelen], &ucslen, bcsbuf, &bcslen);
 		if (x <= -1 && ucslen <= 0) return -1;
 	#else
 		bcslen = HCL_COUNTOF(bcsbuf);
@@ -416,7 +418,7 @@ static HCL_INLINE hcl_ooi_t write_output (hcl_t* hcl, hcl_iooutarg_t* arg)
 		hcl_copybchars (bcsbuf, &arg->ptr[donelen], bcslen);
 	#endif
 
-		if (fwrite (bcsbuf, HCL_SIZEOF(bcsbuf[0]), bcslen, (FILE*)arg->handle) < bcslen)
+		if (fwrite(bcsbuf, HCL_SIZEOF(bcsbuf[0]), bcslen, (FILE*)arg->handle) < bcslen)
 		{
 			hcl_seterrnum (hcl, HCL_EIOERR);
 			return -1;
@@ -426,7 +428,8 @@ static HCL_INLINE hcl_ooi_t write_output (hcl_t* hcl, hcl_iooutarg_t* arg)
 	}
 	while (donelen < arg->len);
 
-	return arg->len;
+	arg->xlen = arg->len;
+	return 0;
 }
 
 static hcl_ooi_t print_handler (hcl_t* hcl, hcl_iocmd_t cmd, void* arg)
