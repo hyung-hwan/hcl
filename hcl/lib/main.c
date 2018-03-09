@@ -199,7 +199,7 @@ static const hcl_bch_t* get_base_name (const hcl_bch_t* path)
 	return (last == HCL_NULL)? path: (last + 1);
 }
 
-static HCL_INLINE hcl_ooi_t open_input (hcl_t* hcl, hcl_ioinarg_t* arg)
+static HCL_INLINE int open_input (hcl_t* hcl, hcl_ioinarg_t* arg)
 {
 	xtn_t* xtn = (xtn_t*)hcl_getxtn(hcl);
 	bb_t* bb = HCL_NULL;
@@ -275,7 +275,7 @@ oops:
 	return -1;
 }
 
-static HCL_INLINE hcl_ooi_t close_input (hcl_t* hcl, hcl_ioinarg_t* arg)
+static HCL_INLINE int close_input (hcl_t* hcl, hcl_ioinarg_t* arg)
 {
 	/*xtn_t* xtn = (xtn_t*)hcl_getxtn(hcl);*/
 	bb_t* bb;
@@ -291,7 +291,7 @@ static HCL_INLINE hcl_ooi_t close_input (hcl_t* hcl, hcl_ioinarg_t* arg)
 }
 
 
-static HCL_INLINE hcl_ooi_t read_input (hcl_t* hcl, hcl_ioinarg_t* arg)
+static HCL_INLINE int read_input (hcl_t* hcl, hcl_ioinarg_t* arg)
 {
 	/*xtn_t* xtn = (xtn_t*)hcl_getxtn(hcl);*/
 	bb_t* bb;
@@ -339,7 +339,7 @@ static HCL_INLINE hcl_ooi_t read_input (hcl_t* hcl, hcl_ioinarg_t* arg)
 }
 
 
-static hcl_ooi_t read_handler (hcl_t* hcl, hcl_iocmd_t cmd, void* arg)
+static int read_handler (hcl_t* hcl, hcl_iocmd_t cmd, void* arg)
 {
 	switch (cmd)
 	{
@@ -358,7 +358,7 @@ static hcl_ooi_t read_handler (hcl_t* hcl, hcl_iocmd_t cmd, void* arg)
 	}
 }
 
-static HCL_INLINE hcl_ooi_t open_output(hcl_t* hcl, hcl_iooutarg_t* arg)
+static HCL_INLINE int open_output(hcl_t* hcl, hcl_iooutarg_t* arg)
 {
 	xtn_t* xtn = (xtn_t*)hcl_getxtn(hcl);
 	FILE* fp;
@@ -380,7 +380,7 @@ static HCL_INLINE hcl_ooi_t open_output(hcl_t* hcl, hcl_iooutarg_t* arg)
 	return 0;
 }
   
-static HCL_INLINE hcl_ooi_t close_output (hcl_t* hcl, hcl_iooutarg_t* arg)
+static HCL_INLINE int close_output (hcl_t* hcl, hcl_iooutarg_t* arg)
 {
 	/*xtn_t* xtn = (xtn_t*)hcl_getxtn(hcl);*/
 	FILE* fp;
@@ -394,7 +394,7 @@ static HCL_INLINE hcl_ooi_t close_output (hcl_t* hcl, hcl_iooutarg_t* arg)
 }
 
 
-static HCL_INLINE hcl_ooi_t write_output (hcl_t* hcl, hcl_iooutarg_t* arg)
+static HCL_INLINE int write_output (hcl_t* hcl, hcl_iooutarg_t* arg)
 {
 	/*xtn_t* xtn = (xtn_t*)hcl_getxtn(hcl);*/
 	hcl_bch_t bcsbuf[1024];
@@ -432,7 +432,7 @@ static HCL_INLINE hcl_ooi_t write_output (hcl_t* hcl, hcl_iooutarg_t* arg)
 	return 0;
 }
 
-static hcl_ooi_t print_handler (hcl_t* hcl, hcl_iocmd_t cmd, void* arg)
+static int print_handler (hcl_t* hcl, hcl_iocmd_t cmd, void* arg)
 {
 	switch (cmd)
 	{
