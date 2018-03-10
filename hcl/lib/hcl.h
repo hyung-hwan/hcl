@@ -706,10 +706,7 @@ typedef void* (*hcl_vmprim_dlopen_t) (hcl_t* hcl, const hcl_ooch_t* name, int fl
 typedef void (*hcl_vmprim_dlclose_t) (hcl_t* hcl, void* handle);
 typedef void* (*hcl_vmprim_dlgetsym_t) (hcl_t* hcl, void* handle, const hcl_ooch_t* name);
 
-typedef int (*hcl_vmprim_startup_t) (hcl_t* hcl);
-typedef void (*hcl_vmprim_cleanup_t) (hcl_t* hcl);
 typedef void (*hcl_vmprim_gettime_t) (hcl_t* hcl, hcl_ntime_t* now);
-
 typedef void (*hcl_vmprim_sleep_t) (hcl_t* hcl, const hcl_ntime_t* duration);
 
 struct hcl_vmprim_t
@@ -718,27 +715,24 @@ struct hcl_vmprim_t
 	 * before hcl is fully initialized. so few features are availble
 	 * in this callback function. If it's not provided, the default
 	 * implementation is used. */
-	hcl_alloc_heap_t      alloc_heap;
+	hcl_alloc_heap_t      alloc_heap; /* optional */
 
 	/* If you customize the heap allocator by providing the alloc_heap
 	 * callback, you should implement the heap freer. otherwise the default
 	 * implementation doesn't know how to free the heap allocated by 
 	 * the allocator callback. */
-	hcl_free_heap_t       free_heap;
+	hcl_free_heap_t       free_heap; /* optional */
 
-	hcl_log_write_t       log_write;
-	hcl_syserrstrb_t      syserrstrb;
+	hcl_log_write_t       log_write; /* required */
+	hcl_syserrstrb_t      syserrstrb; /* one of syserrstrb or syserrstru required */
 	hcl_syserrstru_t      syserrstru;
 
-	hcl_vmprim_dlopen_t   dl_open;
-	hcl_vmprim_dlclose_t  dl_close;
-	hcl_vmprim_dlgetsym_t dl_getsym;
+	hcl_vmprim_dlopen_t   dl_open; /* required */
+	hcl_vmprim_dlclose_t  dl_close; /* required */
+	hcl_vmprim_dlgetsym_t dl_getsym; /* requried */
 
-	hcl_vmprim_startup_t  vm_startup;
-	hcl_vmprim_cleanup_t  vm_cleanup;
-	hcl_vmprim_gettime_t  vm_gettime;
-
-	hcl_vmprim_sleep_t    vm_sleep;
+	hcl_vmprim_gettime_t  vm_gettime; /* required */
+	hcl_vmprim_sleep_t    vm_sleep; /* required */
 };
 
 typedef struct hcl_vmprim_t hcl_vmprim_t;
@@ -863,13 +857,23 @@ typedef int (*hcl_ioimpl_t) (
 /* =========================================================================
  * CALLBACK MANIPULATION
  * ========================================================================= */
-typedef void (*hcl_cbimpl_t) (hcl_t* hcl);
+
+
+typedef void (*hcl_cb_fini_t) (hcl_t* hcl);
+typedef void (*hcl_cb_gc_t) (hcl_t* hcl);
+typedef int (*hcl_cb_vm_startup_t) (hcl_t* hcl);
+typedef void (*hcl_cb_vm_cleanup_t) (hcl_t* hcl);
+typedef void (*hcl_cb_vm_checkpoint_t) (hcl_t* hcl);
 
 typedef struct hcl_cb_t hcl_cb_t;
 struct hcl_cb_t
 {
-	hcl_cbimpl_t gc;
-	hcl_cbimpl_t fini;
+	hcl_cb_gc_t gc;
+	hcl_cb_fini_t fini;
+	
+	hcl_cb_vm_startup_t vm_startup;
+	hcl_cb_vm_cleanup_t vm_cleanup;
+	hcl_cb_vm_checkpoint_t vm_checkpoint;
 
 	/* private below */
 	hcl_cb_t*     prev;
@@ -1023,6 +1027,7 @@ struct hcl_t
 
 	hcl_vmprim_t vmprim;
 
+	hcl_oow_t vm_checkpoint_cb_count;
 	hcl_cb_t* cblist;
 	hcl_rbt_t modtab; /* primitive module table */
 
@@ -1094,6 +1099,7 @@ struct hcl_t
 	hcl_ooi_t ip;
 	int proc_switched; /* TODO: this is temporary. implement something else to skip immediate context switching */
 	int switch_proc;
+	int abort_req;
 	hcl_oop_t last_retv;
 
 	hcl_ntime_t exec_start_time;
@@ -1555,6 +1561,10 @@ HCL_EXPORT hcl_oop_t hcl_execute (
 HCL_EXPORT hcl_oop_t hcl_executefromip (
 	hcl_t*    hcl,
 	hcl_ooi_t initial_ip
+);
+
+HCL_EXPORT void hcl_abort (
+	hcl_t* hcl
 );
 
 HCL_EXPORT int hcl_attachio (

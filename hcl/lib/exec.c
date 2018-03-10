@@ -117,9 +117,21 @@ static HCL_INLINE const char* proc_state_to_string (int state)
 
 static int vm_startup (hcl_t* hcl)
 {
+	hcl_cb_t* cb;
+	
 	HCL_DEBUG1 (hcl, "VM started up at IP %zd\n", hcl->ip);
 
-	if (hcl->vmprim.vm_startup(hcl) <= -1) return -1;
+	for (cb = hcl->cblist; cb; cb = cb->next)
+	{
+		if (cb->vm_startup && cb->vm_startup(hcl) <= -1) 
+		{
+			for (cb = cb->prev; cb; cb = cb->prev)
+			{
+				if (cb->vm_cleanup) cb->vm_cleanup (hcl);
+			}
+			return -1;
+		}
+	}
 	hcl->vmprim.vm_gettime (hcl, &hcl->exec_start_time); /* raw time. no adjustment */
 
 	return 0;
@@ -127,11 +139,23 @@ static int vm_startup (hcl_t* hcl)
 
 static void vm_cleanup (hcl_t* hcl)
 {
+	hcl_cb_t* cb;
 	hcl->vmprim.vm_gettime (hcl, &hcl->exec_end_time); /* raw time. no adjustment */
-	hcl->vmprim.vm_cleanup (hcl);
+	for (cb = hcl->cblist; cb; cb = cb->next)
+	{
+		if (cb->vm_cleanup) cb->vm_cleanup(hcl);
+	}
 	HCL_DEBUG1 (hcl, "VM cleaned up at IP %zd\n", hcl->ip);
 }
 
+static void vm_checkpoint (hcl_t* hcl)
+{
+	hcl_cb_t* cb;
+	for (cb = hcl->cblist; cb; cb = cb->next)
+	{
+		if (cb->vm_checkpoint) cb->vm_checkpoint(hcl);
+	}
+}
 /* ------------------------------------------------------------------------- */
 
 static HCL_INLINE hcl_oop_t make_context (hcl_t* hcl, hcl_ooi_t ntmprs)
@@ -1073,11 +1097,15 @@ static int execute (hcl_t* hcl)
 
 	HCL_ASSERT (hcl, hcl->active_context != HCL_NULL);
 
-	if (vm_startup (hcl) <= -1) return -1;
+	hcl->abort_req = 0;
+	if (vm_startup(hcl) <= -1) return -1;
 	hcl->proc_switched = 0;
 
 	while (1)
 	{
+	#if defined(ENABLE_MULTI_PROCS) 
+		/* i don't think i will ever implement this in HCL.
+		 * but let's keep the code here for some while */
 		if (hcl->sem_heap_count > 0)
 		{
 			hcl_ntime_t ft, now;
@@ -1135,6 +1163,7 @@ static int execute (hcl_t* hcl)
 			} 
 			while (hcl->sem_heap_count > 0);
 		}
+	#endif
 
 		if (hcl->processor->active == hcl->nil_process) 
 		{
@@ -1152,44 +1181,46 @@ static int execute (hcl_t* hcl)
 			break;
 		}
 
+	#if defined(ENABLE_MULTI_PROCS)
 		while (hcl->sem_list_count > 0)
 		{
 			/* handle async signals */
 			--hcl->sem_list_count;
 			signal_semaphore (hcl, hcl->sem_list[hcl->sem_list_count]);
 		}
-		/*
-		if (semaphore heap has pending request)
-		{
-			signal them...
-		}*/
 
 		/* TODO: implement different process switching scheme - time-slice or clock based??? */
-	#if defined(HCL_EXTERNAL_PROCESS_SWITCH)
+		#if defined(HCL_EXTERNAL_PROCESS_SWITCH)
 		if (!hcl->proc_switched && hcl->switch_proc) { switch_to_next_runnable_process (hcl); }
 		hcl->switch_proc = 0;
-	#else
+		#else
 		if (!hcl->proc_switched) { switch_to_next_runnable_process (hcl); }
-	#endif
+		#endif
 
 		hcl->proc_switched = 0;
+	#endif
 
-		if (hcl->ip >= hcl->code.bc.len) 
+		if (HCL_UNLIKELY(hcl->ip >= hcl->code.bc.len) || HCL_UNLIKELY(hcl->abort_req)) 
 		{
-			HCL_DEBUG1 (hcl, "IP reached the end of bytecode(%zu). Stopping execution\n", hcl->code.bc.len);
+			if (hcl->abort_req)
+				HCL_DEBUG0 (hcl, "Stopping execution for abortion request\n");
+			else
+				HCL_DEBUG1 (hcl, "Stopping executeion as IP reached the end of bytecode(%zu)\n", hcl->code.bc.len);
 			return_value = hcl->_nil;
 			goto handle_return;
 		}
 
-#if defined(HCL_DEBUG_VM_EXEC)
+	#if defined(HCL_DEBUG_VM_EXEC)
 		fetched_instruction_pointer = hcl->ip;
-#endif
+	#endif
 		FETCH_BYTE_CODE_TO (hcl, bcode);
 		/*while (bcode == HCL_CODE_NOOP) FETCH_BYTE_CODE_TO (hcl, bcode);*/
 
-#if defined(HCL_PROFILE_VM)
+		if (hcl->vm_checkpoint_cb_count) vm_checkpoint (hcl);
+
+	#if defined(HCL_PROFILE_VM)
 		inst_counter++;
-#endif
+	#endif
 
 		switch (bcode)
 		{
@@ -2234,4 +2265,9 @@ hcl_oop_t hcl_executefromip (hcl_t* hcl, hcl_ooi_t initial_ip)
 hcl_oop_t hcl_execute (hcl_t* hcl)
 {
 	return hcl_executefromip (hcl, 0);
+}
+
+void hcl_abort (hcl_t* hcl)
+{
+	hcl->abort_req = 1;
 }

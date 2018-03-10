@@ -912,6 +912,130 @@ static void* dl_getsym (hcl_t* hcl, void* handle, const hcl_ooch_t* name)
 
 /* ========================================================================= */
 
+static void vm_gettime (hcl_t* hcl, hcl_ntime_t* now)
+{
+#if defined(_WIN32)
+	/* TODO: */
+#elif defined(__OS2__)
+	ULONG out;
+
+/* TODO: handle overflow?? */
+/* TODO: use DosTmrQueryTime() and DosTmrQueryFreq()? */
+	DosQuerySysInfo (QSV_MS_COUNT, QSV_MS_COUNT, &out, HCL_SIZEOF(out)); /* milliseconds */
+	/* it must return NO_ERROR */
+	HCL_INITNTIME (now, HCL_MSEC_TO_SEC(out), HCL_MSEC_TO_NSEC(out));
+#elif defined(__DOS__) && (defined(_INTELC32_) || defined(__WATCOMC__))
+	clock_t c;
+
+/* TODO: handle overflow?? */
+	c = clock ();
+	now->sec = c / CLOCKS_PER_SEC;
+	#if (CLOCKS_PER_SEC == 100)
+		now->nsec = HCL_MSEC_TO_NSEC((c % CLOCKS_PER_SEC) * 10);
+	#elif (CLOCKS_PER_SEC == 1000)
+		now->nsec = HCL_MSEC_TO_NSEC(c % CLOCKS_PER_SEC);
+	#elif (CLOCKS_PER_SEC == 1000000L)
+		now->nsec = HCL_USEC_TO_NSEC(c % CLOCKS_PER_SEC);
+	#elif (CLOCKS_PER_SEC == 1000000000L)
+		now->nsec = (c % CLOCKS_PER_SEC);
+	#else
+	#	error UNSUPPORTED CLOCKS_PER_SEC
+	#endif
+#elif defined(macintosh)
+	UnsignedWide tick;
+	hcl_uint64_t tick64;
+	Microseconds (&tick);
+	tick64 = *(hcl_uint64_t*)&tick;
+	HCL_INITNTIME (now, HCL_USEC_TO_SEC(tick64), HCL_USEC_TO_NSEC(tick64));
+#elif defined(HAVE_CLOCK_GETTIME) && defined(CLOCK_MONOTONIC)
+	struct timespec ts;
+	clock_gettime (CLOCK_MONOTONIC, &ts);
+	HCL_INITNTIME(now, ts.tv_sec, ts.tv_nsec);
+#elif defined(HAVE_CLOCK_GETTIME) && defined(CLOCK_REALTIME)
+	struct timespec ts;
+	clock_gettime (CLOCK_REALTIME, &ts);
+	HCL_INITNTIME(now, ts.tv_sec, ts.tv_nsec);
+#else
+	struct timeval tv;
+	gettimeofday (&tv, HCL_NULL);
+	HCL_INITNTIME(now, tv.tv_sec, HCL_USEC_TO_NSEC(tv.tv_usec));
+#endif
+}
+
+static void vm_sleep (hcl_t* hcl, const hcl_ntime_t* dur)
+{
+#if defined(_WIN32)
+	xtn_t* xtn = (xtn_t*)hcl_getxtn(hcl);
+	if (xtn->waitable_timer)
+	{
+		LARGE_INTEGER li;
+		li.QuadPart = -HCL_SECNSEC_TO_NSEC(dur->sec, dur->nsec);
+		if(SetWaitableTimer(timer, &li, 0, HCL_NULL, HCL_NULL, FALSE) == FALSE) goto normal_sleep;
+		WaitForSingleObject(timer, INFINITE);
+	}
+	else
+	{
+	normal_sleep:
+		/* fallback to normal Sleep() */
+		Sleep (HCL_SECNSEC_TO_MSEC(dur->sec,dur->nsec));
+	}
+#elif defined(__OS2__)
+
+	/* TODO: in gui mode, this is not a desirable method??? 
+	 *       this must be made event-driven coupled with the main event loop */
+	DosSleep (HCL_SECNSEC_TO_MSEC(dur->sec,dur->nsec));
+
+#elif defined(macintosh)
+
+	/* TODO: ... */
+
+#elif defined(__DOS__) && (defined(_INTELC32_) || defined(__WATCOMC__))
+
+	clock_t c;
+
+	c = clock ();
+	c += dur->sec * CLOCKS_PER_SEC;
+
+	#if (CLOCKS_PER_SEC == 100)
+		c += HCL_NSEC_TO_MSEC(dur->nsec) / 10;
+	#elif (CLOCKS_PER_SEC == 1000)
+		c += HCL_NSEC_TO_MSEC(dur->nsec);
+	#elif (CLOCKS_PER_SEC == 1000000L)
+		c += HCL_NSEC_TO_USEC(dur->nsec);
+	#elif (CLOCKS_PER_SEC == 1000000000L)
+		c += dur->nsec;
+	#else
+	#	error UNSUPPORTED CLOCKS_PER_SEC
+	#endif
+
+/* TODO: handle clock overvlow */
+/* TODO: check if there is abortion request or interrupt */
+	while (c > clock()) 
+	{
+		_halt_cpu();
+	}
+
+#else
+	#if defined(USE_THREAD)
+	/* the sleep callback is called only if there is no IO semaphore 
+	 * waiting. so i can safely call vm_muxwait() without a muxwait callback
+	 * when USE_THREAD is true */
+		vm_muxwait (hcl, dur, HCL_NULL);
+	#elif defined(HAVE_NANOSLEEP)
+		struct timespec ts;
+		ts.tv_sec = dur->sec;
+		ts.tv_nsec = dur->nsec;
+		nanosleep (&ts, HCL_NULL);
+	#elif defined(HAVE_USLEEP)
+		usleep (HCL_SECNSEC_TO_USEC(dur->sec, dur->nsec));
+	#else
+	#	error UNSUPPORT SLEEP
+	#endif
+#endif
+}
+
+/* ========================================================================= */
+
 static int vm_startup (hcl_t* hcl)
 {
 #if defined(_WIN32)
@@ -1096,131 +1220,6 @@ static void vm_cleanup (hcl_t* hcl)
 #endif
 }
 
-static void vm_gettime (hcl_t* hcl, hcl_ntime_t* now)
-{
-#if defined(_WIN32)
-	/* TODO: */
-#elif defined(__OS2__)
-	ULONG out;
-
-/* TODO: handle overflow?? */
-/* TODO: use DosTmrQueryTime() and DosTmrQueryFreq()? */
-	DosQuerySysInfo (QSV_MS_COUNT, QSV_MS_COUNT, &out, HCL_SIZEOF(out)); /* milliseconds */
-	/* it must return NO_ERROR */
-	HCL_INITNTIME (now, HCL_MSEC_TO_SEC(out), HCL_MSEC_TO_NSEC(out));
-#elif defined(__DOS__) && (defined(_INTELC32_) || defined(__WATCOMC__))
-	clock_t c;
-
-/* TODO: handle overflow?? */
-	c = clock ();
-	now->sec = c / CLOCKS_PER_SEC;
-	#if (CLOCKS_PER_SEC == 100)
-		now->nsec = HCL_MSEC_TO_NSEC((c % CLOCKS_PER_SEC) * 10);
-	#elif (CLOCKS_PER_SEC == 1000)
-		now->nsec = HCL_MSEC_TO_NSEC(c % CLOCKS_PER_SEC);
-	#elif (CLOCKS_PER_SEC == 1000000L)
-		now->nsec = HCL_USEC_TO_NSEC(c % CLOCKS_PER_SEC);
-	#elif (CLOCKS_PER_SEC == 1000000000L)
-		now->nsec = (c % CLOCKS_PER_SEC);
-	#else
-	#	error UNSUPPORTED CLOCKS_PER_SEC
-	#endif
-#elif defined(macintosh)
-	UnsignedWide tick;
-	hcl_uint64_t tick64;
-	Microseconds (&tick);
-	tick64 = *(hcl_uint64_t*)&tick;
-	HCL_INITNTIME (now, HCL_USEC_TO_SEC(tick64), HCL_USEC_TO_NSEC(tick64));
-#elif defined(HAVE_CLOCK_GETTIME) && defined(CLOCK_MONOTONIC)
-	struct timespec ts;
-	clock_gettime (CLOCK_MONOTONIC, &ts);
-	HCL_INITNTIME(now, ts.tv_sec, ts.tv_nsec);
-#elif defined(HAVE_CLOCK_GETTIME) && defined(CLOCK_REALTIME)
-	struct timespec ts;
-	clock_gettime (CLOCK_REALTIME, &ts);
-	HCL_INITNTIME(now, ts.tv_sec, ts.tv_nsec);
-#else
-	struct timeval tv;
-	gettimeofday (&tv, HCL_NULL);
-	HCL_INITNTIME(now, tv.tv_sec, HCL_USEC_TO_NSEC(tv.tv_usec));
-#endif
-}
-
-static void vm_sleep (hcl_t* hcl, const hcl_ntime_t* dur)
-{
-#if defined(_WIN32)
-	xtn_t* xtn = (xtn_t*)hcl_getxtn(hcl);
-	if (xtn->waitable_timer)
-	{
-		LARGE_INTEGER li;
-		li.QuadPart = -HCL_SECNSEC_TO_NSEC(dur->sec, dur->nsec);
-		if(SetWaitableTimer(timer, &li, 0, HCL_NULL, HCL_NULL, FALSE) == FALSE) goto normal_sleep;
-		WaitForSingleObject(timer, INFINITE);
-	}
-	else
-	{
-	normal_sleep:
-		/* fallback to normal Sleep() */
-		Sleep (HCL_SECNSEC_TO_MSEC(dur->sec,dur->nsec));
-	}
-#elif defined(__OS2__)
-
-	/* TODO: in gui mode, this is not a desirable method??? 
-	 *       this must be made event-driven coupled with the main event loop */
-	DosSleep (HCL_SECNSEC_TO_MSEC(dur->sec,dur->nsec));
-
-#elif defined(macintosh)
-
-	/* TODO: ... */
-
-#elif defined(__DOS__) && (defined(_INTELC32_) || defined(__WATCOMC__))
-
-	clock_t c;
-
-	c = clock ();
-	c += dur->sec * CLOCKS_PER_SEC;
-
-	#if (CLOCKS_PER_SEC == 100)
-		c += HCL_NSEC_TO_MSEC(dur->nsec) / 10;
-	#elif (CLOCKS_PER_SEC == 1000)
-		c += HCL_NSEC_TO_MSEC(dur->nsec);
-	#elif (CLOCKS_PER_SEC == 1000000L)
-		c += HCL_NSEC_TO_USEC(dur->nsec);
-	#elif (CLOCKS_PER_SEC == 1000000000L)
-		c += dur->nsec;
-	#else
-	#	error UNSUPPORTED CLOCKS_PER_SEC
-	#endif
-
-/* TODO: handle clock overvlow */
-/* TODO: check if there is abortion request or interrupt */
-	while (c > clock()) 
-	{
-		_halt_cpu();
-	}
-
-#else
-	#if defined(USE_THREAD)
-	/* the sleep callback is called only if there is no IO semaphore 
-	 * waiting. so i can safely call vm_muxwait() without a muxwait callback
-	 * when USE_THREAD is true */
-		vm_muxwait (hcl, dur, HCL_NULL);
-	#elif defined(HAVE_NANOSLEEP)
-		struct timespec ts;
-		ts.tv_sec = dur->sec;
-		ts.tv_nsec = dur->nsec;
-		nanosleep (&ts, HCL_NULL);
-	#elif defined(HAVE_USLEEP)
-		usleep (HCL_SECNSEC_TO_USEC(dur->sec, dur->nsec));
-	#else
-	#	error UNSUPPORT SLEEP
-	#endif
-#endif
-}
-
-
-/* ========================================================================= */
-
 static void gc_hcl (hcl_t* hcl)
 {
 	xtn_t* xtn = (xtn_t*)hcl_getxtn(hcl);
@@ -1238,6 +1237,7 @@ static void fini_hcl (hcl_t* hcl)
 	}
 }
 
+/* ========================================================================= */
 
 static int handle_logopt (hcl_t* hcl, const hcl_bch_t* str)
 {
@@ -1466,6 +1466,63 @@ static void cancel_tick (void)
 
 /* ========================================================================= */
 
+#if defined(__MSDOS__) && defined(_INTELC32_)
+typedef void(*signal_handler_t)(int);
+#elif defined(macintosh)
+typedef void(*signal_handler_t)(int);
+#else
+typedef void(*signal_handler_t)(int, siginfo_t*, void*);
+#endif
+
+
+#if defined(__MSDOS__) && defined(_INTELC32_)
+	/* TODO: implement this */
+#elif defined(macintosh)
+	/* TODO: implement this */
+#else
+static void handle_sigint (int sig, siginfo_t* siginfo, void* ctx)
+{
+	if (g_hcl) hcl_abort (g_hcl);
+}
+#endif
+
+static void set_signal (int sig, signal_handler_t handler)
+{
+#if defined(__MSDOS__) && defined(_INTELC32_)
+	/* TODO: implement this */
+#elif defined(macintosh)
+	/* TODO: implement this */
+#else
+	struct sigaction sa;
+
+	memset (&sa, 0, sizeof(sa));
+	/*sa.sa_handler = handler;*/
+	sa.sa_flags = SA_SIGINFO;
+	sa.sa_sigaction = handler;
+	sigemptyset (&sa.sa_mask);
+
+	sigaction (sig, &sa, NULL);
+#endif
+}
+
+static void set_signal_to_default (int sig)
+{
+#if defined(__MSDOS__) && defined(_INTELC32_)
+	/* TODO: implement this */
+#elif defined(macintosh)
+	/* TODO: implement this */
+#else
+	struct sigaction sa; 
+
+	memset (&sa, 0, sizeof(sa));
+	sa.sa_handler = SIG_DFL;
+	sa.sa_flags = 0;
+	sigemptyset (&sa.sa_mask);
+
+	sigaction (sig, &sa, NULL);
+#endif
+}
+
 
 /* ========================================================================= */
 
@@ -1600,8 +1657,6 @@ int main (int argc, char* argv[])
 	vmprim.dl_open = dl_open;
 	vmprim.dl_close = dl_close;
 	vmprim.dl_getsym = dl_getsym;
-	vmprim.vm_startup = vm_startup;
-	vmprim.vm_cleanup = vm_cleanup;
 	vmprim.vm_gettime = vm_gettime;
 	vmprim.vm_sleep = vm_sleep;
 
@@ -1641,6 +1696,8 @@ int main (int argc, char* argv[])
 	memset (&hclcb, 0, HCL_SIZEOF(hclcb));
 	hclcb.fini = fini_hcl;
 	hclcb.gc = gc_hcl;
+	hclcb.vm_startup =  vm_startup;
+	hclcb.vm_cleanup = vm_cleanup;
 	hcl_regcb (hcl, &hclcb);
 
 
@@ -1705,6 +1762,10 @@ int main (int argc, char* argv[])
 		HCL_OBJ_SET_FLAGS_KERNEL (xtn->sym_errstr, 1);
 	}
 
+	/* -- from this point onward, any failure leads to jumping to the oops label 
+	 * -- instead of returning -1 immediately. --*/
+	set_signal (SIGINT, handle_sigint);
+
 	while (1)
 	{
 		hcl_oop_t obj;
@@ -1713,7 +1774,6 @@ static int count = 0;
 if (count %5 == 0) hcl_reset (hcl);
 count++;
 */
-
 		obj = hcl_read(hcl);
 		if (!obj)
 		{
@@ -1819,11 +1879,13 @@ count++;
 		g_hcl = HCL_NULL;
 		/*hcl_dumpsymtab (hcl);*/
 	}
-
+	
+	set_signal_to_default (SIGINT);
 	hcl_close (hcl);
 	return 0;
 
 oops:
+	set_signal_to_default (SIGINT);
 	hcl_close (hcl);
 	return -1;
 }

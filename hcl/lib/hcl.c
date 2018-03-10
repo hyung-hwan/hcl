@@ -415,6 +415,8 @@ hcl_cb_t* hcl_regcb (hcl_t* hcl, hcl_cb_t* tmpl)
 	actual->next = hcl->cblist;
 	actual->prev = HCL_NULL;
 	hcl->cblist = actual;
+	
+	if (actual->vm_checkpoint) hcl->vm_checkpoint_cb_count++;
 
 	return actual;
 }
@@ -432,6 +434,11 @@ void hcl_deregcb (hcl_t* hcl, hcl_cb_t* cb)
 		if (cb->prev) cb->prev->next = cb->next;
 	}
 
+	if (cb->vm_checkpoint) 
+	{
+		HCL_ASSERT (hcl, hcl->vm_checkpoint_cb_count > 0);
+		hcl->vm_checkpoint_cb_count--;
+	}
 	hcl_freemem (hcl, cb);
 }
 
