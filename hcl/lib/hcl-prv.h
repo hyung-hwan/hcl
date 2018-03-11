@@ -124,9 +124,6 @@
 #	define HCL_MEMCMP(dst,src,size)  memcmp(dst,src,size)
 #endif
 
-#define HCL_ALIGN(x,y) ((((x) + (y) - 1) / (y)) * (y))
-
-
 #if defined(HCL_LIMIT_OBJ_SIZE)
 /* limit the maximum object size such that:
  *   1. an index to an object field can be represented in a small integer.
