@@ -2452,7 +2452,7 @@ static HCL_INLINE int emit_lambda (hcl_t* hcl)
 {
 	hcl_cframe_t* cf;
 	hcl_oow_t block_code_size;
-	hcl_oow_t jip;
+	hcl_ooi_t jip;
 
 	cf = GET_TOP_CFRAME(hcl);
 	HCL_ASSERT (hcl, cf->opcode == COP_EMIT_LAMBDA);

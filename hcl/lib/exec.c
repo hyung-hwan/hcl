@@ -148,12 +148,12 @@ static void vm_cleanup (hcl_t* hcl)
 	HCL_DEBUG1 (hcl, "VM cleaned up at IP %zd\n", hcl->ip);
 }
 
-static void vm_checkpoint (hcl_t* hcl)
+static void vm_checkbc (hcl_t* hcl, hcl_oob_t bcode)
 {
 	hcl_cb_t* cb;
 	for (cb = hcl->cblist; cb; cb = cb->next)
 	{
-		if (cb->vm_checkpoint) cb->vm_checkpoint(hcl);
+		if (cb->vm_checkbc) cb->vm_checkbc(hcl, bcode);
 	}
 }
 /* ------------------------------------------------------------------------- */
@@ -1213,11 +1213,11 @@ static int execute (hcl_t* hcl)
 		FETCH_BYTE_CODE_TO (hcl, bcode);
 		/*while (bcode == HCL_CODE_NOOP) FETCH_BYTE_CODE_TO (hcl, bcode);*/
 
-		if (hcl->vm_checkpoint_cb_count) vm_checkpoint (hcl);
+		if (hcl->vm_checkbc_cb_count) vm_checkbc (hcl, bcode);
 		
 		if (HCL_UNLIKELY(hcl->abort_req))
 		{
-			/* place the abortion check after vm_checkpoint
+			/* i place this abortion check after vm_checkbc()
 			 * to honor hcl_abort() if called in the callback, */
 			HCL_DEBUG0 (hcl, "Stopping execution for abortion request\n");
 			return_value = hcl->_nil;
@@ -2241,9 +2241,17 @@ oops:
 	return -1;
 }
 
-hcl_oop_t hcl_executefromip (hcl_t* hcl, hcl_ooi_t initial_ip)
+hcl_oop_t hcl_executefromip (hcl_t* hcl, hcl_oow_t initial_ip)
 {
 	int n, log_default_type_mask;
+
+	HCL_ASSERT (hcl, hcl->code.bc.len < HCL_SMOOI_MAX); /* asserted by the compiler */
+	HCL_ASSERT (hcl, initial_ip < hcl->code.bc.len);
+	if (initial_ip >= hcl->code.bc.len)
+	{
+		hcl_seterrnum (hcl, HCL_EINVAL);
+		return HCL_NULL;
+	}
 
 	log_default_type_mask = hcl->log.default_type_mask;
 	hcl->log.default_type_mask |= HCL_LOG_VM;

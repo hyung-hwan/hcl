@@ -416,11 +416,11 @@ hcl_cb_t* hcl_regcb (hcl_t* hcl, hcl_cb_t* tmpl)
 	actual->prev = HCL_NULL;
 	hcl->cblist = actual;
 	
-	/* vm_checkpoint is invoked very frequently.
-	 * and there might be multiple vm_checkpoint callbacks registered.
-	 * keeping the count of vm_checkpoint callbacks registered
+	/* vm_checkbc is invoked very frequently.
+	 * and there might be multiple vm_checkbc callbacks registered.
+	 * keeping the count of vm_checkbc callbacks registered
 	 * speeds up the check */
-	if (actual->vm_checkpoint) hcl->vm_checkpoint_cb_count++;
+	if (actual->vm_checkbc) hcl->vm_checkbc_cb_count++;
 
 	return actual;
 }
@@ -438,10 +438,10 @@ void hcl_deregcb (hcl_t* hcl, hcl_cb_t* cb)
 		if (cb->prev) cb->prev->next = cb->next;
 	}
 
-	if (cb->vm_checkpoint) 
+	if (cb->vm_checkbc) 
 	{
-		HCL_ASSERT (hcl, hcl->vm_checkpoint_cb_count > 0);
-		hcl->vm_checkpoint_cb_count--;
+		HCL_ASSERT (hcl, hcl->vm_checkbc_cb_count > 0);
+		hcl->vm_checkbc_cb_count--;
 	}
 	hcl_freemem (hcl, cb);
 }

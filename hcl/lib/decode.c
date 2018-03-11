@@ -55,7 +55,7 @@
 #endif
 
 /* TODO: check if ip shoots beyond the maximum length in fetching code and parameters */
-int hcl_decode (hcl_t* hcl, hcl_ooi_t start, hcl_ooi_t end)
+int hcl_decode (hcl_t* hcl, hcl_oow_t start, hcl_oow_t end)
 {
 	hcl_oob_t bcode, * cdptr;
 	hcl_ooi_t ip = start, fetched_instruction_pointer;
@@ -67,6 +67,12 @@ int hcl_decode (hcl_t* hcl, hcl_ooi_t start, hcl_ooi_t end)
 	HCL_ASSERT (hcl, start >= 0 && end >= 0);
 	HCL_ASSERT (hcl, hcl->code.bc.len < HCL_SMOOI_MAX); /* asserted by the compiler */
 	HCL_ASSERT (hcl, end <= hcl->code.bc.len); /* not harmful though this fails */
+	if (start >= hcl->code.bc.len)
+	{
+		hcl_seterrnum (hcl, HCL_EINVAL);
+		return -1;
+	}
+	if (end > hcl->code.bc.len) end = hcl->code.bc.len;
 
 	ip = start;
 	cdptr = ((hcl_oop_byte_t)hcl->code.bc.arr)->slot;

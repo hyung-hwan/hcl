@@ -1220,6 +1220,12 @@ static void vm_cleanup (hcl_t* hcl)
 #endif
 }
 
+/*
+static void vm_checkbc (hcl_t* hcl, hcl_oob_t bcode)
+{
+}
+*/
+
 static void gc_hcl (hcl_t* hcl)
 {
 	xtn_t* xtn = (xtn_t*)hcl_getxtn(hcl);
@@ -1398,6 +1404,7 @@ static void arrange_process_switching (int sig)
 }
 #endif
 
+#if 0
 static void setup_tick (void)
 {
 #if defined(__MSDOS__) && defined(_INTELC32_)
@@ -1463,6 +1470,7 @@ static void cancel_tick (void)
 #	error UNSUPPORTED
 #endif
 }
+#endif
 
 /* ========================================================================= */
 
@@ -1698,7 +1706,7 @@ int main (int argc, char* argv[])
 	hclcb.gc = gc_hcl;
 	hclcb.vm_startup =  vm_startup;
 	hclcb.vm_cleanup = vm_cleanup;
-	/*hclcb.vm_checkpoint = vm_checkpoint;*/
+	/*hclcb.vm_checkbc = vm_checkbc;*/
 	hcl_regcb (hcl, &hclcb);
 
 	if (logopt)
@@ -1802,7 +1810,7 @@ count++;
 		{
 			hcl_oow_t code_offset;
 
-			code_offset = hcl->code.bc.len;
+			code_offset = hcl_getbclen(hcl);
 
 			hcl_proutbfmt (hcl, 0, "\n");
 			if (hcl_compile(hcl, obj) <= -1)
@@ -1823,7 +1831,7 @@ count++;
 			{
 				hcl_oop_t retv;
 
-				hcl_decode (hcl, code_offset, hcl->code.bc.len);
+				hcl_decode (hcl, code_offset, hcl_getbclen(hcl));
 				HCL_LOG0 (hcl, HCL_LOG_MNEMONIC, "------------------------------------------\n");
 				g_hcl = hcl;
 				//setup_tick ();
@@ -1858,11 +1866,10 @@ count++;
 	{
 		hcl_oop_t retv;
 
-		hcl_decode (hcl, 0, hcl->code.bc.len);
-		HCL_LOG2 (hcl, HCL_LOG_MNEMONIC, "BYTECODES hcl->code.bc.len = > %lu hcl->code.lit.len => %lu\n", 
-			(unsigned long int)hcl->code.bc.len, (unsigned long int)hcl->code.lit.len);
+		hcl_decode (hcl, 0, hcl_getbclen(hcl));
+		HCL_LOG2 (hcl, HCL_LOG_MNEMONIC, "BYTECODES bclen = > %zu lflen => %zu\n", hcl_getbclen(hcl), hcl_getlflen(hcl));
 		g_hcl = hcl;
-		//setup_tick ();
+		/*setup_tick ();*/
 
 		retv = hcl_execute(hcl);
 		if (!retv)
@@ -1874,8 +1881,7 @@ count++;
 			hcl_logbfmt (hcl, HCL_LOG_STDERR, "EXECUTION OK - EXITED WITH %O\n", retv);
 		}
 
-
-		//cancel_tick();
+		/*cancel_tick();*/
 		g_hcl = HCL_NULL;
 		/*hcl_dumpsymtab (hcl);*/
 	}

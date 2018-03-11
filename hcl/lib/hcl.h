@@ -863,7 +863,7 @@ typedef void (*hcl_cb_fini_t) (hcl_t* hcl);
 typedef void (*hcl_cb_gc_t) (hcl_t* hcl);
 typedef int (*hcl_cb_vm_startup_t) (hcl_t* hcl);
 typedef void (*hcl_cb_vm_cleanup_t) (hcl_t* hcl);
-typedef void (*hcl_cb_vm_checkpoint_t) (hcl_t* hcl);
+typedef void (*hcl_cb_vm_checkbc_t) (hcl_t* hcl, hcl_oob_t bcode);
 
 typedef struct hcl_cb_t hcl_cb_t;
 struct hcl_cb_t
@@ -873,7 +873,7 @@ struct hcl_cb_t
 	
 	hcl_cb_vm_startup_t vm_startup;
 	hcl_cb_vm_cleanup_t vm_cleanup;
-	hcl_cb_vm_checkpoint_t vm_checkpoint;
+	hcl_cb_vm_checkbc_t vm_checkbc;
 
 	/* private below */
 	hcl_cb_t*     prev;
@@ -1027,7 +1027,7 @@ struct hcl_t
 
 	hcl_vmprim_t vmprim;
 
-	hcl_oow_t vm_checkpoint_cb_count;
+	hcl_oow_t vm_checkbc_cb_count;
 	hcl_cb_t* cblist;
 	hcl_rbt_t modtab; /* primitive module table */
 
@@ -1560,7 +1560,7 @@ HCL_EXPORT hcl_oop_t hcl_execute (
 
 HCL_EXPORT hcl_oop_t hcl_executefromip (
 	hcl_t*    hcl,
-	hcl_ooi_t initial_ip
+	hcl_oow_t initial_ip
 );
 
 HCL_EXPORT void hcl_abort (
@@ -1593,11 +1593,26 @@ HCL_EXPORT int hcl_compile (
 	hcl_oop_t    obj
 );
 
+/**
+ * The hcl_decode() function decodes instructions from the position 
+ * \a start to the position \a end - 1, and prints the decoded instructions
+ * in the textual form. 
+ */
 HCL_EXPORT int hcl_decode (
-	hcl_t*            hcl,
-	hcl_ooi_t         start,
-	hcl_ooi_t         end
+	hcl_t*       hcl,
+	hcl_oow_t    start,
+	hcl_oow_t    end
 );
+
+#if defined(HCL_HAVE_INLINE)
+	static HCL_INLINE hcl_oow_t hcl_getbclen (hcl_t* hcl) { return hcl->code.bc.len; }
+	static HCL_INLINE hcl_oow_t hcl_getlflen (hcl_t* hcl) { return hcl->code.lit.len; }
+	static HCL_INLINE hcl_ooi_t hcl_getip (hcl_t* hcl) { return hcl->ip; }
+#else
+#	define hcl_getbclen(hcl) ((hcl)->code.bc.len)
+#	define hcl_getlflen(hcl) ((hcl)->code.lit.len)
+#	define hcl_getip(hcl) ((hcl)->ip)
+#endif
 
 
 /* if you should read charcters from the input stream before hcl_read(), 
