@@ -1698,8 +1698,8 @@ int main (int argc, char* argv[])
 	hclcb.gc = gc_hcl;
 	hclcb.vm_startup =  vm_startup;
 	hclcb.vm_cleanup = vm_cleanup;
+	/*hclcb.vm_checkpoint = vm_checkpoint;*/
 	hcl_regcb (hcl, &hclcb);
-
 
 	if (logopt)
 	{
