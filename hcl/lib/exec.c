@@ -1200,12 +1200,9 @@ static int execute (hcl_t* hcl)
 		hcl->proc_switched = 0;
 	#endif
 
-		if (HCL_UNLIKELY(hcl->ip >= hcl->code.bc.len) || HCL_UNLIKELY(hcl->abort_req)) 
+		if (HCL_UNLIKELY(hcl->ip >= hcl->code.bc.len)) 
 		{
-			if (hcl->abort_req)
-				HCL_DEBUG0 (hcl, "Stopping execution for abortion request\n");
-			else
-				HCL_DEBUG1 (hcl, "Stopping executeion as IP reached the end of bytecode(%zu)\n", hcl->code.bc.len);
+			HCL_DEBUG1 (hcl, "Stopping executeion as IP reached the end of bytecode(%zu)\n", hcl->code.bc.len);
 			return_value = hcl->_nil;
 			goto handle_return;
 		}
@@ -1217,6 +1214,15 @@ static int execute (hcl_t* hcl)
 		/*while (bcode == HCL_CODE_NOOP) FETCH_BYTE_CODE_TO (hcl, bcode);*/
 
 		if (hcl->vm_checkpoint_cb_count) vm_checkpoint (hcl);
+		
+		if (HCL_UNLIKELY(hcl->abort_req))
+		{
+			/* place the abortion check after vm_checkpoint
+			 * to honor hcl_abort() if called in the callback, */
+			HCL_DEBUG0 (hcl, "Stopping execution for abortion request\n");
+			return_value = hcl->_nil;
+			goto handle_return;
+		}
 
 	#if defined(HCL_PROFILE_VM)
 		inst_counter++;

@@ -416,6 +416,10 @@ hcl_cb_t* hcl_regcb (hcl_t* hcl, hcl_cb_t* tmpl)
 	actual->prev = HCL_NULL;
 	hcl->cblist = actual;
 	
+	/* vm_checkpoint is invoked very frequently.
+	 * and there might be multiple vm_checkpoint callbacks registered.
+	 * keeping the count of vm_checkpoint callbacks registered
+	 * speeds up the check */
 	if (actual->vm_checkpoint) hcl->vm_checkpoint_cb_count++;
 
 	return actual;
