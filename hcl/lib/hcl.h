@@ -2001,14 +2001,13 @@ HCL_EXPORT int hcl_convbtoucstr (
  * The hcl_convutobcstr() function converts a null-terminated wide string
  * to a byte string.
  */
-int hcl_convutobcstr (
+HCL_EXPORT int hcl_convutobcstr (
 	hcl_t*           hcl,
 	const hcl_uch_t* ucs,
 	hcl_oow_t*       ucslen,
 	hcl_bch_t*       bcs,
 	hcl_oow_t*       bcslen
 );
-
 
 #if defined(HCL_OOCH_IS_UCH)
 #	define hcl_dupootobcharswithheadroom(hcl,hrb,oocs,oocslen,bcslen) hcl_duputobcharswithheadroom(hcl,hrb,oocs,oocslen,bcslen)

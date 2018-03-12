@@ -105,7 +105,7 @@ int hcl_init (hcl_t* hcl, hcl_mmgr_t* mmgr, hcl_oow_t heapsz, const hcl_vmprim_t
 
 	HCL_MEMSET (hcl, 0, HCL_SIZEOF(*hcl));
 	hcl->mmgr = mmgr;
-	hcl->cmgr = hcl_getutf8cmgr();
+	hcl->cmgr = hcl_get_utf8_cmgr();
 	hcl->vmprim = *vmprim;
 	if (!hcl->vmprim.alloc_heap) hcl->vmprim.alloc_heap = alloc_heap;
 	if (!hcl->vmprim.free_heap) hcl->vmprim.free_heap = free_heap;

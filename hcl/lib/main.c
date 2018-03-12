@@ -152,8 +152,6 @@ struct xtn_t
 
 /* ========================================================================= */
 
-#define MB_1 (256UL*1024*1024)
-
 static void* sys_alloc (hcl_mmgr_t* mmgr, hcl_oow_t size)
 {
 	return malloc(size);
@@ -1892,14 +1890,11 @@ int main_server (int argc, char* argv[]);
 
 int main (int argc, char* argv[])
 {
-	const char* slash;
-	const char* prog;
 
-	prog = argv[0];
-	slash = strrchr(prog, '/');
-	if (slash) prog = slash + 1;
+	const char* base;
 
-	if (strcmp(prog, "hcld") == 0) return main_server (argc, argv);
+	base = get_base_name (argv[0]);
+	if (strcmp(base, "hcld") == 0) return main_server (argc, argv);
 
 	return main_tty (argc, argv);
 }
