@@ -1,3 +1,5 @@
+
+
 /*
  * $Id$
  *
@@ -91,7 +93,12 @@
 #	include <unistd.h>
 #	include <fcntl.h>
 
-
+#	include <sys/types.h>
+#	include <sys/socket.h>
+#	include <netinet/in.h>
+#	include <arpa/inet.h>
+#	include <pthread.h>
+#	include <sys/uio.h>
 #endif
 
 #if !defined(HCL_DEFAULT_PFMODPREFIX)
@@ -122,33 +129,154 @@
 #	endif
 #endif
 
+typedef union sck_addr_t sck_addr_t;
+union sck_addr_t
+{
+	struct sockaddr_in in4;
+	struct sockaddr_in6 in6;
+};
+
 typedef struct bb_t bb_t;
 struct bb_t
 {
 	char buf[1024];
 	hcl_oow_t pos;
 	hcl_oow_t len;
-
-	FILE* fp;
+	int fd;
 	hcl_bch_t* fn;
 };
+
+typedef struct proto_t proto_t;
+typedef struct client_t client_t;
+typedef struct server_t server_t;
 
 typedef struct xtn_t xtn_t;
 struct xtn_t
 {
-	const char* read_path; /* main source file */
-	const char* print_path; 
-
+	proto_t* proto;
 	int vm_running;
 
 	int logfd;
 	int logmask;
 	int logfd_istty;
-
-	int reader_istty;
-	
-	hcl_oop_t sym_errstr;
 };
+
+enum proto_token_type_t
+{
+	PROTO_TOKEN_EOF,
+	PROTO_TOKEN_NL,
+
+	PROTO_TOKEN_BEGIN,
+	PROTO_TOKEN_END,
+	PROTO_TOKEN_SCRIPT,
+	PROTO_TOKEN_EXIT,
+
+	PROTO_TOKEN_OK,
+	PROTO_TOKEN_ERROR,
+	PROTO_TOKEN_LENGTH,
+	PROTO_TOKEN_ENCODING,
+
+	PROTO_TOKEN_IDENT
+};
+
+typedef enum proto_token_type_t proto_token_type_t;
+
+typedef struct proto_token_t proto_token_t;
+struct proto_token_t
+{
+	proto_token_type_t type;
+	hcl_ooch_t* ptr;
+	hcl_oow_t len;
+	hcl_oow_t capa;
+	hcl_ioloc_t loc;
+};
+
+enum proto_req_state_t
+{
+	PROTO_REQ_IN_TOP_LEVEL,
+	PROTO_REQ_IN_BLOCK_LEVEL
+};
+
+#define PROTO_REPLY_BUF_SIZE 1300
+
+enum proto_reply_type_t
+{
+	PROTO_REPLY_SIMPLE = 0,
+	PROTO_REPLY_CHUNKED
+};
+typedef enum proto_reply_type_t proto_reply_type_t;
+
+struct proto_t
+{
+	client_t* client;
+
+	hcl_t* hcl;
+	hcl_iolxc_t* lxc;
+	proto_token_t tok;
+
+	struct
+	{
+		int state;
+	} req;
+
+	struct
+	{
+		proto_reply_type_t type;
+		hcl_oow_t nchunks;
+		hcl_bch_t buf[PROTO_REPLY_BUF_SIZE];
+		hcl_oow_t len;
+
+		int inject_nl; /* inject nl before the chunk length */
+	} reply;
+};
+
+enum client_state_t
+{
+	CLIENT_STATE_DEAD  = 0,
+	CLIENT_STATE_ALIVE = 1
+};
+typedef enum client_state_t client_state_t;
+
+struct client_t
+{
+	pthread_t thr;
+	int sck;
+	/* TODO: peer address */
+
+	time_t time_created;
+	client_state_t state;
+
+	proto_t* proto;
+
+	server_t* server;
+	client_t* prev_client;
+	client_t* next_client;
+};
+
+struct server_t
+{
+	int stopreq;
+
+	struct
+	{
+		hcl_oow_t memsize; /* hcl heap memory size */
+		unsigned int dbgopt;
+		int large_pages;
+		const char* logopt;
+	} cfg;
+
+	struct
+	{
+		client_t* head;
+		client_t* tail;
+	} client_list[2];
+
+	pthread_mutex_t client_mutex;
+	pthread_mutex_t log_mutex;
+};
+
+
+int proto_feed_reply (proto_t* proto, const hcl_ooch_t* ptr, hcl_oow_t len, int escape);
 
 /* ========================================================================= */
 
@@ -232,35 +360,25 @@ static HCL_INLINE int open_input (hcl_t* hcl, hcl_ioinarg_t* arg)
 	#else
 		hcl_copybcstr (&bb->fn[parlen], bcslen + 1, arg->name);
 	#endif
+
+		bb->fd = open(bb->fn, O_RDONLY, 0);
 	}
 	else
 	{
 		/* main stream */
-		hcl_oow_t pathlen;
-
-		pathlen = hcl_countbcstr (xtn->read_path);
-
+		hcl_oow_t pathlen = 0;
 		bb = (bb_t*)hcl_callocmem (hcl, HCL_SIZEOF(*bb) + (HCL_SIZEOF(hcl_bch_t) * (pathlen + 1)));
 		if (!bb) goto oops;
 
-		bb->fn = (hcl_bch_t*)(bb + 1);
-		hcl_copybcstr (bb->fn, pathlen + 1, xtn->read_path);
-	}
+		/*bb->fn = (hcl_bch_t*)(bb + 1);
+		hcl_copybcstr (bb->fn, pathlen + 1, "");*/
 
-#if defined(__DOS__) || defined(_WIN32) || defined(__OS2__)
-	bb->fp = fopen (bb->fn, "rb");
-#else
-	bb->fp = fopen (bb->fn, "r");
-#endif
-	if (!bb->fp)
+		bb->fd = xtn->proto->client->sck;
+	}
+	if (bb->fd <= -1)
 	{
 		hcl_seterrnum (hcl, HCL_EIOERR);
 		goto oops;
-	}
-
-	if (!arg->includer)
-	{
-		xtn->reader_istty = isatty(fileno(bb->fp));
 	}
 
 	arg->handle = bb;
@@ -269,7 +387,7 @@ static HCL_INLINE int open_input (hcl_t* hcl, hcl_ioinarg_t* arg)
 oops:
 	if (bb) 
 	{
-		if (bb->fp) fclose (bb->fp);
+		if (bb->fd >= 0 && bb->fd != xtn->proto->client->sck) close (bb->fd);
 		hcl_freemem (hcl, bb);
 	}
 	return -1;
@@ -277,13 +395,13 @@ oops:
 
 static HCL_INLINE int close_input (hcl_t* hcl, hcl_ioinarg_t* arg)
 {
-	/*xtn_t* xtn = (xtn_t*)hcl_getxtn(hcl);*/
+	xtn_t* xtn = (xtn_t*)hcl_getxtn(hcl);
 	bb_t* bb;
 
 	bb = (bb_t*)arg->handle;
-	HCL_ASSERT (hcl, bb != HCL_NULL && bb->fp != HCL_NULL);
+	HCL_ASSERT (hcl, bb != HCL_NULL && bb->fd >= 0);
 
-	fclose (bb->fp);
+	if (bb->fd != xtn->proto->client->sck) close (bb->fd);
 	hcl_freemem (hcl, bb);
 
 	arg->handle = HCL_NULL;
@@ -293,29 +411,40 @@ static HCL_INLINE int close_input (hcl_t* hcl, hcl_ioinarg_t* arg)
 
 static HCL_INLINE int read_input (hcl_t* hcl, hcl_ioinarg_t* arg)
 {
-	/*xtn_t* xtn = (xtn_t*)hcl_getxtn(hcl);*/
+	xtn_t* xtn = (xtn_t*)hcl_getxtn(hcl);
 	bb_t* bb;
 	hcl_oow_t bcslen, ucslen, remlen;
 	int x;
 
 	bb = (bb_t*)arg->handle;
-	HCL_ASSERT (hcl, bb != HCL_NULL && bb->fp != HCL_NULL);
-	do
+	HCL_ASSERT (hcl, bb != HCL_NULL && bb->fd >= 0);
+
+	if (bb->fd == xtn->proto->client->sck)
 	{
-		x = fgetc (bb->fp);
-		if (x == EOF)
+		ssize_t x;
+
+/* TOOD: timeout, etc */
+		x = recv (bb->fd, &bb->buf[bb->len], HCL_COUNTOF(bb->buf) - bb->len, 0);
+		if (x <= -1)
 		{
-			if (ferror((FILE*)bb->fp))
-			{
-				hcl_seterrnum (hcl, HCL_EIOERR);
-				return -1;
-			}
-			break;
+			hcl_seterrnum (hcl, HCL_EIOERR);
+			return -1;
 		}
 
-		bb->buf[bb->len++] = x;
+		bb->len += x;
 	}
-	while (bb->len < HCL_COUNTOF(bb->buf) && x != '\r' && x != '\n');
+	else
+	{
+		ssize_t x;
+		x = read(bb->fd, &bb->buf[bb->len], HCL_COUNTOF(bb->buf) - bb->len);
+		if (x <= -1)
+		{
+			hcl_seterrnum (hcl, HCL_EIOERR);
+			return -1;
+		}
+
+		bb->len += x;
+	}
 
 #if defined(HCL_OOCH_IS_UCH)
 	bcslen = bb->len;
@@ -358,92 +487,30 @@ static int read_handler (hcl_t* hcl, hcl_iocmd_t cmd, void* arg)
 	}
 }
 
-static HCL_INLINE int open_output(hcl_t* hcl, hcl_iooutarg_t* arg)
-{
-	xtn_t* xtn = (xtn_t*)hcl_getxtn(hcl);
-	FILE* fp;
-
-#if defined(__MSDOS__) || defined(_WIN32) || defined(__OS2__)
-	if (xtn->print_path) fp = fopen (xtn->print_path, "wb");
-	else fp = stdout;
-#else
-	if (xtn->print_path) fp = fopen (xtn->print_path, "w");
-	else fp = stdout;
-#endif
-	if (!fp)
-	{
-		hcl_seterrnum (hcl, HCL_EIOERR);
-		return -1;
-	}
-
-	arg->handle = fp;
-	return 0;
-}
-  
-static HCL_INLINE int close_output (hcl_t* hcl, hcl_iooutarg_t* arg)
-{
-	/*xtn_t* xtn = (xtn_t*)hcl_getxtn(hcl);*/
-	FILE* fp;
-
-	fp = (FILE*)arg->handle;
-	HCL_ASSERT (hcl, fp != HCL_NULL);
-
-	if (fp != stdout) fclose (fp);
-	arg->handle = HCL_NULL;
-	return 0;
-}
-
-
-static HCL_INLINE int write_output (hcl_t* hcl, hcl_iooutarg_t* arg)
-{
-	/*xtn_t* xtn = (xtn_t*)hcl_getxtn(hcl);*/
-	hcl_bch_t bcsbuf[1024];
-	hcl_oow_t bcslen, ucslen, donelen;
-	int x;
-
-	donelen = 0;
-
-	do 
-	{
-	#if defined(HCL_OOCH_IS_UCH)
-		bcslen = HCL_COUNTOF(bcsbuf);
-		ucslen = arg->len - donelen;
-		x = hcl_convootobchars(hcl, &arg->ptr[donelen], &ucslen, bcsbuf, &bcslen);
-		if (x <= -1 && ucslen <= 0) return -1;
-	#else
-		bcslen = HCL_COUNTOF(bcsbuf);
-		ucslen = arg->len - donelen;
-		if (ucslen > bcslen) ucslen = bcslen;
-		else if (ucslen < bcslen) bcslen = ucslen;
-		hcl_copybchars (bcsbuf, &arg->ptr[donelen], bcslen);
-	#endif
-
-		if (fwrite(bcsbuf, HCL_SIZEOF(bcsbuf[0]), bcslen, (FILE*)arg->handle) < bcslen)
-		{
-			hcl_seterrnum (hcl, HCL_EIOERR);
-			return -1;
-		}
-
-		donelen += ucslen;
-	}
-	while (donelen < arg->len);
-
-	arg->xlen = arg->len;
-	return 0;
-}
-
 static int print_handler (hcl_t* hcl, hcl_iocmd_t cmd, void* arg)
 {
 	switch (cmd)
 	{
 		case HCL_IO_OPEN:
-			return open_output (hcl, (hcl_iooutarg_t*)arg);
+			return 0;
 
 		case HCL_IO_CLOSE:
-			return close_output (hcl, (hcl_iooutarg_t*)arg);
+			return 0;
 
 		case HCL_IO_WRITE:
-			return write_output (hcl, (hcl_iooutarg_t*)arg);
+		{
+			xtn_t* xtn = (xtn_t*)hcl_getxtn(hcl);
+			hcl_iooutarg_t* outarg = (hcl_iooutarg_t*)arg;
+
+			if (proto_feed_reply(xtn->proto, outarg->ptr, outarg->len, 0) <= -1) 
+			{
+				/* TODO: change error code and message. propagage the errormessage from proto */
+				hcl_seterrbfmt (hcl, HCL_ESYSERR, "failed to write message via proto");
+				return -1;
+			}
+			outarg->xlen = outarg->len;
+			return 0;
+		}
 
 		default:
 			hcl_seterrnum (hcl, HCL_EINTERN);
@@ -519,14 +586,14 @@ static int write_all (int fd, const char* ptr, hcl_oow_t len)
 	{
 		hcl_ooi_t wr;
 
-		wr = write(fd, ptr, len);
+		wr = write (fd, ptr, len);
 
 		if (wr <= -1)
 		{
 		#if defined(EAGAIN) && defined(EWOULDBLOCK) && (EAGAIN == EWOULDBLOCK)
 			if (errno == EAGAIN) continue;
 		#else
-			#if defined(EAGAIN)
+			#	if defined(EAGAIN)
 			if (errno == EAGAIN) continue;
 			#elif defined(EWOULDBLOCK)
 			if (errno == EWOULDBLOCK) continue;
@@ -547,7 +614,7 @@ static int write_all (int fd, const char* ptr, hcl_oow_t len)
 	return 0;
 }
 
-static void log_write (hcl_t* hcl, int mask, const hcl_ooch_t* msg, hcl_oow_t len)
+static HCL_INLINE void __log_write (hcl_t* hcl, int mask, const hcl_ooch_t* msg, hcl_oow_t len)
 {
 	hcl_bch_t buf[256];
 	hcl_oow_t ucslen, bcslen, msgidx;
@@ -569,7 +636,6 @@ static void log_write (hcl_t* hcl, int mask, const hcl_ooch_t* msg, hcl_oow_t le
 		if (mask & HCL_LOG_STDOUT) logfd = 1;
 		else
 		{
-
 			logfd = xtn->logfd;
 			if (logfd <= -1) return;
 		}
@@ -585,27 +651,23 @@ static void log_write (hcl_t* hcl, int mask, const hcl_ooch_t* msg, hcl_oow_t le
 		struct tm tm, *tmp;
 
 		now = time(NULL);
-	#if defined(__DOS__)
-		tmp = localtime (&now);
-		tslen = strftime (ts, sizeof(ts), "%Y-%m-%d %H:%M:%S ", tmp); /* no timezone info */
-		if (tslen == 0) 
-		{
-			strcpy (ts, "0000-00-00 00:00:00");
-			tslen = 19; 
-		}
-	#else
+
 		tmp = localtime_r (&now, &tm);
 		#if defined(HAVE_STRFTIME_SMALL_Z)
-		tslen = strftime (ts, sizeof(ts), "%Y-%m-%d %H:%M:%S %z ", tmp);
+		tslen = strftime(ts, sizeof(ts), "%Y-%m-%d %H:%M:%S %z ", tmp);
 		#else
-		tslen = strftime (ts, sizeof(ts), "%Y-%m-%d %H:%M:%S %Z ", tmp); 
+		tslen = strftime(ts, sizeof(ts), "%Y-%m-%d %H:%M:%S %Z ", tmp); 
 		#endif
 		if (tslen == 0) 
 		{
 			strcpy (ts, "0000-00-00 00:00:00 +0000");
 			tslen = 25; 
 		}
-	#endif
+
+/* TODO: less write system calls by having a buffer */
+		write_all (logfd, ts, tslen);
+
+		tslen = snprintf (ts, sizeof(ts), "[%d] ", xtn->proto->client->sck);
 		write_all (logfd, ts, tslen);
 	}
 
@@ -660,6 +722,13 @@ static void log_write (hcl_t* hcl, int mask, const hcl_ooch_t* msg, hcl_oow_t le
 	}
 }
 
+static void log_write (hcl_t* hcl, int mask, const hcl_ooch_t* msg, hcl_oow_t len)
+{
+	xtn_t* xtn = (xtn_t*)hcl_getxtn(hcl);
+	pthread_mutex_lock (&xtn->proto->client->server->log_mutex);
+	__log_write (hcl, mask, msg, len);
+	pthread_mutex_unlock (&xtn->proto->client->server->log_mutex);
+}
 
 static void syserrstrb (hcl_t* hcl, int syserr, hcl_bch_t* buf, hcl_oow_t len)
 {
@@ -1030,199 +1099,32 @@ static void vm_sleep (hcl_t* hcl, const hcl_ntime_t* dur)
 
 static int vm_startup (hcl_t* hcl)
 {
-#if defined(_WIN32)
 	xtn_t* xtn = (xtn_t*)hcl_getxtn(hcl);
-	xtn->waitable_timer = CreateWaitableTimer(HCL_NULL, TRUE, HCL_NULL);
-
-#else
-
-	xtn_t* xtn = (xtn_t*)hcl_getxtn(hcl);
-	int pcount = 0, flag;
-
-#if defined(USE_DEVPOLL)
-	xtn->ep = open ("/dev/poll", O_RDWR);
-	if (xtn->ep == -1) 
-	{
-		hcl_syserr_to_errnum (errno);
-		HCL_DEBUG1 (hcl, "Cannot create devpoll - %hs\n", strerror(errno));
-		goto oops;
-	}
-
-	flag = fcntl (xtn->ep, F_GETFD);
-	if (flag >= 0) fcntl (xtn->ep, F_SETFD, flag | FD_CLOEXEC);
-
-#elif defined(USE_EPOLL)
-	#if defined(EPOLL_CLOEXEC)
-	xtn->ep = epoll_create1 (EPOLL_CLOEXEC);
-	#else
-	xtn->ep = epoll_create (1024);
-	#endif
-	if (xtn->ep == -1) 
-	{
-		hcl_syserr_to_errnum (errno);
-		HCL_DEBUG1 (hcl, "Cannot create epoll - %hs\n", strerror(errno));
-		goto oops;
-	}
-
-	#if defined(EPOLL_CLOEXEC)
-	/* do nothing */
-	#else
-	flag = fcntl (xtn->ep, F_GETFD);
-	if (flag >= 0) fcntl (xtn->ep, F_SETFD, flag | FD_CLOEXEC);
-	#endif
-
-#elif defined(USE_POLL)
-
-	MUTEX_INIT (&xtn->ev.reg.pmtx);
-
-#elif defined(USE_SELECT)
-	FD_ZERO (&xtn->ev.reg.rfds);
-	FD_ZERO (&xtn->ev.reg.wfds);
-	xtn->ev.reg.maxfd = -1;
-	MUTEX_INIT (&xtn->ev.reg.smtx);
-#endif /* USE_DEVPOLL */
-
-#if defined(USE_THREAD)
-	if (pipe(xtn->p) == -1)
-	{
-		hcl_syserr_to_errnum (errno);
-		HCL_DEBUG1 (hcl, "Cannot create pipes - %hs\n", strerror(errno));
-		goto oops;
-	}
-	pcount = 2;
-
-	#if defined(O_CLOEXEC)
-	flag = fcntl (xtn->p[0], F_GETFD);
-	if (flag >= 0) fcntl (xtn->p[0], F_SETFD, flag | FD_CLOEXEC);
-	flag = fcntl (xtn->p[1], F_GETFD);
-	if (flag >= 0) fcntl (xtn->p[1], F_SETFD, flag | FD_CLOEXEC);
-	#endif
-
-	#if defined(O_NONBLOCK)
-	flag = fcntl (xtn->p[0], F_GETFL);
-	if (flag >= 0) fcntl (xtn->p[0], F_SETFL, flag | O_NONBLOCK);
-	flag = fcntl (xtn->p[1], F_GETFL);
-	if (flag >= 0) fcntl (xtn->p[1], F_SETFL, flag | O_NONBLOCK);
-	#endif
-
-	if (_add_poll_fd(hcl, xtn->p[0], XPOLLIN) <= -1) goto oops;
-
-	pthread_mutex_init (&xtn->ev.mtx, HCL_NULL);
-	pthread_cond_init (&xtn->ev.cnd, HCL_NULL);
-	pthread_cond_init (&xtn->ev.cnd2, HCL_NULL);
-
-	xtn->iothr_abort = 0;
-	xtn->iothr_up = 0;
-	/*pthread_create (&xtn->iothr, HCL_NULL, iothr_main, hcl);*/
-
-#endif /* USE_THREAD */
-
 	xtn->vm_running = 1;
 	return 0;
-
-oops:
-
-#if defined(USE_THREAD)
-	if (pcount > 0)
-	{
-		close (xtn->p[0]);
-		close (xtn->p[1]);
-	}
-#endif
-
-#if defined(USE_DEVPOLL) || defined(USE_EPOLL)
-	if (xtn->ep >= 0)
-	{
-		close (xtn->ep);
-		xtn->ep = -1;
-	}
-#endif
-
-	return -1;
-#endif
 }
 
 static void vm_cleanup (hcl_t* hcl)
 {
-#if defined(_WIN32)
-	xtn_t* xtn = (xatn_t*)hcl_getxtn(hcl);
-	if (xtn->waitable_timer)
-	{
-		CloseHandle (xtn->waitable_timer);
-		xtn->waitable_timer = HCL_NULL;
-	}
-#else
+	xtn_t* xtn = (xtn_t*)hcl_getxtn(hcl);
+	xtn->vm_running = 0;
+}
+
+static void vm_checkbc (hcl_t* hcl, hcl_oob_t bcode)
+{
 	xtn_t* xtn = (xtn_t*)hcl_getxtn(hcl);
 
-	xtn->vm_running = 0;
+	/* TODO: check how to this vm has been running. too long? abort it */
 
-#if defined(USE_THREAD)
-	if (xtn->iothr_up)
-	{
-		xtn->iothr_abort = 1;
-		write (xtn->p[1], "Q", 1);
-		pthread_cond_signal (&xtn->ev.cnd);
-		pthread_join (xtn->iothr, HCL_NULL);
-		xtn->iothr_up = 0;
-	}
-	pthread_cond_destroy (&xtn->ev.cnd);
-	pthread_cond_destroy (&xtn->ev.cnd2);
-	pthread_mutex_destroy (&xtn->ev.mtx);
+	/* TODO: check if the client connection is ok? if not, abort it */
 
-	_del_poll_fd (hcl, xtn->p[0]);
-	close (xtn->p[1]);
-	close (xtn->p[0]);
-#endif /* USE_THREAD */
-
-#if defined(USE_DEVPOLL) 
-	if (xtn->ep >= 0)
-	{
-		close (xtn->ep);
-		xtn->ep = -1;
-	}
-	/*destroy_poll_data_space (hcl);*/
-#elif defined(USE_EPOLL)
-	if (xtn->ep >= 0)
-	{
-		close (xtn->ep);
-		xtn->ep = -1;
-	}
-#elif defined(USE_POLL)
-	if (xtn->ev.reg.ptr)
-	{
-		hcl_freemem (hcl, xtn->ev.reg.ptr);
-		xtn->ev.reg.ptr = HCL_NULL;
-		xtn->ev.reg.len = 0;
-		xtn->ev.reg.capa = 0;
-	}
-	if (xtn->ev.buf)
-	{
-		hcl_freemem (hcl, xtn->ev.buf);
-		xtn->ev.buf = HCL_NULL;
-	}
-	/*destroy_poll_data_space (hcl);*/
-	MUTEX_DESTROY (&xtn->ev.reg.pmtx);
-#elif defined(USE_SELECT)
-	FD_ZERO (&xtn->ev.reg.rfds);
-	FD_ZERO (&xtn->ev.reg.wfds);
-	xtn->ev.reg.maxfd = -1;
-	MUTEX_DESTROY (&xtn->ev.reg.smtx);
-#endif
-
-#endif
 }
 
 /*
-static void vm_checkbc (hcl_t* hcl, hcl_oob_t bcode)
+static void gc_hcl (hcl_t* hcl)
 {
 }
 */
-
-static void gc_hcl (hcl_t* hcl)
-{
-	xtn_t* xtn = (xtn_t*)hcl_getxtn(hcl);
-	if (xtn->sym_errstr) xtn->sym_errstr = hcl_moveoop(hcl, xtn->sym_errstr);
-}
 
 static void fini_hcl (hcl_t* hcl)
 {
@@ -1320,22 +1222,21 @@ static int handle_logopt (hcl_t* hcl, const hcl_bch_t* str)
 }
 
 #if defined(HCL_BUILD_DEBUG)
-static int handle_dbgopt (hcl_t* hcl, const hcl_bch_t* str)
+static int parse_dbgopt (const char* str, unsigned int* dbgoptp)
 {
-	xtn_t* xtn = (xtn_t*)hcl_getxtn(hcl);
 	const hcl_bch_t* cm, * flt;
 	hcl_oow_t len;
-	unsigned int trait, dbgopt = 0;
+	unsigned int dbgopt = 0;
 
 	cm = str - 1;
 	do
 	{
 		flt = cm + 1;
 
-		cm = hcl_findbcharinbcstr(flt, ',');
-		len = cm? (cm - flt): hcl_countbcstr(flt);
-		if (hcl_compbcharsbcstr (flt, len, "gc") == 0)  dbgopt |= HCL_DEBUG_GC;
-		else if (hcl_compbcharsbcstr (flt, len, "bigint") == 0)  dbgopt |= HCL_DEBUG_BIGINT;
+		cm = strchr(flt, ',');
+		len = cm? (cm - flt): strlen(flt);
+		if (strncasecmp(flt, "gc", len) == 0)  dbgopt |= HCL_DEBUG_GC;
+		else if (strncasecmp (flt, "bigint", len) == 0)  dbgopt |= HCL_DEBUG_BIGINT;
 		else
 		{
 			fprintf (stderr, "ERROR: unknown debug option value - %.*s\n", (int)len, flt);
@@ -1344,155 +1245,25 @@ static int handle_dbgopt (hcl_t* hcl, const hcl_bch_t* str)
 	}
 	while (cm);
 
-	hcl_getoption (hcl, HCL_TRAIT, &trait);
-	trait |= dbgopt;
-	hcl_setoption (hcl, HCL_TRAIT, &trait);
+	*dbgoptp = dbgopt;
 	return 0;
 }
 #endif
 /* ========================================================================= */
 
-static hcl_t* g_hcl = HCL_NULL;
+static server_t* g_server = HCL_NULL;
 
 /* ========================================================================= */
 
+typedef void (*signal_handler_t) (int, siginfo_t*, void*);
 
-#if defined(__MSDOS__) && defined(_INTELC32_)
-static void (*prev_timer_intr_handler) (void);
-
-#pragma interrupt(timer_intr_handler)
-static void timer_intr_handler (void)
-{
-	/*
-	_XSTACK *stk;
-	int r;
-	stk = (_XSTACK *)_get_stk_frame();
-	r = (unsigned short)stk_ptr->eax;   
-	*/
-
-	/* The timer interrupt (normally) occurs 18.2 times per second. */
-	if (g_hcl) hcl_switchprocess (g_hcl);
-	_chain_intr(prev_timer_intr_handler);
-}
-
-#elif defined(macintosh)
-
-static TMTask g_tmtask;
-static ProcessSerialNumber g_psn;
-
-#define TMTASK_DELAY 50 /* milliseconds if positive, microseconds(after negation) if negative */
-
-static pascal void timer_intr_handler (TMTask* task)
-{
-	if (g_hcl) hcl_switchprocess (g_hcl);
-	WakeUpProcess (&g_psn);
-	PrimeTime ((QElem*)&g_tmtask, TMTASK_DELAY);
-}
-
-#else
-static void arrange_process_switching (int sig)
-{
-	if (g_hcl) hcl_switchprocess (g_hcl);
-}
-#endif
-
-#if 0
-static void setup_tick (void)
-{
-#if defined(__MSDOS__) && defined(_INTELC32_)
-
-	prev_timer_intr_handler = _dos_getvect (0x1C);
-	_dos_setvect (0x1C, timer_intr_handler);
-
-#elif defined(macintosh)
-
-	GetCurrentProcess (&g_psn);
-	memset (&g_tmtask, 0, HCL_SIZEOF(g_tmtask));
-	g_tmtask.tmAddr = NewTimerProc (timer_intr_handler);
-	InsXTime ((QElem*)&g_tmtask);
-
-	PrimeTime ((QElem*)&g_tmtask, TMTASK_DELAY);
-
-#elif defined(HAVE_SETITIMER) && defined(SIGVTALRM) && defined(ITIMER_VIRTUAL)
-	struct itimerval itv;
-	struct sigaction act;
-
-	sigemptyset (&act.sa_mask);
-	act.sa_handler = arrange_process_switching;
-	act.sa_flags = 0;
-	sigaction (SIGVTALRM, &act, HCL_NULL);
-
-	itv.it_interval.tv_sec = 0;
-	itv.it_interval.tv_usec = 100; /* 100 microseconds */
-	itv.it_value.tv_sec = 0;
-	itv.it_value.tv_usec = 100;
-	setitimer (ITIMER_VIRTUAL, &itv, HCL_NULL);
-#else
-
-#	error UNSUPPORTED
-#endif
-}
-
-static void cancel_tick (void)
-{
-#if defined(__MSDOS__) && defined(_INTELC32_)
-
-	_dos_setvect (0x1C, prev_timer_intr_handler);
-
-#elif defined(macintosh)
-	RmvTime ((QElem*)&g_tmtask);
-	/*DisposeTimerProc (g_tmtask.tmAddr);*/
-
-#elif defined(HAVE_SETITIMER) && defined(SIGVTALRM) && defined(ITIMER_VIRTUAL)
-	struct itimerval itv;
-	struct sigaction act;
-
-	itv.it_interval.tv_sec = 0;
-	itv.it_interval.tv_usec = 0;
-	itv.it_value.tv_sec = 0; /* make setitimer() one-shot only */
-	itv.it_value.tv_usec = 0;
-	setitimer (ITIMER_VIRTUAL, &itv, HCL_NULL);
-
-	sigemptyset (&act.sa_mask); 
-	act.sa_handler = SIG_IGN; /* ignore the signal potentially fired by the one-shot arrange above */
-	act.sa_flags = 0;
-	sigaction (SIGVTALRM, &act, HCL_NULL);
-
-#else
-#	error UNSUPPORTED
-#endif
-}
-#endif
-
-/* ========================================================================= */
-
-#if defined(__MSDOS__) && defined(_INTELC32_)
-typedef void(*signal_handler_t)(int);
-#elif defined(macintosh)
-typedef void(*signal_handler_t)(int);
-#else
-typedef void(*signal_handler_t)(int, siginfo_t*, void*);
-#endif
-
-
-#if defined(__MSDOS__) && defined(_INTELC32_)
-	/* TODO: implement this */
-#elif defined(macintosh)
-	/* TODO: implement this */
-#else
 static void handle_sigint (int sig, siginfo_t* siginfo, void* ctx)
 {
-	if (g_hcl) hcl_abort (g_hcl);
+	if (g_server) g_server->stopreq = 1;
 }
-#endif
 
 static void set_signal (int sig, signal_handler_t handler)
 {
-#if defined(__MSDOS__) && defined(_INTELC32_)
-	/* TODO: implement this */
-#elif defined(macintosh)
-	/* TODO: implement this */
-#else
 	struct sigaction sa;
 
 	memset (&sa, 0, sizeof(sa));
@@ -1502,16 +1273,10 @@ static void set_signal (int sig, signal_handler_t handler)
 	sigemptyset (&sa.sa_mask);
 
 	sigaction (sig, &sa, NULL);
-#endif
 }
 
 static void set_signal_to_default (int sig)
 {
-#if defined(__MSDOS__) && defined(_INTELC32_)
-	/* TODO: implement this */
-#elif defined(macintosh)
-	/* TODO: implement this */
-#else
 	struct sigaction sa; 
 
 	memset (&sa, 0, sizeof(sa));
@@ -1520,10 +1285,778 @@ static void set_signal_to_default (int sig)
 	sigemptyset (&sa.sa_mask);
 
 	sigaction (sig, &sa, NULL);
+}
+
+/* ========================================================================= */
+
+proto_t* proto_open (hcl_oow_t xtnsize, client_t* client)
+{
+	proto_t* proto;
+	hcl_vmprim_t vmprim;
+	hcl_cb_t hclcb;
+	xtn_t* xtn;
+	unsigned int trait;
+
+	memset (&vmprim, 0, HCL_SIZEOF(vmprim));
+	if (client->server->cfg.large_pages)
+	{
+		vmprim.alloc_heap = alloc_heap;
+		vmprim.free_heap = free_heap;
+	}
+	vmprim.log_write = log_write;
+	vmprim.syserrstrb = syserrstrb;
+	vmprim.dl_open = dl_open;
+	vmprim.dl_close = dl_close;
+	vmprim.dl_getsym = dl_getsym;
+	vmprim.vm_gettime = vm_gettime;
+	vmprim.vm_sleep = vm_sleep;
+
+	proto = (proto_t*)malloc(sizeof(*proto));
+	if (!proto) return NULL;
+
+	memset (proto, 0, sizeof(*proto));
+	proto->client = client;
+
+	proto->hcl = hcl_open(&sys_mmgr, HCL_SIZEOF(xtn_t), client->server->cfg.memsize, &vmprim, HCL_NULL);
+	if (!proto->hcl)  goto oops;
+
+	xtn = (xtn_t*)hcl_getxtn(proto->hcl);
+	xtn->logfd = -1;
+	xtn->logfd_istty = 0;
+	xtn->proto = proto;
+
+	hcl_getoption (proto->hcl, HCL_TRAIT, &trait);
+	trait |= proto->client->server->cfg.dbgopt;
+	hcl_setoption (proto->hcl, HCL_TRAIT, &trait);
+
+	if (proto->client->server->cfg.logopt &&
+	    handle_logopt(proto->hcl, proto->client->server->cfg.logopt) <= -1) goto oops;
+
+	memset (&hclcb, 0, HCL_SIZEOF(hclcb));
+	hclcb.fini = fini_hcl;
+	/*hclcb.gc = gc_hcl;*/
+	hclcb.vm_startup =  vm_startup;
+	hclcb.vm_cleanup = vm_cleanup;
+	hclcb.vm_checkbc = vm_checkbc;
+	hcl_regcb (proto->hcl, &hclcb);
+
+	if (hcl_ignite(proto->hcl) <= -1) goto oops;
+	if (hcl_addbuiltinprims(proto->hcl) <= -1) goto oops;
+
+	if (hcl_attachio(proto->hcl, read_handler, print_handler) <= -1) goto oops;
+	return proto;
+
+oops:
+	if (proto)
+	{
+		if (proto->hcl) hcl_close (proto->hcl);
+		free (proto);
+	}
+	return NULL;
+}
+
+void proto_close (proto_t* proto)
+{
+	if (proto->tok.ptr) free (proto->tok.ptr);
+	hcl_close (proto->hcl);
+	free (proto);
+}
+
+static int write_reply_chunk (proto_t* proto)
+{
+	struct msghdr msg;
+	struct iovec iov[3];
+	hcl_bch_t cl[16]; /* ensure that this is large enough for the chunk length string */
+	int index = 0, count = 0;
+
+	if (proto->reply.type == PROTO_REPLY_CHUNKED)
+	{
+		if (proto->reply.nchunks <= 0)
+		{
+			/* this is the first chunk */
+			iov[count].iov_base = ".OK\n.ENCODING chunked\n";
+			iov[count++].iov_len = 22;
+		}
+
+		iov[count].iov_base = cl,
+		iov[count++].iov_len = snprintf(cl, sizeof(cl), "%s%zu:", ((proto->reply.inject_nl && proto->reply.nchunks > 0)? "\n": ""), proto->reply.len); 
+	}
+	iov[count].iov_base = proto->reply.buf;
+	iov[count++].iov_len = proto->reply.len;
+
+	while (1)
+	{
+		ssize_t nwritten;
+
+		memset (&msg, 0, sizeof(msg));
+		msg.msg_iov = (struct iovec*)&iov[index];
+		msg.msg_iovlen = count - index;
+		nwritten = sendmsg(proto->client->sck, &msg, 0);
+		/*nwritten = writev(proto->client->sck, (const struct iovec*)&iov[index], count - index);*/
+		if (nwritten <= -1) 
+		{
+			fprintf (stderr, "sendmsg failure - %s\n", strerror(errno));
+			return -1;
+		}
+
+		while (index < count && (size_t)nwritten >= iov[index].iov_len)
+			nwritten -= iov[index++].iov_len;
+
+		if (index == count) break;
+
+		iov[index].iov_base = (void*)((hcl_uint8_t*)iov[index].iov_base + nwritten);
+		iov[index].iov_len -= nwritten;
+	}
+
+	if (proto->reply.len <= 0)
+	{
+		/* this should be the last chunk */
+		proto->reply.nchunks = 0;
+	}
+	else
+	{
+		proto->reply.nchunks++;
+		proto->reply.len = 0;
+	}
+
+	return 0;
+}
+
+void proto_start_reply (proto_t* proto)
+{
+	proto->reply.type = PROTO_REPLY_CHUNKED;
+	proto->reply.nchunks = 0;
+	proto->reply.len = 0;
+}
+
+int proto_feed_reply (proto_t* proto, const hcl_ooch_t* ptr, hcl_oow_t len, int escape)
+{
+#if defined(HCL_OOCH_IS_BCH)
+	/* nothing */
+#else
+	hcl_oow_t bcslen, ucslen, donelen;
+	int x;
 #endif
+
+#if defined(HCL_OOCH_IS_BCH)
+	while (len > 0)
+	{
+		if (escape && (*ptr == '\\' || *ptr == '\"'))
+		{
+			if (proto->reply.len >= HCL_COUNTOF(proto->reply.buf) && write_reply_chunk(proto) <=-1) return -1;
+			proto->reply.buf[proto->reply.len++] = '\\';
+		}
+
+		if (proto->reply.len >= HCL_COUNTOF(proto->reply.buf) && write_reply_chunk(proto) <=-1) return -1;
+		proto->reply.buf[proto->reply.len++] = *ptr++;
+		len--;
+	}
+
+	return 0;
+#else
+	donelen = 0;
+	while (donelen < len)
+	{
+		if (escape && (*ptr == '\\' || *ptr == '\"'))
+		{
+			/* i know that these characters don't need conversion */
+			if (proto->reply.len >= HCL_COUNTOF(proto->reply.buf) && write_reply_chunk(proto) <=-1) return -1;
+			proto->reply.buf[proto->reply.len++] = '\\';
+		}
+
+		bcslen = HCL_COUNTOF(proto->reply.buf) - proto->reply.len;
+		if (bcslen < HCL_BCSIZE_MAX)
+		{
+			if (write_reply_chunk(proto) <=-1) return -1;
+			bcslen = HCL_COUNTOF(proto->reply.buf) - proto->reply.len;
+		}
+		ucslen = len - donelen;
+
+		x = hcl_convootobchars(proto->hcl, &ptr[donelen], &ucslen, &proto->reply.buf[proto->reply.len], &bcslen);
+		if (x <= -1 && ucslen <= 0) return -1;
+
+		donelen += ucslen;
+		proto->reply.len += bcslen;
+	}
+#endif
+	return 0;
+}
+
+int proto_end_reply (proto_t* proto, const hcl_ooch_t* failmsg)
+{
+	HCL_ASSERT (proto->hcl, proto->reply.type == PROTO_REPLY_CHUNKED);
+
+	if (failmsg)
+	{
+		if (proto->reply.nchunks <= 0 && proto->reply.len <= 0)
+		{
+			static hcl_ooch_t err1[] = { '.','E','R','R','O','R',' ','\"' };
+			static hcl_ooch_t err2[] = { '\"','\n' };
+			proto->reply.type = PROTO_REPLY_SIMPLE; /* switch to the simple mode forcibly */
+
+		simple_error:
+			if (proto_feed_reply(proto, err1, 8, 0) <= -1 ||
+			    proto_feed_reply(proto, failmsg, hcl_countoocstr(failmsg), 1) <= -1 ||
+			    proto_feed_reply(proto, err2, 2, 0) <= -1) return -1;
+
+			if (write_reply_chunk(proto) <= -1) return -1;
+		}
+		else 
+		{
+			/* some chunks have beed emitted. but at the end, an error has occurred.
+			 * send -1: as the last chunk. the receiver must rub out the reply
+			 * buffer received so far and expect the following .ERROR response */
+			static hcl_ooch_t err0[] = { '-','1',':','\n' };
+			if (proto->reply.len > 0 && write_reply_chunk(proto) <= -1) return -1;
+
+			proto->reply.type = PROTO_REPLY_SIMPLE; /* switch to the simple mode forcibly */
+			proto->reply.nchunks = 0;
+			proto->reply.len = 0;
+
+			if (proto_feed_reply(proto, err0, 4, 0) <= -1) return -1;
+			goto simple_error;
+		}
+	}
+	else
+	{
+		if (proto->reply.nchunks <= 0 && proto->reply.len <= 0)
+		{
+			/* in the chunked mode. but no output has been made so far */
+			static hcl_ooch_t ok[] = { '.','O','K',' ','\"','\"','\n' };
+			proto->reply.type = PROTO_REPLY_SIMPLE; /* switch to the simple mode forcibly */
+			if (proto_feed_reply(proto, ok, 7, 0) <= -1) return -1;
+			if (write_reply_chunk(proto) <= -1) return -1;
+		}
+		else
+		{
+			if (proto->reply.len > 0 && write_reply_chunk(proto) <= -1) return -1;
+			if (write_reply_chunk(proto) <= -1) return -1; /* write 0: */
+		}
+	}
+
+	return 0;
+}
+
+static HCL_INLINE int is_spacechar (hcl_ooci_t c)
+{
+	/* TODO: handle other space unicode characters */
+	switch (c)
+	{
+		case ' ':
+		case '\f': /* formfeed */
+		case '\r': /* carriage return */
+		case '\t': /* horizon tab */
+		case '\v': /* vertical tab */
+			return 1;
+
+		default:
+			return 0;
+	}
+}
+
+static HCL_INLINE int read_char (proto_t* proto)
+{
+	proto->lxc = hcl_readchar(proto->hcl);
+	if (!proto->lxc) return -1;
+	return 0;
+}
+
+static HCL_INLINE int unread_last_char (proto_t* proto)
+{
+	return hcl_unreadchar(proto->hcl, proto->lxc);
+}
+
+#define GET_CHAR_TO(proto,c) \
+	do { \
+		if (read_char(proto) <= -1) return -1; \
+		c = (proto)->lxc->c; \
+	} while(0)
+
+#define UNGET_LAST_CHAR(proto) \
+	do { \
+		if (unread_last_char(proto) <= -1) return -1; \
+	} while (0)
+
+#define CLEAR_TOKEN_NAME(proto) ((proto)->tok.name.len = 0)
+#define SET_TOKEN_TYPE(proto,tv) ((proto)->tok.type = (tv))
+#define ADD_TOKEN_CHAR(proto,c) \
+	do { if (add_token_char(proto, c) <= -1) return -1; } while (0)
+
+
+static HCL_INLINE int add_token_char (proto_t* proto, hcl_ooch_t c)
+{
+	if (proto->tok.len >= proto->tok.capa)
+	{
+		hcl_ooch_t* tmp;
+		hcl_oow_t capa;
+
+		capa = HCL_ALIGN_POW2(proto->tok.len + 1, 64);
+		tmp = (hcl_ooch_t*)realloc(proto->tok.ptr, capa * sizeof(*tmp));
+		if (!tmp) 
+		{
+			fprintf (stderr, "cannot alloc memory when adding a character to the token buffer\n");
+			return -1;
+		}
+
+		proto->tok.ptr = tmp;
+		proto->tok.capa = capa;
+	}
+
+	proto->tok.ptr[proto->tok.len++] = c;
+	return 0;
+}
+
+static HCL_INLINE int is_alphachar (hcl_ooci_t c)
+{
+/* TODO: support full unicode */
+	return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z');
+}
+
+static void classify_current_ident_token (proto_t* proto)
+{
+	static struct cmd_t
+	{
+		proto_token_type_t type;
+		hcl_ooch_t name[32];
+	} tab[] = 
+	{
+		{ PROTO_TOKEN_BEGIN,   { '.','B','E','G','I','N','\0' } },
+		{ PROTO_TOKEN_END,     { '.','E','N','D','\0' } },
+		{ PROTO_TOKEN_SCRIPT,  { '.','S','C','R','I','P','T','\0' } },
+		{ PROTO_TOKEN_EXIT,    { '.','E','X','I','T','\0' } },
+		/* TODO: add more */
+	};
+	hcl_oow_t i;
+
+	for (i = 0; i < HCL_COUNTOF(tab); i++)
+	{
+		if (hcl_compoocharsoocstr(proto->tok.ptr, proto->tok.len, tab[i].name) == 0) 
+		{
+			SET_TOKEN_TYPE (proto, tab[i].type);
+			break;
+		}
+	}
+}
+
+static int get_token (proto_t* proto)
+{
+	hcl_ooci_t c;
+
+	GET_CHAR_TO (proto, c);
+
+	/* skip spaces */
+	while (is_spacechar(c)) GET_CHAR_TO (proto, c);
+
+	SET_TOKEN_TYPE (proto, PROTO_TOKEN_EOF); /* is it correct? */
+	proto->tok.len = 0;
+	/*proto->tok.loc = hcl->c->lxc.l;*/ /* set token location */
+	
+	switch (c)
+	{
+		case HCL_OOCI_EOF:
+			SET_TOKEN_TYPE (proto, PROTO_TOKEN_EOF);
+			break;
+			
+		case '\n':
+			SET_TOKEN_TYPE (proto, PROTO_TOKEN_NL);
+			break;
+
+		case '.':
+			SET_TOKEN_TYPE (proto, PROTO_TOKEN_IDENT);
+
+			ADD_TOKEN_CHAR(proto, c);
+			GET_CHAR_TO(proto, c);
+			if (!is_alphachar(c))
+			{
+				fprintf (stderr, "alphabetic character is expected...\n");
+				return -1;
+			}
+
+			do
+			{
+				ADD_TOKEN_CHAR(proto, c);
+				GET_CHAR_TO(proto, c);
+			}
+			while (is_alphachar(c));
+
+			UNGET_LAST_CHAR (proto);
+
+			classify_current_ident_token (proto);
+			break;
+
+		default:
+			fprintf (stderr, "unrecognized character found - code [%x]\n", c);
+			return -1;
+	}
+	return 0;
+}
+
+int proto_handle_request (proto_t* proto)
+{
+	if (get_token(proto) <= -1) return -1;
+
+	switch (proto->tok.type)
+	{
+		case PROTO_TOKEN_EOF:
+			if (proto->req.state != PROTO_REQ_IN_TOP_LEVEL)
+			{
+				fprintf (stderr, "Unexpected EOF without .END\n");
+				return -1;
+			}
+
+			/* TODO: send some response */
+			return 0;
+
+		case PROTO_TOKEN_EXIT:
+	/* TODO: erorr - not valid inside BEGIN ... END */
+			if (proto->req.state != PROTO_REQ_IN_TOP_LEVEL)
+			{
+				fprintf (stderr, ".EXIT allowed in the top level only\n");
+				return -1;
+			}
+
+			/* TODO: send response */
+			return 0;
+
+		case PROTO_TOKEN_BEGIN:
+			if (proto->req.state != PROTO_REQ_IN_TOP_LEVEL)
+			{
+				fprintf (stderr, ".BEGIN allowed in the top level only\n");
+				return -1;
+			}
+
+			if (get_token(proto) <= -1) return -1;
+			if (proto->tok.type != PROTO_TOKEN_NL)
+			{
+				fprintf (stderr, "no new line after BEGIN\n");
+				return -1;
+			}
+
+			proto->req.state = PROTO_REQ_IN_BLOCK_LEVEL;
+			hcl_reset (proto->hcl);
+			break;
+
+		case PROTO_TOKEN_END:
+		{
+			hcl_oop_t obj;
+
+			if (proto->req.state != PROTO_REQ_IN_BLOCK_LEVEL)
+			{
+				fprintf (stderr, ".END allowed in the block level only\n");
+				return -1;
+			}
+
+			if (get_token(proto) <= -1) return -1;
+			if (proto->tok.type != PROTO_TOKEN_NL)
+			{
+				fprintf (stderr, "no new line after END\n");
+				return -1;
+			}
+
+			
+			proto_start_reply (proto);
+			obj = (hcl_getbclen(proto->hcl) > 0)? hcl_execute(proto->hcl): proto->hcl->_nil;
+			if (proto_end_reply(proto, (obj? NULL: hcl_geterrmsg(proto->hcl))) <= -1) 
+			{
+				fprintf (stderr, "cannot end chunked reply\n");
+				return -1;
+			}
+
+			proto->req.state = PROTO_REQ_IN_TOP_LEVEL;
+			break;
+		}
+
+		case PROTO_TOKEN_SCRIPT:
+		{
+			hcl_oop_t obj;
+
+			if (proto->req.state == PROTO_REQ_IN_TOP_LEVEL) hcl_reset(proto->hcl);
+
+			obj = hcl_read(proto->hcl);
+			if (!obj)
+			{
+				fprintf (stderr, "cannot read script contents\n");
+				return -1;
+			}
+
+			if (get_token(proto) <= -1) return -1;
+			if (proto->tok.type != PROTO_TOKEN_NL)
+			{
+				fprintf (stderr, "no new line after script contents\n");
+				return -1;
+			}
+
+			if (hcl_compile(proto->hcl, obj) <= -1)
+			{
+				fprintf (stderr, "cannot compile script contents\n");
+				return -1;
+			}
+
+			if (proto->req.state == PROTO_REQ_IN_TOP_LEVEL)
+			{
+				proto_start_reply (proto);
+				obj = hcl_execute(proto->hcl);
+				if (proto_end_reply(proto, (obj? NULL: hcl_geterrmsg(proto->hcl))) <= -1) 
+				{
+					fprintf (stderr, "cannot end chunked reply\n");
+					return -1;
+				}
+			}
+			break;
+		}
+
+		default:
+			fprintf (stderr, "unknwn token - %d\n", proto->tok.type);
+			return -1;
+	}
+
+	return 1;
+}
+
+/* ========================================================================= */
+
+static void zap_all_clients (server_t* server)
+{
+}
+
+static client_t* alloc_client (server_t*  server, int cli_sck)
+{
+	client_t* client;
+	
+	client = (client_t*)malloc(sizeof(*client));
+	if (!client) return NULL;
+
+	memset (client, 0, sizeof(*client));
+	client->sck = cli_sck;
+	client->server = server;
+	return client;
+}
+
+static void free_client (client_t* client)
+{
+	if (client->sck >= 0) close (client->sck);
+/* TODO: do anything to server? */
+	free (client);
+}
+
+static void* start_client (void* ctx);
+
+server_t* server_open (size_t xtnsize, hcl_oow_t memsize, const char* logopt, unsigned int dbgopt, int large_pages)
+{
+	server_t* server;
+
+	server = (server_t*)malloc(sizeof(*server) + xtnsize);
+	if (!server) return NULL;
+
+	memset (server, 0, sizeof(*server) + xtnsize);
+	server->cfg.memsize = memsize;
+	server->cfg.logopt = logopt; 
+	server->cfg.dbgopt = dbgopt;
+	server->cfg.large_pages = large_pages;
+	pthread_mutex_init (&server->client_mutex, NULL);
+	pthread_mutex_init (&server->log_mutex, NULL);
+	return server;
+}
+
+void server_close (server_t* server)
+{
+	pthread_mutex_destroy (&server->log_mutex);
+	pthread_mutex_destroy (&server->client_mutex);
+	free (server);
 }
 
 
+int add_client_to_server (server_t* server, client_state_t cstate, client_t* client)
+{
+	if (client->server != server) 
+	{
+		fprintf (stderr, "cannot add client %p to server - client not beloing to server\n", client); /* TODO: use a client id when printing instead of the pointer */
+		return -1;
+	}
+
+
+	if (server->client_list[cstate].tail)
+	{
+		server->client_list[cstate].tail->next_client = client;
+		client->prev_client = server->client_list[cstate].tail;
+		server->client_list[cstate].tail = client;
+		client->next_client = NULL;
+	}
+	else
+	{
+		server->client_list[cstate].tail = client;
+		server->client_list[cstate].head = client;
+		client->prev_client = NULL;
+		client->next_client = NULL;
+	}
+
+	client->state = cstate;
+	return 0;
+}
+
+int zap_client_in_server (server_t* server, client_t* client)
+{
+	if (client->server != server) 
+	{
+		fprintf (stderr, "cannot zap client %p from server - client not beloing to server\n", client); /* TODO: use a client id when printing instead of the pointer */
+		return -1;
+	}
+
+	if (client->prev_client) client->prev_client->next_client = client->next_client;
+	else server->client_list[client->state].head = client->next_client;
+	if (client->next_client) client->next_client->prev_client = client->prev_client;
+	else server->client_list[client->state].tail = client->prev_client;
+
+	return 0;
+}
+
+static void* start_client (void* ctx)
+{
+	client_t* client = (client_t*)ctx;
+	server_t* server = client->server;
+
+	client->thr = pthread_self();
+	client->proto = proto_open(0, client); /* TODO: get this from argumen */
+	if (!client->proto)
+	{
+		free_client (client);
+		return NULL;
+	}
+
+	pthread_mutex_lock (&server->client_mutex);
+	add_client_to_server (server, CLIENT_STATE_ALIVE, client);
+	pthread_mutex_unlock (&server->client_mutex);
+
+	while (!server->stopreq)
+	{
+		if (proto_handle_request(client->proto) <= 0) break;
+	}
+
+	proto_close (client->proto);
+	client->proto = NULL;
+
+	pthread_mutex_lock (&server->client_mutex);
+	zap_client_in_server (server, client);
+	add_client_to_server (server, CLIENT_STATE_DEAD, client);
+	pthread_mutex_unlock (&server->client_mutex);
+
+	//free_client (client);
+	return NULL;
+}
+
+void purge_all_clients (server_t* server, client_state_t cstate)
+{
+	client_t* client, * next;
+
+	client = server->client_list[cstate].head;
+	while (client)
+	{
+		next = client->next_client;
+
+		pthread_join (client->thr, NULL);
+		zap_client_in_server (server, client);
+		free_client (client);
+
+		client = next;
+	}
+}
+
+int server_start (server_t* server, const char* addrs)
+{
+	sck_addr_t srv_addr;
+	int srv_fd, sck_fam;
+	int optval;
+	socklen_t srv_len;
+
+/* TODO: interprete 'addrs' as a command-separated address list 
+ *  192.168.1.1:20,[::1]:20,127.0.0.1:345
+ */
+	memset (&srv_addr, 0, sizeof(srv_addr));
+	if (inet_pton (AF_INET6, addrs, &srv_addr.in6.sin6_addr) != 1)
+	{
+		if (inet_pton (AF_INET, addrs, &srv_addr.in4.sin_addr) != 1)
+		{
+			fprintf (stderr, "cannot open convert server address %s - %s\n", addrs, strerror(errno));
+			return -1;
+		}
+		else
+		{
+			srv_addr.in4.sin_family = AF_INET;
+			srv_addr.in4.sin_port = htons(8888); /* TODO: change it */
+			srv_len = sizeof(srv_addr.in4);
+			sck_fam = AF_INET;
+		}
+	}
+	else
+	{
+		srv_addr.in6.sin6_family = AF_INET6;
+		srv_addr.in6.sin6_port = htons(8888); /* TODO: change it */
+		srv_len = sizeof(srv_addr.in6);
+		sck_fam = AF_INET6;
+	}
+
+	srv_fd = socket(sck_fam, SOCK_STREAM, 0);
+	if (srv_fd == -1)
+	{
+		fprintf (stderr, "cannot open server socket - %s\n", strerror(errno));
+		return -1;
+	}
+
+	optval = 1;
+	setsockopt (srv_fd, SOL_SOCKET, SO_REUSEADDR, &optval, sizeof(int));
+
+	if (bind(srv_fd, (struct sockaddr*)&srv_addr, srv_len) == -1)
+	{
+		fprintf (stderr, "cannot bind server socket %d - %s\n", srv_fd, strerror(errno));
+		close (srv_fd);
+		return -1;
+	}
+
+	if (listen (srv_fd, 128) == -1)
+	{
+		fprintf (stderr, "cannot listen on server socket %d - %s\n", srv_fd, strerror(errno));
+		close (srv_fd);
+		return -1;
+	}
+
+	server->stopreq = 0;
+	while (!server->stopreq)
+	{
+		sck_addr_t cli_addr;
+		int cli_fd;
+		socklen_t cli_len;
+		pthread_t thr;
+		client_t* client;
+
+		purge_all_clients (server, CLIENT_STATE_DEAD);
+
+		cli_len = sizeof(cli_addr);
+		cli_fd = accept(srv_fd, (struct sockaddr*)&cli_addr, &cli_len);
+		if (cli_fd == -1)
+		{
+			if (errno != EINTR || !server->stopreq)
+			{
+				fprintf (stderr, "cannot accept client on socket %d - %s\n", srv_fd, strerror(errno));
+			}
+			break;
+		}
+
+		client = alloc_client(server, cli_fd);
+		if (pthread_create(&thr, NULL, start_client, client) != 0)
+		{
+			free_client (client);
+		}
+	}
+
+	purge_all_clients (server, CLIENT_STATE_DEAD); // is thread protection needed?
+	purge_all_clients (server, CLIENT_STATE_ALIVE); // is thread protection needed?
+	return 0;
+}
+
+void server_stop (server_t* server)
+{
+	server->stopreq = 1;
+}
 /* ========================================================================= */
 
 static void print_synerr (hcl_t* hcl)
@@ -1531,7 +2064,7 @@ static void print_synerr (hcl_t* hcl)
 	hcl_synerr_t synerr;
 	xtn_t* xtn;
 
-	xtn = (xtn_t*)hcl_getxtn (hcl);
+	xtn = (xtn_t*)hcl_getxtn(hcl);
 	hcl_getsynerr (hcl, &synerr);
 
 	hcl_logbfmt (hcl,HCL_LOG_STDERR, "ERROR: ");
@@ -1541,7 +2074,8 @@ static void print_synerr (hcl_t* hcl)
 	}
 	else
 	{
-		hcl_logbfmt (hcl, HCL_LOG_STDERR, "%s", xtn->read_path);
+		/*hcl_logbfmt (hcl, HCL_LOG_STDERR, "%s", xtn->read_path);*/
+		hcl_logbfmt (hcl, HCL_LOG_STDERR, "client");
 	}
 
 	hcl_logbfmt (hcl, HCL_LOG_STDERR, "[%zu,%zu] %js", 
@@ -1559,13 +2093,8 @@ static void print_synerr (hcl_t* hcl)
 
 #define MIN_MEMSIZE 512000ul
  
-static int main_tty (int argc, char* argv[])
+int main_server (int argc, char* argv[])
 {
-	hcl_t* hcl;
-	xtn_t* xtn;
-	hcl_vmprim_t vmprim;
-	hcl_cb_t hclcb;
-
 	hcl_bci_t c;
 	static hcl_bopt_lng_t lopt[] =
 	{
@@ -1583,21 +2112,19 @@ static int main_tty (int argc, char* argv[])
 		lopt
 	};
 
+	server_t* server;
+
 	const char* logopt = HCL_NULL;
 	hcl_oow_t memsize = MIN_MEMSIZE;
 	int large_pages = 0;
-
-#if defined(HCL_BUILD_DEBUG)
-	const char* dbgopt = HCL_NULL;
-#endif
+	unsigned int dbgopt = 0;
 
 	setlocale (LC_ALL, "");
 
-#if !defined(macintosh)
 	if (argc < 2)
 	{
 	print_usage:
-		fprintf (stderr, "Usage: %s filename ...\n", argv[0]);
+		fprintf (stderr, "Usage: %s bind-address:port\n", argv[0]);
 		return -1;
 	}
 
@@ -1623,7 +2150,7 @@ static int main_tty (int argc, char* argv[])
 			#if defined(HCL_BUILD_DEBUG)
 				else if (hcl_compbcstr(opt.lngopt, "debug") == 0)
 				{
-					dbgopt = opt.arg;
+					if (parse_dbgopt (opt.arg, &dbgopt) <= -1) return -1;
 					break;
 				}
 			#endif
@@ -1644,262 +2171,20 @@ static int main_tty (int argc, char* argv[])
 	}
 
 	if (opt.ind >= argc) goto print_usage;
-#endif
 
-	memset (&vmprim, 0, HCL_SIZEOF(vmprim));
-	if (large_pages)
+	server = server_open(0, memsize, logopt, dbgopt, large_pages);
+	if (!server)
 	{
-		vmprim.alloc_heap = alloc_heap;
-		vmprim.free_heap = free_heap;
-	}
-	vmprim.log_write = log_write;
-	vmprim.syserrstrb = syserrstrb;
-	vmprim.dl_open = dl_open;
-	vmprim.dl_close = dl_close;
-	vmprim.dl_getsym = dl_getsym;
-	vmprim.vm_gettime = vm_gettime;
-	vmprim.vm_sleep = vm_sleep;
-
-	hcl = hcl_open (&sys_mmgr, HCL_SIZEOF(xtn_t), memsize, &vmprim, HCL_NULL);
-	if (!hcl)
-	{
-		printf ("cannot open hcl\n");
+		fprintf (stderr, "cannot open server\n");
 		return -1;
 	}
 
-	{
-		hcl_oow_t tab_size;
-		tab_size = 5000;
-		hcl_setoption (hcl, HCL_SYMTAB_SIZE, &tab_size);
-		tab_size = 5000;
-		hcl_setoption (hcl, HCL_SYSDIC_SIZE, &tab_size);
-		tab_size = 600;
-		hcl_setoption (hcl, HCL_PROCSTK_SIZE, &tab_size);
-	}
-
-	{
-		int trait = 0;
-
-		/*trait |= HCL_NOGC;*/
-		trait |= HCL_AWAIT_PROCS;
-		hcl_setoption (hcl, HCL_TRAIT, &trait);
-
-		/* disable GC logs */
-		/*trait = ~HCL_LOG_GC;
-		hcl_setoption (hcl, HCL_LOG_MASK, &trait);*/
-	}
-
-	xtn = (xtn_t*)hcl_getxtn (hcl);
-	xtn->logfd = -1;
-	xtn->logfd_istty = 0;
-
-	memset (&hclcb, 0, HCL_SIZEOF(hclcb));
-	hclcb.fini = fini_hcl;
-	hclcb.gc = gc_hcl;
-	hclcb.vm_startup =  vm_startup;
-	hclcb.vm_cleanup = vm_cleanup;
-	/*hclcb.vm_checkbc = vm_checkbc;*/
-	hcl_regcb (hcl, &hclcb);
-
-	if (logopt)
-	{
-		if (handle_logopt (hcl, logopt) <= -1) 
-		{
-			hcl_close (hcl);
-			return -1;
-		}
-	}
-	else
-	{
-		/* default logging mask when no logging option is set */
-		xtn->logmask = HCL_LOG_ALL_TYPES | HCL_LOG_ERROR | HCL_LOG_FATAL;
-	}
-
-#if defined(HCL_BUILD_DEBUG)
-	if (dbgopt)
-	{
-		if (handle_dbgopt (hcl, dbgopt) <= -1)
-		{
-			hcl_close (hcl);
-			return -1;
-		}
-	}
-#endif
-
-	if (hcl_ignite(hcl) <= -1)
-	{
-		hcl_logbfmt (hcl, HCL_LOG_STDERR, "cannot ignite hcl - [%d] %js\n", hcl_geterrnum(hcl), hcl_geterrmsg(hcl));
-		hcl_close (hcl);
-		return -1;
-	}
-
-	if (hcl_addbuiltinprims(hcl) <= -1)
-	{
-		hcl_logbfmt (hcl, HCL_LOG_STDERR, "cannot add builtin primitives - [%d] %js\n", hcl_geterrnum(hcl), hcl_geterrmsg(hcl));
-		hcl_close (hcl);
-		return -1;
-	}
-
-	xtn->read_path = argv[opt.ind++];
-	if (opt.ind < argc) xtn->print_path = argv[opt.ind++];
-
-	if (hcl_attachio(hcl, read_handler, print_handler) <= -1)
-	{
-		hcl_logbfmt (hcl, HCL_LOG_STDERR, "ERROR: cannot attach input stream - [%d] %js\n", hcl_geterrnum(hcl), hcl_geterrmsg(hcl));
-		hcl_close (hcl);
-		return -1;
-	}
-
-	{
-		hcl_ooch_t errstr[] =  { 'E', 'R', 'R', 'S', 'T', 'R' };
-		xtn->sym_errstr = hcl_makesymbol(hcl, errstr, 6);
-		if (!xtn->sym_errstr)
-		{
-			hcl_logbfmt (hcl, HCL_LOG_STDERR, "ERROR: cannot create the ERRSTR symbol - [%d] %js\n", hcl_geterrnum(hcl), hcl_geterrmsg(hcl));
-			hcl_close (hcl);
-			return -1;
-		}
-		HCL_OBJ_SET_FLAGS_KERNEL (xtn->sym_errstr, 1);
-	}
-
-	/* -- from this point onward, any failure leads to jumping to the oops label 
-	 * -- instead of returning -1 immediately. --*/
+	g_server = server;
 	set_signal (SIGINT, handle_sigint);
-
-	while (1)
-	{
-		hcl_oop_t obj;
-/*
-static int count = 0;
-if (count %5 == 0) hcl_reset (hcl);
-count++;
-*/
-		obj = hcl_read(hcl);
-		if (!obj)
-		{
-			if (hcl->errnum == HCL_EFINIS)
-			{
-				/* end of input */
-				break;
-			}
-			else if (hcl->errnum == HCL_ESYNERR)
-			{
-				print_synerr (hcl);
-				if (xtn->reader_istty) continue;
-			}
-			else
-			{
-				hcl_logbfmt (hcl, HCL_LOG_STDERR, "ERROR: cannot read object - [%d] %js\n", hcl_geterrnum(hcl), hcl_geterrmsg(hcl));
-			}
-			goto oops;
-		}
-
-		if (hcl_print(hcl, obj) <= -1)
-		{
-			hcl_logbfmt (hcl, HCL_LOG_STDERR, "ERROR: cannot print object - [%d] %js\n", hcl_geterrnum(hcl), hcl_geterrmsg(hcl));
-		}
-		else
-		{
-			hcl_oow_t code_offset;
-
-			code_offset = hcl_getbclen(hcl);
-
-			hcl_proutbfmt (hcl, 0, "\n");
-			if (hcl_compile(hcl, obj) <= -1)
-			{
-				if (hcl->errnum == HCL_ESYNERR)
-				{
-					print_synerr (hcl);
-				}
-				else
-				{
-					hcl_logbfmt (hcl, HCL_LOG_STDERR, "ERROR: cannot compile object - [%d] %js\n", hcl_geterrnum(hcl), hcl_geterrmsg(hcl));
-				}
-				/* carry on? */
-
-				if (!xtn->reader_istty) goto oops;
-			}
-			else if (xtn->reader_istty)
-			{
-				hcl_oop_t retv;
-
-				hcl_decode (hcl, code_offset, hcl_getbclen(hcl));
-				HCL_LOG0 (hcl, HCL_LOG_MNEMONIC, "------------------------------------------\n");
-				g_hcl = hcl;
-				//setup_tick ();
-
-				retv = hcl_executefromip(hcl, code_offset);
-				if (!retv)
-				{
-					hcl_logbfmt (hcl, HCL_LOG_STDERR, "ERROR: cannot execute - [%d] %js\n", hcl_geterrnum(hcl), hcl_geterrmsg(hcl));
-				}
-				else
-				{
-					hcl_logbfmt (hcl, HCL_LOG_STDERR, "OK: EXITED WITH %O\n", retv);
-				
-					/*
-					 * print the value of ERRSTR.
-					hcl_oop_cons_t cons = hcl_getatsysdic(hcl, xtn->sym_errstr);
-					if (cons)
-					{
-						HCL_ASSERT (hcl, HCL_IS_CONS(hcl, cons));
-						HCL_ASSERT (hcl, HCL_CONS_CAR(cons) == xtn->sym_errstr);
-						hcl_print (hcl, HCL_CONS_CDR(cons));
-					}
-					*/
-				}
-				//cancel_tick();
-				g_hcl = HCL_NULL;
-			}
-		}
-	}
-
-	if (!xtn->reader_istty)
-	{
-		hcl_oop_t retv;
-
-		hcl_decode (hcl, 0, hcl_getbclen(hcl));
-		HCL_LOG2 (hcl, HCL_LOG_MNEMONIC, "BYTECODES bclen = > %zu lflen => %zu\n", hcl_getbclen(hcl), hcl_getlflen(hcl));
-		g_hcl = hcl;
-		/*setup_tick ();*/
-
-		retv = hcl_execute(hcl);
-		if (!retv)
-		{
-			hcl_logbfmt (hcl, HCL_LOG_STDERR, "ERROR: cannot execute - [%d] %js\n", hcl_geterrnum(hcl), hcl_geterrmsg(hcl));
-		}
-		else
-		{
-			hcl_logbfmt (hcl, HCL_LOG_STDERR, "EXECUTION OK - EXITED WITH %O\n", retv);
-		}
-
-		/*cancel_tick();*/
-		g_hcl = HCL_NULL;
-		/*hcl_dumpsymtab (hcl);*/
-	}
-	
+	server_start (server, argv[opt.ind]);
 	set_signal_to_default (SIGINT);
-	hcl_close (hcl);
+	g_server = NULL;
+
+	server_close (server);
 	return 0;
-
-oops:
-	set_signal_to_default (SIGINT);
-	hcl_close (hcl);
-	return -1;
-}
-
-int main_server (int argc, char* argv[]);
-
-int main (int argc, char* argv[])
-{
-	const char* slash;
-	const char* prog;
-
-	prog = argv[0];
-	slash = strrchr(prog, '/');
-	if (slash) prog = slash + 1;
-
-	if (strcmp(prog, "hcld") == 0) return main_server (argc, argv);
-
-	return main_tty (argc, argv);
 }

@@ -26,8 +26,6 @@
 
 #include "hcl-prv.h"
 
-#define HCL_BCLEN_MAX 6
-
 /* some naming conventions
  *  bchars, uchars -> pointer and length
  *  bcstr, ucstr -> null-terminated string pointer
@@ -577,7 +575,7 @@ static HCL_INLINE int ucsn_to_bcsn_with_cmgr (
 	}
 	else
 	{
-		hcl_bch_t bcsbuf[HCL_BCLEN_MAX];
+		hcl_bch_t bcsbuf[HCL_BCSIZE_MAX];
 		hcl_oow_t mlen = 0;
 
 		while (p < end)
@@ -659,7 +657,7 @@ static int ucs_to_bcs_with_cmgr (
 	}
 	else
 	{
-		hcl_bch_t bcsbuf[HCL_BCLEN_MAX];
+		hcl_bch_t bcsbuf[HCL_BCSIZE_MAX];
 		hcl_oow_t mlen = 0;
 
 		while (*p != '\0')

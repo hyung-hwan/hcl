@@ -286,10 +286,21 @@ void hcl_fini (hcl_t* hcl)
 	}
 }
 
-void hcl_reset (hcl_t* hcl)
+void hcl_reset (hcl_t* hcl/*, int flags*/)
 {
 	hcl_oop_t v;
 	hcl_oow_t i;
+
+#if 0
+	if (flags & HCL_RESET_LXC)
+	{
+		hcl->c->nungots = 0;
+
+		hcl->c->inarg.line = 1;
+		hcl->c->inarg.colm = 1;
+		/* reset on curinp???? hwo to reset the input stream?  or crate a separate function? */
+	}
+#endif
 
 	/* delete all literals shown in the literal frame from the system dictionary 
 	 * excluding special kernel symbols. */

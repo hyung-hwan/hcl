@@ -2246,7 +2246,6 @@ hcl_oop_t hcl_executefromip (hcl_t* hcl, hcl_oow_t initial_ip)
 	int n, log_default_type_mask;
 
 	HCL_ASSERT (hcl, hcl->code.bc.len < HCL_SMOOI_MAX); /* asserted by the compiler */
-	HCL_ASSERT (hcl, initial_ip < hcl->code.bc.len);
 	if (initial_ip >= hcl->code.bc.len)
 	{
 		hcl_seterrnum (hcl, HCL_EINVAL);

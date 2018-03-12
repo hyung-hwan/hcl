@@ -79,7 +79,7 @@ endif
 
 
 bin_PROGRAMS = hcl
-hcl_SOURCES = main.c
+hcl_SOURCES = main.c main2.c
 hcl_CPPFLAGS = $(CPPFLAGS_LIB_COMMON)
 hcl_LDFLAGS = $(LDFLAGS_LIB_COMMON)
 hcl_LDADD = $(LIBADD_LIB_COMMON) -lhcl #-ldyncall_s

@@ -345,6 +345,9 @@ typedef struct hcl_bcs_t hcl_bcs_t;
 #	define HCL_SIZEOF_OOCH_T HCL_SIZEOF_BCH_T
 #endif
 
+/* the maximum number of bch charaters to represent a single uch character */
+#define HCL_BCSIZE_MAX 6
+
 /* =========================================================================
  * TIME-RELATED TYPES
  * =========================================================================*/
