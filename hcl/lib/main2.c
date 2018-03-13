@@ -253,6 +253,20 @@ struct server_worker_t
 	server_worker_t* next_worker;
 };
 
+enum server_option_t
+{
+	SERVER_TRAIT,
+	SERVER_WORKER_STACK_SIZE
+};
+typedef enum server_option_t server_option_t;
+
+enum server_trait_t
+{
+	SERVER_TRAIT_READABLE_PROTO   = (1 << 0),
+	SERVER_TRAIT_USE_LARGE_PAGES  = (1 << 1)
+};
+typedef enum server_trait_t server_trait_t;
+
 struct server_t
 {
 	int stopreq;
@@ -264,12 +278,13 @@ struct server_t
 	{
 		hcl_oow_t memsize; /* hcl heap memory size */
 		unsigned int dbgopt;
-		int large_pages;
 		const char* logopt;
 		int logmask;
 
 		unsigned int idle_timeout; /* idle timeout */
-		int inject_nl_in_chunked_reply;
+		size_t worker_stack_size;
+
+		int trait;
 	} cfg;
 
 	struct
@@ -441,7 +456,7 @@ static HCL_INLINE int read_input (hcl_t* hcl, hcl_ioinarg_t* arg)
 
 			pfd.fd = bb->fd;
 			pfd.events = POLLIN | POLLERR;
-			n = poll(&pfd, 1, 1000);
+			n = poll(&pfd, 1, 10000); /* TOOD: adjust this interval? */
 			if (n <= -1)
 			{
 				if (errno == EINTR) goto start_over;
@@ -1219,7 +1234,7 @@ server_proto_t* server_proto_open (hcl_oow_t xtnsize, server_worker_t* worker)
 	unsigned int trait;
 
 	memset (&vmprim, 0, HCL_SIZEOF(vmprim));
-	if (worker->server->cfg.large_pages)
+	if (worker->server->cfg.trait & SERVER_TRAIT_USE_LARGE_PAGES)
 	{
 		vmprim.alloc_heap = alloc_heap;
 		vmprim.free_heap = free_heap;
@@ -1297,7 +1312,7 @@ static int write_reply_chunk (server_proto_t* proto)
 		}
 
 		iov[count].iov_base = cl,
-		iov[count++].iov_len = snprintf(cl, sizeof(cl), "%s%zu:", ((proto->worker->server->cfg.inject_nl_in_chunked_reply && proto->reply.nchunks > 0)? "\n": ""), proto->reply.len); 
+		iov[count++].iov_len = snprintf(cl, sizeof(cl), "%s%zu:", (((proto->worker->server->cfg.trait & SERVER_TRAIT_READABLE_PROTO) && proto->reply.nchunks > 0)? "\n": ""), proto->reply.len); 
 	}
 	iov[count].iov_base = proto->reply.buf;
 	iov[count++].iov_len = proto->reply.len;
@@ -1762,7 +1777,7 @@ int server_proto_handle_request (server_proto_t* proto)
 			server_proto_start_reply (proto);
 			
 			pthread_mutex_lock (&proto->worker->server->worker_mutex);
-			//print_server_workers (proto);
+			//kill_server_worker (proto);
 			pthread_mutex_unlock (&proto->worker->server->worker_mutex);
 			
 			if (server_proto_end_reply(proto, NULL) <= -1)
@@ -1782,8 +1797,7 @@ int server_proto_handle_request (server_proto_t* proto)
 
 /* ========================================================================= */
 
-
-server_t* server_open (size_t xtnsize, hcl_oow_t memsize, const char* logopt, unsigned int dbgopt, int large_pages)
+server_t* server_open (size_t xtnsize, hcl_oow_t memsize, const char* logopt, unsigned int dbgopt)
 {
 	server_t* server;
 
@@ -1798,11 +1812,12 @@ server_t* server_open (size_t xtnsize, hcl_oow_t memsize, const char* logopt, un
 	server->cfg.memsize = memsize;
 	server->cfg.logopt = logopt; 
 	server->cfg.dbgopt = dbgopt;
-	server->cfg.large_pages = large_pages;
-	
+	server->cfg.worker_stack_size = 512000UL; /* TODO: make it configurable */
+	server->cfg.trait = SERVER_TRAIT_READABLE_PROTO | SERVER_TRAIT_USE_LARGE_PAGES; /* TODO: make it configurable */
+
 	pthread_mutex_init (&server->worker_mutex, NULL);
 	pthread_mutex_init (&server->log_mutex, NULL);
-	
+
 	return server;
 }
 
@@ -1900,11 +1915,12 @@ static void* worker_main (void* ctx)
 	server_proto_close (worker->proto);
 	worker->proto = NULL;
 
+	pthread_mutex_lock (&server->worker_mutex);
+
 	/* close connection before free_client() is called */
 	close (worker->sck);
 	worker->sck = -1;
 
-	pthread_mutex_lock (&server->worker_mutex);
 	if (!worker->claimed)
 	{
 		zap_worker_in_server (server, worker);
@@ -1927,6 +1943,8 @@ static void purge_all_workers (server_t* server, server_worker_state_t wstate)
 		{
 			zap_worker_in_server (server, worker);
 			worker->claimed = 1;
+
+			if (worker->sck >= 0) shutdown (worker->sck, SHUT_RDWR);
 		}
 		pthread_mutex_unlock (&server->worker_mutex);
 		if (!worker) break;
@@ -1960,6 +1978,7 @@ int server_start (server_t* server, const char* addrs)
 	int optval;
 	socklen_t srv_len;
 	char errbuf[128];
+	pthread_attr_t thr_attr;
 
 /* TODO: interprete 'addrs' as a command-separated address list 
  *  192.168.1.1:20,[::1]:20,127.0.0.1:345
@@ -2015,6 +2034,9 @@ int server_start (server_t* server, const char* addrs)
 		return -1;
 	}
 
+	pthread_attr_init (&thr_attr);
+	pthread_attr_setstacksize (&thr_attr, server->cfg.worker_stack_size);
+
 	server->stopreq = 0;
 	while (!server->stopreq)
 	{
@@ -2022,6 +2044,7 @@ int server_start (server_t* server, const char* addrs)
 		int cli_fd;
 		socklen_t cli_len;
 		pthread_t thr;
+		
 		server_worker_t* worker;
 
 		purge_all_workers (server, SERVER_WORKER_STATE_DEAD);
@@ -2039,7 +2062,8 @@ int server_start (server_t* server, const char* addrs)
 		}
 
 		worker = alloc_worker(server, cli_fd);
-		if (pthread_create(&thr, NULL, worker_main, worker) != 0)
+		
+		if (pthread_create(&thr, &thr_attr, worker_main, worker) != 0)
 		{
 			free_worker (worker);
 		}
@@ -2047,6 +2071,8 @@ int server_start (server_t* server, const char* addrs)
 
 	purge_all_workers (server, SERVER_WORKER_STATE_ALIVE);
 	purge_all_workers (server, SERVER_WORKER_STATE_DEAD);
+
+	pthread_attr_destroy (&thr_attr);
 	return 0;
 }
 
@@ -2055,10 +2081,41 @@ void server_stop (server_t* server)
 	server->stopreq = 1;
 }
 
-void server_walk_workers (server_t* server, server_worker_state_t wstate)
+int server_setoption (server_t* server, server_option_t id, const void* value)
 {
-	
+	switch (id)
+	{
+		case SERVER_TRAIT:
+			server->cfg.trait = *(const unsigned int*)value;
+			return 0;
+
+		case SERVER_WORKER_STACK_SIZE:
+			server->cfg.worker_stack_size = *(hcl_oow_t*)value;
+			return 0;
+// TODO: add more options
+	}
+
+	//server_seterrnum (server, SERVER_EINVAL);
+	return -1;
 }
+
+int server_getoption (server_t* server, server_option_t id, void* value)
+{
+	switch  (id)
+	{
+		case SERVER_TRAIT:
+			*(unsigned int*)value = server->cfg.trait;
+			return 0;
+
+		case SERVER_WORKER_STACK_SIZE:
+			*(hcl_oow_t*)value = server->cfg.worker_stack_size;
+			return 0;
+	};
+
+	//server_seterrnum (server, SERVER_EINVAL);
+	return -1;
+}
+
 
 /* ========================================================================= */
 
@@ -2140,6 +2197,7 @@ int main_server (int argc, char* argv[])
 	hcl_oow_t memsize = MIN_MEMSIZE;
 	int large_pages = 0;
 	unsigned int dbgopt = 0;
+	unsigned int trait;
 
 	setlocale (LC_ALL, "");
 
@@ -2194,7 +2252,7 @@ int main_server (int argc, char* argv[])
 
 	if (opt.ind >= argc) goto print_usage;
 
-	server = server_open(0, memsize, logopt, dbgopt, large_pages);
+	server = server_open(0, memsize, logopt, dbgopt);
 	if (!server)
 	{
 		fprintf (stderr, "cannot open server\n");
@@ -2203,10 +2261,15 @@ int main_server (int argc, char* argv[])
 	
 	if (handle_logopt(server, logopt) <= -1) goto oops;
 
+	server_getoption (server, SERVER_TRAIT, &trait);
+	if (large_pages) trait |= SERVER_TRAIT_USE_LARGE_PAGES;
+	else trait &= SERVER_TRAIT_USE_LARGE_PAGES;
+	server_setoption (server, SERVER_TRAIT, &trait);
+
 	g_server = server;
 	set_signal (SIGINT, handle_sigint);
 	set_signal_to_ignore (SIGPIPE);
-	
+
 	n = server_start(server, argv[opt.ind]);
 	
 	set_signal_to_default (SIGINT);
