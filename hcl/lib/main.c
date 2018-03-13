@@ -142,7 +142,7 @@ struct xtn_t
 	int vm_running;
 
 	int logfd;
-	int logmask;
+	unsigned int logmask;
 	int logfd_istty;
 
 	int reader_istty;
@@ -1557,7 +1557,7 @@ static void print_synerr (hcl_t* hcl)
 
 #define MIN_MEMSIZE 512000ul
  
-static int main_tty (int argc, char* argv[])
+int main (int argc, char* argv[])
 {
 	hcl_t* hcl;
 	xtn_t* xtn;
@@ -1884,17 +1884,4 @@ oops:
 	set_signal_to_default (SIGINT);
 	hcl_close (hcl);
 	return -1;
-}
-
-int main_server (int argc, char* argv[]);
-
-int main (int argc, char* argv[])
-{
-
-	const char* base;
-
-	base = get_base_name (argv[0]);
-	if (strcmp(base, "hcld") == 0) return main_server (argc, argv);
-
-	return main_tty (argc, argv);
 }

@@ -335,7 +335,7 @@ int hcl_setoption (hcl_t* hcl, hcl_option_t id, const void* value)
 			return 0;
 
 		case HCL_LOG_MASK:
-			hcl->option.log_mask = *(const int*)value;
+			hcl->option.log_mask = *(const unsigned int*)value;
 			return 0;
 
 		case HCL_LOG_MAXCAPA:
@@ -390,7 +390,7 @@ int hcl_getoption (hcl_t* hcl, hcl_option_t id, void* value)
 			return 0;
 
 		case HCL_LOG_MASK:
-			*(int*)value = hcl->option.log_mask;
+			*(unsigned int*)value = hcl->option.log_mask;
 			return 0;
 
 		case HCL_LOG_MAXCAPA:

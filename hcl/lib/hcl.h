@@ -1012,8 +1012,8 @@ struct hcl_t
 
 	struct
 	{
-		int trait;
-		int log_mask;
+		unsigned int trait;
+		unsigned int log_mask;
 		hcl_oow_t log_maxcapa;
 		hcl_oow_t dfl_symtab_size;
 		hcl_oow_t dfl_sysdic_size;
@@ -1036,8 +1036,8 @@ struct hcl_t
 		hcl_ooch_t* ptr;
 		hcl_oow_t len;
 		hcl_oow_t capa;
-		int last_mask;
-		int default_type_mask;
+		unsigned int last_mask;
+		unsigned int default_type_mask;
 	} log;
 	/* ========================= */
 

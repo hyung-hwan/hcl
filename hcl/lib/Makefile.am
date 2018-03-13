@@ -1,5 +1,7 @@
 AUTOMAKE_OPTIONS = nostdinc
 
+AM_CFLAGS = $(PTHREAD_CFLAGS)
+
 CPPFLAGS_ALL_COMMON = \
 	-I$(abs_builddir) \
 	-I$(abs_srcdir) \
@@ -67,8 +69,14 @@ libhcl_la_LDFLAGS = $(LDFLAGS_LIB_COMMON)
 libhcl_la_LIBADD = $(LIBADD_LIB_COMMON)
 libhcl_la_DEPENDENCIES =
 
-if ENABLE_STATIC_MODULE
+pkglib_LTLIBRARIES += libhcls.la
+libhcls_la_SOURCES = hcl-s.c hcl-s.h
+libhcls_la_CPPFLAGS = $(CPPFLAGS_LIB_COMMON)
+libhcls_la_LDFLAGS = $(LDFLAGS_LIB_COMMON)
+libhcls_la_LIBADD = $(LIBADD_LIB_COMMON) $(PTHREAD_LIBS)
+libhcls_la_DEPENDENCIES =
 
+if ENABLE_STATIC_MODULE
 libhcl_la_LIBADD += -lhcl-arr
 libhcl_la_DEPENDENCIES += $(abs_builddir)/../mod/libhcl-arr.la
 libhcl_la_LIBADD += -lhcl-dic
@@ -77,18 +85,23 @@ libhcl_la_LIBADD += -lhcl-str
 libhcl_la_DEPENDENCIES += $(abs_builddir)/../mod/libhcl-str.la
 endif
 
-
 bin_PROGRAMS = hcl
-hcl_SOURCES = main.c main2.c
+hcl_SOURCES = main.c 
 hcl_CPPFLAGS = $(CPPFLAGS_LIB_COMMON)
 hcl_LDFLAGS = $(LDFLAGS_LIB_COMMON)
 hcl_LDADD = $(LIBADD_LIB_COMMON) -lhcl #-ldyncall_s
-
 if ENABLE_STATIC_MODULE
 hcl_DEPENDENCIES = libhcl.la
 endif
 
-
+bin_PROGRAMS += hcls
+hcls_SOURCES = main2.c
+hcls_CPPFLAGS = $(CPPFLAGS_LIB_COMMON)
+hcls_LDFLAGS = $(LDFLAGS_LIB_COMMON)
+hcls_LDADD = $(LIBADD_LIB_COMMON) $(PTHREAD_LIBS) -lhcl -lhcls #-ldyncall_s
+if ENABLE_STATIC_MODULE
+hcls_DEPENDENCIES = libhcl.la libhcls.la
+endif
 
 install-data-hook:
 	@echo "#ifndef _HCL_CFG_H_" > "$(DESTDIR)$(pkgincludedir)/hcl-cfg.h"
