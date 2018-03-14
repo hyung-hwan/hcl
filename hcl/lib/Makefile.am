@@ -43,6 +43,7 @@ pkglib_LTLIBRARIES = libhcl.la
 libhcl_la_SOURCES = \
 	hcl-prv.h \
 	logfmtv.h \
+	sa-utl.h \
 	bigint.c \
 	comp.c \
 	debug.c \
@@ -69,12 +70,14 @@ libhcl_la_LDFLAGS = $(LDFLAGS_LIB_COMMON)
 libhcl_la_LIBADD = $(LIBADD_LIB_COMMON)
 libhcl_la_DEPENDENCIES =
 
+if ENABLE_HCLS
 pkglib_LTLIBRARIES += libhcls.la
 libhcls_la_SOURCES = hcl-s.c hcl-s.h
 libhcls_la_CPPFLAGS = $(CPPFLAGS_LIB_COMMON)
 libhcls_la_LDFLAGS = $(LDFLAGS_LIB_COMMON)
 libhcls_la_LIBADD = $(LIBADD_LIB_COMMON) $(PTHREAD_LIBS)
 libhcls_la_DEPENDENCIES =
+endif
 
 if ENABLE_STATIC_MODULE
 libhcl_la_LIBADD += -lhcl-arr
@@ -94,6 +97,7 @@ if ENABLE_STATIC_MODULE
 hcl_DEPENDENCIES = libhcl.la
 endif
 
+if ENABLE_HCLS
 bin_PROGRAMS += hcls
 hcls_SOURCES = main2.c
 hcls_CPPFLAGS = $(CPPFLAGS_LIB_COMMON)
@@ -101,6 +105,7 @@ hcls_LDFLAGS = $(LDFLAGS_LIB_COMMON)
 hcls_LDADD = $(LIBADD_LIB_COMMON) $(PTHREAD_LIBS) -lhcl -lhcls #-ldyncall_s
 if ENABLE_STATIC_MODULE
 hcls_DEPENDENCIES = libhcl.la libhcls.la
+endif
 endif
 
 install-data-hook:

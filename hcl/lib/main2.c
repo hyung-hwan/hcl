@@ -234,7 +234,7 @@ static void log_write (hcl_server_t* server, int wid, unsigned int mask, const h
 		}
 	}
 #else
-	write_all (logfd, vmsg, len);
+	write_all (logfd, msg, len);
 #endif
 
 	if (xtn->logfd_istty)
@@ -310,7 +310,7 @@ static int handle_logopt (hcl_server_t* server, const hcl_bch_t* str)
 	{
 		/* i duplicate this string for open() below as open() doesn't 
 		 * accept a length-bounded string */
-		xstr = strdup (str);
+		xstr = strdup(str);
 		if (!xstr) 
 		{
 			fprintf (stderr, "ERROR: out of memory in duplicating %s\n", str);

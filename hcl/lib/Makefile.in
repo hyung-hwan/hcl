@@ -90,18 +90,21 @@ build_triplet = @build@
 host_triplet = @host@
 @ENABLE_LIBLTDL_TRUE@am__append_1 = $(LTDL_LIBS)
 @ENABLE_LIBLTDL_FALSE@am__append_2 = $(DL_LIBS)
-@ENABLE_STATIC_MODULE_TRUE@am__append_3 = -lhcl-arr -lhcl-dic \
+@ENABLE_HCLS_TRUE@am__append_3 = libhcls.la
+@ENABLE_STATIC_MODULE_TRUE@am__append_4 = -lhcl-arr -lhcl-dic \
 @ENABLE_STATIC_MODULE_TRUE@	-lhcl-str
-@ENABLE_STATIC_MODULE_TRUE@am__append_4 = $(abs_builddir)/../mod/libhcl-arr.la \
+@ENABLE_STATIC_MODULE_TRUE@am__append_5 = $(abs_builddir)/../mod/libhcl-arr.la \
 @ENABLE_STATIC_MODULE_TRUE@	$(abs_builddir)/../mod/libhcl-dic.la \
 @ENABLE_STATIC_MODULE_TRUE@	$(abs_builddir)/../mod/libhcl-str.la
-bin_PROGRAMS = hcl$(EXEEXT) hcls$(EXEEXT)
+bin_PROGRAMS = hcl$(EXEEXT) $(am__EXEEXT_1)
 @ENABLE_STATIC_MODULE_FALSE@hcl_DEPENDENCIES = $(am__DEPENDENCIES_4)
-@ENABLE_STATIC_MODULE_FALSE@hcls_DEPENDENCIES = $(am__DEPENDENCIES_4) \
-@ENABLE_STATIC_MODULE_FALSE@	$(am__DEPENDENCIES_1)
+@ENABLE_HCLS_TRUE@am__append_6 = hcls
+@ENABLE_HCLS_TRUE@@ENABLE_STATIC_MODULE_FALSE@hcls_DEPENDENCIES = $(am__DEPENDENCIES_4) \
+@ENABLE_HCLS_TRUE@@ENABLE_STATIC_MODULE_FALSE@	$(am__DEPENDENCIES_1)
 subdir = lib
 ACLOCAL_M4 = $(top_srcdir)/aclocal.m4
-am__aclocal_m4_deps = $(top_srcdir)/m4/ax_cxx_namespace.m4 \
+am__aclocal_m4_deps = $(top_srcdir)/m4/ax_check_sign.m4 \
+	$(top_srcdir)/m4/ax_cxx_namespace.m4 \
 	$(top_srcdir)/m4/ax_numval.m4 $(top_srcdir)/m4/ax_pthread.m4 \
 	$(top_srcdir)/m4/libtool.m4 $(top_srcdir)/m4/ltoptions.m4 \
 	$(top_srcdir)/m4/ltsugar.m4 $(top_srcdir)/m4/ltversion.m4 \
@@ -164,18 +167,22 @@ am__v_lt_1 =
 libhcl_la_LINK = $(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) \
 	$(LIBTOOLFLAGS) --mode=link $(CCLD) $(AM_CFLAGS) $(CFLAGS) \
 	$(libhcl_la_LDFLAGS) $(LDFLAGS) -o $@
-am_libhcls_la_OBJECTS = libhcls_la-hcl-s.lo
+am__libhcls_la_SOURCES_DIST = hcl-s.c hcl-s.h
+@ENABLE_HCLS_TRUE@am_libhcls_la_OBJECTS = libhcls_la-hcl-s.lo
 libhcls_la_OBJECTS = $(am_libhcls_la_OBJECTS)
 libhcls_la_LINK = $(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) \
 	$(LIBTOOLFLAGS) --mode=link $(CCLD) $(AM_CFLAGS) $(CFLAGS) \
 	$(libhcls_la_LDFLAGS) $(LDFLAGS) -o $@
+@ENABLE_HCLS_TRUE@am_libhcls_la_rpath = -rpath $(pkglibdir)
+@ENABLE_HCLS_TRUE@am__EXEEXT_1 = hcls$(EXEEXT)
 PROGRAMS = $(bin_PROGRAMS)
 am_hcl_OBJECTS = hcl-main.$(OBJEXT)
 hcl_OBJECTS = $(am_hcl_OBJECTS)
 hcl_LINK = $(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) \
 	$(LIBTOOLFLAGS) --mode=link $(CCLD) $(AM_CFLAGS) $(CFLAGS) \
 	$(hcl_LDFLAGS) $(LDFLAGS) -o $@
-am_hcls_OBJECTS = hcls-main2.$(OBJEXT)
+am__hcls_SOURCES_DIST = main2.c
+@ENABLE_HCLS_TRUE@am_hcls_OBJECTS = hcls-main2.$(OBJEXT)
 hcls_OBJECTS = $(am_hcls_OBJECTS)
 hcls_LINK = $(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) \
 	$(LIBTOOLFLAGS) --mode=link $(CCLD) $(AM_CFLAGS) $(CFLAGS) \
@@ -216,8 +223,8 @@ am__v_CCLD_0 = @echo "  CCLD    " $@;
 am__v_CCLD_1 = 
 SOURCES = $(libhcl_la_SOURCES) $(libhcls_la_SOURCES) $(hcl_SOURCES) \
 	$(hcls_SOURCES)
-DIST_SOURCES = $(libhcl_la_SOURCES) $(libhcls_la_SOURCES) \
-	$(hcl_SOURCES) $(hcls_SOURCES)
+DIST_SOURCES = $(libhcl_la_SOURCES) $(am__libhcls_la_SOURCES_DIST) \
+	$(hcl_SOURCES) $(am__hcls_SOURCES_DIST)
 am__can_run_installinfo = \
   case $$AM_UPDATE_INFO_DIR in \
     n|no|NO) false;; \
@@ -392,6 +399,7 @@ pdfdir = @pdfdir@
 prefix = @prefix@
 program_transform_name = @program_transform_name@
 psdir = @psdir@
+runstatedir = @runstatedir@
 sbindir = @sbindir@
 sharedstatedir = @sharedstatedir@
 srcdir = @srcdir@
@@ -423,7 +431,7 @@ pkginclude_HEADERS = \
 	hcl-utl.h \
 	hcl.h
 
-pkglib_LTLIBRARIES = libhcl.la libhcls.la
+pkglib_LTLIBRARIES = libhcl.la $(am__append_3)
 libhcl_la_SOURCES = \
 	hcl-prv.h \
 	logfmtv.h \
@@ -451,23 +459,23 @@ libhcl_la_SOURCES = \
 
 libhcl_la_CPPFLAGS = $(CPPFLAGS_LIB_COMMON)
 libhcl_la_LDFLAGS = $(LDFLAGS_LIB_COMMON)
-libhcl_la_LIBADD = $(LIBADD_LIB_COMMON) $(am__append_3)
-libhcl_la_DEPENDENCIES = $(am__append_4)
-libhcls_la_SOURCES = hcl-s.c hcl-s.h
-libhcls_la_CPPFLAGS = $(CPPFLAGS_LIB_COMMON)
-libhcls_la_LDFLAGS = $(LDFLAGS_LIB_COMMON)
-libhcls_la_LIBADD = $(LIBADD_LIB_COMMON) $(PTHREAD_LIBS)
-libhcls_la_DEPENDENCIES = 
+libhcl_la_LIBADD = $(LIBADD_LIB_COMMON) $(am__append_4)
+libhcl_la_DEPENDENCIES = $(am__append_5)
+@ENABLE_HCLS_TRUE@libhcls_la_SOURCES = hcl-s.c hcl-s.h
+@ENABLE_HCLS_TRUE@libhcls_la_CPPFLAGS = $(CPPFLAGS_LIB_COMMON)
+@ENABLE_HCLS_TRUE@libhcls_la_LDFLAGS = $(LDFLAGS_LIB_COMMON)
+@ENABLE_HCLS_TRUE@libhcls_la_LIBADD = $(LIBADD_LIB_COMMON) $(PTHREAD_LIBS)
+@ENABLE_HCLS_TRUE@libhcls_la_DEPENDENCIES = 
 hcl_SOURCES = main.c 
 hcl_CPPFLAGS = $(CPPFLAGS_LIB_COMMON)
 hcl_LDFLAGS = $(LDFLAGS_LIB_COMMON)
 hcl_LDADD = $(LIBADD_LIB_COMMON) -lhcl #-ldyncall_s
 @ENABLE_STATIC_MODULE_TRUE@hcl_DEPENDENCIES = libhcl.la
-hcls_SOURCES = main2.c
-hcls_CPPFLAGS = $(CPPFLAGS_LIB_COMMON)
-hcls_LDFLAGS = $(LDFLAGS_LIB_COMMON)
-hcls_LDADD = $(LIBADD_LIB_COMMON) $(PTHREAD_LIBS) -lhcl -lhcls #-ldyncall_s
-@ENABLE_STATIC_MODULE_TRUE@hcls_DEPENDENCIES = libhcl.la libhcls.la
+@ENABLE_HCLS_TRUE@hcls_SOURCES = main2.c
+@ENABLE_HCLS_TRUE@hcls_CPPFLAGS = $(CPPFLAGS_LIB_COMMON)
+@ENABLE_HCLS_TRUE@hcls_LDFLAGS = $(LDFLAGS_LIB_COMMON)
+@ENABLE_HCLS_TRUE@hcls_LDADD = $(LIBADD_LIB_COMMON) $(PTHREAD_LIBS) -lhcl -lhcls #-ldyncall_s
+@ENABLE_HCLS_TRUE@@ENABLE_STATIC_MODULE_TRUE@hcls_DEPENDENCIES = libhcl.la libhcls.la
 all: hcl-cfg.h
 	$(MAKE) $(AM_MAKEFLAGS) all-am
 
@@ -557,7 +565,7 @@ libhcl.la: $(libhcl_la_OBJECTS) $(libhcl_la_DEPENDENCIES) $(EXTRA_libhcl_la_DEPE
 	$(AM_V_CCLD)$(libhcl_la_LINK) -rpath $(pkglibdir) $(libhcl_la_OBJECTS) $(libhcl_la_LIBADD) $(LIBS)
 
 libhcls.la: $(libhcls_la_OBJECTS) $(libhcls_la_DEPENDENCIES) $(EXTRA_libhcls_la_DEPENDENCIES) 
-	$(AM_V_CCLD)$(libhcls_la_LINK) -rpath $(pkglibdir) $(libhcls_la_OBJECTS) $(libhcls_la_LIBADD) $(LIBS)
+	$(AM_V_CCLD)$(libhcls_la_LINK) $(am_libhcls_la_rpath) $(libhcls_la_OBJECTS) $(libhcls_la_LIBADD) $(LIBS)
 install-binPROGRAMS: $(bin_PROGRAMS)
 	@$(NORMAL_INSTALL)
 	@list='$(bin_PROGRAMS)'; test -n "$(bindir)" || list=; \

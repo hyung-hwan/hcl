@@ -827,7 +827,7 @@ HCL_INLINE hcl_bch_t* hcl_duputobcharswithheadroom (hcl_t* hcl, hcl_oow_t headro
 	hcl_bch_t* ptr;
 
 	inlen = ucslen;
-	if (hcl_convutobchars (hcl, ucs, &inlen, HCL_NULL, &outlen) <= -1) 
+	if (hcl_convutobchars(hcl, ucs, &inlen, HCL_NULL, &outlen) <= -1) 
 	{
 		/* note it's also an error if no full conversion is made in this function */
 		return HCL_NULL;
@@ -858,7 +858,7 @@ HCL_INLINE hcl_uch_t* hcl_dupbtoucstrwithheadroom (hcl_t* hcl, hcl_oow_t headroo
 	hcl_oow_t inlen, outlen;
 	hcl_uch_t* ptr;
 
-	if (hcl_convbtoucstr (hcl, bcs, &inlen, HCL_NULL, &outlen) <= -1) 
+	if (hcl_convbtoucstr(hcl, bcs, &inlen, HCL_NULL, &outlen) <= -1) 
 	{
 		/* note it's also an error if no full conversion is made in this function */
 		return HCL_NULL;

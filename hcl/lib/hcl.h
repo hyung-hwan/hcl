@@ -1471,6 +1471,20 @@ HCL_EXPORT void hcl_seterrufmt (
 	...
 );
 
+HCL_EXPORT void hcl_seterrbfmtv (
+	hcl_t*           hcl,
+	hcl_errnum_t     errnum,
+	const hcl_bch_t* fmt,
+	va_list          ap
+);
+
+HCL_EXPORT void hcl_seterrufmtv (
+	hcl_t*           hcl,
+	hcl_errnum_t     errnum,
+	const hcl_uch_t* fmt,
+	va_list          ap
+);
+
 HCL_EXPORT const hcl_ooch_t* hcl_geterrstr (
 	hcl_t* hcl
 );

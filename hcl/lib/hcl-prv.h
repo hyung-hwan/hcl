@@ -29,7 +29,6 @@
 
 #include "hcl.h"
 #include "hcl-utl.h"
-#include <stdarg.h>
 
 /* you can define this to either 1 or 2 */
 #define HCL_BCODE_LONG_PARAM_SIZE 2
@@ -660,25 +659,6 @@ typedef hcl_ooi_t (*hcl_outbfmt_t) (
 #if defined(__cplusplus)
 extern "C" {
 #endif
-
-/* ========================================================================= */
-/* err.c                                                                    */
-/* ========================================================================= */
-
-void hcl_seterrbfmtv (
-	hcl_t*           hcl,
-	hcl_errnum_t     errnum,
-	const hcl_bch_t* fmt,
-	va_list          ap
-);
-
-void hcl_seterrufmtv (
-	hcl_t*           hcl,
-	hcl_errnum_t     errnum,
-	const hcl_uch_t* fmt,
-	va_list          ap
-);
-
 
 /* ========================================================================= */
 /* heap.c                                                                    */

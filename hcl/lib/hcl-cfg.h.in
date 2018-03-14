@@ -264,6 +264,9 @@
 /* MB_LEN_MAX */
 #undef HCL_MBLEN_MAX
 
+/* offsetof(struct sockaddr, sa_family) */
+#undef HCL_OFFSETOF_SA_FAMILY
+
 /* Author */
 #undef HCL_PACKAGE_AUTHOR
 
@@ -284,6 +287,12 @@
 
 /* Patch level */
 #undef HCL_PACKAGE_VERSION_PATCH
+
+/* PATH_MAX */
+#undef HCL_PATH_MAX
+
+/* Define if sa_family_t is signed */
+#undef HCL_SA_FAMILY_T_IS_SIGNED
 
 /* sizeof(char) */
 #undef HCL_SIZEOF_CHAR
@@ -315,8 +324,29 @@
 /* sizeof(off_t) */
 #undef HCL_SIZEOF_OFF_T
 
+/* sizeof(sa_family_t) */
+#undef HCL_SIZEOF_SA_FAMILY_T
+
 /* sizeof(short) */
 #undef HCL_SIZEOF_SHORT
+
+/* sizeof(socklen_t) */
+#undef HCL_SIZEOF_SOCKLEN_T
+
+/* sizeof(struct sockaddr_dl) */
+#undef HCL_SIZEOF_STRUCT_SOCKADDR_DL
+
+/* sizeof(struct sockaddr_in) */
+#undef HCL_SIZEOF_STRUCT_SOCKADDR_IN
+
+/* sizeof(struct sockaddr_in6) */
+#undef HCL_SIZEOF_STRUCT_SOCKADDR_IN6
+
+/* sizeof(struct sockaddr_ll) */
+#undef HCL_SIZEOF_STRUCT_SOCKADDR_LL
+
+/* sizeof(struct sockaddr_un) */
+#undef HCL_SIZEOF_STRUCT_SOCKADDR_UN
 
 /* sizeof(void*) */
 #undef HCL_SIZEOF_VOID_P
@@ -348,6 +378,9 @@
 /* sizeof(__uint128_t) */
 #undef HCL_SIZEOF___UINT128_T
 
+/* Define if socklen_t is signed */
+#undef HCL_SOCKLEN_T_IS_SIGNED
+
 /* Unicode character type size */
 #undef HCL_UNICODE_SIZE
 
@@ -356,6 +389,9 @@
 
 /* The size of `MB_LEN_MAX', as computed by valueof. */
 #undef NUMVALOF_MB_LEN_MAX
+
+/* The size of `PATH_MAX', as computed by valueof. */
+#undef NUMVALOF_PATH_MAX
 
 /* Name of package */
 #undef PACKAGE
@@ -418,8 +454,29 @@
 /* The size of `off_t', as computed by sizeof. */
 #undef SIZEOF_OFF_T
 
+/* The size of `sa_family_t', as computed by sizeof. */
+#undef SIZEOF_SA_FAMILY_T
+
 /* The size of `short', as computed by sizeof. */
 #undef SIZEOF_SHORT
+
+/* The size of `socklen_t', as computed by sizeof. */
+#undef SIZEOF_SOCKLEN_T
+
+/* The size of `struct sockaddr_dl', as computed by sizeof. */
+#undef SIZEOF_STRUCT_SOCKADDR_DL
+
+/* The size of `struct sockaddr_in', as computed by sizeof. */
+#undef SIZEOF_STRUCT_SOCKADDR_IN
+
+/* The size of `struct sockaddr_in6', as computed by sizeof. */
+#undef SIZEOF_STRUCT_SOCKADDR_IN6
+
+/* The size of `struct sockaddr_ll', as computed by sizeof. */
+#undef SIZEOF_STRUCT_SOCKADDR_LL
+
+/* The size of `struct sockaddr_un', as computed by sizeof. */
+#undef SIZEOF_STRUCT_SOCKADDR_UN
 
 /* The size of `void *', as computed by sizeof. */
 #undef SIZEOF_VOID_P

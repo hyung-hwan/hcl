@@ -28,13 +28,8 @@
 #include "hcl-prv.h"
 
 #include <stdio.h>
-#include <stdlib.h>
 #include <string.h>
-#include <limits.h>
 #include <errno.h>
-#include <locale.h>
-#include <assert.h>
-
 
 #if defined(_WIN32)
 #	include <windows.h>
@@ -95,7 +90,6 @@
 #	include <sys/types.h>
 #	include <sys/socket.h>
 #	include <netinet/in.h>
-#	include <arpa/inet.h>
 #	include <pthread.h>
 #	include <sys/uio.h>
 #	include <poll.h>
@@ -128,13 +122,6 @@
 #		endif
 #	endif
 #endif
-
-typedef union sck_addr_t sck_addr_t;
-union sck_addr_t
-{
-	struct sockaddr_in in4;
-	struct sockaddr_in6 in6;
-};
 
 typedef struct bb_t bb_t;
 struct bb_t
@@ -259,12 +246,6 @@ struct hcl_server_t
 	hcl_errnum_t errnum;
 	struct
 	{
-		union
-		{
-			hcl_ooch_t ooch[2048];
-			hcl_bch_t bch[2048];
-			hcl_uch_t uch[2048];
-		} tmpbuf;
 		hcl_ooch_t buf[2048];
 		hcl_oow_t len;
 	} errmsg;
@@ -275,8 +256,9 @@ struct hcl_server_t
 		unsigned int trait;
 		unsigned int logmask;
 		hcl_oow_t worker_stack_size;
-		hcl_oow_t worker_idle_timeout;
+		hcl_ntime_t worker_idle_timeout;
 		hcl_oow_t actor_heap_size;
+		hcl_ntime_t actor_max_runtime;
 	} cfg;
 
 	struct
@@ -431,7 +413,7 @@ static HCL_INLINE int read_input (hcl_t* hcl, hcl_ioinarg_t* arg)
 			}
 			else if (n >= 1) break;
 
-/* TOOD: idle timeout check - compute idling time and check it against server->cfg.idle_timeout */
+/* TOOD: idle timeout check - compute idling time and check it against server->cfg.worker_idle_timeout */
 		}
 		
 		x = recv(bb->fd, &bb->buf[bb->len], HCL_COUNTOF(bb->buf) - bb->len, 0);
@@ -911,28 +893,60 @@ static void vm_checkbc (hcl_t* hcl, hcl_oob_t bcode)
 	worker_hcl_xtn_t* xtn = (worker_hcl_xtn_t*)hcl_getxtn(hcl);
 
 	if (xtn->proto->worker->server->stopreq) hcl_abort(hcl);
+	
 	/* TODO: check how to this vm has been running. too long? abort it */
-
-	/* TODO: check if the worker connection is ok? if not, abort it */
+	/* check agains xtn->proto->worker->server->cfg.actor_max_runtime */
 }
 
 /*
 static void gc_hcl (hcl_t* hcl)
 {
+	worker_hcl_xtn_t* xtn = (worker_hcl_xtn_t*)hcl_getxtn(hcl);
 }
 
 
 static void fini_hcl (hcl_t* hcl)
 {
 	worker_hcl_xtn_t* xtn = (worker_hcl_xtn_t*)hcl_getxtn(hcl);
-	if (xtn->logfd >= 0)
-	{
-		close (xtn->logfd);
-		xtn->logfd = -1;
-		xtn->logfd_istty = 0;
-	}
 }
 */
+/* ========================================================================= */
+
+
+union sockaddr_t
+{
+	struct sockaddr_in in4;
+#if (HCL_SIZEOF_STRUCT_SOCKADDR_IN6 > 0)
+	struct sockaddr_in6 in6;
+#endif
+};
+typedef union sockaddr_t sockaddr_t;
+
+#undef char_t
+#undef oocs_t
+#undef str_to_ipv4
+#undef str_to_ipv6
+#undef str_to_sockaddr
+
+#define ooch_t hcl_bch_t
+#define oocs_t hcl_bcs_t
+#define str_to_ipv4 bchars_to_ipv4
+#define str_to_ipv6 bchars_to_ipv6
+#define str_to_sockaddr bchars_to_sockaddr
+#include "sa-utl.h"
+
+#undef ooch_t
+#undef oocs_t
+#undef str_to_ipv4
+#undef str_to_ipv6
+#undef str_to_sockaddr
+
+#define ooch_t hcl_uch_t
+#define oocs_t hcl_ucs_t
+#define str_to_ipv4 uchars_to_ipv4
+#define str_to_ipv6 uchars_to_ipv6
+#define str_to_sockaddr uchars_to_sockaddr
+#include "sa-utl.h"
 /* ========================================================================= */
 
 #define HCL_SERVER_PROTO_LOG_MASK (HCL_LOG_ERROR | HCL_LOG_APP)
@@ -1044,8 +1058,10 @@ static int write_reply_chunk (hcl_server_proto_t* proto)
 		/*nwritten = writev(proto->worker->sck, (const struct iovec*)&iov[index], count - index);*/
 		if (nwritten <= -1) 
 		{
+			/* error occurred inside the worker thread shouldn't affect the error information
+			 * in the server object. so here, i just log a message */
 			hcl_logbfmt (proto->hcl, HCL_SERVER_PROTO_LOG_MASK, "sendmsg failure on %d - %hs\n", proto->worker->sck, strerror(errno));
-			return -1;
+			return -1; 
 		}
 
 		while (index < count && (size_t)nwritten >= iov[index].iov_len)
@@ -1591,7 +1607,7 @@ static void free_worker (hcl_server_worker_t* worker)
 
 static void add_hcl_server_worker_to_server (hcl_server_t* server, hcl_server_worker_state_t wstate, hcl_server_worker_t* worker)
 {
-	assert (worker->server == server);
+	HCL_ASSERT (server->dummy_hcl, worker->server == server);
 
 	if (server->worker_list[wstate].tail)
 	{
@@ -1615,7 +1631,7 @@ static void zap_worker_in_server (hcl_server_t* server, hcl_server_worker_t* wor
 {
 	hcl_server_worker_state_t wstate;
 	
-	assert (worker->server == server);
+	HCL_ASSERT (server->dummy_hcl, worker->server == server);
 
 	wstate = worker->state;
 	if (worker->prev_worker) worker->prev_worker->next_worker = worker->next_worker;
@@ -1637,7 +1653,7 @@ static void* worker_main (void* ctx)
 	pthread_sigmask (SIG_BLOCK, &set, HCL_NULL);
 
 	worker->thr = pthread_self();
-	worker->proto = hcl_server_proto_open(0, worker); /* TODO: get this from argumen */
+	worker->proto = hcl_server_proto_open(0, worker);
 	if (!worker->proto)
 	{
 		free_worker (worker);
@@ -1711,9 +1727,71 @@ void hcl_server_logufmt (hcl_server_t* server, unsigned int mask, const hcl_uch_
 	va_end (ap);
 }
 
-int hcl_server_start (hcl_server_t* server, const char* addrs)
+
+static void set_err_with_syserr (hcl_server_t* server, int syserr, const char* bfmt, ...)
 {
-	sck_addr_t srv_addr;
+	hcl_t* hcl = server->dummy_hcl;
+	hcl_errnum_t errnum;
+	hcl_oow_t tmplen, tmplen2;
+	va_list ap;
+	
+	static hcl_bch_t b_dash[] = { ' ', '-', ' ', '\0' };
+	static hcl_uch_t u_dash[] = { ' ', '-', ' ', '\0' };
+
+	if (hcl->shuterr) return;
+
+	errnum = hcl_syserr_to_errnum(syserr);
+	if (hcl->vmprim.syserrstrb)
+	{
+		hcl->vmprim.syserrstrb (hcl, syserr, hcl->errmsg.tmpbuf.bch, HCL_COUNTOF(hcl->errmsg.tmpbuf.bch));
+		
+		va_start (ap, bfmt);
+		hcl_seterrbfmtv (hcl, errnum, bfmt, ap);
+		va_end (ap);
+
+	#if defined(HCL_OOCH_IS_BCH)
+		hcl->errmsg.len += hcl_copybcstr (&hcl->errmsg.buf[hcl->errmsg.len], HCL_COUNTOF(hcl->errmsg.buf) - hcl->errmsg.len, b_dash);
+		hcl->errmsg.len += hcl_copybcstr (&hcl->errmsg.buf[hcl->errmsg.len], HCL_COUNTOF(hcl->errmsg.buf) - hcl->errmsg.len, hcl->errmsg.tmpbuf.bch);
+	#else
+		hcl->errmsg.len += hcl_copyucstr (&hcl->errmsg.buf[hcl->errmsg.len], HCL_COUNTOF(hcl->errmsg.buf) - hcl->errmsg.len, u_dash);
+		tmplen = hcl_countbcstr(hcl->errmsg.tmpbuf.bch);
+		tmplen2 = HCL_COUNTOF(hcl->errmsg.buf) - hcl->errmsg.len;
+		hcl_convbtouchars (hcl, hcl->errmsg.tmpbuf.bch, &tmplen, &hcl->errmsg.buf[hcl->errmsg.len], &tmplen2);
+		hcl->errmsg.len += tmplen2; /* ignore conversion errors */
+	#endif
+	}
+	else
+	{
+		HCL_ASSERT (hcl, hcl->vmprim.syserrstru != HCL_NULL);
+
+		hcl->vmprim.syserrstru (hcl, syserr, hcl->errmsg.tmpbuf.uch, HCL_COUNTOF(hcl->errmsg.tmpbuf.uch));
+
+		va_start (ap, bfmt);
+		hcl_seterrbfmtv (hcl, errnum, bfmt, ap);
+		va_end (ap);
+
+	#if defined(HCL_OOCH_IS_BCH)
+		hcl->errmsg.len += hcl_copybcstr (&hcl->errmsg.buf[hcl->errmsg.len], HCL_COUNTOF(hcl->errmsg.buf) - hcl->errmsg.len, b_dash);
+		
+		tmplen = hcl_countucstr(hcl->errmsg.tmpbuf.uch);
+		tmplen2 = HCL_COUNTOF(hcl->errmsg.buf) - hcl->errmsg.len;
+		hcl_convutobchars (hcl, hcl->errmsg.tmpbuf.uch, &tmplen, &hcl->errmsg.buf[hcl->errmsg.len], &tmplen2);
+		hcl->errmsg.len += tmplen2; /* ignore conversion errors */
+	#else
+		hcl->errmsg.len += hcl_copyucstr (&hcl->errmsg.buf[hcl->errmsg.len], HCL_COUNTOF(hcl->errmsg.buf) - hcl->errmsg.len, u_dash);
+		hcl->errmsg.len += hcl_copyucstr (&hcl->errmsg.buf[hcl->errmsg.len], HCL_COUNTOF(hcl->errmsg.buf) - hcl->errmsg.len, hcl->errmsg.tmpbuf.uch);
+	#endif
+
+	}
+
+	server->errnum = errnum;
+	hcl_copyoochars (server->errmsg.buf, server->dummy_hcl->errmsg.buf, HCL_COUNTOF(server->errmsg.buf));
+	server->errmsg.len = server->dummy_hcl->errmsg.len;
+}
+
+int hcl_server_start (hcl_server_t* server, const hcl_bch_t* addrs)
+{
+	sockaddr_t srv_addr;
 	int srv_fd, sck_fam;
 	int optval;
 	socklen_t srv_len;
@@ -1722,36 +1800,13 @@ int hcl_server_start (hcl_server_t* server, const char* addrs)
 /* TODO: interprete 'addrs' as a command-separated address list 
  *  192.168.1.1:20,[::1]:20,127.0.0.1:345
  */
-	HCL_MEMSET (&srv_addr, 0, HCL_SIZEOF(srv_addr));
-	if (inet_pton(AF_INET6, addrs, &srv_addr.in6.sin6_addr) != 1)
-	{
-		if (inet_pton(AF_INET, addrs, &srv_addr.in4.sin_addr) != 1)
-		{
-			fprintf (stderr, "cannot open convert server address %s - %s\n", addrs, strerror(errno));
-			return -1;
-		}
-		else
-		{
-			srv_addr.in4.sin_family = AF_INET;
-			srv_addr.in4.sin_port = htons(8888); /* TODO: change it */
-			srv_len = HCL_SIZEOF(srv_addr.in4);
-			sck_fam = AF_INET;
-		}
-	}
-	else
-	{
-		srv_addr.in6.sin6_family = AF_INET6;
-		srv_addr.in6.sin6_port = htons(8888); /* TODO: change it */
-		srv_len = HCL_SIZEOF(srv_addr.in6);
-		sck_fam = AF_INET6;
-	}
+	sck_fam = bchars_to_sockaddr(server, addrs, hcl_countbcstr(addrs), &srv_addr, &srv_len);
+	if (sck_fam <= -1) return -1;
 
 	srv_fd = socket(sck_fam, SOCK_STREAM, 0);
 	if (srv_fd == -1)
 	{
-		int xerrno = errno;
-		hcl_server_seterrnum (server, hcl_syserr_to_errnum(xerrno));
-		hcl_server_logbfmt (server, HCL_SERVER_PROTO_LOG_MASK, "cannot open server socket - %s\n", strerror(xerrno));
+		set_err_with_syserr (server, errno, "unable to open server socket");
 		return -1;
 	}
 
@@ -1760,18 +1815,14 @@ int hcl_server_start (hcl_server_t* server, const char* addrs)
 
 	if (bind(srv_fd, (struct sockaddr*)&srv_addr, srv_len) == -1)
 	{
-		int xerrno = errno;
-		hcl_server_seterrnum (server, hcl_syserr_to_errnum(xerrno));
-		hcl_server_logbfmt (server, HCL_SERVER_PROTO_LOG_MASK, "cannot bind server socket %d - %s\n", srv_fd, strerror(xerrno));
+		set_err_with_syserr (server, errno, "unable to bind server socket %d", srv_fd);
 		close (srv_fd);
 		return -1;
 	}
 
-	if (listen (srv_fd, 128) == -1)
+	if (listen(srv_fd, 128) == -1)
 	{
-		int xerrno = errno;
-		hcl_server_seterrnum (server, hcl_syserr_to_errnum(xerrno));
-		hcl_server_logbfmt (server, HCL_SERVER_PROTO_LOG_MASK, "cannot listen on server socket %d - %s\n", srv_fd, strerror(xerrno));
+		set_err_with_syserr (server, errno, "unable to listen on server socket %d", srv_fd);
 		close (srv_fd);
 		return -1;
 	}
@@ -1782,7 +1833,7 @@ int hcl_server_start (hcl_server_t* server, const char* addrs)
 	server->stopreq = 0;
 	while (!server->stopreq)
 	{
-		sck_addr_t cli_addr;
+		sockaddr_t cli_addr;
 		int cli_fd;
 		socklen_t cli_len;
 		pthread_t thr;
@@ -1795,12 +1846,7 @@ int hcl_server_start (hcl_server_t* server, const char* addrs)
 		cli_fd = accept(srv_fd, (struct sockaddr*)&cli_addr, &cli_len);
 		if (cli_fd == -1)
 		{
-			if (errno != EINTR || !server->stopreq)
-			{
-				int xerrno = errno;
-				hcl_server_seterrnum (server, hcl_syserr_to_errnum(xerrno));
-				hcl_server_logbfmt (server, HCL_SERVER_PROTO_LOG_MASK, "cannot accept worker on socket %d - %s\n", srv_fd, strerror(xerrno));
-			}
+			if (errno != EINTR || !server->stopreq) set_err_with_syserr (server, errno, "unable to accept worker on socket %d", srv_fd);
 			break;
 		}
 
@@ -1838,11 +1884,18 @@ int hcl_server_setoption (hcl_server_t* server, hcl_server_option_t id, const vo
 		case HCL_SERVER_WORKER_STACK_SIZE:
 			server->cfg.worker_stack_size = *(hcl_oow_t*)value;
 			return 0;
+			
+		case HCL_SERVER_WORKER_IDLE_TIMEOUT:
+			server->cfg.worker_idle_timeout = *(hcl_ntime_t*)value;
+			return 0;
 
 		case HCL_SERVER_ACTOR_HEAP_SIZE:
 			server->cfg.actor_heap_size = *(hcl_oow_t*)value;
 			return 0;
-
+			
+		case HCL_SERVER_ACTOR_MAX_RUNTIME:
+			server->cfg.actor_max_runtime = *(hcl_ntime_t*)value;
+			return 0;
 	}
 
 	hcl_server_seterrnum (server, HCL_EINVAL);
@@ -1864,9 +1917,17 @@ int hcl_server_getoption (hcl_server_t* server, hcl_server_option_t id, void* va
 		case HCL_SERVER_WORKER_STACK_SIZE:
 			*(hcl_oow_t*)value = server->cfg.worker_stack_size;
 			return 0;
+			
+		case HCL_SERVER_WORKER_IDLE_TIMEOUT:
+			*(hcl_ntime_t*)value = server->cfg.worker_idle_timeout;
+			return 0;
 
 		case HCL_SERVER_ACTOR_HEAP_SIZE:
 			*(hcl_oow_t*)value = server->cfg.actor_heap_size;
+			return 0;
+
+		case HCL_SERVER_ACTOR_MAX_RUNTIME:
+			*(hcl_ntime_t*)value = server->cfg.actor_max_runtime;
 			return 0;
 	};
 
@@ -1915,4 +1976,32 @@ void hcl_server_seterrnum (hcl_server_t* server, hcl_errnum_t errnum)
 	/*if (server->shuterr) return; */
 	server->errnum = errnum;
 	server->errmsg.len = 0;
+}
+
+void hcl_server_seterrbfmt (hcl_server_t* server, hcl_errnum_t errnum, const hcl_bch_t* fmt, ...)
+{
+	va_list ap;
+
+	va_start (ap, fmt);
+	hcl_seterrbfmtv (server->dummy_hcl, errnum, fmt, ap);
+	va_end (ap);
+
+	HCL_ASSERT (server->dummy_hcl, HCL_COUNTOF(server->errmsg.buf) == HCL_COUNTOF(server->dummy_hcl->errmsg.buf));
+	server->errnum = errnum;
+	hcl_copyoochars (server->errmsg.buf, server->dummy_hcl->errmsg.buf, HCL_COUNTOF(server->errmsg.buf));
+	server->errmsg.len = server->dummy_hcl->errmsg.len;
+}
+
+void hcl_server_seterrufmt (hcl_server_t* server, hcl_errnum_t errnum, const hcl_uch_t* fmt, ...)
+{
+	va_list ap;
+
+	va_start (ap, fmt);
+	hcl_seterrufmtv (server->dummy_hcl, errnum, fmt, ap);
+	va_end (ap);
+
+	HCL_ASSERT (server->dummy_hcl, HCL_COUNTOF(server->errmsg.buf) == HCL_COUNTOF(server->dummy_hcl->errmsg.buf));
+	server->errnum = errnum;
+	hcl_copyoochars (server->errmsg.buf, server->dummy_hcl->errmsg.buf, HCL_COUNTOF(server->errmsg.buf));
+	server->errmsg.len = server->dummy_hcl->errmsg.len;
 }

@@ -651,6 +651,8 @@ HCL_SIZEOF_LONG_LONG
 HCL_SIZEOF_CHAR32_T
 HCL_SIZEOF_CHAR16_T
 HCL_SIZEOF_WCHAR_T
+ENABLE_HCLS_FALSE
+ENABLE_HCLS_TRUE
 ENABLE_LIBLTDL_FALSE
 ENABLE_LIBLTDL_TRUE
 ENABLE_STATIC_MODULE_FALSE
@@ -777,6 +779,7 @@ infodir
 docdir
 oldincludedir
 includedir
+runstatedir
 localstatedir
 sharedstatedir
 sysconfdir
@@ -815,6 +818,7 @@ enable_cxx
 enable_dynamic_module
 enable_static_module
 enable_libltdl
+enable_hcls
 '
       ac_precious_vars='build_alias
 host_alias
@@ -868,6 +872,7 @@ datadir='${datarootdir}'
 sysconfdir='${prefix}/etc'
 sharedstatedir='${prefix}/com'
 localstatedir='${prefix}/var'
+runstatedir='${localstatedir}/run'
 includedir='${prefix}/include'
 oldincludedir='/usr/include'
 docdir='${datarootdir}/doc/${PACKAGE_TARNAME}'
@@ -1120,6 +1125,15 @@ do
   | -silent | --silent | --silen | --sile | --sil)
     silent=yes ;;
 
+  -runstatedir | --runstatedir | --runstatedi | --runstated \
+  | --runstate | --runstat | --runsta | --runst | --runs \
+  | --run | --ru | --r)
+    ac_prev=runstatedir ;;
+  -runstatedir=* | --runstatedir=* | --runstatedi=* | --runstated=* \
+  | --runstate=* | --runstat=* | --runsta=* | --runst=* | --runs=* \
+  | --run=* | --ru=* | --r=*)
+    runstatedir=$ac_optarg ;;
+
   -sbindir | --sbindir | --sbindi | --sbind | --sbin | --sbi | --sb)
     ac_prev=sbindir ;;
   -sbindir=* | --sbindir=* | --sbindi=* | --sbind=* | --sbin=* \
@@ -1257,7 +1271,7 @@ fi
 for ac_var in	exec_prefix prefix bindir sbindir libexecdir datarootdir \
 		datadir sysconfdir sharedstatedir localstatedir includedir \
 		oldincludedir docdir infodir htmldir dvidir pdfdir psdir \
-		libdir localedir mandir
+		libdir localedir mandir runstatedir
 do
   eval ac_val=\$$ac_var
   # Remove trailing slashes.
@@ -1410,6 +1424,7 @@ Fine tuning of the installation directories:
   --sysconfdir=DIR        read-only single-machine data [PREFIX/etc]
   --sharedstatedir=DIR    modifiable architecture-independent data [PREFIX/com]
   --localstatedir=DIR     modifiable single-machine data [PREFIX/var]
+  --runstatedir=DIR       modifiable per-process data [LOCALSTATEDIR/run]
   --libdir=DIR            object code libraries [EPREFIX/lib]
   --includedir=DIR        C header files [PREFIX/include]
   --oldincludedir=DIR     C header files for non-gcc [/usr/include]
@@ -1469,6 +1484,7 @@ Optional Features:
   --enable-static-module  build modules statically into the main
                           library(default. no)
   --enable-libltdl        use libltdl(default. no)
+  --enable-hcls           build libhcls and hcls(default. no)
 
 Optional Packages:
   --with-PACKAGE[=ARG]    use PACKAGE [ARG=yes]
@@ -7038,7 +7054,7 @@ linux* | k*bsd*-gnu | kopensolaris*-gnu | gnu*)
   lt_cv_deplibs_check_method=pass_all
   ;;
 
-netbsd*)
+netbsd* | netbsdelf*-gnu)
   if echo __ELF__ | $CC -E - | $GREP __ELF__ > /dev/null; then
     lt_cv_deplibs_check_method='match_pattern /lib[^/]+(\.so\.[0-9]+\.[0-9]+|_pic\.a)$'
   else
@@ -10740,6 +10756,9 @@ $as_echo_n "checking whether the $compiler linker ($LD) supports shared librarie
   openbsd* | bitrig*)
     with_gnu_ld=no
     ;;
+  linux* | k*bsd*-gnu | gnu*)
+    link_all_deplibs=no
+    ;;
   esac
 
   ld_shlibs=yes
@@ -10994,7 +11013,7 @@ _LT_EOF
       fi
       ;;
 
-    netbsd*)
+    netbsd* | netbsdelf*-gnu)
       if echo __ELF__ | $CC -E - | $GREP __ELF__ >/dev/null; then
 	archive_cmds='$LD -Bshareable $libobjs $deplibs $linker_flags -o $lib'
 	wlarc=
@@ -11664,6 +11683,7 @@ $as_echo "$lt_cv_irix_exported_symbol" >&6; }
 	if test yes = "$lt_cv_irix_exported_symbol"; then
           archive_expsym_cmds='$CC -shared $pic_flag $libobjs $deplibs $compiler_flags $wl-soname $wl$soname `test -n "$verstring" && func_echo_all "$wl-set_version $wl$verstring"` $wl-update_registry $wl$output_objdir/so_locations $wl-exports_file $wl$export_symbols -o $lib'
 	fi
+	link_all_deplibs=no
       else
 	archive_cmds='$CC -shared $libobjs $deplibs $compiler_flags -soname $soname `test -n "$verstring" && func_echo_all "-set_version $verstring"` -update_registry $output_objdir/so_locations -o $lib'
 	archive_expsym_cmds='$CC -shared $libobjs $deplibs $compiler_flags -soname $soname `test -n "$verstring" && func_echo_all "-set_version $verstring"` -update_registry $output_objdir/so_locations -exports_file $export_symbols -o $lib'
@@ -11685,7 +11705,7 @@ $as_echo "$lt_cv_irix_exported_symbol" >&6; }
       esac
       ;;
 
-    netbsd*)
+    netbsd* | netbsdelf*-gnu)
       if echo __ELF__ | $CC -E - | $GREP __ELF__ >/dev/null; then
 	archive_cmds='$LD -Bshareable -o $lib $libobjs $deplibs $linker_flags'  # a.out
       else
@@ -12780,9 +12800,6 @@ fi
   # before this can be enabled.
   hardcode_into_libs=yes
 
-  # Add ABI-specific directories to the system library path.
-  sys_lib_dlsearch_path_spec="/lib64 /usr/lib64 /lib /usr/lib"
-
   # Ideally, we could use ldconfig to report *all* directores which are
   # searched for libraries, however this is still not possible.  Aside from not
   # being certain /sbin/ldconfig is available, command
@@ -12791,7 +12808,7 @@ fi
   # appending ld.so.conf contents (and includes) to the search path.
   if test -f /etc/ld.so.conf; then
     lt_ld_extra=`awk '/^include / { system(sprintf("cd /etc; cat %s 2>/dev/null", \$2)); skip = 1; } { if (!skip) print \$0; skip = 0; }' < /etc/ld.so.conf | $SED -e 's/#.*//;/^[	 ]*hwcap[	 ]/d;s/[:,	]/ /g;s/=[^=]*$//;s/=[^= ]* / /g;s/"//g;/^$/d' | tr '\n' ' '`
-    sys_lib_dlsearch_path_spec="$sys_lib_dlsearch_path_spec $lt_ld_extra"
+    sys_lib_dlsearch_path_spec="/lib /usr/lib $lt_ld_extra"
   fi
 
   # We used to test for /lib/ld.so.1 and disable shared libraries on
@@ -12801,6 +12818,18 @@ fi
   # people can always --disable-shared, the test was removed, and we
   # assume the GNU/Linux dynamic linker is in use.
   dynamic_linker='GNU/Linux ld.so'
+  ;;
+
+netbsdelf*-gnu)
+  version_type=linux
+  need_lib_prefix=no
+  need_version=no
+  library_names_spec='${libname}${release}${shared_ext}$versuffix ${libname}${release}${shared_ext}$major ${libname}${shared_ext}'
+  soname_spec='${libname}${release}${shared_ext}$major'
+  shlibpath_var=LD_LIBRARY_PATH
+  shlibpath_overrides_runpath=no
+  hardcode_into_libs=yes
+  dynamic_linker='NetBSD ld.elf_so'
   ;;
 
 netbsd*)
@@ -15697,7 +15726,7 @@ lt_prog_compiler_static_CXX=
 	    ;;
 	esac
 	;;
-      netbsd*)
+      netbsd* | netbsdelf*-gnu)
 	;;
       *qnx* | *nto*)
         # QNX uses GNU C++, but need to define -shared option too, otherwise
@@ -16071,6 +16100,9 @@ $as_echo_n "checking whether the $compiler linker ($LD) supports shared librarie
       exclude_expsyms_CXX='[_]+GLOBAL_OFFSET_TABLE_|[_]+GLOBAL__[FID]_.*|[_]+head_[A-Za-z0-9_]+_dll|[A-Za-z0-9_]+_dll_iname'
       ;;
     esac
+    ;;
+  linux* | k*bsd*-gnu | gnu*)
+    link_all_deplibs_CXX=no
     ;;
   *)
     export_symbols_cmds_CXX='$NM $libobjs $convenience | $global_symbol_pipe | $SED '\''s/.* //'\'' | sort | uniq > $export_symbols'
@@ -16745,9 +16777,6 @@ fi
   # before this can be enabled.
   hardcode_into_libs=yes
 
-  # Add ABI-specific directories to the system library path.
-  sys_lib_dlsearch_path_spec="/lib64 /usr/lib64 /lib /usr/lib"
-
   # Ideally, we could use ldconfig to report *all* directores which are
   # searched for libraries, however this is still not possible.  Aside from not
   # being certain /sbin/ldconfig is available, command
@@ -16756,7 +16785,7 @@ fi
   # appending ld.so.conf contents (and includes) to the search path.
   if test -f /etc/ld.so.conf; then
     lt_ld_extra=`awk '/^include / { system(sprintf("cd /etc; cat %s 2>/dev/null", \$2)); skip = 1; } { if (!skip) print \$0; skip = 0; }' < /etc/ld.so.conf | $SED -e 's/#.*//;/^[	 ]*hwcap[	 ]/d;s/[:,	]/ /g;s/=[^=]*$//;s/=[^= ]* / /g;s/"//g;/^$/d' | tr '\n' ' '`
-    sys_lib_dlsearch_path_spec="$sys_lib_dlsearch_path_spec $lt_ld_extra"
+    sys_lib_dlsearch_path_spec="/lib /usr/lib $lt_ld_extra"
   fi
 
   # We used to test for /lib/ld.so.1 and disable shared libraries on
@@ -16766,6 +16795,18 @@ fi
   # people can always --disable-shared, the test was removed, and we
   # assume the GNU/Linux dynamic linker is in use.
   dynamic_linker='GNU/Linux ld.so'
+  ;;
+
+netbsdelf*-gnu)
+  version_type=linux
+  need_lib_prefix=no
+  need_version=no
+  library_names_spec='${libname}${release}${shared_ext}$versuffix ${libname}${release}${shared_ext}$major ${libname}${shared_ext}'
+  soname_spec='${libname}${release}${shared_ext}$major'
+  shlibpath_var=LD_LIBRARY_PATH
+  shlibpath_overrides_runpath=no
+  hardcode_into_libs=yes
+  dynamic_linker='NetBSD ld.elf_so'
   ;;
 
 netbsd*)
@@ -19531,6 +19572,759 @@ _ACEOF
 
 
 
+
+
+		{ $as_echo "$as_me:${as_lineno-$LINENO}: checking numeric value of PATH_MAX" >&5
+$as_echo_n "checking numeric value of PATH_MAX... " >&6; }
+if ${ax_cv_numvalof_PATH_MAX+:} false; then :
+  $as_echo_n "(cached) " >&6
+else
+  if ac_fn_c_compute_int "$LINENO" "(PATH_MAX)" "ax_cv_numvalof_PATH_MAX"        "#include <limits.h>
+"; then :
+
+else
+  ax_cv_numvalof_PATH_MAX=0
+fi
+
+fi
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ax_cv_numvalof_PATH_MAX" >&5
+$as_echo "$ax_cv_numvalof_PATH_MAX" >&6; }
+
+
+
+cat >>confdefs.h <<_ACEOF
+#define NUMVALOF_PATH_MAX $ax_cv_numvalof_PATH_MAX
+_ACEOF
+
+
+
+
+if test "x${platform_win32}" = "xyes"
+then
+	# The cast to long int works around a bug in the HP C Compiler
+# version HP92453-01 B.11.11.23709.GP, which incorrectly rejects
+# declarations like `int a3[[(sizeof (unsigned char)) >= 0]];'.
+# This bug is HP SR number 8606223364.
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking size of struct sockaddr_in" >&5
+$as_echo_n "checking size of struct sockaddr_in... " >&6; }
+if ${ac_cv_sizeof_struct_sockaddr_in+:} false; then :
+  $as_echo_n "(cached) " >&6
+else
+  if ac_fn_c_compute_int "$LINENO" "(long int) (sizeof (struct sockaddr_in))" "ac_cv_sizeof_struct_sockaddr_in"        "
+		#include <winsock2.h>
+		#include <ws2tcpip.h>
+"; then :
+
+else
+  if test "$ac_cv_type_struct_sockaddr_in" = yes; then
+     { { $as_echo "$as_me:${as_lineno-$LINENO}: error: in \`$ac_pwd':" >&5
+$as_echo "$as_me: error: in \`$ac_pwd':" >&2;}
+as_fn_error 77 "cannot compute sizeof (struct sockaddr_in)
+See \`config.log' for more details" "$LINENO" 5; }
+   else
+     ac_cv_sizeof_struct_sockaddr_in=0
+   fi
+fi
+
+fi
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_cv_sizeof_struct_sockaddr_in" >&5
+$as_echo "$ac_cv_sizeof_struct_sockaddr_in" >&6; }
+
+
+
+cat >>confdefs.h <<_ACEOF
+#define SIZEOF_STRUCT_SOCKADDR_IN $ac_cv_sizeof_struct_sockaddr_in
+_ACEOF
+
+
+	# The cast to long int works around a bug in the HP C Compiler
+# version HP92453-01 B.11.11.23709.GP, which incorrectly rejects
+# declarations like `int a3[[(sizeof (unsigned char)) >= 0]];'.
+# This bug is HP SR number 8606223364.
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking size of struct sockaddr_in6" >&5
+$as_echo_n "checking size of struct sockaddr_in6... " >&6; }
+if ${ac_cv_sizeof_struct_sockaddr_in6+:} false; then :
+  $as_echo_n "(cached) " >&6
+else
+  if ac_fn_c_compute_int "$LINENO" "(long int) (sizeof (struct sockaddr_in6))" "ac_cv_sizeof_struct_sockaddr_in6"        "
+		#include <winsock2.h>
+		#include <ws2tcpip.h>
+"; then :
+
+else
+  if test "$ac_cv_type_struct_sockaddr_in6" = yes; then
+     { { $as_echo "$as_me:${as_lineno-$LINENO}: error: in \`$ac_pwd':" >&5
+$as_echo "$as_me: error: in \`$ac_pwd':" >&2;}
+as_fn_error 77 "cannot compute sizeof (struct sockaddr_in6)
+See \`config.log' for more details" "$LINENO" 5; }
+   else
+     ac_cv_sizeof_struct_sockaddr_in6=0
+   fi
+fi
+
+fi
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_cv_sizeof_struct_sockaddr_in6" >&5
+$as_echo "$ac_cv_sizeof_struct_sockaddr_in6" >&6; }
+
+
+
+cat >>confdefs.h <<_ACEOF
+#define SIZEOF_STRUCT_SOCKADDR_IN6 $ac_cv_sizeof_struct_sockaddr_in6
+_ACEOF
+
+
+	# The cast to long int works around a bug in the HP C Compiler
+# version HP92453-01 B.11.11.23709.GP, which incorrectly rejects
+# declarations like `int a3[[(sizeof (unsigned char)) >= 0]];'.
+# This bug is HP SR number 8606223364.
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking size of struct sockaddr_un" >&5
+$as_echo_n "checking size of struct sockaddr_un... " >&6; }
+if ${ac_cv_sizeof_struct_sockaddr_un+:} false; then :
+  $as_echo_n "(cached) " >&6
+else
+  if ac_fn_c_compute_int "$LINENO" "(long int) (sizeof (struct sockaddr_un))" "ac_cv_sizeof_struct_sockaddr_un"        "
+		#include <winsock2.h>
+		#include <ws2tcpip.h>
+"; then :
+
+else
+  if test "$ac_cv_type_struct_sockaddr_un" = yes; then
+     { { $as_echo "$as_me:${as_lineno-$LINENO}: error: in \`$ac_pwd':" >&5
+$as_echo "$as_me: error: in \`$ac_pwd':" >&2;}
+as_fn_error 77 "cannot compute sizeof (struct sockaddr_un)
+See \`config.log' for more details" "$LINENO" 5; }
+   else
+     ac_cv_sizeof_struct_sockaddr_un=0
+   fi
+fi
+
+fi
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_cv_sizeof_struct_sockaddr_un" >&5
+$as_echo "$ac_cv_sizeof_struct_sockaddr_un" >&6; }
+
+
+
+cat >>confdefs.h <<_ACEOF
+#define SIZEOF_STRUCT_SOCKADDR_UN $ac_cv_sizeof_struct_sockaddr_un
+_ACEOF
+
+
+	# The cast to long int works around a bug in the HP C Compiler
+# version HP92453-01 B.11.11.23709.GP, which incorrectly rejects
+# declarations like `int a3[[(sizeof (unsigned char)) >= 0]];'.
+# This bug is HP SR number 8606223364.
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking size of struct sockaddr_ll" >&5
+$as_echo_n "checking size of struct sockaddr_ll... " >&6; }
+if ${ac_cv_sizeof_struct_sockaddr_ll+:} false; then :
+  $as_echo_n "(cached) " >&6
+else
+  if ac_fn_c_compute_int "$LINENO" "(long int) (sizeof (struct sockaddr_ll))" "ac_cv_sizeof_struct_sockaddr_ll"        "
+		#include <winsock2.h>
+		#include <ws2tcpip.h>
+"; then :
+
+else
+  if test "$ac_cv_type_struct_sockaddr_ll" = yes; then
+     { { $as_echo "$as_me:${as_lineno-$LINENO}: error: in \`$ac_pwd':" >&5
+$as_echo "$as_me: error: in \`$ac_pwd':" >&2;}
+as_fn_error 77 "cannot compute sizeof (struct sockaddr_ll)
+See \`config.log' for more details" "$LINENO" 5; }
+   else
+     ac_cv_sizeof_struct_sockaddr_ll=0
+   fi
+fi
+
+fi
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_cv_sizeof_struct_sockaddr_ll" >&5
+$as_echo "$ac_cv_sizeof_struct_sockaddr_ll" >&6; }
+
+
+
+cat >>confdefs.h <<_ACEOF
+#define SIZEOF_STRUCT_SOCKADDR_LL $ac_cv_sizeof_struct_sockaddr_ll
+_ACEOF
+
+
+	# The cast to long int works around a bug in the HP C Compiler
+# version HP92453-01 B.11.11.23709.GP, which incorrectly rejects
+# declarations like `int a3[[(sizeof (unsigned char)) >= 0]];'.
+# This bug is HP SR number 8606223364.
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking size of struct sockaddr_dl" >&5
+$as_echo_n "checking size of struct sockaddr_dl... " >&6; }
+if ${ac_cv_sizeof_struct_sockaddr_dl+:} false; then :
+  $as_echo_n "(cached) " >&6
+else
+  if ac_fn_c_compute_int "$LINENO" "(long int) (sizeof (struct sockaddr_dl))" "ac_cv_sizeof_struct_sockaddr_dl"        "
+		#include <winsock2.h>
+		#include <ws2tcpip.h>
+"; then :
+
+else
+  if test "$ac_cv_type_struct_sockaddr_dl" = yes; then
+     { { $as_echo "$as_me:${as_lineno-$LINENO}: error: in \`$ac_pwd':" >&5
+$as_echo "$as_me: error: in \`$ac_pwd':" >&2;}
+as_fn_error 77 "cannot compute sizeof (struct sockaddr_dl)
+See \`config.log' for more details" "$LINENO" 5; }
+   else
+     ac_cv_sizeof_struct_sockaddr_dl=0
+   fi
+fi
+
+fi
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_cv_sizeof_struct_sockaddr_dl" >&5
+$as_echo "$ac_cv_sizeof_struct_sockaddr_dl" >&6; }
+
+
+
+cat >>confdefs.h <<_ACEOF
+#define SIZEOF_STRUCT_SOCKADDR_DL $ac_cv_sizeof_struct_sockaddr_dl
+_ACEOF
+
+
+
+	# The cast to long int works around a bug in the HP C Compiler
+# version HP92453-01 B.11.11.23709.GP, which incorrectly rejects
+# declarations like `int a3[[(sizeof (unsigned char)) >= 0]];'.
+# This bug is HP SR number 8606223364.
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking size of socklen_t" >&5
+$as_echo_n "checking size of socklen_t... " >&6; }
+if ${ac_cv_sizeof_socklen_t+:} false; then :
+  $as_echo_n "(cached) " >&6
+else
+  if ac_fn_c_compute_int "$LINENO" "(long int) (sizeof (socklen_t))" "ac_cv_sizeof_socklen_t"        "
+		#include <winsock2.h>
+		#include <ws2tcpip.h>
+"; then :
+
+else
+  if test "$ac_cv_type_socklen_t" = yes; then
+     { { $as_echo "$as_me:${as_lineno-$LINENO}: error: in \`$ac_pwd':" >&5
+$as_echo "$as_me: error: in \`$ac_pwd':" >&2;}
+as_fn_error 77 "cannot compute sizeof (socklen_t)
+See \`config.log' for more details" "$LINENO" 5; }
+   else
+     ac_cv_sizeof_socklen_t=0
+   fi
+fi
+
+fi
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_cv_sizeof_socklen_t" >&5
+$as_echo "$ac_cv_sizeof_socklen_t" >&6; }
+
+
+
+cat >>confdefs.h <<_ACEOF
+#define SIZEOF_SOCKLEN_T $ac_cv_sizeof_socklen_t
+_ACEOF
+
+
+	if test ${ac_cv_sizeof_socklen_t} -gt 0
+	then
+
+ typename=`echo socklen_t | sed "s/[^a-zA-Z0-9_]/_/g"`
+ { $as_echo "$as_me:${as_lineno-$LINENO}: checking whether socklen_t is signed" >&5
+$as_echo_n "checking whether socklen_t is signed... " >&6; }
+if eval \${ax_cv_decl_${typename}_signed+:} false; then :
+  $as_echo_n "(cached) " >&6
+else
+
+   cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+/* end confdefs.h.  */
+#include <winsock2.h>
+			 #include <ws2tcpip.h>
+int
+main ()
+{
+ int foo [ 1 - 2 * !(((socklen_t) -1) < 0) ]
+  ;
+  return 0;
+}
+_ACEOF
+if ac_fn_c_try_compile "$LINENO"; then :
+   eval "ax_cv_decl_${typename}_signed=\"yes\""
+else
+   eval "ax_cv_decl_${typename}_signed=\"no\""
+fi
+rm -f core conftest.err conftest.$ac_objext conftest.$ac_ext
+fi
+eval ac_res=\$ax_cv_decl_${typename}_signed
+	       { $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_res" >&5
+$as_echo "$ac_res" >&6; }
+ symbolname=`echo socklen_t | sed "s/[^a-zA-Z0-9_]/_/g" | tr "a-z" "A-Z"`
+ if eval "test \"\${ax_cv_decl_${typename}_signed}\" = \"yes\""; then
+
+$as_echo "#define HCL_SOCKLEN_T_IS_SIGNED 1" >>confdefs.h
+
+ elif eval "test \"\${ax_cv_decl_${typename}_signed}\" = \"no\""; then
+    $as_echo_n ""
+ fi
+
+	fi
+
+	# The cast to long int works around a bug in the HP C Compiler
+# version HP92453-01 B.11.11.23709.GP, which incorrectly rejects
+# declarations like `int a3[[(sizeof (unsigned char)) >= 0]];'.
+# This bug is HP SR number 8606223364.
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking size of sa_family_t" >&5
+$as_echo_n "checking size of sa_family_t... " >&6; }
+if ${ac_cv_sizeof_sa_family_t+:} false; then :
+  $as_echo_n "(cached) " >&6
+else
+  if ac_fn_c_compute_int "$LINENO" "(long int) (sizeof (sa_family_t))" "ac_cv_sizeof_sa_family_t"        "
+		#include <winsock2.h>
+		#include <ws2tcpip.h>
+"; then :
+
+else
+  if test "$ac_cv_type_sa_family_t" = yes; then
+     { { $as_echo "$as_me:${as_lineno-$LINENO}: error: in \`$ac_pwd':" >&5
+$as_echo "$as_me: error: in \`$ac_pwd':" >&2;}
+as_fn_error 77 "cannot compute sizeof (sa_family_t)
+See \`config.log' for more details" "$LINENO" 5; }
+   else
+     ac_cv_sizeof_sa_family_t=0
+   fi
+fi
+
+fi
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_cv_sizeof_sa_family_t" >&5
+$as_echo "$ac_cv_sizeof_sa_family_t" >&6; }
+
+
+
+cat >>confdefs.h <<_ACEOF
+#define SIZEOF_SA_FAMILY_T $ac_cv_sizeof_sa_family_t
+_ACEOF
+
+
+	if test ${ac_cv_sizeof_sa_family_t} -gt 0
+	then
+
+ typename=`echo sa_family_t | sed "s/[^a-zA-Z0-9_]/_/g"`
+ { $as_echo "$as_me:${as_lineno-$LINENO}: checking whether sa_family_t is signed" >&5
+$as_echo_n "checking whether sa_family_t is signed... " >&6; }
+if eval \${ax_cv_decl_${typename}_signed+:} false; then :
+  $as_echo_n "(cached) " >&6
+else
+
+   cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+/* end confdefs.h.  */
+#include <winsock2.h>
+			 #include <ws2tcpip.h>
+int
+main ()
+{
+ int foo [ 1 - 2 * !(((sa_family_t) -1) < 0) ]
+  ;
+  return 0;
+}
+_ACEOF
+if ac_fn_c_try_compile "$LINENO"; then :
+   eval "ax_cv_decl_${typename}_signed=\"yes\""
+else
+   eval "ax_cv_decl_${typename}_signed=\"no\""
+fi
+rm -f core conftest.err conftest.$ac_objext conftest.$ac_ext
+fi
+eval ac_res=\$ax_cv_decl_${typename}_signed
+	       { $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_res" >&5
+$as_echo "$ac_res" >&6; }
+ symbolname=`echo sa_family_t | sed "s/[^a-zA-Z0-9_]/_/g" | tr "a-z" "A-Z"`
+ if eval "test \"\${ax_cv_decl_${typename}_signed}\" = \"yes\""; then
+
+$as_echo "#define HCL_SA_FAMILY_T_IS_SIGNED 1" >>confdefs.h
+
+ elif eval "test \"\${ax_cv_decl_${typename}_signed}\" = \"no\""; then
+    $as_echo_n ""
+ fi
+
+	fi
+
+	{ $as_echo "$as_me:${as_lineno-$LINENO}: checking offset of sa_family in struct sockaddr" >&5
+$as_echo_n "checking offset of sa_family in struct sockaddr... " >&6; }
+	if ac_fn_c_compute_int "$LINENO" "offsetof(struct sockaddr, sa_family)" "ac_cv_offsetof_sa_family"        "#include <stddef.h>
+		 #include <winsock2.h>
+		 #include <ws2tcpip.h>"; then :
+
+else
+  ac_cv_offsteof_sa_family=0
+fi
+
+	{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_cv_offsetof_sa_family" >&5
+$as_echo "$ac_cv_offsetof_sa_family" >&6; }
+
+cat >>confdefs.h <<_ACEOF
+#define HCL_OFFSETOF_SA_FAMILY ${ac_cv_offsetof_sa_family}
+_ACEOF
+
+
+else
+	# The cast to long int works around a bug in the HP C Compiler
+# version HP92453-01 B.11.11.23709.GP, which incorrectly rejects
+# declarations like `int a3[[(sizeof (unsigned char)) >= 0]];'.
+# This bug is HP SR number 8606223364.
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking size of struct sockaddr_in" >&5
+$as_echo_n "checking size of struct sockaddr_in... " >&6; }
+if ${ac_cv_sizeof_struct_sockaddr_in+:} false; then :
+  $as_echo_n "(cached) " >&6
+else
+  if ac_fn_c_compute_int "$LINENO" "(long int) (sizeof (struct sockaddr_in))" "ac_cv_sizeof_struct_sockaddr_in"        "
+		#include <sys/types.h>
+		#include <sys/socket.h>
+		#include <netinet/in.h>
+"; then :
+
+else
+  if test "$ac_cv_type_struct_sockaddr_in" = yes; then
+     { { $as_echo "$as_me:${as_lineno-$LINENO}: error: in \`$ac_pwd':" >&5
+$as_echo "$as_me: error: in \`$ac_pwd':" >&2;}
+as_fn_error 77 "cannot compute sizeof (struct sockaddr_in)
+See \`config.log' for more details" "$LINENO" 5; }
+   else
+     ac_cv_sizeof_struct_sockaddr_in=0
+   fi
+fi
+
+fi
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_cv_sizeof_struct_sockaddr_in" >&5
+$as_echo "$ac_cv_sizeof_struct_sockaddr_in" >&6; }
+
+
+
+cat >>confdefs.h <<_ACEOF
+#define SIZEOF_STRUCT_SOCKADDR_IN $ac_cv_sizeof_struct_sockaddr_in
+_ACEOF
+
+
+	# The cast to long int works around a bug in the HP C Compiler
+# version HP92453-01 B.11.11.23709.GP, which incorrectly rejects
+# declarations like `int a3[[(sizeof (unsigned char)) >= 0]];'.
+# This bug is HP SR number 8606223364.
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking size of struct sockaddr_in6" >&5
+$as_echo_n "checking size of struct sockaddr_in6... " >&6; }
+if ${ac_cv_sizeof_struct_sockaddr_in6+:} false; then :
+  $as_echo_n "(cached) " >&6
+else
+  if ac_fn_c_compute_int "$LINENO" "(long int) (sizeof (struct sockaddr_in6))" "ac_cv_sizeof_struct_sockaddr_in6"        "
+		#include <sys/types.h>
+		#include <sys/socket.h>
+		#include <netinet/in.h>
+"; then :
+
+else
+  if test "$ac_cv_type_struct_sockaddr_in6" = yes; then
+     { { $as_echo "$as_me:${as_lineno-$LINENO}: error: in \`$ac_pwd':" >&5
+$as_echo "$as_me: error: in \`$ac_pwd':" >&2;}
+as_fn_error 77 "cannot compute sizeof (struct sockaddr_in6)
+See \`config.log' for more details" "$LINENO" 5; }
+   else
+     ac_cv_sizeof_struct_sockaddr_in6=0
+   fi
+fi
+
+fi
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_cv_sizeof_struct_sockaddr_in6" >&5
+$as_echo "$ac_cv_sizeof_struct_sockaddr_in6" >&6; }
+
+
+
+cat >>confdefs.h <<_ACEOF
+#define SIZEOF_STRUCT_SOCKADDR_IN6 $ac_cv_sizeof_struct_sockaddr_in6
+_ACEOF
+
+
+	# The cast to long int works around a bug in the HP C Compiler
+# version HP92453-01 B.11.11.23709.GP, which incorrectly rejects
+# declarations like `int a3[[(sizeof (unsigned char)) >= 0]];'.
+# This bug is HP SR number 8606223364.
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking size of struct sockaddr_un" >&5
+$as_echo_n "checking size of struct sockaddr_un... " >&6; }
+if ${ac_cv_sizeof_struct_sockaddr_un+:} false; then :
+  $as_echo_n "(cached) " >&6
+else
+  if ac_fn_c_compute_int "$LINENO" "(long int) (sizeof (struct sockaddr_un))" "ac_cv_sizeof_struct_sockaddr_un"        "
+		#include <sys/types.h>
+		#include <sys/socket.h>
+		#include <sys/un.h>
+"; then :
+
+else
+  if test "$ac_cv_type_struct_sockaddr_un" = yes; then
+     { { $as_echo "$as_me:${as_lineno-$LINENO}: error: in \`$ac_pwd':" >&5
+$as_echo "$as_me: error: in \`$ac_pwd':" >&2;}
+as_fn_error 77 "cannot compute sizeof (struct sockaddr_un)
+See \`config.log' for more details" "$LINENO" 5; }
+   else
+     ac_cv_sizeof_struct_sockaddr_un=0
+   fi
+fi
+
+fi
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_cv_sizeof_struct_sockaddr_un" >&5
+$as_echo "$ac_cv_sizeof_struct_sockaddr_un" >&6; }
+
+
+
+cat >>confdefs.h <<_ACEOF
+#define SIZEOF_STRUCT_SOCKADDR_UN $ac_cv_sizeof_struct_sockaddr_un
+_ACEOF
+
+
+	# The cast to long int works around a bug in the HP C Compiler
+# version HP92453-01 B.11.11.23709.GP, which incorrectly rejects
+# declarations like `int a3[[(sizeof (unsigned char)) >= 0]];'.
+# This bug is HP SR number 8606223364.
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking size of struct sockaddr_ll" >&5
+$as_echo_n "checking size of struct sockaddr_ll... " >&6; }
+if ${ac_cv_sizeof_struct_sockaddr_ll+:} false; then :
+  $as_echo_n "(cached) " >&6
+else
+  if ac_fn_c_compute_int "$LINENO" "(long int) (sizeof (struct sockaddr_ll))" "ac_cv_sizeof_struct_sockaddr_ll"        "
+		#include <sys/types.h>
+		#include <sys/socket.h>
+		#include <netpacket/packet.h>
+"; then :
+
+else
+  if test "$ac_cv_type_struct_sockaddr_ll" = yes; then
+     { { $as_echo "$as_me:${as_lineno-$LINENO}: error: in \`$ac_pwd':" >&5
+$as_echo "$as_me: error: in \`$ac_pwd':" >&2;}
+as_fn_error 77 "cannot compute sizeof (struct sockaddr_ll)
+See \`config.log' for more details" "$LINENO" 5; }
+   else
+     ac_cv_sizeof_struct_sockaddr_ll=0
+   fi
+fi
+
+fi
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_cv_sizeof_struct_sockaddr_ll" >&5
+$as_echo "$ac_cv_sizeof_struct_sockaddr_ll" >&6; }
+
+
+
+cat >>confdefs.h <<_ACEOF
+#define SIZEOF_STRUCT_SOCKADDR_LL $ac_cv_sizeof_struct_sockaddr_ll
+_ACEOF
+
+
+	# The cast to long int works around a bug in the HP C Compiler
+# version HP92453-01 B.11.11.23709.GP, which incorrectly rejects
+# declarations like `int a3[[(sizeof (unsigned char)) >= 0]];'.
+# This bug is HP SR number 8606223364.
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking size of struct sockaddr_dl" >&5
+$as_echo_n "checking size of struct sockaddr_dl... " >&6; }
+if ${ac_cv_sizeof_struct_sockaddr_dl+:} false; then :
+  $as_echo_n "(cached) " >&6
+else
+  if ac_fn_c_compute_int "$LINENO" "(long int) (sizeof (struct sockaddr_dl))" "ac_cv_sizeof_struct_sockaddr_dl"        "
+		#include <sys/types.h>
+		#include <sys/socket.h>
+		#include <net/if_dl.h>
+"; then :
+
+else
+  if test "$ac_cv_type_struct_sockaddr_dl" = yes; then
+     { { $as_echo "$as_me:${as_lineno-$LINENO}: error: in \`$ac_pwd':" >&5
+$as_echo "$as_me: error: in \`$ac_pwd':" >&2;}
+as_fn_error 77 "cannot compute sizeof (struct sockaddr_dl)
+See \`config.log' for more details" "$LINENO" 5; }
+   else
+     ac_cv_sizeof_struct_sockaddr_dl=0
+   fi
+fi
+
+fi
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_cv_sizeof_struct_sockaddr_dl" >&5
+$as_echo "$ac_cv_sizeof_struct_sockaddr_dl" >&6; }
+
+
+
+cat >>confdefs.h <<_ACEOF
+#define SIZEOF_STRUCT_SOCKADDR_DL $ac_cv_sizeof_struct_sockaddr_dl
+_ACEOF
+
+
+
+
+	# The cast to long int works around a bug in the HP C Compiler
+# version HP92453-01 B.11.11.23709.GP, which incorrectly rejects
+# declarations like `int a3[[(sizeof (unsigned char)) >= 0]];'.
+# This bug is HP SR number 8606223364.
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking size of socklen_t" >&5
+$as_echo_n "checking size of socklen_t... " >&6; }
+if ${ac_cv_sizeof_socklen_t+:} false; then :
+  $as_echo_n "(cached) " >&6
+else
+  if ac_fn_c_compute_int "$LINENO" "(long int) (sizeof (socklen_t))" "ac_cv_sizeof_socklen_t"        "
+		#include <sys/types.h>
+		#include <sys/socket.h>
+"; then :
+
+else
+  if test "$ac_cv_type_socklen_t" = yes; then
+     { { $as_echo "$as_me:${as_lineno-$LINENO}: error: in \`$ac_pwd':" >&5
+$as_echo "$as_me: error: in \`$ac_pwd':" >&2;}
+as_fn_error 77 "cannot compute sizeof (socklen_t)
+See \`config.log' for more details" "$LINENO" 5; }
+   else
+     ac_cv_sizeof_socklen_t=0
+   fi
+fi
+
+fi
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_cv_sizeof_socklen_t" >&5
+$as_echo "$ac_cv_sizeof_socklen_t" >&6; }
+
+
+
+cat >>confdefs.h <<_ACEOF
+#define SIZEOF_SOCKLEN_T $ac_cv_sizeof_socklen_t
+_ACEOF
+
+
+	if test ${ac_cv_sizeof_socklen_t} -gt 0
+	then
+
+ typename=`echo socklen_t | sed "s/[^a-zA-Z0-9_]/_/g"`
+ { $as_echo "$as_me:${as_lineno-$LINENO}: checking whether socklen_t is signed" >&5
+$as_echo_n "checking whether socklen_t is signed... " >&6; }
+if eval \${ax_cv_decl_${typename}_signed+:} false; then :
+  $as_echo_n "(cached) " >&6
+else
+
+   cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+/* end confdefs.h.  */
+#include <sys/types.h>
+			 #include <sys/socket.h>
+int
+main ()
+{
+ int foo [ 1 - 2 * !(((socklen_t) -1) < 0) ]
+  ;
+  return 0;
+}
+_ACEOF
+if ac_fn_c_try_compile "$LINENO"; then :
+   eval "ax_cv_decl_${typename}_signed=\"yes\""
+else
+   eval "ax_cv_decl_${typename}_signed=\"no\""
+fi
+rm -f core conftest.err conftest.$ac_objext conftest.$ac_ext
+fi
+eval ac_res=\$ax_cv_decl_${typename}_signed
+	       { $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_res" >&5
+$as_echo "$ac_res" >&6; }
+ symbolname=`echo socklen_t | sed "s/[^a-zA-Z0-9_]/_/g" | tr "a-z" "A-Z"`
+ if eval "test \"\${ax_cv_decl_${typename}_signed}\" = \"yes\""; then
+
+$as_echo "#define HCL_SOCKLEN_T_IS_SIGNED 1" >>confdefs.h
+
+ elif eval "test \"\${ax_cv_decl_${typename}_signed}\" = \"no\""; then
+    $as_echo_n ""
+ fi
+
+	fi
+
+	# The cast to long int works around a bug in the HP C Compiler
+# version HP92453-01 B.11.11.23709.GP, which incorrectly rejects
+# declarations like `int a3[[(sizeof (unsigned char)) >= 0]];'.
+# This bug is HP SR number 8606223364.
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking size of sa_family_t" >&5
+$as_echo_n "checking size of sa_family_t... " >&6; }
+if ${ac_cv_sizeof_sa_family_t+:} false; then :
+  $as_echo_n "(cached) " >&6
+else
+  if ac_fn_c_compute_int "$LINENO" "(long int) (sizeof (sa_family_t))" "ac_cv_sizeof_sa_family_t"        "
+		#include <sys/types.h>
+		#include <sys/socket.h>
+		#include <netinet/in.h>
+"; then :
+
+else
+  if test "$ac_cv_type_sa_family_t" = yes; then
+     { { $as_echo "$as_me:${as_lineno-$LINENO}: error: in \`$ac_pwd':" >&5
+$as_echo "$as_me: error: in \`$ac_pwd':" >&2;}
+as_fn_error 77 "cannot compute sizeof (sa_family_t)
+See \`config.log' for more details" "$LINENO" 5; }
+   else
+     ac_cv_sizeof_sa_family_t=0
+   fi
+fi
+
+fi
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_cv_sizeof_sa_family_t" >&5
+$as_echo "$ac_cv_sizeof_sa_family_t" >&6; }
+
+
+
+cat >>confdefs.h <<_ACEOF
+#define SIZEOF_SA_FAMILY_T $ac_cv_sizeof_sa_family_t
+_ACEOF
+
+
+	if test ${ac_cv_sizeof_sa_family_t} -gt 0
+	then
+
+ typename=`echo sa_family_t | sed "s/[^a-zA-Z0-9_]/_/g"`
+ { $as_echo "$as_me:${as_lineno-$LINENO}: checking whether sa_family_t is signed" >&5
+$as_echo_n "checking whether sa_family_t is signed... " >&6; }
+if eval \${ax_cv_decl_${typename}_signed+:} false; then :
+  $as_echo_n "(cached) " >&6
+else
+
+   cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+/* end confdefs.h.  */
+#include <sys/types.h>
+			 #include <sys/socket.h>
+			 #include <netinet/in.h>
+int
+main ()
+{
+ int foo [ 1 - 2 * !(((sa_family_t) -1) < 0) ]
+  ;
+  return 0;
+}
+_ACEOF
+if ac_fn_c_try_compile "$LINENO"; then :
+   eval "ax_cv_decl_${typename}_signed=\"yes\""
+else
+   eval "ax_cv_decl_${typename}_signed=\"no\""
+fi
+rm -f core conftest.err conftest.$ac_objext conftest.$ac_ext
+fi
+eval ac_res=\$ax_cv_decl_${typename}_signed
+	       { $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_res" >&5
+$as_echo "$ac_res" >&6; }
+ symbolname=`echo sa_family_t | sed "s/[^a-zA-Z0-9_]/_/g" | tr "a-z" "A-Z"`
+ if eval "test \"\${ax_cv_decl_${typename}_signed}\" = \"yes\""; then
+
+$as_echo "#define HCL_SA_FAMILY_T_IS_SIGNED 1" >>confdefs.h
+
+ elif eval "test \"\${ax_cv_decl_${typename}_signed}\" = \"no\""; then
+    $as_echo_n ""
+ fi
+
+	fi
+
+	{ $as_echo "$as_me:${as_lineno-$LINENO}: checking offset of sa_family in struct sockaddr" >&5
+$as_echo_n "checking offset of sa_family in struct sockaddr... " >&6; }
+	if ac_fn_c_compute_int "$LINENO" "offsetof(struct sockaddr, sa_family)" "ac_cv_offsetof_sa_family"        "#include <stddef.h>
+		 #include <sys/types.h>
+		 #include <sys/socket.h>"; then :
+
+else
+  ac_cv_offsteof_sa_family=0
+fi
+
+	{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_cv_offsetof_sa_family" >&5
+$as_echo "$ac_cv_offsetof_sa_family" >&6; }
+
+cat >>confdefs.h <<_ACEOF
+#define HCL_OFFSETOF_SA_FAMILY ${ac_cv_offsetof_sa_family}
+_ACEOF
+
+fi
+
 if test ${ac_cv_sizeof___int128_t} -gt 0
 then
 	{ $as_echo "$as_me:${as_lineno-$LINENO}: checking __int128_t with %" >&5
@@ -19836,6 +20630,52 @@ _ACEOF
 
 cat >>confdefs.h <<_ACEOF
 #define HCL_MBLEN_MAX ${ax_cv_numvalof_MB_LEN_MAX}
+_ACEOF
+
+if test ${ax_cv_numvalof_PATH_MAX} -gt 0
+then
+
+cat >>confdefs.h <<_ACEOF
+#define HCL_PATH_MAX ${ax_cv_numvalof_PATH_MAX}
+_ACEOF
+
+fi
+
+
+cat >>confdefs.h <<_ACEOF
+#define HCL_SIZEOF_STRUCT_SOCKADDR_IN ${ac_cv_sizeof_struct_sockaddr_in}
+_ACEOF
+
+
+cat >>confdefs.h <<_ACEOF
+#define HCL_SIZEOF_STRUCT_SOCKADDR_IN6 ${ac_cv_sizeof_struct_sockaddr_in6}
+_ACEOF
+
+
+cat >>confdefs.h <<_ACEOF
+#define HCL_SIZEOF_STRUCT_SOCKADDR_LL ${ac_cv_sizeof_struct_sockaddr_ll}
+_ACEOF
+
+
+cat >>confdefs.h <<_ACEOF
+#define HCL_SIZEOF_STRUCT_SOCKADDR_UN ${ac_cv_sizeof_struct_sockaddr_un}
+_ACEOF
+
+
+cat >>confdefs.h <<_ACEOF
+#define HCL_SIZEOF_STRUCT_SOCKADDR_DL ${ac_cv_sizeof_struct_sockaddr_dl}
+_ACEOF
+
+
+
+
+cat >>confdefs.h <<_ACEOF
+#define HCL_SIZEOF_SOCKLEN_T ${ac_cv_sizeof_socklen_t}
+_ACEOF
+
+
+cat >>confdefs.h <<_ACEOF
+#define HCL_SIZEOF_SA_FAMILY_T ${ac_cv_sizeof_sa_family_t}
 _ACEOF
 
 
@@ -20289,6 +21129,23 @@ else
 fi
 
 
+# Check whether --enable-hcls was given.
+if test "${enable_hcls+set}" = set; then :
+  enableval=$enable_hcls; enable_hcls_is=$enableval
+else
+  enable_hcls_is=no
+
+fi
+
+ if test "${enable_hcls_is}" = "yes"; then
+  ENABLE_HCLS_TRUE=
+  ENABLE_HCLS_FALSE='#'
+else
+  ENABLE_HCLS_TRUE='#'
+  ENABLE_HCLS_FALSE=
+fi
+
+
 HCL_SIZEOF_WCHAR_T=$ac_cv_sizeof_wchar_t
 
 HCL_SIZEOF_CHAR16_T=$ac_cv_sizeof_char16_t
@@ -20485,6 +21342,10 @@ Usually this means the macro was only invoked conditionally." "$LINENO" 5
 fi
 if test -z "${ENABLE_LIBLTDL_TRUE}" && test -z "${ENABLE_LIBLTDL_FALSE}"; then
   as_fn_error $? "conditional \"ENABLE_LIBLTDL\" was never defined.
+Usually this means the macro was only invoked conditionally." "$LINENO" 5
+fi
+if test -z "${ENABLE_HCLS_TRUE}" && test -z "${ENABLE_HCLS_FALSE}"; then
+  as_fn_error $? "conditional \"ENABLE_HCLS\" was never defined.
 Usually this means the macro was only invoked conditionally." "$LINENO" 5
 fi
 
@@ -22170,7 +23031,6 @@ $as_echo X"$file" |
     cat <<_LT_EOF >> "$cfgfile"
 #! $SHELL
 # Generated automatically by $as_me ($PACKAGE) $VERSION
-# Libtool was configured on host `(hostname || uname -n) 2>/dev/null | sed 1q`:
 # NOTE: Changes made to this file will be lost: look at ltmain.sh.
 
 # Provide generalized library-building support services.

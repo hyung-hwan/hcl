@@ -426,7 +426,7 @@ hcl_ooi_t hcl_logbfmtv (hcl_t* hcl, int mask, const hcl_bch_t* fmt, va_list ap)
 	fo.putch = put_logch;
 	fo.putcs = put_logcs;
 
-	x = _logbfmtv (hcl, fmt, &fo, ap);
+	x = _logbfmtv(hcl, fmt, &fo, ap);
 
 	if (hcl->log.len > 0 && hcl->log.ptr[hcl->log.len - 1] == '\n')
 	{
@@ -463,7 +463,7 @@ hcl_ooi_t hcl_logufmtv (hcl_t* hcl, int mask, const hcl_uch_t* fmt, va_list ap)
 	fo.putch = put_logch;
 	fo.putcs = put_logcs;
 
-	x = _logufmtv (hcl, fmt, &fo, ap);
+	x = _logufmtv(hcl, fmt, &fo, ap);
 
 	if (hcl->log.len > 0 && hcl->log.ptr[hcl->log.len - 1] == '\n')
 	{

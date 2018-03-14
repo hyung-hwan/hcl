@@ -257,6 +257,117 @@ AC_CHECK_SIZEOF(off64_t)
 
 AC_CHECK_SIZEOF(mbstate_t,,[#include <wchar.h>])
 AX_CHECK_NUMVALOF(MB_LEN_MAX,[32],[#include <limits.h>])
+AX_CHECK_NUMVALOF(PATH_MAX,[0],[#include <limits.h>])
+
+if test "x${platform_win32}" = "xyes"
+then
+	AC_CHECK_SIZEOF(struct sockaddr_in,,[
+		#include <winsock2.h>
+		#include <ws2tcpip.h>])
+	AC_CHECK_SIZEOF(struct sockaddr_in6,,[
+		#include <winsock2.h>
+		#include <ws2tcpip.h>])
+	AC_CHECK_SIZEOF(struct sockaddr_un,,[
+		#include <winsock2.h>
+		#include <ws2tcpip.h>])
+	AC_CHECK_SIZEOF(struct sockaddr_ll,,[
+		#include <winsock2.h>
+		#include <ws2tcpip.h>])
+	AC_CHECK_SIZEOF(struct sockaddr_dl,,[
+		#include <winsock2.h>
+		#include <ws2tcpip.h>])
+
+	AC_CHECK_SIZEOF(socklen_t,, [
+		#include <winsock2.h>
+		#include <ws2tcpip.h>])
+	if test ${ac_cv_sizeof_socklen_t} -gt 0
+	then
+		AX_CHECK_SIGN([socklen_t],
+			[ AC_DEFINE(HCL_SOCKLEN_T_IS_SIGNED, 1, [Define if socklen_t is signed]) ],
+			[ AS_ECHO_N("") ],
+			[#include <winsock2.h>
+			 #include <ws2tcpip.h>])
+	fi
+
+	AC_CHECK_SIZEOF(sa_family_t,, [
+		#include <winsock2.h>
+		#include <ws2tcpip.h>])
+	if test ${ac_cv_sizeof_sa_family_t} -gt 0
+	then
+		AX_CHECK_SIGN([sa_family_t],
+			[ AC_DEFINE(HCL_SA_FAMILY_T_IS_SIGNED, 1, [Define if sa_family_t is signed]) ],
+			[ AS_ECHO_N("") ],
+			[#include <winsock2.h>
+			 #include <ws2tcpip.h>])
+	fi
+
+	AC_MSG_CHECKING([offset of sa_family in struct sockaddr])
+	AC_COMPUTE_INT([ac_cv_offsetof_sa_family],
+		[[offsetof(struct sockaddr, sa_family)]],
+		[#include <stddef.h>
+		 #include <winsock2.h>
+		 #include <ws2tcpip.h>], [ac_cv_offsteof_sa_family=0])
+	AC_MSG_RESULT([$ac_cv_offsetof_sa_family])
+	AC_DEFINE_UNQUOTED(HCL_OFFSETOF_SA_FAMILY, ${ac_cv_offsetof_sa_family}, [offsetof(struct sockaddr, sa_family)])
+
+else
+	AC_CHECK_SIZEOF(struct sockaddr_in,,[
+		#include <sys/types.h>
+		#include <sys/socket.h>
+		#include <netinet/in.h>])
+	AC_CHECK_SIZEOF(struct sockaddr_in6,,[
+		#include <sys/types.h>
+		#include <sys/socket.h>
+		#include <netinet/in.h>])
+	AC_CHECK_SIZEOF(struct sockaddr_un,,[
+		#include <sys/types.h>
+		#include <sys/socket.h>
+		#include <sys/un.h>])
+	AC_CHECK_SIZEOF(struct sockaddr_ll,,[
+		#include <sys/types.h>
+		#include <sys/socket.h>
+		#include <netpacket/packet.h>])
+	AC_CHECK_SIZEOF(struct sockaddr_dl,,[
+		#include <sys/types.h>
+		#include <sys/socket.h>
+		#include <net/if_dl.h>])
+
+
+	AC_CHECK_SIZEOF(socklen_t,, [
+		#include <sys/types.h>
+		#include <sys/socket.h>])
+	if test ${ac_cv_sizeof_socklen_t} -gt 0
+	then
+		AX_CHECK_SIGN([socklen_t],
+			[ AC_DEFINE(HCL_SOCKLEN_T_IS_SIGNED, 1, [Define if socklen_t is signed]) ],
+			[ AS_ECHO_N("") ],
+			[#include <sys/types.h>
+			 #include <sys/socket.h>])
+	fi
+
+	AC_CHECK_SIZEOF(sa_family_t,, [
+		#include <sys/types.h>
+		#include <sys/socket.h>
+		#include <netinet/in.h>])
+	if test ${ac_cv_sizeof_sa_family_t} -gt 0
+	then
+		AX_CHECK_SIGN([sa_family_t],
+			[ AC_DEFINE(HCL_SA_FAMILY_T_IS_SIGNED, 1, [Define if sa_family_t is signed]) ],
+			[ AS_ECHO_N("") ],
+			[#include <sys/types.h>
+			 #include <sys/socket.h>
+			 #include <netinet/in.h>])
+	fi
+
+	AC_MSG_CHECKING([offset of sa_family in struct sockaddr])
+	AC_COMPUTE_INT([ac_cv_offsetof_sa_family],
+		[[offsetof(struct sockaddr, sa_family)]],
+		[#include <stddef.h>
+		 #include <sys/types.h>
+		 #include <sys/socket.h>], [ac_cv_offsteof_sa_family=0])
+	AC_MSG_RESULT([$ac_cv_offsetof_sa_family])
+	AC_DEFINE_UNQUOTED(HCL_OFFSETOF_SA_FAMILY, ${ac_cv_offsetof_sa_family}, [offsetof(struct sockaddr, sa_family)])
+fi
 
 dnl gcc 3.4.3 on opensolaris x86 gave this warning without -msse or 
 dnl something similar.
@@ -384,6 +495,20 @@ AC_DEFINE_UNQUOTED(HCL_SIZEOF_OFF64_T, ${ac_cv_sizeof_off64_t}, [sizeof(off64_t)
 
 AC_DEFINE_UNQUOTED(HCL_SIZEOF_MBSTATE_T, ${ac_cv_sizeof_mbstate_t}, [sizeof(mbstate_t)])
 AC_DEFINE_UNQUOTED(HCL_MBLEN_MAX, ${ax_cv_numvalof_MB_LEN_MAX}, [MB_LEN_MAX])
+if test ${ax_cv_numvalof_PATH_MAX} -gt 0
+then
+	AC_DEFINE_UNQUOTED(HCL_PATH_MAX, ${ax_cv_numvalof_PATH_MAX}, [PATH_MAX])
+fi
+
+AC_DEFINE_UNQUOTED(HCL_SIZEOF_STRUCT_SOCKADDR_IN, ${ac_cv_sizeof_struct_sockaddr_in}, [sizeof(struct sockaddr_in)])
+AC_DEFINE_UNQUOTED(HCL_SIZEOF_STRUCT_SOCKADDR_IN6, ${ac_cv_sizeof_struct_sockaddr_in6}, [sizeof(struct sockaddr_in6)])
+AC_DEFINE_UNQUOTED(HCL_SIZEOF_STRUCT_SOCKADDR_LL, ${ac_cv_sizeof_struct_sockaddr_ll}, [sizeof(struct sockaddr_ll)])
+AC_DEFINE_UNQUOTED(HCL_SIZEOF_STRUCT_SOCKADDR_UN, ${ac_cv_sizeof_struct_sockaddr_un}, [sizeof(struct sockaddr_un)])
+AC_DEFINE_UNQUOTED(HCL_SIZEOF_STRUCT_SOCKADDR_DL, ${ac_cv_sizeof_struct_sockaddr_dl}, [sizeof(struct sockaddr_dl)])
+
+
+AC_DEFINE_UNQUOTED(HCL_SIZEOF_SOCKLEN_T, ${ac_cv_sizeof_socklen_t}, [sizeof(socklen_t)])
+AC_DEFINE_UNQUOTED(HCL_SIZEOF_SA_FAMILY_T, ${ac_cv_sizeof_sa_family_t}, [sizeof(sa_family_t)])
 
 hcl_package_version_major="`echo ${PACKAGE_VERSION} | cut -d. -f1`"
 hcl_package_version_minor="`echo ${PACKAGE_VERSION} | cut -d. -f2`"
@@ -509,6 +634,14 @@ then
 	fi
 fi
 AM_CONDITIONAL(ENABLE_LIBLTDL, test "${enable_libltdl_is}" = "yes")
+
+dnl ===== enable-hcls =====
+AC_ARG_ENABLE([hcls],
+	[AS_HELP_STRING([--enable-hcls],[build libhcls and hcls(default. no)])],
+	enable_hcls_is=$enableval,
+	enable_hcls_is=no
+)
+AM_CONDITIONAL(ENABLE_HCLS, test "${enable_hcls_is}" = "yes")
 
 AC_SUBST(HCL_SIZEOF_WCHAR_T, $ac_cv_sizeof_wchar_t)
 AC_SUBST(HCL_SIZEOF_CHAR16_T, $ac_cv_sizeof_char16_t)

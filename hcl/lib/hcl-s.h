@@ -38,7 +38,9 @@ enum hcl_server_option_t
 	HCL_SERVER_TRAIT,
 	HCL_SERVER_LOG_MASK,
 	HCL_SERVER_WORKER_STACK_SIZE,
-	HCL_SERVER_ACTOR_HEAP_SIZE
+	HCL_SERVER_WORKER_IDLE_TIMEOUT,
+	HCL_SERVER_ACTOR_HEAP_SIZE,
+	HCL_SERVER_ACTOR_MAX_RUNTIME
 };
 typedef enum hcl_server_option_t hcl_server_option_t;
 
@@ -86,8 +88,8 @@ HCL_EXPORT void hcl_server_close (
 );
 
 HCL_EXPORT int hcl_server_start (
-	hcl_server_t* server,
-	const char*   addrs
+	hcl_server_t*    server,
+	const hcl_bch_t* addrs
 );
 
 HCL_EXPORT void hcl_server_stop (
@@ -129,9 +131,31 @@ HCL_EXPORT hcl_errnum_t hcl_server_geterrnum (
 	hcl_server_t* server
 );
 
+HCL_EXPORT const hcl_ooch_t* hcl_server_geterrstr (
+	hcl_server_t* server
+);
+
+HCL_EXPORT const hcl_ooch_t* hcl_server_geterrmsg (
+	hcl_server_t* server
+);
+
 HCL_EXPORT void hcl_server_seterrnum (
 	hcl_server_t* server,
 	hcl_errnum_t  errnum
+);
+
+HCL_EXPORT void hcl_server_seterrbfmt (
+	hcl_server_t*    server,
+	hcl_errnum_t     errnum,
+	const hcl_bch_t* fmt,
+	...
+);
+
+HCL_EXPORT void hcl_server_seterrufmt (
+	hcl_server_t*    server,
+	hcl_errnum_t     errnum,
+	const hcl_uch_t* fmt,
+	...
 );
 
 HCL_EXPORT void hcl_server_logbfmt (
