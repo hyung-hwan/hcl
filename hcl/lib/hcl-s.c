@@ -1794,7 +1794,11 @@ int hcl_server_start (hcl_server_t* server, const hcl_bch_t* addrs)
  *  192.168.1.1:20,[::1]:20,127.0.0.1:345
  */
 	sck_fam = bchars_to_sockaddr(server, addrs, hcl_countbcstr(addrs), &srv_addr, &srv_len);
-	if (sck_fam <= -1) return -1;
+	if (sck_fam <= -1) 
+	{
+		hcl_server_seterrbfmt (server, HCL_EINVAL, "unable to convert address - %hs", addrs);
+		return -1;
+	}
 
 	srv_fd = socket(sck_fam, SOCK_STREAM, 0);
 	if (srv_fd == -1)
