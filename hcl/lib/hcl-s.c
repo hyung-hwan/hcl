@@ -244,7 +244,7 @@ struct hcl_server_t
 	hcl_errnum_t errnum;
 	struct
 	{
-		hcl_ooch_t buf[2048];
+		hcl_ooch_t buf[HCL_ERRMSG_CAPA];
 		hcl_oow_t len;
 	} errmsg;
 	int stopreq;
@@ -1748,13 +1748,12 @@ static void set_err_with_syserr (hcl_server_t* server, int syserr, const char* b
 		va_end (ap);
 
 	#if defined(HCL_OOCH_IS_BCH)
-		hcl->errmsg.len += hcl_copybcstr (&hcl->errmsg.buf[hcl->errmsg.len], HCL_COUNTOF(hcl->errmsg.buf) - hcl->errmsg.len, b_dash);
-		hcl->errmsg.len += hcl_copybcstr (&hcl->errmsg.buf[hcl->errmsg.len], HCL_COUNTOF(hcl->errmsg.buf) - hcl->errmsg.len, hcl->errmsg.tmpbuf.bch);
+		hcl->errmsg.len += hcl_copybcstr(&hcl->errmsg.buf[hcl->errmsg.len], HCL_COUNTOF(hcl->errmsg.buf) - hcl->errmsg.len, b_dash);
+		hcl->errmsg.len += hcl_copybcstr(&hcl->errmsg.buf[hcl->errmsg.len], HCL_COUNTOF(hcl->errmsg.buf) - hcl->errmsg.len, hcl->errmsg.tmpbuf.bch);
 	#else
-		hcl->errmsg.len += hcl_copyucstr (&hcl->errmsg.buf[hcl->errmsg.len], HCL_COUNTOF(hcl->errmsg.buf) - hcl->errmsg.len, u_dash);
-		tmplen = hcl_countbcstr(hcl->errmsg.tmpbuf.bch);
+		hcl->errmsg.len += hcl_copyucstr(&hcl->errmsg.buf[hcl->errmsg.len], HCL_COUNTOF(hcl->errmsg.buf) - hcl->errmsg.len, u_dash);
 		tmplen2 = HCL_COUNTOF(hcl->errmsg.buf) - hcl->errmsg.len;
-		hcl_convbtouchars (hcl, hcl->errmsg.tmpbuf.bch, &tmplen, &hcl->errmsg.buf[hcl->errmsg.len], &tmplen2);
+		hcl_convbtoucstr (hcl, hcl->errmsg.tmpbuf.bch, &tmplen, &hcl->errmsg.buf[hcl->errmsg.len], &tmplen2);
 		hcl->errmsg.len += tmplen2; /* ignore conversion errors */
 	#endif
 	}
@@ -1769,17 +1768,14 @@ static void set_err_with_syserr (hcl_server_t* server, int syserr, const char* b
 		va_end (ap);
 
 	#if defined(HCL_OOCH_IS_BCH)
-		hcl->errmsg.len += hcl_copybcstr (&hcl->errmsg.buf[hcl->errmsg.len], HCL_COUNTOF(hcl->errmsg.buf) - hcl->errmsg.len, b_dash);
-		
-		tmplen = hcl_countucstr(hcl->errmsg.tmpbuf.uch);
+		hcl->errmsg.len += hcl_copybcstr(&hcl->errmsg.buf[hcl->errmsg.len], HCL_COUNTOF(hcl->errmsg.buf) - hcl->errmsg.len, b_dash);
 		tmplen2 = HCL_COUNTOF(hcl->errmsg.buf) - hcl->errmsg.len;
-		hcl_convutobchars (hcl, hcl->errmsg.tmpbuf.uch, &tmplen, &hcl->errmsg.buf[hcl->errmsg.len], &tmplen2);
+		hcl_convutobcstr (hcl, hcl->errmsg.tmpbuf.uch, &tmplen, &hcl->errmsg.buf[hcl->errmsg.len], &tmplen2);
 		hcl->errmsg.len += tmplen2; /* ignore conversion errors */
 	#else
-		hcl->errmsg.len += hcl_copyucstr (&hcl->errmsg.buf[hcl->errmsg.len], HCL_COUNTOF(hcl->errmsg.buf) - hcl->errmsg.len, u_dash);
-		hcl->errmsg.len += hcl_copyucstr (&hcl->errmsg.buf[hcl->errmsg.len], HCL_COUNTOF(hcl->errmsg.buf) - hcl->errmsg.len, hcl->errmsg.tmpbuf.uch);
+		hcl->errmsg.len += hcl_copyucstr(&hcl->errmsg.buf[hcl->errmsg.len], HCL_COUNTOF(hcl->errmsg.buf) - hcl->errmsg.len, u_dash);
+		hcl->errmsg.len += hcl_copyucstr(&hcl->errmsg.buf[hcl->errmsg.len], HCL_COUNTOF(hcl->errmsg.buf) - hcl->errmsg.len, hcl->errmsg.tmpbuf.uch);
 	#endif
-
 	}
 
 	server->errnum = errnum;

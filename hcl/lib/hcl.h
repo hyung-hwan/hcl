@@ -992,6 +992,8 @@ struct hcl_synerr_t
 typedef struct hcl_compiler_t hcl_compiler_t;
 #endif
 
+#define HCL_ERRMSG_CAPA 2048
+
 struct hcl_t
 {
 	hcl_mmgr_t*  mmgr;
@@ -1002,11 +1004,11 @@ struct hcl_t
 	{
 		union
 		{
-			hcl_ooch_t ooch[2048];
-			hcl_bch_t bch[2048];
-			hcl_uch_t uch[2048];
+			hcl_ooch_t ooch[HCL_ERRMSG_CAPA];
+			hcl_bch_t bch[HCL_ERRMSG_CAPA];
+			hcl_uch_t uch[HCL_ERRMSG_CAPA];
 		} tmpbuf;
-		hcl_ooch_t buf[2048];
+		hcl_ooch_t buf[HCL_ERRMSG_CAPA];
 		hcl_oow_t len;
 	} errmsg;
 	int shuterr;
