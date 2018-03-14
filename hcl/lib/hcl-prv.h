@@ -648,7 +648,6 @@ typedef hcl_ooi_t (*hcl_outbfmt_t) (
 	...
 );
 
-
 /* i don't want an error raised inside the callback to override 
  * the existing error number and message. */
 #define vmprim_log_write(hcl,mask,ptr,len) do { \

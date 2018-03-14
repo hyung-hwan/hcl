@@ -29,6 +29,7 @@
 
 #include "hcl-cmn.h"
 #include "hcl-rbt.h"
+#include <stdarg.h>
 
 /* TODO: move this macro out to the build files.... */
 #define HCL_INCLUDE_COMPILER
@@ -692,7 +693,7 @@ struct hcl_heap_t
 typedef void* (*hcl_alloc_heap_t) (hcl_t* hcl, hcl_oow_t size);
 typedef void (*hcl_free_heap_t) (hcl_t* hcl, void* ptr);
 
-typedef void (*hcl_log_write_t) (hcl_t* hcl, int mask, const hcl_ooch_t* msg, hcl_oow_t len);
+typedef void (*hcl_log_write_t) (hcl_t* hcl, unsigned int mask, const hcl_ooch_t* msg, hcl_oow_t len);
 typedef void (*hcl_syserrstrb_t) (hcl_t* hcl, int syserr, hcl_bch_t* buf, hcl_oow_t len);
 typedef void (*hcl_syserrstru_t) (hcl_t* hcl, int syserr, hcl_uch_t* buf, hcl_oow_t len);
 
@@ -1214,29 +1215,33 @@ struct hcl_t
 
 enum hcl_log_mask_t
 {
-	HCL_LOG_DEBUG       = (1 << 0),
-	HCL_LOG_INFO        = (1 << 1),
-	HCL_LOG_WARN        = (1 << 2),
-	HCL_LOG_ERROR       = (1 << 3),
-	HCL_LOG_FATAL       = (1 << 4),
+	HCL_LOG_DEBUG       = (1u << 0),
+	HCL_LOG_INFO        = (1u << 1),
+	HCL_LOG_WARN        = (1u << 2),
+	HCL_LOG_ERROR       = (1u << 3),
+	HCL_LOG_FATAL       = (1u << 4),
 
-	HCL_LOG_UNTYPED     = (1 << 6), /* only to be used by HCL_DEBUGx() and HCL_INFOx() */
-	HCL_LOG_COMPILER    = (1 << 7),
-	HCL_LOG_VM          = (1 << 8),
-	HCL_LOG_MNEMONIC    = (1 << 9), /* bytecode mnemonic */
-	HCL_LOG_GC          = (1 << 10),
-	HCL_LOG_IC          = (1 << 11), /* instruction cycle, fetch-decode-execute */
-	HCL_LOG_PRIMITIVE   = (1 << 12),
-	HCL_LOG_APP         = (1 << 13), /* hcl applications, set by hcl logging primitive */
+	HCL_LOG_UNTYPED     = (1u << 6), /* only to be used by HCL_DEBUGx() and HCL_INFOx() */
+	HCL_LOG_COMPILER    = (1u << 7),
+	HCL_LOG_VM          = (1u << 8),
+	HCL_LOG_MNEMONIC    = (1u << 9), /* bytecode mnemonic */
+	HCL_LOG_GC          = (1u << 10),
+	HCL_LOG_IC          = (1u << 11), /* instruction cycle, fetch-decode-execute */
+	HCL_LOG_PRIMITIVE   = (1u << 12),
+
+	HCL_LOG_APP         = (1u << 13), /* hcl applications, set by hcl logging primitive */
+	HCL_LOG_APP_X1      = (1u << 14), /* more hcl applications, you can choose to use one of APP_X? randomly */
+	HCL_LOG_APP_X2      = (1u << 15),
+	HCL_LOG_APP_X3      = (1u << 16),
 
 	HCL_LOG_ALL_LEVELS  = (HCL_LOG_DEBUG  | HCL_LOG_INFO | HCL_LOG_WARN | HCL_LOG_ERROR | HCL_LOG_FATAL),
-	HCL_LOG_ALL_TYPES   = (HCL_LOG_UNTYPED | HCL_LOG_COMPILER | HCL_LOG_VM | HCL_LOG_MNEMONIC | HCL_LOG_GC | HCL_LOG_IC | HCL_LOG_PRIMITIVE | HCL_LOG_APP),
+	HCL_LOG_ALL_TYPES   = (HCL_LOG_UNTYPED | HCL_LOG_COMPILER | HCL_LOG_VM | HCL_LOG_MNEMONIC | HCL_LOG_GC | HCL_LOG_IC | HCL_LOG_PRIMITIVE | HCL_LOG_APP | HCL_LOG_APP_X1 | HCL_LOG_APP_X2 | HCL_LOG_APP_X3),
 
 
-	HCL_LOG_STDOUT      = (1 << 14),  /* write log messages to stdout without timestamp. HCL_LOG_STDOUT wins over HCL_LOG_STDERR. */
-	HCL_LOG_STDERR      = (1 << 15),  /* write log messages to stderr without timestamp. */
+	HCL_LOG_STDOUT      = (1u << 20),  /* write log messages to stdout without timestamp. HCL_LOG_STDOUT wins over HCL_LOG_STDERR. */
+	HCL_LOG_STDERR      = (1u << 21),  /* write log messages to stderr without timestamp. */
 
-	HCL_LOG_PREFER_JSON = (1 << 30)   /* write a object in the json format. don't set this explicitly. use %J instead */
+	HCL_LOG_PREFER_JSON = (1u << 30)   /* write a object in the json format. don't set this explicitly. use %J instead */
 };
 typedef enum hcl_log_mask_t hcl_log_mask_t;
 
@@ -1476,6 +1481,14 @@ HCL_EXPORT const hcl_ooch_t* hcl_geterrmsg (
 
 HCL_EXPORT const hcl_ooch_t* hcl_backuperrmsg (
 	hcl_t* hcl
+);
+
+HCL_EXPORT const hcl_ooch_t* hcl_errnum_to_errstr (
+	hcl_errnum_t errnum
+);
+
+HCL_EXPORT hcl_errnum_t hcl_syserr_to_errnum (
+	int syserr
 );
 
 /**
@@ -1722,11 +1735,19 @@ HCL_EXPORT hcl_pfbase_t* hcl_findpfbase (
 /* =========================================================================
  * LOGGING
  * ========================================================================= */
+
 HCL_EXPORT hcl_ooi_t hcl_logbfmt (
 	hcl_t*           hcl,
 	int              mask,
 	const hcl_bch_t* fmt,
 	...
+);
+
+HCL_EXPORT hcl_ooi_t hcl_logbfmtv (
+	hcl_t*           hcl,
+	int              mask,
+	const hcl_bch_t* fmt,
+	va_list          ap
 );
 
 HCL_EXPORT hcl_ooi_t hcl_logufmt (
@@ -1736,10 +1757,19 @@ HCL_EXPORT hcl_ooi_t hcl_logufmt (
 	...
 );
 
+HCL_EXPORT hcl_ooi_t hcl_logufmtv (
+	hcl_t*           hcl,
+	int              mask,
+	const hcl_uch_t* fmt,
+	va_list          ap
+);
+
 #if defined(HCL_OOCH_IS_UCH)
 #	define hcl_logoofmt hcl_logufmt
+#	define hcl_logoofmtv hcl_logufmtv
 #else
 #	define hcl_logoofmt hcl_logbfmt
+#	define hcl_logoofmtv hcl_logbfmtv
 #endif
 
 

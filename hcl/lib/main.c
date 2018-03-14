@@ -545,7 +545,7 @@ static int write_all (int fd, const char* ptr, hcl_oow_t len)
 	return 0;
 }
 
-static void log_write (hcl_t* hcl, int mask, const hcl_ooch_t* msg, hcl_oow_t len)
+static void log_write (hcl_t* hcl, unsigned int mask, const hcl_ooch_t* msg, hcl_oow_t len)
 {
 	hcl_bch_t buf[256];
 	hcl_oow_t ucslen, bcslen, msgidx;

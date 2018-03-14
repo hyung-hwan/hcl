@@ -406,10 +406,9 @@ static int _logufmtv (hcl_t* hcl, const hcl_uch_t* fmt, hcl_fmtout_t* data, va_l
 	return __logufmtv (hcl, fmt, data, ap, hcl_logbfmt);
 }
 
-hcl_ooi_t hcl_logbfmt (hcl_t* hcl, int mask, const hcl_bch_t* fmt, ...)
+hcl_ooi_t hcl_logbfmtv (hcl_t* hcl, int mask, const hcl_bch_t* fmt, va_list ap)
 {
 	int x;
-	va_list ap;
 	hcl_fmtout_t fo;
 
 	if (hcl->log.default_type_mask & HCL_LOG_ALL_TYPES) 
@@ -427,9 +426,7 @@ hcl_ooi_t hcl_logbfmt (hcl_t* hcl, int mask, const hcl_bch_t* fmt, ...)
 	fo.putch = put_logch;
 	fo.putcs = put_logcs;
 
-	va_start (ap, fmt);
 	x = _logbfmtv (hcl, fmt, &fo, ap);
-	va_end (ap);
 
 	if (hcl->log.len > 0 && hcl->log.ptr[hcl->log.len - 1] == '\n')
 	{
@@ -439,10 +436,21 @@ hcl_ooi_t hcl_logbfmt (hcl_t* hcl, int mask, const hcl_bch_t* fmt, ...)
 	return (x <= -1)? -1: fo.count;
 }
 
-hcl_ooi_t hcl_logufmt (hcl_t* hcl, int mask, const hcl_uch_t* fmt, ...)
+hcl_ooi_t hcl_logbfmt (hcl_t* hcl, int mask, const hcl_bch_t* fmt, ...)
+{
+	va_list ap;
+	hcl_ooi_t x;
+
+	va_start (ap, fmt);
+	x = hcl_logbfmtv (hcl, mask, fmt, ap);
+	va_end (ap);
+
+	return x;
+}
+
+hcl_ooi_t hcl_logufmtv (hcl_t* hcl, int mask, const hcl_uch_t* fmt, va_list ap)
 {
 	int x;
-	va_list ap;
 	hcl_fmtout_t fo;
 
 	if (hcl->log.default_type_mask & HCL_LOG_ALL_TYPES) 
@@ -455,9 +463,7 @@ hcl_ooi_t hcl_logufmt (hcl_t* hcl, int mask, const hcl_uch_t* fmt, ...)
 	fo.putch = put_logch;
 	fo.putcs = put_logcs;
 
-	va_start (ap, fmt);
 	x = _logufmtv (hcl, fmt, &fo, ap);
-	va_end (ap);
 
 	if (hcl->log.len > 0 && hcl->log.ptr[hcl->log.len - 1] == '\n')
 	{
@@ -467,6 +473,19 @@ hcl_ooi_t hcl_logufmt (hcl_t* hcl, int mask, const hcl_uch_t* fmt, ...)
 
 	return (x <= -1)? -1: fo.count;
 }
+
+hcl_ooi_t hcl_logufmt (hcl_t* hcl, int mask, const hcl_uch_t* fmt, ...)
+{
+	va_list ap;
+	hcl_ooi_t x;
+
+	va_start (ap, fmt);
+	x = hcl_logufmtv (hcl, mask, fmt, ap);
+	va_end (ap);
+
+	return x;
+}
+
 
 /* -------------------------------------------------------------------------- 
  * HELPER FOR PRINTING

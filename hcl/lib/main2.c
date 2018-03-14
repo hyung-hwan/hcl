@@ -62,12 +62,186 @@
 /* ========================================================================= */
 
 typedef struct server_xtn_t server_xtn_t;
-struct xtn_t
+struct server_xtn_t
 {
 	int logfd;
 	unsigned int logmask;
 	int logfd_istty;
 };
+
+/* ========================================================================= */
+
+static void* sys_alloc (hcl_mmgr_t* mmgr, hcl_oow_t size)
+{
+	return malloc(size);
+}
+
+static void* sys_realloc (hcl_mmgr_t* mmgr, void* ptr, hcl_oow_t size)
+{
+	return realloc(ptr, size);
+}
+
+static void sys_free (hcl_mmgr_t* mmgr, void* ptr)
+{
+	free (ptr);
+}
+
+static hcl_mmgr_t sys_mmgr =
+{
+	sys_alloc,
+	sys_realloc,
+	sys_free,
+	HCL_NULL
+};
+/* ========================================================================= */
+
+static int write_all (int fd, const char* ptr, hcl_oow_t len)
+{
+	while (len > 0)
+	{
+		hcl_ooi_t wr;
+
+		wr = write(fd, ptr, len);
+
+		if (wr <= -1)
+		{
+		#if defined(EAGAIN) && defined(EWOULDBLOCK) && (EAGAIN == EWOULDBLOCK)
+			if (errno == EAGAIN) continue;
+		#else
+			#if defined(EAGAIN)
+			if (errno == EAGAIN) continue;
+			#elif defined(EWOULDBLOCK)
+			if (errno == EWOULDBLOCK) continue;
+			#endif
+		#endif
+
+		#if defined(EINTR)
+			/* TODO: would this interfere with non-blocking nature of this VM? */
+			if (errno == EINTR) continue;
+		#endif
+			return -1;
+		}
+
+		ptr += wr;
+		len -= wr;
+	}
+
+	return 0;
+}
+
+static void log_write (hcl_server_t* server, int wid, unsigned int mask, const hcl_ooch_t* msg, hcl_oow_t len)
+{
+	hcl_bch_t buf[256];
+	hcl_oow_t ucslen, bcslen;
+	server_xtn_t* xtn;
+	hcl_oow_t msgidx;
+	int n, logfd;
+
+	xtn = hcl_server_getxtn(server);
+
+	if (mask & HCL_LOG_STDERR)
+	{
+		/* the messages that go to STDERR don't get masked out */
+		logfd = 2;
+	}
+	else
+	{
+		if (!(xtn->logmask & mask & ~HCL_LOG_ALL_LEVELS)) return;  /* check log types */
+		if (!(xtn->logmask & mask & ~HCL_LOG_ALL_TYPES)) return;  /* check log levels */
+
+		if (mask & HCL_LOG_STDOUT) logfd = 1;
+		else
+		{
+			logfd = xtn->logfd;
+			if (logfd <= -1) return;
+		}
+	}
+
+/* TODO: beautify the log message.
+ *       do classification based on mask. */
+	if (!(mask & (HCL_LOG_STDOUT | HCL_LOG_STDERR)))
+	{
+		time_t now;
+		char ts[32];
+		size_t tslen;
+		struct tm tm, *tmp;
+
+
+		now = time(NULL);
+
+		tmp = localtime_r (&now, &tm);
+		#if defined(HAVE_STRFTIME_SMALL_Z)
+		tslen = strftime(ts, sizeof(ts), "%Y-%m-%d %H:%M:%S %z ", tmp);
+		#else
+		tslen = strftime(ts, sizeof(ts), "%Y-%m-%d %H:%M:%S %Z ", tmp); 
+		#endif
+		if (tslen == 0) 
+		{
+			strcpy (ts, "0000-00-00 00:00:00 +0000");
+			tslen = 25; 
+		}
+
+/* TODO: less write system calls by having a buffer */
+		write_all (logfd, ts, tslen);
+
+		if (wid >= 0)
+		{
+			tslen = snprintf (ts, sizeof(ts), "[%x] ", wid);
+			write_all (logfd, ts, tslen);
+		}
+	}
+
+	if (xtn->logfd_istty)
+	{
+		if (mask & HCL_LOG_FATAL) write_all (logfd, "\x1B[1;31m", 7);
+		else if (mask & HCL_LOG_ERROR) write_all (logfd, "\x1B[1;32m", 7);
+		else if (mask & HCL_LOG_WARN) write_all (logfd, "\x1B[1;33m", 7);
+	}
+
+#if defined(HCL_OOCH_IS_UCH)
+	msgidx = 0;
+	while (len > 0)
+	{
+		ucslen = len;
+		bcslen = HCL_COUNTOF(buf);
+
+		n = hcl_conv_oocsn_to_bcsn_with_cmgr(&msg[msgidx], &ucslen, buf, &bcslen, hcl_get_utf8_cmgr());
+		if (n == 0 || n == -2)
+		{
+			/* n = 0: 
+			 *   converted all successfully 
+			 * n == -2: 
+			 *    buffer not sufficient. not all got converted yet.
+			 *    write what have been converted this round. */
+
+			/*HCL_ASSERT (hcl, ucslen > 0); */ /* if this fails, the buffer size must be increased */
+			assert (ucslen > 0);
+
+			/* attempt to write all converted characters */
+			if (write_all(logfd, buf, bcslen) <= -1) break;
+
+			if (n == 0) break;
+			else
+			{
+				msgidx += ucslen;
+				len -= ucslen;
+			}
+		}
+		else if (n <= -1)
+		{
+			/* conversion error */
+			break;
+		}
+	}
+#else
+	write_all (logfd, vmsg, len);
+#endif
+
+	if (xtn->logfd_istty)
+	{
+		if (mask & (HCL_LOG_FATAL | HCL_LOG_ERROR | HCL_LOG_WARN)) write_all (logfd, "\x1B[0m", 4);
+	}
+}
 
 /* ========================================================================= */
 
@@ -126,10 +300,12 @@ static int handle_logopt (hcl_server_t* server, const hcl_bch_t* str)
 	hcl_bch_t* xstr = (hcl_bch_t*)str;
 	hcl_bch_t* cm, * flt;
 	unsigned int logmask;
+	server_xtn_t* xtn;
 
+	xtn = (server_xtn_t*)hcl_server_getxtn(server);
 	hcl_server_getoption (server, HCL_SERVER_LOG_MASK, &logmask);
 
-	cm = strchr(xstr, ',');
+	cm = hcl_findbcharinbcstr(xstr, ',');
 	if (cm) 
 	{
 		/* i duplicate this string for open() below as open() doesn't 
@@ -141,14 +317,14 @@ static int handle_logopt (hcl_server_t* server, const hcl_bch_t* str)
 			return -1;
 		}
 
-		cm = strchr(xstr, ',');
+		cm = hcl_findbcharinbcstr(xstr, ',');
 		*cm = '\0';
 
 		do
 		{
 			flt = cm + 1;
 
-			cm = strchr(flt, ',');
+			cm = hcl_findbcharinbcstr(flt, ',');
 			if (cm) *cm = '\0';
 
 			if (hcl_compbcstr(flt, "app") == 0) logmask |= HCL_LOG_APP;
@@ -188,10 +364,9 @@ static int handle_logopt (hcl_server_t* server, const hcl_bch_t* str)
 		logmask = HCL_LOG_ALL_LEVELS | HCL_LOG_ALL_TYPES;
 	}
 
-	hcl_server_setoption (server, HCL_SERVER_LOG_MASK, &logmask);
-
-	server->logfd = open(xstr, O_CREAT | O_WRONLY | O_APPEND , 0644);
-	if (server->logfd == -1)
+	xtn->logmask = logmask;
+	xtn->logfd = open(xstr, O_CREAT | O_WRONLY | O_APPEND , 0644);
+	if (xtn->logfd == -1)
 	{
 		fprintf (stderr, "ERROR: cannot open a log file %s\n", xstr);
 		if (str != xstr) free (xstr);
@@ -199,7 +374,7 @@ static int handle_logopt (hcl_server_t* server, const hcl_bch_t* str)
 	}
 
 #if defined(HAVE_ISATTY)
-	server->logfd_istty = isatty(server->logfd);
+	xtn->logfd_istty = isatty(xtn->logfd);
 #endif
 
 	if (str != xstr) free (xstr);
@@ -207,21 +382,23 @@ static int handle_logopt (hcl_server_t* server, const hcl_bch_t* str)
 }
 
 #if defined(HCL_BUILD_DEBUG)
-static int parse_dbgopt (const char* str, unsigned int* dbgoptp)
+static int handle_dbgopt (hcl_server_t* server, const char* str)
 {
 	const hcl_bch_t* cm, * flt;
 	hcl_oow_t len;
-	unsigned int dbgopt = 0;
+	unsigned int trait;
+
+	hcl_server_getoption (server, HCL_SERVER_TRAIT, &trait);
 
 	cm = str - 1;
 	do
 	{
 		flt = cm + 1;
 
-		cm = strchr(flt, ',');
-		len = cm? (cm - flt): strlen(flt);
-		if (strncasecmp(flt, "gc", len) == 0)  dbgopt |= HCL_DEBUG_GC;
-		else if (strncasecmp (flt, "bigint", len) == 0)  dbgopt |= HCL_DEBUG_BIGINT;
+		cm = hcl_findbcharinbcstr(flt, ',');
+		len = cm? (cm - flt): hcl_countbcstr(flt);
+		if (hcl_compbcharsbcstr(flt, len, "gc") == 0)  trait |= HCL_SERVER_TRAIT_DEBUG_GC;
+		else if (hcl_compbcharsbcstr(flt, len, "bigint") == 0)  trait |= HCL_SERVER_TRAIT_DEBUG_BIGINT;
 		else
 		{
 			fprintf (stderr, "ERROR: unknown debug option value - %.*s\n", (int)len, flt);
@@ -230,7 +407,7 @@ static int parse_dbgopt (const char* str, unsigned int* dbgoptp)
 	}
 	while (cm);
 
-	*dbgoptp = dbgopt;
+	hcl_server_setoption (server, HCL_SERVER_TRAIT, &trait);
 	return 0;
 }
 #endif
@@ -260,12 +437,13 @@ int main (int argc, char* argv[])
 
 	hcl_server_t* server;
 	server_xtn_t* xtn;
+	hcl_server_prim_t server_prim;
 	int n;
 
 	const char* logopt = HCL_NULL;
+	const char* dbgopt = HCL_NULL;
 	hcl_oow_t memsize = MIN_MEMSIZE;
 	int large_pages = 0;
-	unsigned int dbgopt = 0;
 	unsigned int trait;
 
 	setlocale (LC_ALL, "");
@@ -299,7 +477,7 @@ int main (int argc, char* argv[])
 			#if defined(HCL_BUILD_DEBUG)
 				else if (hcl_compbcstr(opt.lngopt, "debug") == 0)
 				{
-					if (parse_dbgopt (opt.arg, &dbgopt) <= -1) return -1;
+					dbgopt = opt.arg;
 					break;
 				}
 			#endif
@@ -321,7 +499,10 @@ int main (int argc, char* argv[])
 
 	if (opt.ind >= argc) goto print_usage;
 
-	server = hcl_server_open(HCL_SIZEOF(xtn_t), dbgopt);
+	memset (&server_prim, 0, HCL_SIZEOF(server_prim));
+	server_prim.log_write = log_write;
+
+	server = hcl_server_open(&sys_mmgr, HCL_SIZEOF(server_xtn_t), &server_prim, HCL_NULL);
 	if (!server)
 	{
 		fprintf (stderr, "cannot open server\n");
@@ -332,26 +513,46 @@ int main (int argc, char* argv[])
 	xtn->logfd = -1;
 	xtn->logfd_istty = 0;
 
-	if (handle_logopt(server, logopt) <= -1) goto oops;
+	if (logopt)
+	{
+		if (handle_logopt(server, logopt) <= -1) goto oops;
+	}
+	else
+	{
+		xtn->logmask = HCL_LOG_ALL_TYPES | HCL_LOG_ERROR | HCL_LOG_FATAL;
+	}
+
+	if (dbgopt)
+	{
+		if (handle_dbgopt(server, dbgopt) <= -1) goto oops;
+	}
 
 	hcl_server_getoption (server, HCL_SERVER_TRAIT, &trait);
 	if (large_pages) trait |= HCL_SERVER_TRAIT_USE_LARGE_PAGES;
-	else trait &= HCL_SERVER_TRAIT_USE_LARGE_PAGES;
+	else trait &= ~HCL_SERVER_TRAIT_USE_LARGE_PAGES;
 	hcl_server_setoption (server, HCL_SERVER_TRAIT, &trait);
 
 	/*hcl_server_setoption (server, HCL_SERVER_WORKER_STACK_SIZE, ???);*/
 	hcl_server_setoption (server, HCL_SERVER_ACTOR_HEAP_SIZE, &memsize);
-	/*hcl_server_setoption (server, HCL_SERVER_ACTOR_DEBUG, &memsize);*/
 
 	g_server = server;
 	set_signal (SIGINT, handle_sigint);
 	set_signal_to_ignore (SIGPIPE);
 
 	n = hcl_server_start(server, argv[opt.ind]);
-	
+
 	set_signal_to_default (SIGINT);
 	set_signal_to_default (SIGPIPE);
 	g_server = NULL;
+
+	if (n <= -1)
+	{
+		hcl_server_logbfmt (server, HCL_LOG_APP | HCL_LOG_FATAL, "server error[%d] - %js\n", hcl_server_geterrnum(server), hcl_server_geterrmsg(server));
+	}
+
+	close (xtn->logfd);
+	xtn->logfd = -1;
+	xtn->logfd_istty = 0;
 
 	hcl_server_close (server);
 	return n;

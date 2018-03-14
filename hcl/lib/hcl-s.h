@@ -44,10 +44,30 @@ typedef enum hcl_server_option_t hcl_server_option_t;
 
 enum hcl_server_trait_t
 {
-	HCL_SERVER_TRAIT_READABLE_PROTO   = (1 << 0),
-	HCL_SERVER_TRAIT_USE_LARGE_PAGES  = (1 << 1)
+#if defined(HCL_BUILD_DEBUG)
+	HCL_SERVER_TRAIT_DEBUG_GC         = (1 << 0),
+	HCL_SERVER_TRAIT_DEBUG_BIGINT     = (1 << 1),
+#endif
+
+	HCL_SERVER_TRAIT_READABLE_PROTO   = (1 << 2),
+	HCL_SERVER_TRAIT_USE_LARGE_PAGES  = (1 << 3)
 };
 typedef enum hcl_server_trait_t hcl_server_trait_t;
+
+
+typedef void (*hcl_server_log_write_t) (
+	hcl_server_t*     server,
+	int               wid,
+	unsigned int      mask,
+	const hcl_ooch_t* msg,
+	hcl_oow_t         len
+);
+
+struct hcl_server_prim_t
+{
+	hcl_server_log_write_t log_write;
+};
+typedef struct hcl_server_prim_t hcl_server_prim_t;
 
 
 #if defined(__cplusplus)
@@ -55,15 +75,15 @@ extern "C" {
 #endif
 
 HCL_EXPORT hcl_server_t* hcl_server_open (
-	hcl_mmgr_t*  mmgr,
-	hcl_oow_t    xtnsize,
-	unsigned int dbgopt
+	hcl_mmgr_t*        mmgr,
+	hcl_oow_t          xtnsize,
+	hcl_server_prim_t* prim,
+	hcl_errnum_t*      errnum
 );
 
 HCL_EXPORT void hcl_server_close (
 	hcl_server_t* server
 );
-
 
 HCL_EXPORT int hcl_server_start (
 	hcl_server_t* server,
@@ -86,26 +106,47 @@ HCL_EXPORT int hcl_server_getoption (
 	void*               value
 );
 
+HCL_EXPORT void* hcl_server_getxtn (
+	hcl_server_t* server
+);
 
-#if defined(HCL_HAVE_INLINE)
-	static HCL_INLINE hcl_mmgr_t* hcl_server_getmmgr (hcl_server_t* server) { return server->mmgr; }
-	static HCL_INLINE void* hcl_server_getxtn (hcl_server_t* server) { return (void*)(hcl + 1); }
 
-	/*static HCL_INLINE hcl_server_cmgr_t* hcl_server_getcmgr (hcl_server_t* server) { return server->cmgr; }
-	static HCL_INLINE void hcl_server_setcmgr (hcl_server_t* hcl, hcl_server_cmgr_t* cmgr) { server->cmgr = cmgr; }*/
+HCL_EXPORT hcl_mmgr_t* hcl_server_getmmgr (
+	hcl_server_t* server
+);
 
-	static HCL_INLINE hcl_server_errnum_t hcl_server_geterrnum (hcl_server_t* server) { return server->errnum; }
-	
-#else
-#	define hcl_server_getmmgr(server) ((server)->mmgr)
-#	define hcl_server_getxtn(server) ((void*)((server) + 1))
 
-/*#	define hcl_server_getcmgr(server) ((server)->cmgr)
-#	define hcl_server_setcmgr(hcl,mgr) ((server)->cmgr = (mgr))*/
+HCL_EXPORT hcl_cmgr_t* hcl_server_getcmgr (
+	hcl_server_t* server
+);
 
-#	define hcl_server_geterrnum(server) ((server)->errnum)
-#endif
+HCL_EXPORT void hcl_server_setcmgr (
+	hcl_server_t* server,
+	hcl_cmgr_t*   cmgr
+);
 
+HCL_EXPORT hcl_errnum_t hcl_server_geterrnum (
+	hcl_server_t* server
+);
+
+HCL_EXPORT void hcl_server_seterrnum (
+	hcl_server_t* server,
+	hcl_errnum_t  errnum
+);
+
+HCL_EXPORT void hcl_server_logbfmt (
+	hcl_server_t*    server,
+	unsigned int     mask,
+	const hcl_bch_t* fmt,
+	...
+);
+
+HCL_EXPORT void hcl_server_logufmt (
+	hcl_server_t*    server,
+	unsigned int     mask,
+	const hcl_uch_t* fmt,
+	...
+);
 
 #if defined(__cplusplus)
 }
