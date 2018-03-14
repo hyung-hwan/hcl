@@ -992,7 +992,7 @@ struct hcl_synerr_t
 typedef struct hcl_compiler_t hcl_compiler_t;
 #endif
 
-#define HCL_ERRMSG_CAPA 2048
+#define HCL_ERRMSG_CAPA (2048)
 
 struct hcl_t
 {
