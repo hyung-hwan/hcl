@@ -1023,8 +1023,8 @@ static int write_reply_chunk (hcl_server_proto_t* proto)
 		if (proto->reply.nchunks <= 0)
 		{
 			/* this is the first chunk */
-			iov[count].iov_base = ".OK\n.ENCODING chunked\n";
-			iov[count++].iov_len = 22;
+			iov[count].iov_base = ".OK\n.ENCODING chunked\n.DATA\n";
+			iov[count++].iov_len = 28;
 		}
 
 		iov[count].iov_base = cl,
