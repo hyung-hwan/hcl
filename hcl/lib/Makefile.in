@@ -435,6 +435,7 @@ pkglib_LTLIBRARIES = libhcl.la $(am__append_3)
 libhcl_la_SOURCES = \
 	hcl-prv.h \
 	logfmtv.h \
+	sa-utl.h \
 	bigint.c \
 	comp.c \
 	debug.c \

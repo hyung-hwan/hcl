@@ -82,11 +82,9 @@
 #	if defined(HAVE_SYS_MMAN_H)
 #		include <sys/mman.h>
 #	endif
-	
-#	include <errno.h>
+
 #	include <unistd.h>
 #	include <fcntl.h>
-
 #	include <sys/types.h>
 #	include <sys/socket.h>
 #	include <netinet/in.h>
@@ -1792,8 +1790,7 @@ static void set_err_with_syserr (hcl_server_t* server, int syserr, const char* b
 int hcl_server_start (hcl_server_t* server, const hcl_bch_t* addrs)
 {
 	sockaddr_t srv_addr;
-	int srv_fd, sck_fam;
-	int optval;
+	int srv_fd, sck_fam, optval;
 	socklen_t srv_len;
 	pthread_attr_t thr_attr;
 

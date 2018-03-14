@@ -31,11 +31,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <limits.h>
 #include <errno.h>
 #include <locale.h>
-#include <assert.h>
-
 
 #if defined(HAVE_TIME_H)
 #	include <time.h>
@@ -46,18 +43,9 @@
 #if defined(HAVE_SIGNAL_H)
 #	include <signal.h>
 #endif
-#if defined(HAVE_SYS_MMAN_H)
-#	include <sys/mman.h>
-#endif
 
-#include <errno.h>
 #include <unistd.h>
 #include <fcntl.h>
-
-#include <sys/types.h>
-#include <sys/socket.h>
-#include <netinet/in.h>
-#include <arpa/inet.h>
 
 /* ========================================================================= */
 
@@ -215,7 +203,7 @@ static void log_write (hcl_server_t* server, int wid, unsigned int mask, const h
 			 *    write what have been converted this round. */
 
 			/*HCL_ASSERT (hcl, ucslen > 0); */ /* if this fails, the buffer size must be increased */
-			assert (ucslen > 0);
+			/*assert (ucslen > 0);*/
 
 			/* attempt to write all converted characters */
 			if (write_all(logfd, buf, bcslen) <= -1) break;
