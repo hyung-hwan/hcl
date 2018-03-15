@@ -111,6 +111,8 @@ int hcl_init (hcl_t* hcl, hcl_mmgr_t* mmgr, hcl_oow_t heapsz, const hcl_vmprim_t
 	if (!hcl->vmprim.free_heap) hcl->vmprim.free_heap = free_heap;
 
 	hcl->option.log_mask = ~0u;
+	hcl->option.log_mask &= ~HCL_LOG_PREFER_JSON;
+
 	hcl->option.log_maxcapa = HCL_DFL_LOG_MAXCAPA;
 	hcl->option.dfl_symtab_size = HCL_DFL_SYMTAB_SIZE;
 	hcl->option.dfl_sysdic_size = HCL_DFL_SYSDIC_SIZE;

@@ -36,6 +36,7 @@ pkginclude_HEADERS = \
 	hcl-cfg.h \
 	hcl-cmn.h \
 	hcl-rbt.h \
+	hcl-tmr.h \
 	hcl-utl.h \
 	hcl.h
 
@@ -63,6 +64,7 @@ libhcl_la_SOURCES = \
 	rbt.c \
 	read.c \
 	sym.c \
+	tmr.c \
 	utf8.c \
 	utl.c 
 libhcl_la_CPPFLAGS = $(CPPFLAGS_LIB_COMMON)

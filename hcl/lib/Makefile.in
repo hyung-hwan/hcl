@@ -158,7 +158,8 @@ am_libhcl_la_OBJECTS = libhcl_la-bigint.lo libhcl_la-comp.lo \
 	libhcl_la-hcl.lo libhcl_la-heap.lo libhcl_la-logfmt.lo \
 	libhcl_la-obj.lo libhcl_la-opt.lo libhcl_la-prim.lo \
 	libhcl_la-print.lo libhcl_la-rbt.lo libhcl_la-read.lo \
-	libhcl_la-sym.lo libhcl_la-utf8.lo libhcl_la-utl.lo
+	libhcl_la-sym.lo libhcl_la-tmr.lo libhcl_la-utf8.lo \
+	libhcl_la-utl.lo
 libhcl_la_OBJECTS = $(am_libhcl_la_OBJECTS)
 AM_V_lt = $(am__v_lt_@AM_V@)
 am__v_lt_ = $(am__v_lt_@AM_DEFAULT_V@)
@@ -399,7 +400,6 @@ pdfdir = @pdfdir@
 prefix = @prefix@
 program_transform_name = @program_transform_name@
 psdir = @psdir@
-runstatedir = @runstatedir@
 sbindir = @sbindir@
 sharedstatedir = @sharedstatedir@
 srcdir = @srcdir@
@@ -428,6 +428,7 @@ pkginclude_HEADERS = \
 	hcl-cfg.h \
 	hcl-cmn.h \
 	hcl-rbt.h \
+	hcl-tmr.h \
 	hcl-utl.h \
 	hcl.h
 
@@ -455,6 +456,7 @@ libhcl_la_SOURCES = \
 	rbt.c \
 	read.c \
 	sym.c \
+	tmr.c \
 	utf8.c \
 	utl.c 
 
@@ -651,6 +653,7 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libhcl_la-rbt.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libhcl_la-read.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libhcl_la-sym.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libhcl_la-tmr.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libhcl_la-utf8.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libhcl_la-utl.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libhcls_la-hcl-s.Plo@am__quote@
@@ -804,6 +807,13 @@ libhcl_la-sym.lo: sym.c
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='sym.c' object='libhcl_la-sym.lo' libtool=yes @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libhcl_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o libhcl_la-sym.lo `test -f 'sym.c' || echo '$(srcdir)/'`sym.c
+
+libhcl_la-tmr.lo: tmr.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libhcl_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT libhcl_la-tmr.lo -MD -MP -MF $(DEPDIR)/libhcl_la-tmr.Tpo -c -o libhcl_la-tmr.lo `test -f 'tmr.c' || echo '$(srcdir)/'`tmr.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/libhcl_la-tmr.Tpo $(DEPDIR)/libhcl_la-tmr.Plo
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='tmr.c' object='libhcl_la-tmr.lo' libtool=yes @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libhcl_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o libhcl_la-tmr.lo `test -f 'tmr.c' || echo '$(srcdir)/'`tmr.c
 
 libhcl_la-utf8.lo: utf8.c
 @am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libhcl_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT libhcl_la-utf8.lo -MD -MP -MF $(DEPDIR)/libhcl_la-utf8.Tpo -c -o libhcl_la-utf8.lo `test -f 'utf8.c' || echo '$(srcdir)/'`utf8.c

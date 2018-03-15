@@ -947,7 +947,8 @@ typedef union sockaddr_t sockaddr_t;
 #include "sa-utl.h"
 /* ========================================================================= */
 
-#define HCL_SERVER_PROTO_LOG_MASK (HCL_LOG_ERROR | HCL_LOG_APP)
+#define SERVER_LOGMASK_INFO (HCL_LOG_INFO | HCL_LOG_APP)
+#define SERVER_LOGMASK_ERROR (HCL_LOG_ERROR | HCL_LOG_APP)
 
 hcl_server_proto_t* hcl_server_proto_open (hcl_oow_t xtnsize, hcl_server_worker_t* worker)
 {
@@ -1058,7 +1059,7 @@ static int write_reply_chunk (hcl_server_proto_t* proto)
 		{
 			/* error occurred inside the worker thread shouldn't affect the error information
 			 * in the server object. so here, i just log a message */
-			hcl_logbfmt (proto->hcl, HCL_SERVER_PROTO_LOG_MASK, "sendmsg failure on %d - %hs\n", proto->worker->sck, strerror(errno));
+			hcl_logbfmt (proto->hcl, SERVER_LOGMASK_ERROR, "sendmsg failure on %d - %hs\n", proto->worker->sck, strerror(errno));
 			return -1; 
 		}
 
@@ -1257,7 +1258,7 @@ static HCL_INLINE int add_token_char (hcl_server_proto_t* proto, hcl_ooch_t c)
 		tmp = (hcl_ooch_t*)HCL_MMGR_REALLOC(proto->worker->server->mmgr, proto->tok.ptr, capa * HCL_SIZEOF(*tmp));
 		if (!tmp) 
 		{
-			hcl_logbfmt (proto->hcl, HCL_SERVER_PROTO_LOG_MASK, "out of memory in allocating a token buffer\n");
+			hcl_logbfmt (proto->hcl, SERVER_LOGMASK_ERROR, "out of memory in allocating a token buffer\n");
 			return -1;
 		}
 
@@ -1334,7 +1335,7 @@ static int get_token (hcl_server_proto_t* proto)
 			GET_CHAR_TO(proto, c);
 			if (!is_alphachar(c))
 			{
-				hcl_logbfmt (proto->hcl, HCL_SERVER_PROTO_LOG_MASK, "alphabetic character expected after a period\n");
+				hcl_logbfmt (proto->hcl, SERVER_LOGMASK_ERROR, "alphabetic character expected after a period\n");
 				return -1;
 			}
 
@@ -1351,7 +1352,7 @@ static int get_token (hcl_server_proto_t* proto)
 			break;
 
 		default:
-			hcl_logbfmt (proto->hcl, HCL_SERVER_PROTO_LOG_MASK, "unrecognized character - [%jc]\n", c);
+			hcl_logbfmt (proto->hcl, SERVER_LOGMASK_ERROR, "unrecognized character - [%jc]\n", c);
 			return -1;
 	}
 	return 0;
@@ -1370,7 +1371,7 @@ int hcl_server_proto_handle_request (hcl_server_proto_t* proto)
 		case HCL_SERVER_PROTO_TOKEN_EOF:
 			if (proto->req.state != HCL_SERVER_PROTO_REQ_IN_TOP_LEVEL)
 			{
-				hcl_logbfmt (proto->hcl, HCL_SERVER_PROTO_LOG_MASK, "unexpected EOF without .END\n");
+				hcl_logbfmt (proto->hcl, SERVER_LOGMASK_ERROR, "unexpected EOF without .END\n");
 				return -1;
 			}
 
@@ -1380,21 +1381,21 @@ int hcl_server_proto_handle_request (hcl_server_proto_t* proto)
 		case HCL_SERVER_PROTO_TOKEN_EXIT:
 			if (proto->req.state != HCL_SERVER_PROTO_REQ_IN_TOP_LEVEL)
 			{
-				hcl_logbfmt (proto->hcl, HCL_SERVER_PROTO_LOG_MASK, ".EXIT allowed in the top level only\n");
+				hcl_logbfmt (proto->hcl, SERVER_LOGMASK_ERROR, ".EXIT allowed in the top level only\n");
 				return -1;
 			}
 
 			if (get_token(proto) <= -1) return -1;
 			if (proto->tok.type != HCL_SERVER_PROTO_TOKEN_NL)
 			{
-				hcl_logbfmt (proto->hcl, HCL_SERVER_PROTO_LOG_MASK, "no new line after .EXIT\n");
+				hcl_logbfmt (proto->hcl, SERVER_LOGMASK_ERROR, "no new line after .EXIT\n");
 				return -1;
 			}
 			
 			hcl_server_proto_start_reply (proto);
 			if (hcl_server_proto_end_reply(proto, HCL_NULL) <= -1) 
 			{
-				hcl_logbfmt (proto->hcl, HCL_SERVER_PROTO_LOG_MASK, "cannot finalize reply for .EXIT\n");
+				hcl_logbfmt (proto->hcl, SERVER_LOGMASK_ERROR, "cannot finalize reply for .EXIT\n");
 				return -1;
 			}
 			return 0;
@@ -1402,14 +1403,14 @@ int hcl_server_proto_handle_request (hcl_server_proto_t* proto)
 		case HCL_SERVER_PROTO_TOKEN_BEGIN:
 			if (proto->req.state != HCL_SERVER_PROTO_REQ_IN_TOP_LEVEL)
 			{
-				hcl_logbfmt (proto->hcl, HCL_SERVER_PROTO_LOG_MASK, ".BEGIN not allowed to be nested\n");
+				hcl_logbfmt (proto->hcl, SERVER_LOGMASK_ERROR, ".BEGIN not allowed to be nested\n");
 				return -1;
 			}
 
 			if (get_token(proto) <= -1) return -1;
 			if (proto->tok.type != HCL_SERVER_PROTO_TOKEN_NL)
 			{
-				hcl_logbfmt (proto->hcl, HCL_SERVER_PROTO_LOG_MASK, "no new line after .BEGIN\n");
+				hcl_logbfmt (proto->hcl, SERVER_LOGMASK_ERROR, "no new line after .BEGIN\n");
 				return -1;
 			}
 
@@ -1423,14 +1424,14 @@ int hcl_server_proto_handle_request (hcl_server_proto_t* proto)
 
 			if (proto->req.state != HCL_SERVER_PROTO_REQ_IN_BLOCK_LEVEL)
 			{
-				hcl_logbfmt (proto->hcl, HCL_SERVER_PROTO_LOG_MASK, ".END without opening .BEGIN\n");
+				hcl_logbfmt (proto->hcl, SERVER_LOGMASK_ERROR, ".END without opening .BEGIN\n");
 				return -1;
 			}
 
 			if (get_token(proto) <= -1) return -1;
 			if (proto->tok.type != HCL_SERVER_PROTO_TOKEN_NL)
 			{
-				hcl_logbfmt (proto->hcl, HCL_SERVER_PROTO_LOG_MASK, "no new line after .BEGIN\n");
+				hcl_logbfmt (proto->hcl, SERVER_LOGMASK_ERROR, "no new line after .BEGIN\n");
 				return -1;
 			}
 
@@ -1438,7 +1439,7 @@ int hcl_server_proto_handle_request (hcl_server_proto_t* proto)
 			obj = (hcl_getbclen(proto->hcl) > 0)? hcl_execute(proto->hcl): proto->hcl->_nil;
 			if (hcl_server_proto_end_reply(proto, (obj? HCL_NULL: hcl_geterrmsg(proto->hcl))) <= -1) 
 			{
-				hcl_logbfmt (proto->hcl, HCL_SERVER_PROTO_LOG_MASK, "cannot finalize reply for .END\n");
+				hcl_logbfmt (proto->hcl, SERVER_LOGMASK_ERROR, "cannot finalize reply for .END\n");
 				return -1;
 			}
 
@@ -1455,20 +1456,20 @@ int hcl_server_proto_handle_request (hcl_server_proto_t* proto)
 			obj = hcl_read(proto->hcl);
 			if (!obj)
 			{
-				hcl_logbfmt (proto->hcl, HCL_SERVER_PROTO_LOG_MASK, "cannot read .SCRIPT contents - %js\n", hcl_geterrmsg(proto->hcl));
+				hcl_logbfmt (proto->hcl, SERVER_LOGMASK_ERROR, "cannot read .SCRIPT contents - %js\n", hcl_geterrmsg(proto->hcl));
 				return -1;
 			}
 
 			if (get_token(proto) <= -1) return -1;
 			if (proto->tok.type != HCL_SERVER_PROTO_TOKEN_NL)
 			{
-				hcl_logbfmt (proto->hcl, HCL_SERVER_PROTO_LOG_MASK, "no new line after .SCRIPT contest\n");
+				hcl_logbfmt (proto->hcl, SERVER_LOGMASK_ERROR, "no new line after .SCRIPT contest\n");
 				return -1;
 			}
 
 			if (hcl_compile(proto->hcl, obj) <= -1)
 			{
-				hcl_logbfmt (proto->hcl, HCL_SERVER_PROTO_LOG_MASK, "cannot compile .SCRIPT contents - %js\n", hcl_geterrmsg(proto->hcl));
+				hcl_logbfmt (proto->hcl, SERVER_LOGMASK_ERROR, "cannot compile .SCRIPT contents - %js\n", hcl_geterrmsg(proto->hcl));
 				return -1;
 			}
 
@@ -1478,7 +1479,7 @@ int hcl_server_proto_handle_request (hcl_server_proto_t* proto)
 				obj = hcl_execute(proto->hcl);
 				if (hcl_server_proto_end_reply(proto, (obj? HCL_NULL: hcl_geterrmsg(proto->hcl))) <= -1) 
 				{
-					hcl_logbfmt (proto->hcl, HCL_SERVER_PROTO_LOG_MASK, "cannot finalize reply for .SCRIPT\n");
+					hcl_logbfmt (proto->hcl, SERVER_LOGMASK_ERROR, "cannot finalize reply for .SCRIPT\n");
 					return -1;
 				}
 			}
@@ -1495,7 +1496,7 @@ int hcl_server_proto_handle_request (hcl_server_proto_t* proto)
 			
 			if (hcl_server_proto_end_reply(proto, HCL_NULL) <= -1)
 			{
-				hcl_logbfmt (proto->hcl, HCL_SERVER_PROTO_LOG_MASK, "cannot finalize reply for .SHOW-WORKERS\n");
+				hcl_logbfmt (proto->hcl, SERVER_LOGMASK_ERROR, "cannot finalize reply for .SHOW-WORKERS\n");
 				return -1;
 			}
 			
@@ -1510,13 +1511,13 @@ int hcl_server_proto_handle_request (hcl_server_proto_t* proto)
 			
 			if (hcl_server_proto_end_reply(proto, HCL_NULL) <= -1)
 			{
-				hcl_logbfmt (proto->hcl, HCL_SERVER_PROTO_LOG_MASK, "cannot finalize reply for .KILL-WORKER\n");
+				hcl_logbfmt (proto->hcl, SERVER_LOGMASK_ERROR, "cannot finalize reply for .KILL-WORKER\n");
 				return -1;
 			}
 			break;
 
 		default:
-			hcl_logbfmt (proto->hcl, HCL_SERVER_PROTO_LOG_MASK, "unknown token - %d - %.*js\n", (int)proto->tok.type, proto->tok.len, proto->tok.ptr);
+			hcl_logbfmt (proto->hcl, SERVER_LOGMASK_ERROR, "unknown token - %d - %.*js\n", (int)proto->tok.type, proto->tok.len, proto->tok.ptr);
 			return -1;
 	}
 
@@ -1597,9 +1598,26 @@ static hcl_server_worker_t* alloc_worker (hcl_server_t*  server, int cli_sck)
 	return worker;
 }
 
+static void close_worker_socket (hcl_server_worker_t* worker)
+{
+	if (worker->sck >= 0) 
+	{
+		if (worker->proto)
+		{
+			hcl_logbfmt (worker->proto->hcl, SERVER_LOGMASK_INFO, "closing worker socket %d\n", worker->sck);
+		}
+		else
+		{
+			hcl_server_logbfmt (worker->server, SERVER_LOGMASK_INFO, "closing worker socket %d\n", worker->sck);
+		}
+		close (worker->sck);
+		worker->sck = -1;
+	}
+}
+
 static void free_worker (hcl_server_worker_t* worker)
 {
-	if (worker->sck >= 0) close (worker->sck);
+	close_worker_socket (worker);
 	HCL_MMGR_FREE (worker->server->mmgr, worker);
 }
 
@@ -1671,11 +1689,7 @@ static void* worker_main (void* ctx)
 	worker->proto = HCL_NULL;
 
 	pthread_mutex_lock (&server->worker_mutex);
-
-	/* close connection before free_client() is called */
-	close (worker->sck);
-	worker->sck = -1;
-
+	close_worker_socket (worker); 
 	if (!worker->claimed)
 	{
 		zap_worker_in_server (server, worker);
@@ -1786,7 +1800,7 @@ static void set_err_with_syserr (hcl_server_t* server, int syserr, const char* b
 int hcl_server_start (hcl_server_t* server, const hcl_bch_t* addrs)
 {
 	sockaddr_t srv_addr;
-	int srv_fd, sck_fam, optval;
+	int srv_fd, sck_fam, optval, xret = 0;
 	socklen_t srv_len;
 	pthread_attr_t thr_attr;
 
@@ -1843,9 +1857,15 @@ int hcl_server_start (hcl_server_t* server, const hcl_bch_t* addrs)
 		cli_fd = accept(srv_fd, (struct sockaddr*)&cli_addr, &cli_len);
 		if (cli_fd == -1)
 		{
-			if (errno != EINTR || !server->stopreq) set_err_with_syserr (server, errno, "unable to accept worker on socket %d", srv_fd);
+			if (server->stopreq) break; /* normal termination requested */
+			if (errno == EINTR) continue; /* interrupted but not termination requested */
+
+			set_err_with_syserr (server, errno, "unable to accept worker on socket %d", srv_fd);
+			xret = -1;
 			break;
 		}
+
+		hcl_server_logbfmt (server, SERVER_LOGMASK_INFO, "accepted worker - socket %d\n", cli_fd);
 
 		worker = alloc_worker(server, cli_fd);
 		if (pthread_create(&thr, &thr_attr, worker_main, worker) != 0)
@@ -1858,7 +1878,7 @@ int hcl_server_start (hcl_server_t* server, const hcl_bch_t* addrs)
 	purge_all_workers (server, HCL_SERVER_WORKER_STATE_DEAD);
 
 	pthread_attr_destroy (&thr_attr);
-	return 0;
+	return xret;
 }
 
 void hcl_server_stop (hcl_server_t* server)

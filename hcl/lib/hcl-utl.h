@@ -534,7 +534,6 @@ HCL_EXPORT hcl_uint128_t hcl_hton128 (
 );
 #endif
 
-
 #if defined(__cplusplus)
 }
 #endif
