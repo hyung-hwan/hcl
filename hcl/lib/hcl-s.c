@@ -26,6 +26,7 @@
 
 #include "hcl-s.h"
 #include "hcl-prv.h"
+#include "hcl-tmr.h"
 
 #include <stdio.h>
 #include <string.h>
@@ -195,6 +196,7 @@ struct hcl_server_proto_t
 	hcl_t* hcl;
 	hcl_iolxc_t* lxc;
 	hcl_server_proto_token_t tok;
+	hcl_tmr_index_t exec_runtime_event_index;
 
 	struct
 	{
@@ -240,6 +242,7 @@ struct hcl_server_t
 	hcl_cmgr_t*  cmgr;
 	hcl_server_prim_t prim;
 	hcl_t* dummy_hcl;
+	hcl_tmr_t* tmr;
 
 	hcl_errnum_t errnum;
 	struct
@@ -266,6 +269,7 @@ struct hcl_server_t
 	} worker_list[2];
 
 	pthread_mutex_t worker_mutex;
+	pthread_mutex_t tmr_mutex;
 	pthread_mutex_t log_mutex;
 };
 
@@ -602,7 +606,7 @@ static void syserrstrb (hcl_t* hcl, int syserr, hcl_bch_t* buf, hcl_oow_t len)
 #if defined(HAVE_STRERROR_R)
 	strerror_r (syserr, buf, len);
 #else
-	/* this is not thread safe */
+	/* this may not be thread safe */
 	hcl_copybcstr (buf, len, strerror(syserr));
 #endif
 }
@@ -977,6 +981,7 @@ hcl_server_proto_t* hcl_server_proto_open (hcl_oow_t xtnsize, hcl_server_worker_
 
 	HCL_MEMSET (proto, 0, HCL_SIZEOF(*proto));
 	proto->worker = worker;
+	proto->exec_runtime_event_index = HCL_TMR_INVALID_INDEX;
 
 	proto->hcl = hcl_open(proto->worker->server->mmgr, HCL_SIZEOF(*xtn), worker->server->cfg.actor_heap_size, &vmprim, HCL_NULL);
 	if (!proto->hcl) goto oops;
@@ -1358,6 +1363,57 @@ static int get_token (hcl_server_proto_t* proto)
 	return 0;
 }
 
+static void exec_runtime_handler (hcl_tmr_t* tmr, const hcl_ntime_t* now, hcl_tmr_event_t* evt)
+{
+	hcl_server_proto_t* proto;
+	proto = (hcl_server_proto_t*)evt->ctx;
+//printf ("aborting hcl for runtime handler timeout...\n");
+	hcl_abort (proto->hcl);
+}
+
+static void exec_runtime_updater (hcl_tmr_t* tmr, hcl_tmr_index_t old_index, hcl_tmr_index_t new_index, hcl_tmr_event_t* evt)
+{
+	hcl_server_proto_t* proto;
+	proto = (hcl_server_proto_t*)evt->ctx;
+	HCL_ASSERT (proto->hcl, proto->exec_runtime_event_index == old_index);
+	proto->exec_runtime_event_index = new_index;
+}
+
+static int insert_exec_timer (hcl_server_proto_t* proto, const hcl_ntime_t* tmout)
+{
+	hcl_tmr_event_t event;
+	hcl_tmr_index_t index;
+
+	HCL_ASSERT (proto->hcl, proto->exec_runtime_event_index == HCL_TMR_INVALID_INDEX);
+
+	HCL_MEMSET (&event, 0, HCL_SIZEOF(event));
+	event.ctx = proto;
+	proto->hcl->vmprim.vm_gettime (proto->hcl, &event.when);
+	HCL_ADDNTIME (&event.when, &event.when, tmout);
+	event.handler = exec_runtime_handler;
+	event.updater = exec_runtime_updater;
+
+	pthread_mutex_lock (&proto->worker->server->tmr_mutex);
+	index = hcl_tmr_insert(proto->worker->server->tmr, &event);
+	pthread_mutex_unlock (&proto->worker->server->tmr_mutex);
+	if (index == HCL_TMR_INVALID_INDEX) return -1;
+
+	proto->exec_runtime_event_index = index;
+	return 0;
+}
+
+static void delete_exec_timer (hcl_server_proto_t* proto)
+{
+	if (proto->exec_runtime_event_index != HCL_TMR_INVALID_INDEX)
+	{
+//printf ("deleted exec timer..........\n");
+		pthread_mutex_lock (&proto->worker->server->tmr_mutex);
+		hcl_tmr_delete (proto->worker->server->tmr, proto->exec_runtime_event_index);
+		pthread_mutex_unlock (&proto->worker->server->tmr_mutex);
+		proto->exec_runtime_event_index = HCL_TMR_INVALID_INDEX;
+	}
+}
+
 int hcl_server_proto_handle_request (hcl_server_proto_t* proto)
 {
 	if (get_token(proto) <= -1) return -1;
@@ -1475,9 +1531,37 @@ int hcl_server_proto_handle_request (hcl_server_proto_t* proto)
 
 			if (proto->req.state == HCL_SERVER_PROTO_REQ_IN_TOP_LEVEL)
 			{
+				const hcl_ooch_t* failmsg = HCL_NULL;
+				hcl_server_t* server;
+
+				server = proto->worker->server;
+
 				hcl_server_proto_start_reply (proto);
-				obj = hcl_execute(proto->hcl);
-				if (hcl_server_proto_end_reply(proto, (obj? HCL_NULL: hcl_geterrmsg(proto->hcl))) <= -1) 
+				if (server->cfg.actor_max_runtime.sec <= 0 && server->cfg.actor_max_runtime.sec <= 0)
+				{
+					obj = hcl_execute(proto->hcl);
+					if (!obj) failmsg = hcl_geterrmsg(proto->hcl);
+				}
+				else
+				{
+					if (insert_exec_timer(proto, &server->cfg.actor_max_runtime) <= -1)
+					{
+						hcl_logbfmt (proto->hcl, SERVER_LOGMASK_ERROR, "cannot start execution timer\n");
+						/* use proto->hcl's error formatting instead of server's to avoid using mutex over the shared server->dummy_hcl */
+						hcl_seterrbfmt (proto->hcl, HCL_ESYSMEM, "cannot start execution timer"); 
+						failmsg = hcl_geterrmsg(proto->hcl);
+					}
+					else
+					{
+//printf ("inserted exec timer..........\n");
+						obj = hcl_execute(proto->hcl);
+						if (!obj) failmsg = hcl_geterrmsg(proto->hcl);
+
+						delete_exec_timer (proto);
+					}
+				}
+
+				if (hcl_server_proto_end_reply(proto, failmsg) <= -1) 
 				{
 					hcl_logbfmt (proto->hcl, SERVER_LOGMASK_ERROR, "cannot finalize reply for .SCRIPT\n");
 					return -1;
@@ -1531,6 +1615,7 @@ hcl_server_t* hcl_server_open (hcl_mmgr_t* mmgr, hcl_oow_t xtnsize, hcl_server_p
 	hcl_server_t* server;
 	hcl_t* hcl;
 	hcl_vmprim_t vmprim;
+	hcl_tmr_t* tmr;
 	dummy_hcl_xtn_t* xtn;
 
 	server = (hcl_server_t*)HCL_MMGR_ALLOC(mmgr, HCL_SIZEOF(*server) + xtnsize);
@@ -1549,11 +1634,18 @@ hcl_server_t* hcl_server_open (hcl_mmgr_t* mmgr, hcl_oow_t xtnsize, hcl_server_p
 	vmprim.vm_gettime = vm_gettime;
 	vmprim.vm_sleep = vm_sleep;
 
-	hcl = hcl_open(mmgr, HCL_SIZEOF(*xtn), 10240, &vmprim, errnum);
+	hcl = hcl_open(mmgr, HCL_SIZEOF(*xtn), 2048, &vmprim, errnum);
 	if (!hcl) 
 	{
 		HCL_MMGR_FREE (mmgr, server);
 		return HCL_NULL;
+	}
+
+	tmr = hcl_tmr_open(hcl, 0, 1024); /* TOOD: make the timer's default size configurable */
+	if (!tmr)
+	{
+		hcl_close (hcl);
+		HCL_MMGR_FREE (mmgr, server);
 	}
 
 	xtn = (dummy_hcl_xtn_t*)hcl_getxtn(hcl);
@@ -1564,14 +1656,18 @@ hcl_server_t* hcl_server_open (hcl_mmgr_t* mmgr, hcl_oow_t xtnsize, hcl_server_p
 	server->cmgr = hcl_get_utf8_cmgr();
 	server->prim = *prim;
 	server->dummy_hcl = hcl;
+	server->tmr = tmr;
 
 	server->cfg.logmask = ~0u;
 	server->cfg.worker_stack_size = 512000UL; 
 	server->cfg.actor_heap_size = 512000UL;
 
-	pthread_mutex_init (&server->worker_mutex, HCL_NULL);
-	pthread_mutex_init (&server->log_mutex, HCL_NULL);
+	HCL_INITNTIME (&server->cfg.worker_idle_timeout, 0, 0);
+	HCL_INITNTIME (&server->cfg.actor_max_runtime, 0, 0);
 
+	pthread_mutex_init (&server->worker_mutex, HCL_NULL);
+	pthread_mutex_init (&server->tmr_mutex, HCL_NULL);
+	pthread_mutex_init (&server->log_mutex, HCL_NULL);
 
 	return server;
 }
@@ -1579,8 +1675,10 @@ hcl_server_t* hcl_server_open (hcl_mmgr_t* mmgr, hcl_oow_t xtnsize, hcl_server_p
 void hcl_server_close (hcl_server_t* server)
 {
 	pthread_mutex_destroy (&server->log_mutex);
+	pthread_mutex_destroy (&server->tmr_mutex);
 	pthread_mutex_destroy (&server->worker_mutex);
 
+	hcl_tmr_close (server->tmr);
 	hcl_close (server->dummy_hcl);
 	HCL_MMGR_FREE (server->mmgr, server);
 }
@@ -1588,7 +1686,7 @@ void hcl_server_close (hcl_server_t* server)
 static hcl_server_worker_t* alloc_worker (hcl_server_t*  server, int cli_sck)
 {
 	hcl_server_worker_t* worker;
-	
+
 	worker = (hcl_server_worker_t*)HCL_MMGR_ALLOC (server->mmgr, HCL_SIZEOF(*worker));
 	if (!worker) return HCL_NULL;
 
@@ -1848,29 +1946,61 @@ int hcl_server_start (hcl_server_t* server, const hcl_bch_t* addrs)
 		int cli_fd;
 		socklen_t cli_len;
 		pthread_t thr;
-
+		hcl_ntime_t tmout;
 		hcl_server_worker_t* worker;
+		struct pollfd pfd[1];
+		int n;
 
 		purge_all_workers (server, HCL_SERVER_WORKER_STATE_DEAD);
 
-		cli_len = HCL_SIZEOF(cli_addr);
-		cli_fd = accept(srv_fd, (struct sockaddr*)&cli_addr, &cli_len);
-		if (cli_fd == -1)
+		pthread_mutex_lock (&server->tmr_mutex);
+		n = hcl_tmr_gettmout(server->tmr,  HCL_NULL, &tmout);
+		pthread_mutex_unlock (&server->tmr_mutex);
+		if (n <= -1) HCL_INITNTIME (&tmout, 1, 0);
+
+		pfd[0].fd = srv_fd;
+		pfd[0].events = POLLIN | POLLERR;
+		n = poll(pfd, 1, HCL_SECNSEC_TO_MSEC(tmout.sec, tmout.nsec));
+		if (n <= -1)
 		{
 			if (server->stopreq) break; /* normal termination requested */
 			if (errno == EINTR) continue; /* interrupted but not termination requested */
 
-			set_err_with_syserr (server, errno, "unable to accept worker on socket %d", srv_fd);
+			set_err_with_syserr (server, errno, "unable to poll for events in server");
 			xret = -1;
 			break;
 		}
 
-		hcl_server_logbfmt (server, SERVER_LOGMASK_INFO, "accepted worker - socket %d\n", cli_fd);
+		pthread_mutex_lock (&server->tmr_mutex);
+		hcl_tmr_fire (server->tmr, HCL_NULL, HCL_NULL);
+		pthread_mutex_unlock (&server->tmr_mutex);
 
-		worker = alloc_worker(server, cli_fd);
-		if (pthread_create(&thr, &thr_attr, worker_main, worker) != 0)
+		while (n > 0)
 		{
-			free_worker (worker);
+			--n;
+
+			if (pfd[n].revents /*& (POLLIN | POLLHUP | POLLERR) */)
+			{
+				cli_len = HCL_SIZEOF(cli_addr);
+				cli_fd = accept(pfd[n].fd, (struct sockaddr*)&cli_addr, &cli_len);
+				if (cli_fd == -1)
+				{
+					if (server->stopreq) break; /* normal termination requested */
+					if (errno == EINTR) continue; /* interrupted but not termination requested */
+
+					set_err_with_syserr (server, errno, "unable to accept worker on socket %d", pfd[n]);
+					xret = -1;
+					break;
+				}
+
+				hcl_server_logbfmt (server, SERVER_LOGMASK_INFO, "accepted worker - socket %d\n", cli_fd);
+
+				worker = alloc_worker(server, cli_fd);
+				if (pthread_create(&thr, &thr_attr, worker_main, worker) != 0)
+				{
+					free_worker (worker);
+				}
+			}
 		}
 	}
 

@@ -431,6 +431,7 @@ int main (int argc, char* argv[])
 	const char* logopt = HCL_NULL;
 	const char* dbgopt = HCL_NULL;
 	hcl_oow_t memsize = MIN_MEMSIZE;
+	hcl_ntime_t tmout = { 0, 0 };
 	int large_pages = 0;
 	unsigned int trait;
 
@@ -522,6 +523,9 @@ int main (int argc, char* argv[])
 
 	/*hcl_server_setoption (server, HCL_SERVER_WORKER_STACK_SIZE, ???);*/
 	hcl_server_setoption (server, HCL_SERVER_ACTOR_HEAP_SIZE, &memsize);
+
+	HCL_INITNTIME (&tmout, 5, 0);
+	hcl_server_setoption (server, HCL_SERVER_ACTOR_MAX_RUNTIME, &tmout);
 
 	g_server = server;
 	set_signal (SIGINT, handle_sigint);

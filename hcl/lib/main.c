@@ -664,7 +664,7 @@ static void syserrstrb (hcl_t* hcl, int syserr, hcl_bch_t* buf, hcl_oow_t len)
 #if defined(HAVE_STRERROR_R)
 	strerror_r (syserr, buf, len);
 #else
-	/* this is not thread safe */
+	/* this may not be thread safe */
 	hcl_copybcstr (buf, len, strerror(syserr));
 #endif
 }

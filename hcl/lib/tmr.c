@@ -66,7 +66,7 @@ int hcl_tmr_init (hcl_tmr_t* tmr, hcl_t* hcl, hcl_oow_t capa)
 
 	if (capa <= 0) capa = 1;
 
-	tmp = HCL_MMGR_ALLOC (hcl->mmgr, capa * HCL_SIZEOF(*tmp));
+	tmp = HCL_MMGR_ALLOC(hcl->mmgr, capa * HCL_SIZEOF(*tmp));
 	if (tmp == HCL_NULL) return -1;
 
 	tmr->hcl = hcl;
@@ -208,25 +208,31 @@ hcl_tmr_index_t hcl_tmr_insert (hcl_tmr_t* tmr, const hcl_tmr_event_t* event)
 
 		HCL_ASSERT (tmr->hcl, tmr->capa >= 1);
 		new_capa = tmr->capa * 2;
-		tmp = HCL_MMGR_REALLOC (tmr->hcl->mmgr, tmr->event, new_capa * HCL_SIZEOF(*tmp));
+		tmp = HCL_MMGR_REALLOC(tmr->hcl->mmgr, tmr->event, new_capa * HCL_SIZEOF(*tmp));
 		if (tmp == HCL_NULL) return HCL_TMR_INVALID_INDEX;
 
 		tmr->event = tmp;
 		tmr->capa = new_capa;
 	}
 
+	HCL_ASSERT (tmr->hcl, event->handler != HCL_NULL);
+	HCL_ASSERT (tmr->hcl, event->updater != HCL_NULL);
+
 	tmr->size = tmr->size + 1;
 	tmr->event[index] = *event;
-	return sift_up (tmr, index, 0);
+	return sift_up(tmr, index, 0);
 }
 
 hcl_tmr_index_t hcl_tmr_update (hcl_tmr_t* tmr, hcl_oow_t index, const hcl_tmr_event_t* event)
 {
 	hcl_tmr_event_t item;
 
+	HCL_ASSERT (tmr->hcl, event->handler != HCL_NULL);
+	HCL_ASSERT (tmr->hcl, event->updater != HCL_NULL);
+
 	item = tmr->event[index];
 	tmr->event[index] = *event;
-	return YOUNGER_THAN(event, &item)? sift_up (tmr, index, 0): sift_down (tmr, index, 0);
+	return YOUNGER_THAN(event, &item)? sift_up(tmr, index, 0): sift_down(tmr, index, 0);
 }
 
 int hcl_tmr_fire (hcl_tmr_t* tmr, const hcl_ntime_t* tm, hcl_oow_t* firecnt)
@@ -267,7 +273,7 @@ int hcl_tmr_gettmout (hcl_tmr_t* tmr, const hcl_ntime_t* tm, hcl_ntime_t* tmout)
 	/*else if (hcl_gettime(&now) <= -1) return -1;*/
 	tmr->hcl->vmprim.vm_gettime (tmr->hcl, &now);
 
-	HCL_SUBNTIME (&tmr->event[0].when, &now, tmout);
+	HCL_SUBNTIME (tmout, &tmr->event[0].when, &now);
 	if (tmout->sec < 0) HCL_CLEARNTIME (tmout);
 
 	return 0;
