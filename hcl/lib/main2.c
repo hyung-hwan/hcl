@@ -402,16 +402,20 @@ static int handle_dbgopt (hcl_server_t* server, const char* str)
 
 /* ========================================================================= */
 
-#define MIN_MEMSIZE 512000ul
+#define MIN_WORKER_STACK_SIZE 512000ul
+#define MIN_ACTOR_HEAP_SIZE 512000ul
  
 int main (int argc, char* argv[])
 {
 	hcl_bci_t c;
 	static hcl_bopt_lng_t lopt[] =
 	{
-		{ ":log",         'l' },
-		{ ":memsize",     'm' },
-		{ "large-pages",  '\0' },
+		{ ":log",                'l'  },
+		{ "large-pages",         '\0' },
+		{ ":worker-stack-size",  '\0' },
+		{ ":worker-idle-timeout",'\0' },
+		{ ":actor-heap-size",    'm'  },
+		{ ":actor-max-runtime",  '\0' },
 	#if defined(HCL_BUILD_DEBUG)
 		{ ":debug",       '\0' }, /* NOTE: there is no short option for --debug */
 	#endif
@@ -430,8 +434,10 @@ int main (int argc, char* argv[])
 
 	const char* logopt = HCL_NULL;
 	const char* dbgopt = HCL_NULL;
-	hcl_oow_t memsize = MIN_MEMSIZE;
-	hcl_ntime_t tmout = { 0, 0 };
+	hcl_oow_t worker_stack_size = MIN_ACTOR_HEAP_SIZE;
+	hcl_ntime_t worker_idle_timeout = { 0, 0 };
+	hcl_oow_t actor_heap_size = MIN_ACTOR_HEAP_SIZE;
+	hcl_ntime_t actor_max_runtime = { 0, 0 };
 	int large_pages = 0;
 	unsigned int trait;
 
@@ -453,14 +459,29 @@ int main (int argc, char* argv[])
 				break;
 
 			case 'm':
-				memsize = strtoul(opt.arg, HCL_NULL, 0);
-				if (memsize <= MIN_MEMSIZE) memsize = MIN_MEMSIZE;
+				actor_heap_size = strtoul(opt.arg, HCL_NULL, 0);
+				if (actor_heap_size <= MIN_ACTOR_HEAP_SIZE) actor_heap_size = MIN_ACTOR_HEAP_SIZE;
 				break;
 
 			case '\0':
 				if (hcl_compbcstr(opt.lngopt, "large-pages") == 0)
 				{
 					large_pages = 1;
+					break;
+				}
+				else if (hcl_compbcstr(opt.lngopt, "worker-stack-size") == 0)
+				{
+					worker_stack_size = strtoul(opt.arg, HCL_NULL, 0);
+					if (worker_stack_size <= MIN_WORKER_STACK_SIZE) actor_heap_size = MIN_WORKER_STACK_SIZE;
+				}
+				else if (hcl_compbcstr(opt.lngopt, "worker-idle-timeout") == 0)
+				{
+					worker_idle_timeout.sec = strtoul(opt.arg, HCL_NULL, 0);
+					break;
+				}
+				else if (hcl_compbcstr(opt.lngopt, "actor-max-runtime") == 0)
+				{
+					actor_max_runtime.sec = strtoul(opt.arg, HCL_NULL, 0);
 					break;
 				}
 			#if defined(HCL_BUILD_DEBUG)
@@ -521,11 +542,10 @@ int main (int argc, char* argv[])
 	else trait &= ~HCL_SERVER_TRAIT_USE_LARGE_PAGES;
 	hcl_server_setoption (server, HCL_SERVER_TRAIT, &trait);
 
-	/*hcl_server_setoption (server, HCL_SERVER_WORKER_STACK_SIZE, ???);*/
-	hcl_server_setoption (server, HCL_SERVER_ACTOR_HEAP_SIZE, &memsize);
-
-	HCL_INITNTIME (&tmout, 5, 0);
-	hcl_server_setoption (server, HCL_SERVER_ACTOR_MAX_RUNTIME, &tmout);
+	hcl_server_setoption (server, HCL_SERVER_WORKER_STACK_SIZE, &worker_stack_size);
+	hcl_server_setoption (server, HCL_SERVER_WORKER_IDLE_TIMEOUT, &worker_idle_timeout);
+	hcl_server_setoption (server, HCL_SERVER_ACTOR_HEAP_SIZE, &actor_heap_size);
+	hcl_server_setoption (server, HCL_SERVER_ACTOR_MAX_RUNTIME, &actor_max_runtime);
 
 	g_server = server;
 	set_signal (SIGINT, handle_sigint);
