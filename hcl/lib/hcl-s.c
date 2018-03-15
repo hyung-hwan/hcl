@@ -1740,6 +1740,7 @@ static hcl_server_worker_t* alloc_worker (hcl_server_t*  server, int cli_sck)
 	HCL_MEMSET (worker, 0, HCL_SIZEOF(*worker));
 	worker->sck = cli_sck;
 	worker->server = server;
+/* TODO: allocate a unique id for worker. the socket number isn't very nice because once  it's closed, the uniqueness can't be guaranteed */
 	return worker;
 }
 
