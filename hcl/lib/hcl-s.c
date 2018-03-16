@@ -166,7 +166,8 @@ enum hcl_server_proto_token_type_t
 	HCL_SERVER_PROTO_TOKEN_KILL_WORKER,
 	HCL_SERVER_PROTO_TOKEN_SHOW_WORKERS,
 
-	HCL_SERVER_PROTO_TOKEN_IDENT
+	HCL_SERVER_PROTO_TOKEN_IDENT,
+	HCL_SERVER_PROTO_TOKEN_NUMBER
 };
 typedef enum hcl_server_proto_token_type_t hcl_server_proto_token_type_t;
 
@@ -242,12 +243,16 @@ struct hcl_server_worker_t
 	hcl_server_worker_t* next_worker;
 };
 
-union hcl_server_wid_map_data_t
+struct hcl_server_wid_map_data_t
 {
-	hcl_server_worker_t* worker;
-	hcl_oow_t            next;
+	int used;
+	union
+	{
+		hcl_server_worker_t* worker;
+		hcl_oow_t            next;
+	} u;
 };
-typedef union hcl_server_wid_map_data_t hcl_server_wid_map_data_t;
+typedef struct hcl_server_wid_map_data_t hcl_server_wid_map_data_t;
 		
 struct hcl_server_t
 {
@@ -1084,7 +1089,7 @@ static int write_reply_chunk (hcl_server_proto_t* proto)
 		{
 			/* error occurred inside the worker thread shouldn't affect the error information
 			 * in the server object. so here, i just log a message */
-			HCL_LOG2 (proto->hcl, SERVER_LOGMASK_ERROR, "sendmsg failure on %d - %hs\n", proto->worker->sck, strerror(errno));
+			HCL_LOG2 (proto->hcl, SERVER_LOGMASK_ERROR, "Unable to sendmsg on %d - %hs\n", proto->worker->sck, strerror(errno));
 			return -1; 
 		}
 
@@ -1266,7 +1271,6 @@ static HCL_INLINE int unread_last_char (hcl_server_proto_t* proto)
 		if (unread_last_char(proto) <= -1) return -1; \
 	} while (0)
 
-#define CLEAR_TOKEN_NAME(proto) ((proto)->tok.name.len = 0)
 #define SET_TOKEN_TYPE(proto,tv) ((proto)->tok.type = (tv))
 #define ADD_TOKEN_CHAR(proto,c) \
 	do { if (add_token_char(proto, c) <= -1) return -1; } while (0)
@@ -1283,7 +1287,7 @@ static HCL_INLINE int add_token_char (hcl_server_proto_t* proto, hcl_ooch_t c)
 		tmp = (hcl_ooch_t*)HCL_MMGR_REALLOC(proto->worker->server->mmgr, proto->tok.ptr, capa * HCL_SIZEOF(*tmp));
 		if (!tmp) 
 		{
-			HCL_LOG0 (proto->hcl, SERVER_LOGMASK_ERROR, "out of memory in allocating a token buffer\n");
+			HCL_LOG0 (proto->hcl, SERVER_LOGMASK_ERROR, "Out of memory in allocating a token buffer\n");
 			return -1;
 		}
 
@@ -1299,6 +1303,12 @@ static HCL_INLINE int is_alphachar (hcl_ooci_t c)
 {
 /* TODO: support full unicode */
 	return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z');
+}
+
+static HCL_INLINE int is_digitchar (hcl_ooci_t c)
+{
+/* TODO: support full unicode */
+	return (c >= '0' && c <= '9');
 }
 
 static void classify_current_ident_token (hcl_server_proto_t* proto)
@@ -1360,7 +1370,7 @@ static int get_token (hcl_server_proto_t* proto)
 			GET_CHAR_TO(proto, c);
 			if (!is_alphachar(c))
 			{
-				HCL_LOG0 (proto->hcl, SERVER_LOGMASK_ERROR, "alphabetic character expected after a period\n");
+				HCL_LOG0 (proto->hcl, SERVER_LOGMASK_ERROR, "Alphabetic character expected after a period\n");
 				return -1;
 			}
 
@@ -1377,7 +1387,22 @@ static int get_token (hcl_server_proto_t* proto)
 			break;
 
 		default:
-			HCL_LOG1 (proto->hcl, SERVER_LOGMASK_ERROR, "unrecognized character - [%jc]\n", c);
+			if (is_digitchar(c))
+			{
+				SET_TOKEN_TYPE (proto, HCL_SERVER_PROTO_TOKEN_NUMBER);
+
+				do
+				{
+					ADD_TOKEN_CHAR(proto, c);
+					GET_CHAR_TO(proto, c);
+				}
+				while (is_digitchar(c));
+				
+				UNGET_LAST_CHAR (proto);
+				break;
+			}
+
+			HCL_LOG1 (proto->hcl, SERVER_LOGMASK_ERROR, "Unrecognized character - [%jc]\n", c);
 			return -1;
 	}
 	return 0;
@@ -1502,6 +1527,62 @@ static int execute_script (hcl_server_proto_t* proto, const hcl_bch_t* trigger)
 	return 0;
 }
 
+
+static void show_server_workers (hcl_server_proto_t* proto)
+{
+	hcl_server_t* server;
+	hcl_server_worker_t* w;
+
+	server = proto->worker->server;
+	pthread_mutex_lock (&server->worker_mutex);
+	for (w = server->worker_list[HCL_SERVER_WORKER_STATE_ALIVE].head; w; w = w->next_worker)
+	{
+		/* TODO: implement this better... */
+		hcl_proutbfmt (proto->hcl, 0, "%zu %d %d\n", w->wid, w->sck, 1000);
+	}
+	pthread_mutex_unlock (&server->worker_mutex);
+}
+
+static int kill_server_worker (hcl_server_proto_t* proto, hcl_oow_t wid)
+{
+	hcl_server_t* server;
+	int xret = 0;
+
+	server = proto->worker->server;
+	pthread_mutex_lock (&server->worker_mutex);
+	if (wid >= server->wid_map.capa)
+	{
+		hcl_server_seterrnum (server, HCL_ENOENT);
+		xret = -1;
+	}
+	else
+	{
+		hcl_server_worker_t* worker;
+
+		if (!server->wid_map.ptr[wid].used)
+		{
+			hcl_server_seterrnum (server, HCL_ENOENT);
+			xret = -1;
+		}
+		else
+		{
+			worker = server->wid_map.ptr[wid].u.worker;
+			if (!worker) 
+			{
+				hcl_server_seterrnum (server, HCL_ENOENT);
+				xret = -1;
+			}
+			else
+			{
+				if (worker->sck) shutdown (worker->sck, SHUT_RDWR);
+				if (worker->proto) hcl_abort (worker->proto->hcl);
+			}
+		}
+	}
+	pthread_mutex_unlock (&server->worker_mutex);
+	return xret;
+}
+
 int hcl_server_proto_handle_request (hcl_server_proto_t* proto)
 {
 	if (get_token(proto) <= -1) return -1;
@@ -1608,7 +1689,7 @@ int hcl_server_proto_handle_request (hcl_server_proto_t* proto)
 			if (get_token(proto) <= -1) return -1;
 			if (proto->tok.type != HCL_SERVER_PROTO_TOKEN_NL)
 			{
-				HCL_LOG0 (proto->hcl, SERVER_LOGMASK_ERROR, "No new line after .SCRIPT contest\n");
+				HCL_LOG0 (proto->hcl, SERVER_LOGMASK_ERROR, "No new line after .SCRIPT contents\n");
 				return -1;
 			}
 
@@ -1626,12 +1707,21 @@ int hcl_server_proto_handle_request (hcl_server_proto_t* proto)
 		}
 
 		case HCL_SERVER_PROTO_TOKEN_SHOW_WORKERS:
+			if (proto->req.state != HCL_SERVER_PROTO_REQ_IN_TOP_LEVEL)
+			{
+				HCL_LOG0 (proto->hcl, SERVER_LOGMASK_ERROR, ".SHOW-WORKERS not allowed to be nested\n");
+				return -1;
+			}
+
+			if (get_token(proto) <= -1) return -1;
+			if (proto->tok.type != HCL_SERVER_PROTO_TOKEN_NL)
+			{
+				HCL_LOG0 (proto->hcl, SERVER_LOGMASK_ERROR, "No new line after .SHOW-WORKERS\n");
+				return -1;
+			}
+			
 			hcl_server_proto_start_reply (proto);
-			
-			pthread_mutex_lock (&proto->worker->server->worker_mutex);
-			//print_hcl_server_workers (proto);
-			pthread_mutex_unlock (&proto->worker->server->worker_mutex);
-			
+			show_server_workers (proto);
 			if (hcl_server_proto_end_reply(proto, HCL_NULL) <= -1)
 			{
 				HCL_LOG0 (proto->hcl, SERVER_LOGMASK_ERROR, "Unable to finalize reply for .SHOW-WORKERS\n");
@@ -1641,18 +1731,43 @@ int hcl_server_proto_handle_request (hcl_server_proto_t* proto)
 			break;
 
 		case HCL_SERVER_PROTO_TOKEN_KILL_WORKER:
+		{
+			int n;
+			hcl_oow_t wid, wp;
+
+			static hcl_ooch_t failmsg[] = { 'U','n','a','b','l','e',' ','t','o',' ','k','i','l','l','\0' };
+
+			if (proto->req.state != HCL_SERVER_PROTO_REQ_IN_TOP_LEVEL)
+			{
+				HCL_LOG0 (proto->hcl, SERVER_LOGMASK_ERROR, ".KILL-WORKER not allowed to be nested\n");
+				return -1;
+			}
+
+			if (get_token(proto) <= -1) return -1;
+			if (proto->tok.type != HCL_SERVER_PROTO_TOKEN_NUMBER)
+			{
+				HCL_LOG0 (proto->hcl, SERVER_LOGMASK_ERROR, "No worker ID after .KILL-WORKER\n");
+				return -1;
+			}
+
+			for (wid = 0, wp = 0; wp < proto->tok.len; wp++) wid = wid * 10 + (proto->tok.ptr[wp] - '0');
+
+			if (get_token(proto) <= -1) return -1;
+			if (proto->tok.type != HCL_SERVER_PROTO_TOKEN_NL)
+			{
+				HCL_LOG0 (proto->hcl, SERVER_LOGMASK_ERROR, "No new line after worker ID of .KILL-WORKER\n");
+				return -1;
+			}
+
 			hcl_server_proto_start_reply (proto);
-			
-			pthread_mutex_lock (&proto->worker->server->worker_mutex);
-			//kill_hcl_server_worker (proto);
-			pthread_mutex_unlock (&proto->worker->server->worker_mutex);
-			
-			if (hcl_server_proto_end_reply(proto, HCL_NULL) <= -1)
+			n = kill_server_worker(proto, wid);
+			if (hcl_server_proto_end_reply(proto, (n <= -1? failmsg: HCL_NULL)) <= -1)
 			{
 				HCL_LOG0 (proto->hcl, SERVER_LOGMASK_ERROR, "Unable to finalize reply for .KILL-WORKER\n");
 				return -1;
 			}
 			break;
+		}
 
 		default:
 			HCL_LOG3 (proto->hcl, SERVER_LOGMASK_ERROR, "Unknown token - %d - %.*js\n", (int)proto->tok.type, proto->tok.len, proto->tok.ptr);
@@ -1820,9 +1935,11 @@ static HCL_INLINE int prepare_to_acquire_wid (hcl_server_t* server)
 	server->wid_map.free_first = server->wid_map.capa;
 	for (i = server->wid_map.capa, j = server->wid_map.capa + 1; j < new_capa; i++, j++)
 	{
-		tmp[i].next = j;
+		tmp[i].used = 0;
+		tmp[i].u.next = j;
 	}
-	tmp[i].next = HCL_SERVER_WID_INVALID;
+	tmp[i].used = 0;
+	tmp[i].u.next = HCL_SERVER_WID_INVALID;
 	server->wid_map.free_last = i;
 
 	server->wid_map.ptr = tmp;
@@ -1838,10 +1955,11 @@ static HCL_INLINE void acquire_wid (hcl_server_t* server, hcl_server_worker_t* w
 	wid = server->wid_map.free_first;
 	worker->wid = wid;
 
-	server->wid_map.free_first = server->wid_map.ptr[wid].next;
+	server->wid_map.free_first = server->wid_map.ptr[wid].u.next;
 	if (server->wid_map.free_first == HCL_SERVER_WID_INVALID) server->wid_map.free_last = HCL_SERVER_WID_INVALID;
 
-	server->wid_map.ptr[wid].worker = worker;
+	server->wid_map.ptr[wid].used = 1;
+	server->wid_map.ptr[wid].u.worker = worker;
 }
 
 static HCL_INLINE void release_wid (hcl_server_t* server, hcl_server_worker_t* worker)
@@ -1851,7 +1969,8 @@ static HCL_INLINE void release_wid (hcl_server_t* server, hcl_server_worker_t* w
 	wid = worker->wid;
 	HCL_ASSERT (server->dummy_hcl, wid < server->wid_map.capa && wid != HCL_SERVER_WID_INVALID);
 
-	server->wid_map.ptr[wid].next = HCL_SERVER_WID_INVALID;
+	server->wid_map.ptr[wid].used = 0;
+	server->wid_map.ptr[wid].u.next = HCL_SERVER_WID_INVALID;
 	if (server->wid_map.free_last == HCL_SERVER_WID_INVALID)
 	{
 		HCL_ASSERT (server->dummy_hcl, server->wid_map.free_first <= HCL_SERVER_WID_INVALID);
@@ -1859,12 +1978,11 @@ static HCL_INLINE void release_wid (hcl_server_t* server, hcl_server_worker_t* w
 	}
 	else
 	{
-		server->wid_map.ptr[server->wid_map.free_last].next = wid;
+		server->wid_map.ptr[server->wid_map.free_last].u.next = wid;
 	}
 	server->wid_map.free_last = wid;
 	worker->wid = HCL_SERVER_WID_INVALID;
 }
-
 
 static hcl_server_worker_t* alloc_worker (hcl_server_t* server, int cli_sck)
 {

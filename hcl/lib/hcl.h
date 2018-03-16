@@ -1620,6 +1620,20 @@ HCL_EXPORT int hcl_print (
 	hcl_oop_t    obj
 );
 
+HCL_EXPORT hcl_ooi_t hcl_proutbfmt (
+	hcl_t*           hcl,
+	int              mask,
+	const hcl_bch_t* fmt,
+	...
+);
+
+HCL_EXPORT hcl_ooi_t hcl_proutufmt (
+	hcl_t*           hcl,
+	int              mask,
+	const hcl_uch_t* fmt,
+	...
+);
+
 HCL_EXPORT int hcl_compile (
 	hcl_t*       hcl,
 	hcl_oop_t    obj

@@ -1006,20 +1006,6 @@ int hcl_addbuiltinprims (
 /* ========================================================================= */
 /* logfmt.c                                                                  */
 /* ========================================================================= */
-hcl_ooi_t hcl_proutbfmt (
-	hcl_t*           hcl,
-	int              mask,
-	const hcl_bch_t* fmt,
-	...
-);
-
-hcl_ooi_t hcl_proutufmt (
-	hcl_t*           hcl,
-	int              mask,
-	const hcl_uch_t* fmt,
-	...
-);
-
 int hcl_outfmtobj (
 	hcl_t*        hcl,
 	int           mask,
