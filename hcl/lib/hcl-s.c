@@ -1637,6 +1637,7 @@ hcl_server_t* hcl_server_open (hcl_mmgr_t* mmgr, hcl_oow_t xtnsize, hcl_server_p
 	hcl_tmr_t* tmr;
 	dummy_hcl_xtn_t* xtn;
 	int pfd[2], fcv;
+	unsigned int trait;
 
 	server = (hcl_server_t*)HCL_MMGR_ALLOC(mmgr, HCL_SIZEOF(*server) + xtnsize);
 	if (!server) 
@@ -1713,6 +1714,18 @@ hcl_server_t* hcl_server_open (hcl_mmgr_t* mmgr, hcl_oow_t xtnsize, hcl_server_p
 	pthread_mutex_init (&server->worker_mutex, HCL_NULL);
 	pthread_mutex_init (&server->tmr_mutex, HCL_NULL);
 	pthread_mutex_init (&server->log_mutex, HCL_NULL);
+
+	/* the dummy hcl is used for this server to perform primitive operations
+	 * such as getting system time or logging. so the heap size doesn't 
+	 * need to be changed from the tiny value set above. */
+	hcl_setoption (server->dummy_hcl, HCL_LOG_MASK, &server->cfg.logmask);
+	hcl_setcmgr (server->dummy_hcl, server->cmgr);
+	hcl_getoption (server->dummy_hcl, HCL_TRAIT, &trait);
+#if defined(HCL_BUILD_DEBUG)
+	if (server->cfg.trait & HCL_SERVER_TRAIT_DEBUG_GC) trait |= HCL_DEBUG_GC;
+	if (server->cfg.trait & HCL_SERVER_TRAIT_DEBUG_BIGINT) trait |= HCL_DEBUG_BIGINT;
+#endif
+	hcl_setoption (server->dummy_hcl, HCL_TRAIT, &trait);
 
 	return server;
 }
@@ -2083,10 +2096,33 @@ int hcl_server_setoption (hcl_server_t* server, hcl_server_option_t id, const vo
 	{
 		case HCL_SERVER_TRAIT:
 			server->cfg.trait = *(const unsigned int*)value;
+			if (server->dummy_hcl)
+			{
+				/* setting this affects the dummy hcl immediately.
+				 * existing hcl instances inside worker threads won't get 
+				 * affected. new hcl instances to be created later 
+				 * is supposed to use the new value */
+				unsigned int trait;
+
+				hcl_getoption (server->dummy_hcl, HCL_TRAIT, &trait);
+			#if defined(HCL_BUILD_DEBUG)
+				if (server->cfg.trait & HCL_SERVER_TRAIT_DEBUG_GC) trait |= HCL_DEBUG_GC;
+				if (server->cfg.trait & HCL_SERVER_TRAIT_DEBUG_BIGINT) trait |= HCL_DEBUG_BIGINT;
+			#endif
+				hcl_setoption (server->dummy_hcl, HCL_TRAIT, &trait);
+			}
 			return 0;
 
 		case HCL_SERVER_LOG_MASK:
 			server->cfg.logmask = *(const unsigned int*)value;
+			if (server->dummy_hcl) 
+			{
+				/* setting this affects the dummy hcl immediately.
+				 * existing hcl instances inside worker threads won't get 
+				 * affected. new hcl instances to be created later 
+				 * is supposed to use the new value */
+				hcl_setoption (server->dummy_hcl, HCL_LOG_MASK, value);
+			}
 			return 0;
 
 		case HCL_SERVER_WORKER_STACK_SIZE:

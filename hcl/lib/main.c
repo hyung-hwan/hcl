@@ -1676,7 +1676,7 @@ int main (int argc, char* argv[])
 	}
 
 	{
-		int trait = 0;
+		unsigned int trait = 0;
 
 		/*trait |= HCL_NOGC;*/
 		trait |= HCL_AWAIT_PROCS;

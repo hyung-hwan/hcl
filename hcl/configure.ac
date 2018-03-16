@@ -83,7 +83,7 @@ AC_SUBST(LIBM, $LIBM)
 AX_PTHREAD()
 
 
-check some compiler builtins
+dnl check some compiler builtins
 AC_MSG_CHECKING([__builtin_memset])
 AC_COMPILE_IFELSE(
 	[AC_LANG_PROGRAM([], [__builtin_memset ((void*)1, ' ', 10);])],
