@@ -56,10 +56,12 @@ enum hcl_server_trait_t
 };
 typedef enum hcl_server_trait_t hcl_server_trait_t;
 
+#define HCL_SERVER_WID_INVALID ((hcl_oow_t)-1)
+#define HCL_SERVER_WID_MAX (HCL_SERVER_WID_INVALID - 1)
 
 typedef void (*hcl_server_log_write_t) (
 	hcl_server_t*     server,
-	int               wid,
+	hcl_oow_t         wid,
 	unsigned int      mask,
 	const hcl_ooch_t* msg,
 	hcl_oow_t         len

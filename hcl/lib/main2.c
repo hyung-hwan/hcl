@@ -117,7 +117,7 @@ static int write_all (int fd, const char* ptr, hcl_oow_t len)
 	return 0;
 }
 
-static void log_write (hcl_server_t* server, int wid, unsigned int mask, const hcl_ooch_t* msg, hcl_oow_t len)
+static void log_write (hcl_server_t* server, hcl_oow_t wid, unsigned int mask, const hcl_ooch_t* msg, hcl_oow_t len)
 {
 	hcl_bch_t buf[256];
 	hcl_oow_t ucslen, bcslen;
@@ -172,9 +172,10 @@ static void log_write (hcl_server_t* server, int wid, unsigned int mask, const h
 /* TODO: less write system calls by having a buffer */
 		write_all (logfd, ts, tslen);
 
-		if (wid >= 0)
+		if (wid != HCL_SERVER_WID_INVALID)
 		{
-			tslen = snprintf (ts, sizeof(ts), "[%x] ", wid);
+			/* TODO: check if the underlying snprintf support %zd */
+			tslen = snprintf (ts, sizeof(ts), "[%zu] ", wid);
 			write_all (logfd, ts, tslen);
 		}
 	}
