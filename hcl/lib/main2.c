@@ -43,6 +43,9 @@
 #if defined(HAVE_SIGNAL_H)
 #	include <signal.h>
 #endif
+#if defined(HAVE_SYS_UIO_H)
+#	include <sys/uio.h>
+#endif
 
 #include <unistd.h>
 #include <fcntl.h>
@@ -55,6 +58,12 @@ struct server_xtn_t
 	int logfd;
 	unsigned int logmask;
 	int logfd_istty;
+	
+	struct
+	{
+		hcl_bch_t buf[4096];
+		hcl_oow_t len;
+	} logbuf;
 };
 
 /* ========================================================================= */
@@ -83,7 +92,7 @@ static hcl_mmgr_t sys_mmgr =
 };
 /* ========================================================================= */
 
-static int write_all (int fd, const char* ptr, hcl_oow_t len)
+static int write_all (int fd, const hcl_bch_t* ptr, hcl_oow_t len)
 {
 	while (len > 0)
 	{
@@ -115,6 +124,70 @@ static int write_all (int fd, const char* ptr, hcl_oow_t len)
 	}
 
 	return 0;
+}
+
+
+static int write_log (hcl_server_t* server, const hcl_bch_t* ptr, hcl_oow_t len)
+{
+	server_xtn_t* xtn;
+
+
+	xtn = hcl_server_getxtn(server);
+
+	while (len > 0)
+	{
+		if (xtn->logbuf.len > 0)
+		{
+			hcl_oow_t rcapa, cplen;
+
+			rcapa = HCL_COUNTOF(xtn->logbuf.buf) - xtn->logbuf.len;
+			cplen = (len >= rcapa)? rcapa: len;
+
+			memcpy (&xtn->logbuf.buf[xtn->logbuf.len], ptr, cplen);
+			xtn->logbuf.len += cplen;
+			ptr += cplen;
+			len -= cplen;
+
+			if (xtn->logbuf.len >= HCL_COUNTOF(xtn->logbuf.buf))
+			{
+				write_all(xtn->logfd, xtn->logbuf.buf, xtn->logbuf.len);
+				xtn->logbuf.len = 0;
+			}
+		}
+		else
+		{
+			hcl_oow_t rcapa;
+
+			rcapa = HCL_COUNTOF(xtn->logbuf.buf);
+			if (len >= rcapa)
+			{
+				write_all (xtn->logfd, ptr, rcapa);
+				ptr += rcapa;
+				len -= rcapa;
+			}
+			else
+			{
+				memcpy (xtn->logbuf.buf, ptr, len);
+				xtn->logbuf.len += len;
+				ptr += len;
+				len -= len;
+				
+			}
+		}
+	}
+
+	return 0;
+}
+
+static void flush_log (hcl_server_t* server)
+{
+	server_xtn_t* xtn;
+	xtn = hcl_server_getxtn(server);
+	if (xtn->logbuf.len > 0)
+	{
+		write_all (xtn->logfd, xtn->logbuf.buf, xtn->logbuf.len);
+		xtn->logbuf.len = 0;
+	}
 }
 
 static void log_write (hcl_server_t* server, hcl_oow_t wid, unsigned int mask, const hcl_ooch_t* msg, hcl_oow_t len)
@@ -154,7 +227,6 @@ static void log_write (hcl_server_t* server, hcl_oow_t wid, unsigned int mask, c
 		size_t tslen;
 		struct tm tm, *tmp;
 
-
 		now = time(NULL);
 
 		tmp = localtime_r (&now, &tm);
@@ -170,21 +242,21 @@ static void log_write (hcl_server_t* server, hcl_oow_t wid, unsigned int mask, c
 		}
 
 /* TODO: less write system calls by having a buffer */
-		write_all (logfd, ts, tslen);
+		write_log (server, ts, tslen);
 
 		if (wid != HCL_SERVER_WID_INVALID)
 		{
 			/* TODO: check if the underlying snprintf support %zd */
 			tslen = snprintf (ts, sizeof(ts), "[%zu] ", wid);
-			write_all (logfd, ts, tslen);
+			write_log (server, ts, tslen);
 		}
 	}
 
 	if (xtn->logfd_istty)
 	{
-		if (mask & HCL_LOG_FATAL) write_all (logfd, "\x1B[1;31m", 7);
-		else if (mask & HCL_LOG_ERROR) write_all (logfd, "\x1B[1;32m", 7);
-		else if (mask & HCL_LOG_WARN) write_all (logfd, "\x1B[1;33m", 7);
+		if (mask & HCL_LOG_FATAL) write_log (server, "\x1B[1;31m", 7);
+		else if (mask & HCL_LOG_ERROR) write_log (server, "\x1B[1;32m", 7);
+		else if (mask & HCL_LOG_WARN) write_log (server, "\x1B[1;33m", 7);
 	}
 
 #if defined(HCL_OOCH_IS_UCH)
@@ -207,7 +279,7 @@ static void log_write (hcl_server_t* server, hcl_oow_t wid, unsigned int mask, c
 			/*assert (ucslen > 0);*/
 
 			/* attempt to write all converted characters */
-			if (write_all(logfd, buf, bcslen) <= -1) break;
+			if (write_log(server, buf, bcslen) <= -1) break;
 
 			if (n == 0) break;
 			else
@@ -223,13 +295,15 @@ static void log_write (hcl_server_t* server, hcl_oow_t wid, unsigned int mask, c
 		}
 	}
 #else
-	write_all (logfd, msg, len);
+	write_log (server, msg, len);
 #endif
 
 	if (xtn->logfd_istty)
 	{
-		if (mask & (HCL_LOG_FATAL | HCL_LOG_ERROR | HCL_LOG_WARN)) write_all (logfd, "\x1B[0m", 4);
+		if (mask & (HCL_LOG_FATAL | HCL_LOG_ERROR | HCL_LOG_WARN)) write_log (server, "\x1B[0m", 4);
 	}
+
+	flush_log (server);
 }
 
 /* ========================================================================= */

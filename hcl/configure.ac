@@ -120,7 +120,7 @@ dnl check header files.
 AC_HEADER_STDC
 AC_CHECK_HEADERS([stddef.h wchar.h wctype.h errno.h signal.h fcntl.h dirent.h])
 AC_CHECK_HEADERS([time.h sys/time.h utime.h spawn.h execinfo.h ucontext.h])
-AC_CHECK_HEADERS([dlfcn.h ltdl.h sys/mman.h])
+AC_CHECK_HEADERS([dlfcn.h ltdl.h sys/mman.h sys/uio.h])
 
 dnl check data types
 dnl AC_CHECK_TYPE([wchar_t], 
@@ -136,7 +136,7 @@ AC_CHECK_FUNCS([backtrace backtrace_symbols])
 AC_CHECK_FUNCS([makecontext swapcontext getcontext setcontext])
 AC_CHECK_FUNCS([clock_nanosleep nanosleep usleep])
 AC_CHECK_FUNCS([snprintf _vsnprintf _vsnwprintf])
-AC_CHECK_FUNCS([isatty mmap munmap])
+AC_CHECK_FUNCS([isatty mmap munmap readv writev])
 
 save_LIBS="$LIBS"
 AC_SEARCH_LIBS([dlopen], [dl dld], [

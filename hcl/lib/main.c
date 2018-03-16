@@ -144,6 +144,12 @@ struct xtn_t
 	int logfd;
 	unsigned int logmask;
 	int logfd_istty;
+	
+	struct 
+	{
+		hcl_bch_t buf[4096];
+		hcl_oow_t len;
+	} logbuf;
 
 	int reader_istty;
 	
@@ -511,7 +517,7 @@ static void free_heap (hcl_t* hcl, void* ptr)
 #endif
 }
 
-static int write_all (int fd, const char* ptr, hcl_oow_t len)
+static int write_all (int fd, const hcl_bch_t* ptr, hcl_oow_t len)
 {
 	while (len > 0)
 	{
@@ -543,6 +549,71 @@ static int write_all (int fd, const char* ptr, hcl_oow_t len)
 	}
 
 	return 0;
+}
+
+
+static int write_log (hcl_t* hcl, const hcl_bch_t* ptr, hcl_oow_t len)
+{
+	xtn_t* xtn;
+
+	xtn = hcl_getxtn(hcl);
+
+	while (len > 0)
+	{
+		if (xtn->logbuf.len > 0)
+		{
+			hcl_oow_t rcapa, cplen;
+
+			rcapa = HCL_COUNTOF(xtn->logbuf.buf) - xtn->logbuf.len;
+			cplen = (len >= rcapa)? rcapa: len;
+
+			memcpy (&xtn->logbuf.buf[xtn->logbuf.len], ptr, cplen);
+			xtn->logbuf.len += cplen;
+			ptr += cplen;
+			len -= cplen;
+
+			if (xtn->logbuf.len >= HCL_COUNTOF(xtn->logbuf.buf))
+			{
+				int n;
+				n = write_all(xtn->logfd, xtn->logbuf.buf, xtn->logbuf.len);
+				xtn->logbuf.len = 0;
+				if (n <= -1) return -1;
+			}
+		}
+		else
+		{
+			hcl_oow_t rcapa;
+
+			rcapa = HCL_COUNTOF(xtn->logbuf.buf);
+			if (len >= rcapa)
+			{
+				if (write_all(xtn->logfd, ptr, rcapa) <= -1) return -1;
+				ptr += rcapa;
+				len -= rcapa;
+			}
+			else
+			{
+				memcpy (xtn->logbuf.buf, ptr, len);
+				xtn->logbuf.len += len;
+				ptr += len;
+				len -= len;
+				
+			}
+		}
+	}
+
+	return 0;
+}
+
+static void flush_log (hcl_t* hcl)
+{
+	xtn_t* xtn;
+	xtn = hcl_getxtn(hcl);
+	if (xtn->logbuf.len > 0)
+	{
+		write_all (xtn->logfd, xtn->logbuf.buf, xtn->logbuf.len);
+		xtn->logbuf.len = 0;
+	}
 }
 
 static void log_write (hcl_t* hcl, unsigned int mask, const hcl_ooch_t* msg, hcl_oow_t len)
@@ -604,14 +675,14 @@ static void log_write (hcl_t* hcl, unsigned int mask, const hcl_ooch_t* msg, hcl
 			tslen = 25; 
 		}
 	#endif
-		write_all (logfd, ts, tslen);
+		write_log (hcl, ts, tslen);
 	}
 
 	if (xtn->logfd_istty)
 	{
-		if (mask & HCL_LOG_FATAL) write_all (logfd, "\x1B[1;31m", 7);
-		else if (mask & HCL_LOG_ERROR) write_all (logfd, "\x1B[1;32m", 7);
-		else if (mask & HCL_LOG_WARN) write_all (logfd, "\x1B[1;33m", 7);
+		if (mask & HCL_LOG_FATAL) write_log (hcl, "\x1B[1;31m", 7);
+		else if (mask & HCL_LOG_ERROR) write_log (hcl, "\x1B[1;32m", 7);
+		else if (mask & HCL_LOG_WARN) write_log (hcl, "\x1B[1;33m", 7);
 	}
 
 #if defined(HCL_OOCH_IS_UCH)
@@ -633,7 +704,7 @@ static void log_write (hcl_t* hcl, unsigned int mask, const hcl_ooch_t* msg, hcl
 			HCL_ASSERT (hcl, ucslen > 0); /* if this fails, the buffer size must be increased */
 
 			/* attempt to write all converted characters */
-			if (write_all (logfd, buf, bcslen) <= -1) break;
+			if (write_log (hcl, buf, bcslen) <= -1) break;
 
 			if (n == 0) break;
 			else
@@ -649,13 +720,15 @@ static void log_write (hcl_t* hcl, unsigned int mask, const hcl_ooch_t* msg, hcl
 		}
 	}
 #else
-	write_all (logfd, msg, len);
+	write_log (hcl, msg, len);
 #endif
 
 	if (xtn->logfd_istty)
 	{
-		if (mask & (HCL_LOG_FATAL | HCL_LOG_ERROR | HCL_LOG_WARN)) write_all (logfd, "\x1B[0m", 4);
+		if (mask & (HCL_LOG_FATAL | HCL_LOG_ERROR | HCL_LOG_WARN)) write_log (hcl, "\x1B[0m", 4);
 	}
+
+	flush_log (hcl);
 }
 
 

@@ -32,8 +32,9 @@
 #include <string.h>
 #include <errno.h>
 
-#define TOKEN_NAME_ALIGN 64
-#define WID_MAP_ALIGN 512
+#define HCL_SERVER_TOKEN_NAME_ALIGN 64
+#define HCL_SERVER_WID_MAP_ALIGN 512
+#define HCL_SERVER_PROTO_REPLY_BUF_SIZE 1300
 
 #if defined(_WIN32)
 #	include <windows.h>
@@ -86,6 +87,9 @@
 #	if defined(HAVE_SYS_MMAN_H)
 #		include <sys/mman.h>
 #	endif
+#	if defined(HAVE_SYS_UIO_H)
+#		include <sys/uio.h>
+#	endif
 
 #	include <unistd.h>
 #	include <fcntl.h>
@@ -93,7 +97,6 @@
 #	include <sys/socket.h>
 #	include <netinet/in.h>
 #	include <pthread.h>
-#	include <sys/uio.h>
 #	include <poll.h>
 #endif
 
@@ -182,8 +185,6 @@ enum hcl_server_proto_req_state_t
 	HCL_SERVER_PROTO_REQ_IN_TOP_LEVEL,
 	HCL_SERVER_PROTO_REQ_IN_BLOCK_LEVEL
 };
-
-#define HCL_SERVER_PROTO_REPLY_BUF_SIZE 1300
 
 enum hcl_server_proto_reply_type_t
 {
@@ -1278,7 +1279,7 @@ static HCL_INLINE int add_token_char (hcl_server_proto_t* proto, hcl_ooch_t c)
 		hcl_ooch_t* tmp;
 		hcl_oow_t capa;
 
-		capa = HCL_ALIGN_POW2(proto->tok.len + 1, TOKEN_NAME_ALIGN);
+		capa = HCL_ALIGN_POW2(proto->tok.len + 1, HCL_SERVER_TOKEN_NAME_ALIGN);
 		tmp = (hcl_ooch_t*)HCL_MMGR_REALLOC(proto->worker->server->mmgr, proto->tok.ptr, capa * HCL_SIZEOF(*tmp));
 		if (!tmp) 
 		{
@@ -1582,6 +1583,18 @@ int hcl_server_proto_handle_request (hcl_server_proto_t* proto)
 		case HCL_SERVER_PROTO_TOKEN_SCRIPT:
 		{
 			hcl_oop_t obj;
+			hcl_ooci_t c;
+
+			/* do a special check bypassing get_token(). it checks if the script contents
+			 * come on the same line as .SCRIPT */
+			GET_CHAR_TO (proto, c);
+			while (is_spacechar(c)) GET_CHAR_TO (proto, c);
+			if (c == HCL_OOCI_EOF || c == '\n')
+			{
+				HCL_LOG0 (proto->hcl, SERVER_LOGMASK_ERROR, "No contents on the .SCRIPT line\n");
+				return -1;
+			}
+			UNGET_LAST_CHAR (proto);
 
 			if (proto->req.state == HCL_SERVER_PROTO_REQ_IN_TOP_LEVEL) hcl_reset(proto->hcl);
 
@@ -1785,7 +1798,7 @@ static HCL_INLINE int prepare_to_acquire_wid (hcl_server_t* server)
 	HCL_ASSERT (server->dummy_hcl, server->wid_map.free_first == HCL_SERVER_WID_INVALID);
 	HCL_ASSERT (server->dummy_hcl, server->wid_map.free_last == HCL_SERVER_WID_INVALID);
 
-	new_capa = HCL_ALIGN_POW2(server->wid_map.capa + 1, WID_MAP_ALIGN);
+	new_capa = HCL_ALIGN_POW2(server->wid_map.capa + 1, HCL_SERVER_WID_MAP_ALIGN);
 	if (new_capa > HCL_SERVER_WID_MAX)
 	{
 		if (server->wid_map.capa >= HCL_SERVER_WID_MAX)
@@ -2028,7 +2041,6 @@ void hcl_server_logufmt (hcl_server_t* server, unsigned int mask, const hcl_uch_
 	hcl_logufmtv (server->dummy_hcl, mask, fmt, ap);
 	va_end (ap);
 }
-
 
 static void set_err_with_syserr (hcl_server_t* server, int syserr, const char* bfmt, ...)
 {

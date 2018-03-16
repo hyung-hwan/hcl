@@ -117,6 +117,9 @@
 /* Define to 1 if you have the `quadmath_snprintf' function. */
 #undef HAVE_QUADMATH_SNPRINTF
 
+/* Define to 1 if you have the `readv' function. */
+#undef HAVE_READV
+
 /* Define to 1 if you have the `roundq' function. */
 #undef HAVE_ROUNDQ
 
@@ -183,6 +186,9 @@
 /* Define to 1 if you have the <sys/types.h> header file. */
 #undef HAVE_SYS_TYPES_H
 
+/* Define to 1 if you have the <sys/uio.h> header file. */
+#undef HAVE_SYS_UIO_H
+
 /* Define to 1 if you have the `tanhq' function. */
 #undef HAVE_TANHQ
 
@@ -212,6 +218,9 @@
 
 /* Define to 1 if you have the <wctype.h> header file. */
 #undef HAVE_WCTYPE_H
+
+/* Define to 1 if you have the `writev' function. */
+#undef HAVE_WRITEV
 
 /* Define to 1 if you have the `_vsnprintf' function. */
 #undef HAVE__VSNPRINTF
