@@ -47,43 +47,46 @@ enum hcl_errnum_t
 {
 	HCL_ENOERR,   /**< no error */
 	HCL_EGENERIC, /**< generic error */
-
 	HCL_ENOIMPL,  /**< not implemented */
 	HCL_ESYSERR,  /**< subsystem error */
 	HCL_EINTERN,  /**< internal error */
+	
 	HCL_ESYSMEM,  /**< insufficient system memory */
 	HCL_EOOMEM,   /**< insufficient object memory */
 	HCL_ETYPE,    /**< invalid class/type */
-
 	HCL_EINVAL,   /**< invalid parameter or data */
 	HCL_ENOENT,   /**< data not found */
+	
 	HCL_EEXIST,   /**< existing/duplicate data */
 	HCL_EBUSY, 
 	HCL_EACCES,
 	HCL_EPERM,
 	HCL_ENOTDIR,
+	
 	HCL_EINTR,
 	HCL_EPIPE,
 	HCL_EAGAIN,
 	HCL_EBADHND,
-
 	HCL_EFRMFLOOD, /**< too many frames */
+	
 	HCL_EMSGRCV,   /**< mesasge receiver error */
 	HCL_EMSGSND,   /**< message sending error. even doesNotUnderstand: is not found */
 	HCL_ENUMARGS,  /**< wrong number of arguments */
 	HCL_ERANGE,    /**< range error. overflow and underflow */
 	HCL_EBCFULL,   /**< byte-code full */
+	
 	HCL_EDFULL,    /**< dictionary full */
 	HCL_EPFULL,    /**< processor full */
 	HCL_EFINIS,    /**< unexpected end of data/input/stream/etc */
-	HCL_EXXXXX2,   /**< **** not used ***** */
+	HCL_EFLOOD,    /**< too many items/data */
 	HCL_EDIVBY0,   /**< divide by zero */
+	
 	HCL_EIOERR,    /**< I/O error */
 	HCL_EECERR,    /**< encoding conversion error */
 	HCL_EBUFFULL,  /**< buffer full */
-
 	HCL_ESYNERR,  /**< syntax error */
 	HCL_ECALL,    /**< runtime error - cannot call */
+	
 	HCL_ERECALL,  /**< runtime error - cannot call again */
 	HCL_ECALLARG  /**< runtime error - wrong number of arguments to call */
 };

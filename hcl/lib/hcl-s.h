@@ -37,6 +37,7 @@ enum hcl_server_option_t
 {
 	HCL_SERVER_TRAIT,
 	HCL_SERVER_LOG_MASK,
+	HCL_SERVER_WORKER_MAX_COUNT,
 	HCL_SERVER_WORKER_STACK_SIZE,
 	HCL_SERVER_WORKER_IDLE_TIMEOUT,
 	HCL_SERVER_ACTOR_HEAP_SIZE,
@@ -66,7 +67,7 @@ typedef void (*hcl_server_log_write_t) (
 	const hcl_ooch_t* msg,
 	hcl_oow_t         len
 );
-
+	
 struct hcl_server_prim_t
 {
 	hcl_server_log_write_t log_write;

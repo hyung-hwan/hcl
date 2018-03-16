@@ -413,6 +413,7 @@ int main (int argc, char* argv[])
 	{
 		{ ":log",                'l'  },
 		{ "large-pages",         '\0' },
+		{ ":worker-max-count",   '\0' },
 		{ ":worker-stack-size",  '\0' },
 		{ ":worker-idle-timeout",'\0' },
 		{ ":actor-heap-size",    'm'  },
@@ -435,6 +436,7 @@ int main (int argc, char* argv[])
 
 	const char* logopt = HCL_NULL;
 	const char* dbgopt = HCL_NULL;
+	hcl_oow_t worker_max_count = 0;
 	hcl_oow_t worker_stack_size = MIN_ACTOR_HEAP_SIZE;
 	hcl_ntime_t worker_idle_timeout = { 0, 0 };
 	hcl_oow_t actor_heap_size = MIN_ACTOR_HEAP_SIZE;
@@ -468,7 +470,10 @@ int main (int argc, char* argv[])
 				if (hcl_compbcstr(opt.lngopt, "large-pages") == 0)
 				{
 					large_pages = 1;
-					break;
+				}
+				else if (hcl_compbcstr(opt.lngopt, "worker-max-count") == 0)
+				{
+					worker_max_count = strtoul(opt.arg, HCL_NULL, 0);
 				}
 				else if (hcl_compbcstr(opt.lngopt, "worker-stack-size") == 0)
 				{
@@ -478,22 +483,19 @@ int main (int argc, char* argv[])
 				else if (hcl_compbcstr(opt.lngopt, "worker-idle-timeout") == 0)
 				{
 					worker_idle_timeout.sec = strtoul(opt.arg, HCL_NULL, 0);
-					break;
 				}
 				else if (hcl_compbcstr(opt.lngopt, "actor-max-runtime") == 0)
 				{
 					actor_max_runtime.sec = strtoul(opt.arg, HCL_NULL, 0);
-					break;
 				}
 			#if defined(HCL_BUILD_DEBUG)
 				else if (hcl_compbcstr(opt.lngopt, "debug") == 0)
 				{
 					dbgopt = opt.arg;
-					break;
 				}
 			#endif
-
-				goto print_usage;
+				else goto print_usage;
+				break;
 
 			case ':':
 				if (opt.lngopt)
@@ -543,6 +545,7 @@ int main (int argc, char* argv[])
 	else trait &= ~HCL_SERVER_TRAIT_USE_LARGE_PAGES;
 	hcl_server_setoption (server, HCL_SERVER_TRAIT, &trait);
 
+	hcl_server_setoption (server, HCL_SERVER_WORKER_MAX_COUNT, &worker_max_count);
 	hcl_server_setoption (server, HCL_SERVER_WORKER_STACK_SIZE, &worker_stack_size);
 	hcl_server_setoption (server, HCL_SERVER_WORKER_IDLE_TIMEOUT, &worker_idle_timeout);
 	hcl_server_setoption (server, HCL_SERVER_ACTOR_HEAP_SIZE, &actor_heap_size);
