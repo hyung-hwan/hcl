@@ -475,6 +475,20 @@ static int handle_dbgopt (hcl_server_t* server, const char* str)
 }
 #endif
 
+static int handle_incpath (hcl_server_t* server, const char* str)
+{
+#if defined(HCL_OOCH_IS_UCH)
+	hcl_ooch_t incpath[HCL_PATH_MAX + 1];
+	hcl_oow_t bcslen, ucslen;
+
+	ucslen = HCL_COUNTOF(incpath);
+	if (hcl_conv_bcs_to_ucs_with_cmgr(str, &bcslen, incpath, &ucslen, hcl_server_getcmgr(server), 1) <= -1) return -1;
+	return hcl_server_setoption(server, HCL_SERVER_SCRIPT_INCLUDE_PATH, incpath);
+#else
+	return hcl_server_setoption(server, HCL_SERVER_SCRIPT_INCLUDE_PATH, str);
+#endif
+}
+
 /* ========================================================================= */
 
 #define MIN_WORKER_STACK_SIZE 512000ul
@@ -485,13 +499,14 @@ int main (int argc, char* argv[])
 	hcl_bci_t c;
 	static hcl_bopt_lng_t lopt[] =
 	{
-		{ ":log",                'l'  },
-		{ "large-pages",         '\0' },
-		{ ":worker-max-count",   '\0' },
-		{ ":worker-stack-size",  '\0' },
-		{ ":worker-idle-timeout",'\0' },
-		{ ":actor-heap-size",    'm'  },
-		{ ":actor-max-runtime",  '\0' },
+		{ ":log",                  'l'  },
+		{ "large-pages",           '\0' },
+		{ ":worker-max-count",     '\0' },
+		{ ":worker-stack-size",    '\0' },
+		{ ":worker-idle-timeout",  '\0' },
+		{ ":actor-heap-size",      'm'  },
+		{ ":actor-max-runtime",    '\0' },
+		{ ":script-include-path",  '\0' },
 	#if defined(HCL_BUILD_DEBUG)
 		{ ":debug",       '\0' }, /* NOTE: there is no short option for --debug */
 	#endif
@@ -510,6 +525,7 @@ int main (int argc, char* argv[])
 
 	const char* logopt = HCL_NULL;
 	const char* dbgopt = HCL_NULL;
+	const char* incpath = HCL_NULL;
 	hcl_oow_t worker_max_count = 0;
 	hcl_oow_t worker_stack_size = MIN_ACTOR_HEAP_SIZE;
 	hcl_ntime_t worker_idle_timeout = { 0, 0 };
@@ -562,6 +578,10 @@ int main (int argc, char* argv[])
 				{
 					actor_max_runtime.sec = strtoul(opt.arg, HCL_NULL, 0);
 				}
+				else if (hcl_compbcstr(opt.lngopt, "script-include-path") == 0)
+				{
+					incpath = opt.arg;
+				}
 			#if defined(HCL_BUILD_DEBUG)
 				else if (hcl_compbcstr(opt.lngopt, "debug") == 0)
 				{
@@ -606,12 +626,19 @@ int main (int argc, char* argv[])
 	}
 	else
 	{
-		xtn->logmask = HCL_LOG_ALL_TYPES | HCL_LOG_ERROR | HCL_LOG_FATAL;
+		/*xtn->logmask = HCL_LOG_ALL_TYPES | HCL_LOG_ERROR | HCL_LOG_FATAL;*/
 	}
 
+#if defined(HCL_BUILD_DEBUG)
 	if (dbgopt)
 	{
 		if (handle_dbgopt(server, dbgopt) <= -1) goto oops;
+	}
+#endif
+
+	if (incpath)
+	{
+		if (handle_incpath(server, incpath) <= -1) goto oops;
 	}
 
 	hcl_server_getoption (server, HCL_SERVER_TRAIT, &trait);

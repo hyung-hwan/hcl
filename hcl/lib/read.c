@@ -1244,7 +1244,7 @@ static int begin_include (hcl_t* hcl)
 
 	if (hcl->c->reader (hcl, HCL_IO_OPEN, arg) <= -1) 
 	{
-		hcl_setsynerr (hcl, HCL_SYNERR_INCLUDE, TOKEN_LOC(hcl), TOKEN_NAME(hcl));
+		hcl_setsynerrbfmt (hcl, HCL_SYNERR_INCLUDE, TOKEN_LOC(hcl), TOKEN_NAME(hcl), "unable to include %js", io_name);
 		goto oops;
 	}
 

@@ -220,9 +220,21 @@ struct hcl_server_proto_t
 enum hcl_server_worker_state_t
 {
 	HCL_SERVER_WORKER_STATE_DEAD  = 0,
-	HCL_SERVER_WORKER_STATE_ALIVE = 1
+	HCL_SERVER_WORKER_STATE_ALIVE = 1,
+	HCL_SERVER_WORKER_STATE_ZOMBIE = 2 /* the worker is not chained in the server's client list */
 };
 typedef enum hcl_server_worker_state_t hcl_server_worker_state_t;
+
+enum hcl_server_worker_opstate_t
+{
+	HCL_SERVER_WORKER_OPSTATE_IDLE = 0,
+	HCL_SERVER_WORKER_OPSTATE_ERROR = 1,
+	HCL_SERVER_WORKER_OPSTATE_WAIT = 2,
+	HCL_SERVER_WORKER_OPSTATE_READ = 3,
+	HCL_SERVER_WORKER_OPSTATE_COMPILE = 4,
+	HCL_SERVER_WORKER_OPSTATE_EXECUTE = 5
+};
+typedef enum hcl_server_worker_opstate_t hcl_server_worker_opstate_t;
 
 struct hcl_server_worker_t
 {
@@ -233,9 +245,10 @@ struct hcl_server_worker_t
 	/* TODO: peer address */
 
 	int claimed;
-	time_t time_created;
+	
+	hcl_ntime_t time_created;
 	hcl_server_worker_state_t state;
-
+	hcl_server_worker_opstate_t opstate;
 	hcl_server_proto_t* proto;
 
 	hcl_server_t* server;
@@ -279,6 +292,7 @@ struct hcl_server_t
 		hcl_ntime_t worker_idle_timeout;
 		hcl_oow_t actor_heap_size;
 		hcl_ntime_t actor_max_runtime;
+		hcl_ooch_t script_include_path[HCL_PATH_MAX + 1];
 	} cfg;
 
 	struct
@@ -308,11 +322,15 @@ int hcl_server_proto_feed_reply (hcl_server_proto_t* proto, const hcl_ooch_t* pt
 /* ========================================================================= */
 
 
+
 #if defined(_WIN32) || defined(__OS2__) || defined(__DOS__)
 #	define IS_PATH_SEP(c) ((c) == '/' || (c) == '\\')
+#	define PATH_SEP_CHAR ('\\')
 #else
 #	define IS_PATH_SEP(c) ((c) == '/')
+#	define PATH_SEP_CHAR ('/')
 #endif
+
 
 static const hcl_bch_t* get_base_name (const hcl_bch_t* path)
 {
@@ -330,47 +348,75 @@ static HCL_INLINE int open_input (hcl_t* hcl, hcl_ioinarg_t* arg)
 {
 	worker_hcl_xtn_t* xtn = (worker_hcl_xtn_t*)hcl_getxtn(hcl);
 	bb_t* bb = HCL_NULL;
+	hcl_server_t* server;
 
-/* TOOD: support predefined include directory as well */
+	server = xtn->proto->worker->server;
+
 	if (arg->includer)
 	{
 		/* includee */
+
+		/* TOOD: Do i need to skip prepending the include path if the included path is an absolute path? 
+		 *       it may be good for security if i don't skip it. we can lock the included files in a given directory */
 		hcl_oow_t ucslen, bcslen, parlen;
 		const hcl_bch_t* fn, * fb;
 
 	#if defined(HCL_OOCH_IS_UCH)
-		if (hcl_convootobcstr (hcl, arg->name, &ucslen, HCL_NULL, &bcslen) <= -1) goto oops;
+		if (hcl_convootobcstr(hcl, arg->name, &ucslen, HCL_NULL, &bcslen) <= -1) goto oops;
 	#else
-		bcslen = hcl_countbcstr (arg->name);
+		bcslen = hcl_countbcstr(arg->name);
 	#endif
 
 		fn = ((bb_t*)arg->includer->handle)->fn;
+		if (fn[0] == '\0' && server->cfg.script_include_path[0] != '\0')
+		{
+		#if defined(HCL_OOCH_IS_UCH)
+			if (hcl_convootobcstr(hcl, server->cfg.script_include_path, &ucslen, HCL_NULL, &parlen) <= -1) goto oops;
+		#else
+			parlen = hcl_countbcstr(server->cfg.script_include_path);
+		#endif
+		}
+		else
+		{
+			fb = get_base_name(fn);
+			parlen = fb - fn;
+		}
 
-		fb = get_base_name (fn);
-		parlen = fb - fn;
-
-		bb = (bb_t*)hcl_callocmem (hcl, HCL_SIZEOF(*bb) + (HCL_SIZEOF(hcl_bch_t) * (parlen + bcslen + 1)));
+		bb = (bb_t*)hcl_callocmem(hcl, HCL_SIZEOF(*bb) + (HCL_SIZEOF(hcl_bch_t) * (parlen + bcslen + 2)));
 		if (!bb) goto oops;
 
 		bb->fn = (hcl_bch_t*)(bb + 1);
-		hcl_copybchars (bb->fn, fn, parlen);
+		if (fn[0] == '\0' && server->cfg.script_include_path[0] != '\0')
+		{
+		#if defined(HCL_OOCH_IS_UCH)
+			hcl_convootobcstr (hcl, server->cfg.script_include_path, &ucslen, bb->fn, &parlen);
+		#else
+			hcl_copybchars (bb->fn, fn, server->cfg.script_include_path);
+		#endif
+			if (!IS_PATH_SEP(bb->fn[parlen])) bb->fn[parlen++] = PATH_SEP_CHAR; /* +2 was used in hcl_callocmem() for this (+1 for this, +1 for '\0' */
+		}
+		else
+		{
+			hcl_copybchars (bb->fn, fn, parlen);
+		}
+
 	#if defined(HCL_OOCH_IS_UCH)
 		hcl_convootobcstr (hcl, arg->name, &ucslen, &bb->fn[parlen], &bcslen);
 	#else
 		hcl_copybcstr (&bb->fn[parlen], bcslen + 1, arg->name);
 	#endif
-
 		bb->fd = open(bb->fn, O_RDONLY, 0);
 	}
 	else
 	{
 		/* main stream */
 		hcl_oow_t pathlen = 0;
-		bb = (bb_t*)hcl_callocmem (hcl, HCL_SIZEOF(*bb) + (HCL_SIZEOF(hcl_bch_t) * (pathlen + 1)));
+		bb = (bb_t*)hcl_callocmem(hcl, HCL_SIZEOF(*bb) + (HCL_SIZEOF(hcl_bch_t) * (pathlen + 1)));
 		if (!bb) goto oops;
 
-		/*bb->fn = (hcl_bch_t*)(bb + 1);
-		hcl_copybcstr (bb->fn, pathlen + 1, "");*/
+		/* copy ane empty string as a main stream's name */
+		bb->fn = (hcl_bch_t*)(bb + 1);
+		hcl_copybcstr (bb->fn, pathlen + 1, "");
 
 		bb->fd = xtn->proto->worker->sck;
 	}
@@ -436,7 +482,7 @@ static HCL_INLINE int read_input (hcl_t* hcl, hcl_ioinarg_t* arg)
 
 			pfd.fd = bb->fd;
 			pfd.events = POLLIN | POLLERR;
-			n = poll(&pfd, 1, 10000); /* TOOD: adjust this interval? */
+			n = poll(&pfd, 1, 10000); /* TOOD: adjust this interval base on the worker_idle_timeout? */
 			if (n <= -1)
 			{
 				if (errno == EINTR) goto start_over;
@@ -1657,6 +1703,7 @@ int hcl_server_proto_handle_request (hcl_server_proto_t* proto)
 				return -1;
 			}
 
+			proto->worker->opstate = HCL_SERVER_WORKER_OPSTATE_EXECUTE;
 			if (execute_script(proto, ".END") <= -1) return -1;
 			proto->req.state = HCL_SERVER_PROTO_REQ_IN_TOP_LEVEL;
 			break;
@@ -1679,6 +1726,7 @@ int hcl_server_proto_handle_request (hcl_server_proto_t* proto)
 
 			if (proto->req.state == HCL_SERVER_PROTO_REQ_IN_TOP_LEVEL) hcl_reset(proto->hcl);
 
+			proto->worker->opstate = HCL_SERVER_WORKER_OPSTATE_READ;
 			obj = hcl_read(proto->hcl);
 			if (!obj)
 			{
@@ -1693,6 +1741,7 @@ int hcl_server_proto_handle_request (hcl_server_proto_t* proto)
 				return -1;
 			}
 
+			proto->worker->opstate = HCL_SERVER_WORKER_OPSTATE_COMPILE;
 			if (hcl_compile(proto->hcl, obj) <= -1)
 			{
 				HCL_LOG1 (proto->hcl, SERVER_LOGMASK_ERROR, "Unable to compile .SCRIPT contents - %js\n", hcl_geterrmsg(proto->hcl));
@@ -1701,6 +1750,7 @@ int hcl_server_proto_handle_request (hcl_server_proto_t* proto)
 
 			if (proto->req.state == HCL_SERVER_PROTO_REQ_IN_TOP_LEVEL)
 			{
+				proto->worker->opstate = HCL_SERVER_WORKER_OPSTATE_EXECUTE;
 				if (execute_script(proto, ".SCRIPT") <= -1) return -1;
 			}
 			break;
@@ -1721,6 +1771,7 @@ int hcl_server_proto_handle_request (hcl_server_proto_t* proto)
 			}
 			
 			hcl_server_proto_start_reply (proto);
+			proto->worker->opstate = HCL_SERVER_WORKER_OPSTATE_EXECUTE;
 			show_server_workers (proto);
 			if (hcl_server_proto_end_reply(proto, HCL_NULL) <= -1)
 			{
@@ -1760,6 +1811,7 @@ int hcl_server_proto_handle_request (hcl_server_proto_t* proto)
 			}
 
 			hcl_server_proto_start_reply (proto);
+			proto->worker->opstate = HCL_SERVER_WORKER_OPSTATE_EXECUTE;
 			n = kill_server_worker(proto, wid);
 			if (hcl_server_proto_end_reply(proto, (n <= -1? failmsg: HCL_NULL)) <= -1)
 			{
@@ -1992,6 +2044,8 @@ static hcl_server_worker_t* alloc_worker (hcl_server_t* server, int cli_sck)
 	if (!worker) return HCL_NULL;
 
 	HCL_MEMSET (worker, 0, HCL_SIZEOF(*worker));
+	worker->state = HCL_SERVER_WORKER_STATE_ZOMBIE;
+	worker->opstate = HCL_SERVER_WORKER_OPSTATE_IDLE;
 	worker->sck = cli_sck;
 	worker->server = server;
 
@@ -2076,6 +2130,7 @@ static void zap_worker_in_server (hcl_server_t* server, hcl_server_worker_t* wor
 
 	HCL_ASSERT (server->dummy_hcl, server->worker_list[wstate].count > 0);
 	server->worker_list[wstate].count--;
+	worker->state = HCL_SERVER_WORKER_STATE_ZOMBIE;
 	worker->prev_worker = HCL_NULL;
 	worker->next_worker = HCL_NULL;
 }
@@ -2103,7 +2158,12 @@ static void* worker_main (void* ctx)
 
 	while (!server->stopreq)
 	{
-		if (hcl_server_proto_handle_request(worker->proto) <= 0) break;
+		worker->opstate = HCL_SERVER_WORKER_OPSTATE_WAIT;
+		if (hcl_server_proto_handle_request(worker->proto) <= 0) 
+		{
+			worker->opstate = HCL_SERVER_WORKER_OPSTATE_ERROR;
+			break;
+		}
 	}
 
 	hcl_server_proto_close (worker->proto);
@@ -2421,6 +2481,10 @@ int hcl_server_setoption (hcl_server_t* server, hcl_server_option_t id, const vo
 		case HCL_SERVER_ACTOR_MAX_RUNTIME:
 			server->cfg.actor_max_runtime = *(hcl_ntime_t*)value;
 			return 0;
+
+		case HCL_SERVER_SCRIPT_INCLUDE_PATH:
+			hcl_copyoocstr (server->cfg.script_include_path, HCL_COUNTOF(server->cfg.script_include_path), (const hcl_ooch_t*)value);
+			return 0;
 	}
 
 	hcl_server_seterrnum (server, HCL_EINVAL);
@@ -2457,6 +2521,10 @@ int hcl_server_getoption (hcl_server_t* server, hcl_server_option_t id, void* va
 
 		case HCL_SERVER_ACTOR_MAX_RUNTIME:
 			*(hcl_ntime_t*)value = server->cfg.actor_max_runtime;
+			return 0;
+			
+		case HCL_SERVER_SCRIPT_INCLUDE_PATH:
+			*(hcl_ooch_t**)value = server->cfg.script_include_path;
 			return 0;
 	};
 
