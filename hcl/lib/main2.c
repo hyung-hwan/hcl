@@ -366,7 +366,6 @@ static int handle_logopt (hcl_server_t* server, const hcl_bch_t* str)
 	server_xtn_t* xtn;
 
 	xtn = (server_xtn_t*)hcl_server_getxtn(server);
-	hcl_server_getoption (server, HCL_SERVER_LOG_MASK, &logmask);
 
 	cm = hcl_findbcharinbcstr(xstr, ',');
 	if (cm) 
@@ -383,6 +382,7 @@ static int handle_logopt (hcl_server_t* server, const hcl_bch_t* str)
 		cm = hcl_findbcharinbcstr(xstr, ',');
 		*cm = '\0';
 
+		logmask = xtn->logmask;
 		do
 		{
 			flt = cm + 1;
@@ -427,7 +427,6 @@ static int handle_logopt (hcl_server_t* server, const hcl_bch_t* str)
 		logmask = HCL_LOG_ALL_LEVELS | HCL_LOG_ALL_TYPES;
 	}
 
-	xtn->logmask = logmask;
 	xtn->logfd = open(xstr, O_CREAT | O_WRONLY | O_APPEND , 0644);
 	if (xtn->logfd == -1)
 	{
@@ -436,6 +435,7 @@ static int handle_logopt (hcl_server_t* server, const hcl_bch_t* str)
 		return -1;
 	}
 
+	xtn->logmask = logmask;
 #if defined(HAVE_ISATTY)
 	xtn->logfd_istty = isatty(xtn->logfd);
 #endif
@@ -626,7 +626,8 @@ int main (int argc, char* argv[])
 	}
 	else
 	{
-		/*xtn->logmask = HCL_LOG_ALL_TYPES | HCL_LOG_ERROR | HCL_LOG_FATAL;*/
+		/* default logging mask when no logging option is set */
+		xtn->logmask = HCL_LOG_ALL_TYPES | HCL_LOG_ERROR | HCL_LOG_FATAL;
 	}
 
 #if defined(HCL_BUILD_DEBUG)

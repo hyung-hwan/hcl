@@ -1313,6 +1313,7 @@ static int handle_logopt (hcl_t* hcl, const hcl_bch_t* str)
 	xtn_t* xtn = (xtn_t*)hcl_getxtn (hcl);
 	hcl_bch_t* xstr = (hcl_bch_t*)str;
 	hcl_bch_t* cm, * flt;
+	unsigned int logmask;
 
 	cm = hcl_findbcharinbcstr (xstr, ',');
 	if (cm) 
@@ -1329,6 +1330,7 @@ static int handle_logopt (hcl_t* hcl, const hcl_bch_t* str)
 		cm = hcl_findbcharinbcstr(xstr, ',');
 		*cm = '\0';
 
+		logmask = xtn->logmask;
 		do
 		{
 			flt = cm + 1;
@@ -1336,25 +1338,25 @@ static int handle_logopt (hcl_t* hcl, const hcl_bch_t* str)
 			cm = hcl_findbcharinbcstr(flt, ',');
 			if (cm) *cm = '\0';
 
-			if (hcl_compbcstr(flt, "app") == 0) xtn->logmask |= HCL_LOG_APP;
-			else if (hcl_compbcstr(flt, "compiler") == 0) xtn->logmask |= HCL_LOG_COMPILER;
-			else if (hcl_compbcstr(flt, "vm") == 0) xtn->logmask |= HCL_LOG_VM;
-			else if (hcl_compbcstr(flt, "mnemonic") == 0) xtn->logmask |= HCL_LOG_MNEMONIC;
-			else if (hcl_compbcstr(flt, "gc") == 0) xtn->logmask |= HCL_LOG_GC;
-			else if (hcl_compbcstr(flt, "ic") == 0) xtn->logmask |= HCL_LOG_IC;
-			else if (hcl_compbcstr(flt, "primitive") == 0) xtn->logmask |= HCL_LOG_PRIMITIVE;
+			if (hcl_compbcstr(flt, "app") == 0) logmask |= HCL_LOG_APP;
+			else if (hcl_compbcstr(flt, "compiler") == 0) logmask |= HCL_LOG_COMPILER;
+			else if (hcl_compbcstr(flt, "vm") == 0) logmask |= HCL_LOG_VM;
+			else if (hcl_compbcstr(flt, "mnemonic") == 0) logmask |= HCL_LOG_MNEMONIC;
+			else if (hcl_compbcstr(flt, "gc") == 0) logmask |= HCL_LOG_GC;
+			else if (hcl_compbcstr(flt, "ic") == 0) logmask |= HCL_LOG_IC;
+			else if (hcl_compbcstr(flt, "primitive") == 0) logmask |= HCL_LOG_PRIMITIVE;
 
-			else if (hcl_compbcstr(flt, "fatal") == 0) xtn->logmask |= HCL_LOG_FATAL;
-			else if (hcl_compbcstr(flt, "error") == 0) xtn->logmask |= HCL_LOG_ERROR;
-			else if (hcl_compbcstr(flt, "warn") == 0) xtn->logmask |= HCL_LOG_WARN;
-			else if (hcl_compbcstr(flt, "info") == 0) xtn->logmask |= HCL_LOG_INFO;
-			else if (hcl_compbcstr(flt, "debug") == 0) xtn->logmask |= HCL_LOG_DEBUG;
+			else if (hcl_compbcstr(flt, "fatal") == 0) logmask |= HCL_LOG_FATAL;
+			else if (hcl_compbcstr(flt, "error") == 0) logmask |= HCL_LOG_ERROR;
+			else if (hcl_compbcstr(flt, "warn") == 0) logmask |= HCL_LOG_WARN;
+			else if (hcl_compbcstr(flt, "info") == 0) logmask |= HCL_LOG_INFO;
+			else if (hcl_compbcstr(flt, "debug") == 0) logmask |= HCL_LOG_DEBUG;
 
-			else if (hcl_compbcstr(flt, "fatal+") == 0) xtn->logmask |= HCL_LOG_FATAL;
-			else if (hcl_compbcstr(flt, "error+") == 0) xtn->logmask |= HCL_LOG_FATAL | HCL_LOG_ERROR;
-			else if (hcl_compbcstr(flt, "warn+") == 0) xtn->logmask |= HCL_LOG_FATAL | HCL_LOG_ERROR | HCL_LOG_WARN;
-			else if (hcl_compbcstr(flt, "info+") == 0) xtn->logmask |= HCL_LOG_FATAL | HCL_LOG_ERROR | HCL_LOG_WARN | HCL_LOG_INFO;
-			else if (hcl_compbcstr(flt, "debug+") == 0) xtn->logmask |= HCL_LOG_FATAL | HCL_LOG_ERROR | HCL_LOG_WARN | HCL_LOG_INFO | HCL_LOG_DEBUG;
+			else if (hcl_compbcstr(flt, "fatal+") == 0) logmask |= HCL_LOG_FATAL;
+			else if (hcl_compbcstr(flt, "error+") == 0) logmask |= HCL_LOG_FATAL | HCL_LOG_ERROR;
+			else if (hcl_compbcstr(flt, "warn+") == 0) logmask |= HCL_LOG_FATAL | HCL_LOG_ERROR | HCL_LOG_WARN;
+			else if (hcl_compbcstr(flt, "info+") == 0) logmask |= HCL_LOG_FATAL | HCL_LOG_ERROR | HCL_LOG_WARN | HCL_LOG_INFO;
+			else if (hcl_compbcstr(flt, "debug+") == 0) logmask |= HCL_LOG_FATAL | HCL_LOG_ERROR | HCL_LOG_WARN | HCL_LOG_INFO | HCL_LOG_DEBUG;
 
 			else
 			{
@@ -1366,14 +1368,15 @@ static int handle_logopt (hcl_t* hcl, const hcl_bch_t* str)
 		while (cm);
 
 
-		if (!(xtn->logmask & HCL_LOG_ALL_TYPES)) xtn->logmask |= HCL_LOG_ALL_TYPES;  /* no types specified. force to all types */
-		if (!(xtn->logmask & HCL_LOG_ALL_LEVELS)) xtn->logmask |= HCL_LOG_ALL_LEVELS;  /* no levels specified. force to all levels */
+		if (!(logmask & HCL_LOG_ALL_TYPES)) logmask |= HCL_LOG_ALL_TYPES;  /* no types specified. force to all types */
+		if (!(logmask & HCL_LOG_ALL_LEVELS)) logmask |= HCL_LOG_ALL_LEVELS;  /* no levels specified. force to all levels */
 	}
 	else
 	{
-		xtn->logmask = HCL_LOG_ALL_LEVELS | HCL_LOG_ALL_TYPES;
+		logmask = HCL_LOG_ALL_LEVELS | HCL_LOG_ALL_TYPES;
 	}
 
+	
 	xtn->logfd = open (xstr, O_CREAT | O_WRONLY | O_APPEND , 0644);
 	if (xtn->logfd == -1)
 	{
@@ -1382,6 +1385,7 @@ static int handle_logopt (hcl_t* hcl, const hcl_bch_t* str)
 		return -1;
 	}
 
+	xtn->logmask = logmask;
 #if defined(HAVE_ISATTY)
 	xtn->logfd_istty = isatty(xtn->logfd);
 #endif

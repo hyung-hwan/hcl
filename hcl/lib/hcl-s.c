@@ -128,7 +128,16 @@
 #	endif
 #endif
 
-typedef struct bb_t bb_t;
+
+union sockaddr_t
+{
+	struct sockaddr_in in4;
+#if (HCL_SIZEOF_STRUCT_SOCKADDR_IN6 > 0)
+	struct sockaddr_in6 in6;
+#endif
+};
+typedef union sockaddr_t sockaddr_t;
+
 struct bb_t
 {
 	char buf[1024];
@@ -137,19 +146,20 @@ struct bb_t
 	int fd;
 	hcl_bch_t* fn;
 };
+typedef struct bb_t bb_t;
 
-typedef struct worker_hcl_xtn_t worker_hcl_xtn_t;
 struct worker_hcl_xtn_t
 {
 	hcl_server_proto_t* proto;
 	int vm_running;
 };
+typedef struct worker_hcl_xtn_t worker_hcl_xtn_t;
 
-typedef struct dummy_hcl_xtn_t dummy_hcl_xtn_t;
 struct dummy_hcl_xtn_t
 {
 	hcl_server_t* server;
 };
+typedef struct dummy_hcl_xtn_t dummy_hcl_xtn_t;
 
 
 enum hcl_server_proto_token_type_t
@@ -242,11 +252,11 @@ struct hcl_server_worker_t
 	hcl_oow_t wid;
 
 	int sck;
-	/* TODO: peer address */
+	sockaddr_t peeraddr;
 
 	int claimed;
 	
-	hcl_ntime_t time_created;
+	hcl_ntime_t alloc_time;
 	hcl_server_worker_state_t state;
 	hcl_server_worker_opstate_t opstate;
 	hcl_server_proto_t* proto;
@@ -320,8 +330,6 @@ struct hcl_server_t
 int hcl_server_proto_feed_reply (hcl_server_proto_t* proto, const hcl_ooch_t* ptr, hcl_oow_t len, int escape);
 
 /* ========================================================================= */
-
-
 
 #if defined(_WIN32) || defined(__OS2__) || defined(__DOS__)
 #	define IS_PATH_SEP(c) ((c) == '/' || (c) == '\\')
@@ -985,15 +993,6 @@ static void fini_hcl (hcl_t* hcl)
 */
 /* ========================================================================= */
 
-
-union sockaddr_t
-{
-	struct sockaddr_in in4;
-#if (HCL_SIZEOF_STRUCT_SOCKADDR_IN6 > 0)
-	struct sockaddr_in6 in6;
-#endif
-};
-typedef union sockaddr_t sockaddr_t;
 
 #undef char_t
 #undef oocs_t
@@ -2036,7 +2035,7 @@ static HCL_INLINE void release_wid (hcl_server_t* server, hcl_server_worker_t* w
 	worker->wid = HCL_SERVER_WID_INVALID;
 }
 
-static hcl_server_worker_t* alloc_worker (hcl_server_t* server, int cli_sck)
+static hcl_server_worker_t* alloc_worker (hcl_server_t* server, int cli_sck, const sockaddr_t* peeraddr)
 {
 	hcl_server_worker_t* worker;
 
@@ -2047,7 +2046,10 @@ static hcl_server_worker_t* alloc_worker (hcl_server_t* server, int cli_sck)
 	worker->state = HCL_SERVER_WORKER_STATE_ZOMBIE;
 	worker->opstate = HCL_SERVER_WORKER_OPSTATE_IDLE;
 	worker->sck = cli_sck;
+	worker->peeraddr = *peeraddr;
 	worker->server = server;
+	
+	server->dummy_hcl->vmprim.vm_gettime (server->dummy_hcl, &worker->alloc_time); /* TODO: the callback may return monotonic time. find a way to guarantee it is realtime??? */
 
 	if (server->wid_map.free_first == HCL_SERVER_WID_INVALID && prepare_to_acquire_wid(server) <= -1) 
 	{
@@ -2393,7 +2395,7 @@ int hcl_server_start (hcl_server_t* server, const hcl_bch_t* addrs)
 					if (flood) goto unable_to_accomodate;
 				}
 
-				worker = alloc_worker(server, cli_fd);
+				worker = alloc_worker(server, cli_fd, &cli_addr);
 				if (!worker)
 				{
 				unable_to_accomodate:
