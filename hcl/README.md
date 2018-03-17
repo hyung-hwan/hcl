@@ -2,7 +2,7 @@
 
 ## Language Syntax
 
-A HCL program is composed of 0 or more expressions.
+A HCL program is composed of more expressions.
 
 
 ## Special Form Expression
@@ -26,3 +26,17 @@ A HCL program is composed of 0 or more expressions.
 * #nil
 * #true
 * #false
+* integer
+* character
+* small pointer
+* error
+* string
+* dictionary
+* array
+* byte array
+
+## Builtin functions
+
+* eqv?
+* eqk?
+* printf
