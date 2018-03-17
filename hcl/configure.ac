@@ -643,6 +643,14 @@ AC_ARG_ENABLE([hcls],
 )
 AM_CONDITIONAL(ENABLE_HCLS, test "${enable_hcls_is}" = "yes")
 
+dnl ===== enable-hclc =====
+AC_ARG_ENABLE([hclc],
+	[AS_HELP_STRING([--enable-hclc],[build libhclc and hclc(default. no)])],
+	enable_hclc_is=$enableval,
+	enable_hclc_is=no
+)
+AM_CONDITIONAL(ENABLE_HCLC, test "${enable_hclc_is}" = "yes")
+
 AC_SUBST(HCL_SIZEOF_WCHAR_T, $ac_cv_sizeof_wchar_t)
 AC_SUBST(HCL_SIZEOF_CHAR16_T, $ac_cv_sizeof_char16_t)
 AC_SUBST(HCL_SIZEOF_CHAR32_T, $ac_cv_sizeof_char32_t)

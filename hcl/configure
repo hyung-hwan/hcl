@@ -651,6 +651,8 @@ HCL_SIZEOF_LONG_LONG
 HCL_SIZEOF_CHAR32_T
 HCL_SIZEOF_CHAR16_T
 HCL_SIZEOF_WCHAR_T
+ENABLE_HCLC_FALSE
+ENABLE_HCLC_TRUE
 ENABLE_HCLS_FALSE
 ENABLE_HCLS_TRUE
 ENABLE_LIBLTDL_FALSE
@@ -819,6 +821,7 @@ enable_dynamic_module
 enable_static_module
 enable_libltdl
 enable_hcls
+enable_hclc
 '
       ac_precious_vars='build_alias
 host_alias
@@ -1485,6 +1488,7 @@ Optional Features:
                           library(default. no)
   --enable-libltdl        use libltdl(default. no)
   --enable-hcls           build libhcls and hcls(default. no)
+  --enable-hclc           build libhclc and hclc(default. no)
 
 Optional Packages:
   --with-PACKAGE[=ARG]    use PACKAGE [ARG=yes]
@@ -21145,6 +21149,23 @@ else
 fi
 
 
+# Check whether --enable-hclc was given.
+if test "${enable_hclc+set}" = set; then :
+  enableval=$enable_hclc; enable_hclc_is=$enableval
+else
+  enable_hclc_is=no
+
+fi
+
+ if test "${enable_hclc_is}" = "yes"; then
+  ENABLE_HCLC_TRUE=
+  ENABLE_HCLC_FALSE='#'
+else
+  ENABLE_HCLC_TRUE='#'
+  ENABLE_HCLC_FALSE=
+fi
+
+
 HCL_SIZEOF_WCHAR_T=$ac_cv_sizeof_wchar_t
 
 HCL_SIZEOF_CHAR16_T=$ac_cv_sizeof_char16_t
@@ -21345,6 +21366,10 @@ Usually this means the macro was only invoked conditionally." "$LINENO" 5
 fi
 if test -z "${ENABLE_HCLS_TRUE}" && test -z "${ENABLE_HCLS_FALSE}"; then
   as_fn_error $? "conditional \"ENABLE_HCLS\" was never defined.
+Usually this means the macro was only invoked conditionally." "$LINENO" 5
+fi
+if test -z "${ENABLE_HCLC_TRUE}" && test -z "${ENABLE_HCLC_FALSE}"; then
+  as_fn_error $? "conditional \"ENABLE_HCLC\" was never defined.
 Usually this means the macro was only invoked conditionally." "$LINENO" 5
 fi
 

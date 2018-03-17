@@ -30,4 +30,27 @@
 #include <hcl.h>
 
 
+typedef struct hcl_client_t hcl_client_t;
+
+
+#if defined(__cplusplus)
+extern "C" {
+#endif
+
+HCL_EXPORT hcl_client_t* hcl_client_open (
+	hcl_mmgr_t*        mmgr,
+	hcl_oow_t          xtnsize,
+	/*hcl_client_prim_t* prim,*/
+	hcl_errnum_t*      errnum
+);
+
+HCL_EXPORT void hcl_client_close (
+	hcl_client_t* client
+);
+
+
+#if defined(__cplusplus)
+}
+#endif
+
 #endif

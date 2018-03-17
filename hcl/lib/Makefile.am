@@ -81,6 +81,15 @@ libhcls_la_LIBADD = $(LIBADD_LIB_COMMON) $(PTHREAD_LIBS)
 libhcls_la_DEPENDENCIES =
 endif
 
+if ENABLE_HCLC
+pkglib_LTLIBRARIES += libhclc.la
+libhclc_la_SOURCES = hcl-c.c hcl-c.h
+libhclc_la_CPPFLAGS = $(CPPFLAGS_LIB_COMMON)
+libhclc_la_LDFLAGS = $(LDFLAGS_LIB_COMMON)
+libhclc_la_LIBADD = $(LIBADD_LIB_COMMON) $(PTHREAD_LIBS)
+libhclc_la_DEPENDENCIES =
+endif
+
 if ENABLE_STATIC_MODULE
 libhcl_la_LIBADD += -lhcl-arr
 libhcl_la_DEPENDENCIES += $(abs_builddir)/../mod/libhcl-arr.la
@@ -101,12 +110,23 @@ endif
 
 if ENABLE_HCLS
 bin_PROGRAMS += hcls
-hcls_SOURCES = main2.c
+hcls_SOURCES = main-s.c
 hcls_CPPFLAGS = $(CPPFLAGS_LIB_COMMON)
 hcls_LDFLAGS = $(LDFLAGS_LIB_COMMON)
-hcls_LDADD = $(LIBADD_LIB_COMMON) $(PTHREAD_LIBS) -lhcl -lhcls #-ldyncall_s
+hcls_LDADD = $(LIBADD_LIB_COMMON) $(PTHREAD_LIBS) -lhcl -lhcls
 if ENABLE_STATIC_MODULE
 hcls_DEPENDENCIES = libhcl.la libhcls.la
+endif
+endif
+
+if ENABLE_HCLC
+bin_PROGRAMS += hclc
+hclc_SOURCES = main-c.c
+hclc_CPPFLAGS = $(CPPFLAGS_LIB_COMMON)
+hclc_LDFLAGS = $(LDFLAGS_LIB_COMMON)
+hclc_LDADD = $(LIBADD_LIB_COMMON) $(PTHREAD_LIBS) -lhcl -lhclc
+if ENABLE_STATIC_MODULE
+hclc_DEPENDENCIES = libhcl.la libhclc.la
 endif
 endif
 
