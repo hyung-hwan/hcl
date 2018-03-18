@@ -27,6 +27,25 @@
 #include "hcl-c.h"
 #include "hcl-prv.h"
 
+enum hcl_reply_type_t
+{
+	HCL_REPLY_TYPE_OK = 0,
+	HCL_REPLY_TYPE_ERROR = 1
+};
+typedef enum hcl_reply_type_t hcl_reply_type_t;
+
+enum hcl_client_proto_state_t
+{
+	HCL_CLIENT_PROTO_STATE_START,
+	HCL_CLIENT_PROTO_STATE_IN_REPLY_NAME,
+	HCL_CLIENT_PROTO_STATE_IN_REPLY_VALUE,
+	HCL_CLIENT_PROTO_STATE_IN_HEADER_NAME,
+	HCL_CLIENT_PROTO_STATE_IN_HEADER_VALUE,
+	HCL_CLIENT_PROTO_STATE_IN_DATA,
+	HCL_CLIENT_PROTO_STATE_IN_BINARY_DATA,
+	HCL_CLIENT_PROTO_STATE_IN_CHUNK,
+};
+typedef enum hcl_client_proto_state_t hcl_client_proto_state_t;
 
 struct hcl_client_proto_t
 {
@@ -38,25 +57,45 @@ struct hcl_client_proto_t
 		hcl_oow_t len;
 		hcl_oow_t capa;
 	} req;
-	
+
+	hcl_client_proto_state_t state;
 	struct
 	{
+		/*
 		hcl_ooch_t* ptr;
 		hcl_oow_t len;
 		hcl_oow_t capa;
+		*/
+		struct
+		{
+			hcl_ooch_t* ptr;
+			hcl_oow_t len;
+			hcl_oow_t capa;
+		} tok;
+
+		hcl_reply_type_t type;
 	} rep;
 };
+typedef struct hcl_client_proto_t hcl_client_proto_t;
 
 struct hcl_client_t
 {
 	hcl_mmgr_t* mmgr;
 	hcl_cmgr_t* cmgr;
 	/*hcl_t* dummy_hcl;*/
+
+	hcl_errnum_t errnum;
+	struct
+	{
+		hcl_ooch_t buf[HCL_ERRMSG_CAPA];
+		hcl_oow_t len;
+	} errmsg;
 };
 
 /* ========================================================================= */
 
 
+#if 0
 static void proto_start_request (hcl_client_proto_t* proto)
 {
 	proto->req.len = 0;
@@ -74,24 +113,162 @@ static int proto_end_request (hcl_client_proto_t* proto)
 
 	return 0;
 }
+#endif
 
 
 static void proto_start_response (hcl_client_proto_t* proto)
 {
+	proto->state = HCL_CLIENT_PROTO_STATE_START;
+	//proto->rep.len = 0;
 }
 
-static void proto_feed_reply_data (hcl_client_proto_t* proto, const hcl_bch_t* ptr, hcl_oow_t len)
-{
-	const hcl_bch_t* end = ptr + len;
-	while (ptr < end)
-	{
-		hcl_bch_t b = *ptr++;
 
-		switch (b)
+static HCL_INLINE int is_spacechar (hcl_bch_t c)
+{
+	/* TODO: handle other space unicode characters */
+	switch (c)
+	{
+		case ' ':
+		case '\f': /* formfeed */
+		case '\r': /* carriage return */
+		case '\t': /* horizon tab */
+		case '\v': /* vertical tab */
+			return 1;
+
+		default:
+			return 0;
+	}
+}
+
+static HCL_INLINE int is_alphachar (hcl_ooci_t c)
+{
+/* TODO: support full unicode */
+	return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z');
+}
+
+static HCL_INLINE int is_digitchar (hcl_ooci_t c)
+{
+/* TODO: support full unicode */
+	return (c >= '0' && c <= '9');
+}
+
+static void clear_reply_token (hcl_client_proto_t* proto)
+{
+	proto->rep.tok.len = 0;
+}
+
+static int add_to_reply_token (hcl_client_proto_t* proto, hcl_ooch_t ch)
+{
+	if (proto->rep.tok.len >= proto->rep.tok.capa)
+	{
+		hcl_ooch_t* tmp;
+		hcl_oow_t newcapa;
+
+		newcapa = HCL_ALIGN_POW2(proto->rep.tok.len + 1, 128);
+		tmp = hcl_client_reallocmem(proto->client, proto->rep.tok.ptr, newcapa * HCL_SIZEOF(*tmp));
+		if (!tmp) return -1;
+		
+		proto->rep.tok.capa = newcapa;
+		proto->rep.tok.ptr = tmp;
+	}
+
+	proto->rep.tok.ptr[proto->rep.tok.len++] = ch;
+	return -1;
+}
+
+static int proto_feed_reply_data (hcl_client_proto_t* proto, const hcl_bch_t* data, hcl_oow_t len)
+{
+	const hcl_bch_t* ptr;
+	const hcl_bch_t* end;
+	
+	ptr = data;
+	end = ptr + len;
+
+	if (proto->state == HCL_CLIENT_PROTO_STATE_IN_BINARY_DATA)
+	{
+	}
+	else
+	{
+		while (ptr < end)
 		{
-			case '\0':
+			hcl_ooch_t c;
+
+	#if defined(HCL_OOCH_IS_UCH)
+			hcl_oow_t bcslen, ucslen;
+			int n;
+
+			bcslen = end - ptr;
+			ucslen = 1;
+
+			n = hcl_conv_bcsn_to_ucsn_with_cmgr(ptr, &bcslen, &c, &ucslen, proto->client->cmgr, 0);
+			if (n <= -1)
+			{
+				if (n == -3)
+				{
+					/* incomplete sequence */
+					
+				}
+				
+			}
+	#else
+			c = *ptr++;
+	#endif
+
+			switch (proto->state)
+			{
+				case HCL_CLIENT_PROTO_STATE_START:
+					if (c == '.')
+					{
+						proto->state = HCL_CLIENT_PROTO_STATE_IN_REPLY_NAME;
+						clear_reply_token (proto);
+						if (add_to_reply_token(proto, c) <= -1) goto oops;
+						break;
+					}
+					else if (!is_spacechar(c)) 
+					{
+						/* TODO: set error code? or log error messages? */
+						goto oops;
+					}
+					break;
+				
+				case HCL_CLIENT_PROTO_STATE_IN_REPLY_NAME:
+					if (is_alphachar(c) || (proto->rep.tok.len > 2 && c == '-'))
+					{
+						if (add_to_reply_token(proto, c) <= -1) goto oops;	
+					}
+					else
+					{
+						if (hcl_compoocharsbcstr(proto->rep.tok.ptr, proto->rep.tok.len, ".OK") == 0)
+						{
+							proto->rep.type = HCL_REPLY_TYPE_OK;
+						}
+						else if (hcl_compoocharsbcstr(proto->rep.tok.ptr, proto->rep.tok.len, ".ERROR") == 0)
+						{
+							proto->rep.type = HCL_REPLY_TYPE_ERROR;
+						}
+
+						clear_reply_token (proto);
+						if (add_to_reply_token(proto, c) <= -1) goto oops;
+					}
+					break;
+				/*case HCL_CLIENT_PROTO_STATE_IN_START_LINE:*/
+
+				case HCL_CLIENT_PROTO_STATE_IN_HEADER_NAME:
+
+					break;
+					
+				case HCL_CLIENT_PROTO_STATE_IN_HEADER_VALUE:
+
+					break;
+			}
 		}
 	}
+	return 0;
+
+
+oops:
+	/* TODO: compute the number of processes bytes so far and return it via a parameter??? */
+	return -1;
 }
 
 /* ========================================================================= */
@@ -217,6 +394,64 @@ void hcl_client_close (hcl_client_t* client)
 	HCL_MMGR_FREE (client->mmgr, client);
 }
 
+
+hcl_errnum_t hcl_client_geterrnum (hcl_client_t* client)
+{
+	return client->errnum;
+}
+
+const hcl_ooch_t* hcl_client_geterrstr (hcl_client_t* client)
+{
+	return hcl_errnum_to_errstr(client->errnum);
+}
+
+const hcl_ooch_t* hcl_client_geterrmsg (hcl_client_t* client)
+{
+	if (client->errmsg.len <= 0) return hcl_errnum_to_errstr(client->errnum);
+	return client->errmsg.buf;
+}
+
+void hcl_client_seterrnum (hcl_client_t* client, hcl_errnum_t errnum)
+{
+	/*if (client->shuterr) return; */
+	client->errnum = errnum;
+	client->errmsg.len = 0;
+}
+
+void* hcl_client_allocmem (hcl_client_t* client, hcl_oow_t size)
+{
+	void* ptr;
+
+	ptr = HCL_MMGR_ALLOC(client->mmgr, size);
+	if (!ptr) hcl_client_seterrnum (client, HCL_ESYSMEM);
+	return ptr;
+}
+
+void* hcl_client_callocmem (hcl_client_t* client, hcl_oow_t size)
+{
+	void* ptr;
+
+	ptr = HCL_MMGR_ALLOC(client->mmgr, size);
+	if (!ptr) hcl_client_seterrnum (client, HCL_ESYSMEM);
+	else HCL_MEMSET (ptr, 0, size);
+	return ptr;
+}
+
+void* hcl_client_reallocmem (hcl_client_t* client, void* ptr, hcl_oow_t size)
+{
+	ptr = HCL_MMGR_REALLOC(client->mmgr, ptr, size);
+	if (!ptr) hcl_client_seterrnum (client, HCL_ESYSMEM);
+	return ptr;
+}
+
+void hcl_client_freemem (hcl_client_t* client, void* ptr)
+{
+	HCL_MMGR_FREE (client->mmgr, ptr);
+}
+
+
+/* ========================================================================= */
+
 int hcl_client_start (hcl_client_t* client, const hcl_bch_t* addrs)
 {
 
@@ -228,3 +463,6 @@ int hcl_client_start (hcl_client_t* client, const hcl_bch_t* addrs)
 int hcl_client_sendreq (hcl_client_t* client, const hcl_bch_t* addrs)
 {
 }
+
+
+

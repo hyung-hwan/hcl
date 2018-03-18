@@ -1046,7 +1046,7 @@ hcl_server_proto_t* hcl_server_proto_open (hcl_oow_t xtnsize, hcl_server_worker_
 	vmprim.vm_gettime = vm_gettime;
 	vmprim.vm_sleep = vm_sleep;
 
-	proto = (hcl_server_proto_t*)HCL_MMGR_ALLOC(worker->server->mmgr, HCL_SIZEOF(*proto));
+	proto = (hcl_server_proto_t*)hcl_server_allocmem(worker->server, HCL_SIZEOF(*proto));
 	if (!proto) return HCL_NULL;
 
 	HCL_MEMSET (proto, 0, HCL_SIZEOF(*proto));
@@ -1087,16 +1087,16 @@ oops:
 	if (proto)
 	{
 		if (proto->hcl) hcl_close (proto->hcl);
-		HCL_MMGR_FREE (proto->worker->server->mmgr, proto);
+		hcl_server_freemem (proto->worker->server, proto);
 	}
 	return HCL_NULL;
 }
 
 void hcl_server_proto_close (hcl_server_proto_t* proto)
 {
-	if (proto->tok.ptr) HCL_MMGR_FREE (proto->worker->server->mmgr, proto->tok.ptr);
+	if (proto->tok.ptr) hcl_server_freemem (proto->worker->server, proto->tok.ptr);
 	hcl_close (proto->hcl);
-	HCL_MMGR_FREE (proto->worker->server->mmgr, proto);
+	hcl_server_freemem (proto->worker->server, proto);
 }
 
 static int write_reply_chunk (hcl_server_proto_t* proto)
@@ -1293,6 +1293,18 @@ static HCL_INLINE int is_spacechar (hcl_ooci_t c)
 	}
 }
 
+static HCL_INLINE int is_alphachar (hcl_ooci_t c)
+{
+/* TODO: support full unicode */
+	return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z');
+}
+
+static HCL_INLINE int is_digitchar (hcl_ooci_t c)
+{
+/* TODO: support full unicode */
+	return (c >= '0' && c <= '9');
+}
+
 static HCL_INLINE int read_char (hcl_server_proto_t* proto)
 {
 	proto->lxc = hcl_readchar(proto->hcl);
@@ -1329,7 +1341,7 @@ static HCL_INLINE int add_token_char (hcl_server_proto_t* proto, hcl_ooch_t c)
 		hcl_oow_t capa;
 
 		capa = HCL_ALIGN_POW2(proto->tok.len + 1, HCL_SERVER_TOKEN_NAME_ALIGN);
-		tmp = (hcl_ooch_t*)HCL_MMGR_REALLOC(proto->worker->server->mmgr, proto->tok.ptr, capa * HCL_SIZEOF(*tmp));
+		tmp = (hcl_ooch_t*)hcl_server_reallocmem(proto->worker->server, proto->tok.ptr, capa * HCL_SIZEOF(*tmp));
 		if (!tmp) 
 		{
 			HCL_LOG0 (proto->hcl, SERVER_LOGMASK_ERROR, "Out of memory in allocating a token buffer\n");
@@ -1342,18 +1354,6 @@ static HCL_INLINE int add_token_char (hcl_server_proto_t* proto, hcl_ooch_t c)
 
 	proto->tok.ptr[proto->tok.len++] = c;
 	return 0;
-}
-
-static HCL_INLINE int is_alphachar (hcl_ooci_t c)
-{
-/* TODO: support full unicode */
-	return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z');
-}
-
-static HCL_INLINE int is_digitchar (hcl_ooci_t c)
-{
-/* TODO: support full unicode */
-	return (c >= '0' && c <= '9');
 }
 
 static void classify_current_ident_token (hcl_server_proto_t* proto)
@@ -1832,10 +1832,10 @@ int hcl_server_proto_handle_request (hcl_server_proto_t* proto)
 
 hcl_server_t* hcl_server_open (hcl_mmgr_t* mmgr, hcl_oow_t xtnsize, hcl_server_prim_t* prim, hcl_errnum_t* errnum)
 {
-	hcl_server_t* server;
-	hcl_t* hcl;
+	hcl_server_t* server = HCL_NULL;
+	hcl_t* hcl = HCL_NULL;
 	hcl_vmprim_t vmprim;
-	hcl_tmr_t* tmr;
+	hcl_tmr_t* tmr = HCL_NULL;
 	dummy_hcl_xtn_t* xtn;
 	int pfd[2], fcv;
 	unsigned int trait;
@@ -1857,26 +1857,19 @@ hcl_server_t* hcl_server_open (hcl_mmgr_t* mmgr, hcl_oow_t xtnsize, hcl_server_p
 	vmprim.vm_sleep = vm_sleep;
 
 	hcl = hcl_open(mmgr, HCL_SIZEOF(*xtn), 2048, &vmprim, errnum);
-	if (!hcl) 
-	{
-		HCL_MMGR_FREE (mmgr, server);
-		return HCL_NULL;
-	}
+	if (!hcl) goto oops;
 
 	tmr = hcl_tmr_open(hcl, 0, 1024); /* TOOD: make the timer's default size configurable */
 	if (!tmr)
 	{
-		hcl_close (hcl);
-		HCL_MMGR_FREE (mmgr, server);
-		return HCL_NULL;
+		if (errnum) *errnum = HCL_ESYSMEM;
+		goto oops;
 	}
 
 	if (pipe(pfd) <= -1)
 	{
-		hcl_tmr_close (tmr);
-		hcl_close (hcl);
-		HCL_MMGR_FREE (mmgr, server);
-		return HCL_NULL;
+		if (errnum) *errnum = hcl_syserr_to_errnum(errno);
+		goto oops;
 	}
 
 #if defined(O_CLOEXEC)
@@ -1932,13 +1925,20 @@ hcl_server_t* hcl_server_open (hcl_mmgr_t* mmgr, hcl_oow_t xtnsize, hcl_server_p
 	hcl_setoption (server->dummy_hcl, HCL_TRAIT, &trait);
 
 	return server;
+	
+oops:
+	/* NOTE: pipe should be closed if jump to here is made after pipe() above */
+	if (tmr) hcl_tmr_close (tmr);
+	if (hcl) hcl_close (hcl);
+	if (server) HCL_MMGR_FREE (mmgr, server);
+	return HCL_NULL;
 }
 
 void hcl_server_close (hcl_server_t* server)
 {
 	if (server->wid_map.ptr)
 	{
-		HCL_MMGR_FREE (server->mmgr, server->wid_map.ptr);
+		hcl_server_freemem(server, server->wid_map.ptr);
 		server->wid_map.capa = 0;
 		server->wid_map.free_first = HCL_SERVER_WID_INVALID;
 		server->wid_map.free_last = HCL_SERVER_WID_INVALID;
@@ -1976,12 +1976,8 @@ static HCL_INLINE int prepare_to_acquire_wid (hcl_server_t* server)
 		new_capa = HCL_SERVER_WID_MAX;
 	}
 
-	tmp = (hcl_server_wid_map_data_t*)HCL_MMGR_REALLOC(server->mmgr, server->wid_map.ptr, HCL_SIZEOF(*tmp) * new_capa);
-	if (!tmp) 
-	{
-		hcl_server_seterrnum (server, HCL_ESYSERR);
-		return -1;
-	}
+	tmp = (hcl_server_wid_map_data_t*)hcl_server_reallocmem(server, server->wid_map.ptr, HCL_SIZEOF(*tmp) * new_capa);
+	if (!tmp) return -1;
 
 	server->wid_map.free_first = server->wid_map.capa;
 	for (i = server->wid_map.capa, j = server->wid_map.capa + 1; j < new_capa; i++, j++)
@@ -2039,7 +2035,7 @@ static hcl_server_worker_t* alloc_worker (hcl_server_t* server, int cli_sck, con
 {
 	hcl_server_worker_t* worker;
 
-	worker = (hcl_server_worker_t*)HCL_MMGR_ALLOC(server->mmgr, HCL_SIZEOF(*worker));
+	worker = (hcl_server_worker_t*)hcl_server_allocmem(server, HCL_SIZEOF(*worker));
 	if (!worker) return HCL_NULL;
 
 	HCL_MEMSET (worker, 0, HCL_SIZEOF(*worker));
@@ -2053,7 +2049,7 @@ static hcl_server_worker_t* alloc_worker (hcl_server_t* server, int cli_sck, con
 
 	if (server->wid_map.free_first == HCL_SERVER_WID_INVALID && prepare_to_acquire_wid(server) <= -1) 
 	{
-		HCL_MMGR_FREE (server->mmgr, worker);
+		hcl_server_freemem (server, worker);
 		return HCL_NULL;
 	}
 
@@ -2092,7 +2088,7 @@ static void free_worker (hcl_server_worker_t* worker)
 	}
 
 	release_wid (worker->server, worker);
-	HCL_MMGR_FREE (worker->server->mmgr, worker);
+	hcl_server_freemem (worker->server, worker);
 }
 
 static void add_worker_to_server (hcl_server_t* server, hcl_server_worker_state_t wstate, hcl_server_worker_t* worker)
@@ -2603,4 +2599,35 @@ void hcl_server_seterrufmt (hcl_server_t* server, hcl_errnum_t errnum, const hcl
 	server->errnum = errnum;
 	hcl_copyoochars (server->errmsg.buf, server->dummy_hcl->errmsg.buf, HCL_COUNTOF(server->errmsg.buf));
 	server->errmsg.len = server->dummy_hcl->errmsg.len;
+}
+
+void* hcl_server_allocmem (hcl_server_t* server, hcl_oow_t size)
+{
+	void* ptr;
+
+	ptr = HCL_MMGR_ALLOC(server->mmgr, size);
+	if (!ptr) hcl_server_seterrnum (server, HCL_ESYSMEM);
+	return ptr;
+}
+
+void* hcl_server_callocmem (hcl_server_t* server, hcl_oow_t size)
+{
+	void* ptr;
+
+	ptr = HCL_MMGR_ALLOC(server->mmgr, size);
+	if (!ptr) hcl_server_seterrnum (server, HCL_ESYSMEM);
+	else HCL_MEMSET (ptr, 0, size);
+	return ptr;
+}
+
+void* hcl_server_reallocmem (hcl_server_t* server, void* ptr, hcl_oow_t size)
+{
+	ptr = HCL_MMGR_REALLOC(server->mmgr, ptr, size);
+	if (!ptr) hcl_server_seterrnum (server, HCL_ESYSMEM);
+	return ptr;
+}
+
+void hcl_server_freemem (hcl_server_t* server, void* ptr)
+{
+	HCL_MMGR_FREE (server->mmgr, ptr);
 }

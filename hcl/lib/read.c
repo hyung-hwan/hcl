@@ -240,6 +240,7 @@ static hcl_oop_t string_to_num (hcl_t* hcl, hcl_oocs_t* str, int radixed)
 	if (negsign) base = -base;
 	return hcl_strtoint(hcl, ptr, end - ptr, base);
 }
+
 static HCL_INLINE int is_spacechar (hcl_ooci_t c)
 {
 	/* TODO: handle other space unicode characters */

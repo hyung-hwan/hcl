@@ -49,6 +49,92 @@ HCL_EXPORT void hcl_client_close (
 );
 
 
+HCL_EXPORT hcl_errnum_t hcl_client_geterrnum (
+	hcl_client_t* client
+);
+
+HCL_EXPORT const hcl_ooch_t* hcl_client_geterrstr (
+	hcl_client_t* client
+);
+
+HCL_EXPORT const hcl_ooch_t* hcl_client_geterrmsg (
+	hcl_client_t* client
+);
+
+HCL_EXPORT void hcl_client_seterrnum (
+	hcl_client_t* client,
+	hcl_errnum_t  errnum
+);
+
+
+
+
+
+HCL_EXPORT void* hcl_client_allocmem (
+	hcl_client_t* client,
+	hcl_oow_t     size
+);
+
+HCL_EXPORT void* hcl_client_callocmem (
+	hcl_client_t* client,
+	hcl_oow_t     size
+);
+
+HCL_EXPORT void* hcl_client_reallocmem (
+	hcl_client_t* client,
+	void*         ptr,
+	hcl_oow_t     size
+);
+
+
+HCL_EXPORT void hcl_client_freemem (
+	hcl_client_t* client,
+	void*         ptr
+);
+
+
+HCL_EXPORT hcl_errnum_t hcl_client_geterrnum (
+	hcl_client_t* client
+);
+
+HCL_EXPORT const hcl_ooch_t* hcl_client_geterrstr (
+	hcl_client_t* client
+);
+
+HCL_EXPORT const hcl_ooch_t* hcl_client_geterrmsg (
+	hcl_client_t* client
+);
+
+HCL_EXPORT void hcl_client_seterrnum (
+	hcl_client_t* client,
+	hcl_errnum_t  errnum
+);
+
+
+
+
+
+HCL_EXPORT void* hcl_client_allocmem (
+	hcl_client_t* client,
+	hcl_oow_t     size
+);
+
+HCL_EXPORT void* hcl_client_callocmem (
+	hcl_client_t* client,
+	hcl_oow_t     size
+);
+
+HCL_EXPORT void* hcl_client_reallocmem (
+	hcl_client_t* client,
+	void*         ptr,
+	hcl_oow_t     size
+);
+
+
+HCL_EXPORT void hcl_client_freemem (
+	hcl_client_t* client,
+	void*         ptr
+);
 #if defined(__cplusplus)
 }
 #endif

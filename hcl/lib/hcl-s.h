@@ -176,6 +176,29 @@ HCL_EXPORT void hcl_server_logufmt (
 	...
 );
 
+
+HCL_EXPORT void* hcl_server_allocmem (
+	hcl_server_t* server,
+	hcl_oow_t     size
+);
+
+HCL_EXPORT void* hcl_server_callocmem (
+	hcl_server_t* server,
+	hcl_oow_t     size
+);
+
+HCL_EXPORT void* hcl_server_reallocmem (
+	hcl_server_t* server,
+	void*         ptr,
+	hcl_oow_t     size
+);
+
+
+HCL_EXPORT void hcl_server_freemem (
+	hcl_server_t* server,
+	void*         ptr
+);
+
 #if defined(__cplusplus)
 }
 #endif
