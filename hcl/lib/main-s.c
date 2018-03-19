@@ -127,7 +127,7 @@ static int write_all (int fd, const hcl_bch_t* ptr, hcl_oow_t len)
 }
 
 
-static int write_log (hcl_server_t* server, const hcl_bch_t* ptr, hcl_oow_t len)
+static int write_log (hcl_server_t* server, int fd, const hcl_bch_t* ptr, hcl_oow_t len)
 {
 	server_xtn_t* xtn;
 
@@ -161,7 +161,7 @@ static int write_log (hcl_server_t* server, const hcl_bch_t* ptr, hcl_oow_t len)
 			rcapa = HCL_COUNTOF(xtn->logbuf.buf);
 			if (len >= rcapa)
 			{
-				write_all (xtn->logfd, ptr, rcapa);
+				write_all (fd, ptr, rcapa);
 				ptr += rcapa;
 				len -= rcapa;
 			}
@@ -179,13 +179,13 @@ static int write_log (hcl_server_t* server, const hcl_bch_t* ptr, hcl_oow_t len)
 	return 0;
 }
 
-static void flush_log (hcl_server_t* server)
+static void flush_log (hcl_server_t* server, int fd)
 {
 	server_xtn_t* xtn;
 	xtn = hcl_server_getxtn(server);
 	if (xtn->logbuf.len > 0)
 	{
-		write_all (xtn->logfd, xtn->logbuf.buf, xtn->logbuf.len);
+		write_all (fd, xtn->logbuf.buf, xtn->logbuf.len);
 		xtn->logbuf.len = 0;
 	}
 }
@@ -241,22 +241,21 @@ static void log_write (hcl_server_t* server, hcl_oow_t wid, unsigned int mask, c
 			tslen = 25; 
 		}
 
-/* TODO: less write system calls by having a buffer */
-		write_log (server, ts, tslen);
+		write_log (server, logfd, ts, tslen);
 
 		if (wid != HCL_SERVER_WID_INVALID)
 		{
 			/* TODO: check if the underlying snprintf support %zd */
 			tslen = snprintf (ts, sizeof(ts), "[%zu] ", wid);
-			write_log (server, ts, tslen);
+			write_log (server, logfd, ts, tslen);
 		}
 	}
 
 	if (xtn->logfd_istty)
 	{
-		if (mask & HCL_LOG_FATAL) write_log (server, "\x1B[1;31m", 7);
-		else if (mask & HCL_LOG_ERROR) write_log (server, "\x1B[1;32m", 7);
-		else if (mask & HCL_LOG_WARN) write_log (server, "\x1B[1;33m", 7);
+		if (mask & HCL_LOG_FATAL) write_log (server, logfd, "\x1B[1;31m", 7);
+		else if (mask & HCL_LOG_ERROR) write_log (server, logfd, "\x1B[1;32m", 7);
+		else if (mask & HCL_LOG_WARN) write_log (server, logfd, "\x1B[1;33m", 7);
 	}
 
 #if defined(HCL_OOCH_IS_UCH)
@@ -279,7 +278,7 @@ static void log_write (hcl_server_t* server, hcl_oow_t wid, unsigned int mask, c
 			/*assert (ucslen > 0);*/
 
 			/* attempt to write all converted characters */
-			if (write_log(server, buf, bcslen) <= -1) break;
+			if (write_log(server, logfd, buf, bcslen) <= -1) break;
 
 			if (n == 0) break;
 			else
@@ -295,15 +294,15 @@ static void log_write (hcl_server_t* server, hcl_oow_t wid, unsigned int mask, c
 		}
 	}
 #else
-	write_log (server, msg, len);
+	write_log (server, logfd, msg, len);
 #endif
 
 	if (xtn->logfd_istty)
 	{
-		if (mask & (HCL_LOG_FATAL | HCL_LOG_ERROR | HCL_LOG_WARN)) write_log (server, "\x1B[0m", 4);
+		if (mask & (HCL_LOG_FATAL | HCL_LOG_ERROR | HCL_LOG_WARN)) write_log (server, logfd, "\x1B[0m", 4);
 	}
 
-	flush_log (server);
+	flush_log (server, logfd);
 }
 
 /* ========================================================================= */

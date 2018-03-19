@@ -1396,8 +1396,8 @@ static int get_token (hcl_server_proto_t* proto)
 
 	SET_TOKEN_TYPE (proto, HCL_SERVER_PROTO_TOKEN_EOF); /* is it correct? */
 	proto->tok.len = 0;
-	proto->tok.loc = proto->hcl->c->lxc.l; /* set token location */
-	
+	proto->tok.loc = proto->lxc->l; /* set token location */
+
 	switch (c)
 	{
 		case HCL_OOCI_EOF:

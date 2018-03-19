@@ -1583,6 +1583,10 @@ HCL_EXPORT int hcl_ignite (
 	hcl_t* hcl
 );
 
+HCL_EXPORT int hcl_addbuiltinprims (
+	hcl_t*         hcl
+);
+
 /**
  * The hcl_execute() function executes an activated context.
  */
