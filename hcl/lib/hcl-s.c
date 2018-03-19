@@ -994,7 +994,7 @@ static void fini_hcl (hcl_t* hcl)
 /* ========================================================================= */
 
 
-#undef char_t
+#undef ooch_t
 #undef oocs_t
 #undef str_to_ipv4
 #undef str_to_ipv6

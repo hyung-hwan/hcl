@@ -150,7 +150,7 @@ static int write_log (hcl_server_t* server, int fd, const hcl_bch_t* ptr, hcl_oo
 
 			if (xtn->logbuf.len >= HCL_COUNTOF(xtn->logbuf.buf))
 			{
-				write_all(xtn->logfd, xtn->logbuf.buf, xtn->logbuf.len);
+				write_all(fd, xtn->logbuf.buf, xtn->logbuf.len);
 				xtn->logbuf.len = 0;
 			}
 		}
@@ -251,7 +251,7 @@ static void log_write (hcl_server_t* server, hcl_oow_t wid, unsigned int mask, c
 		}
 	}
 
-	if (xtn->logfd_istty)
+	if (logfd == xtn->logfd && xtn->logfd_istty)
 	{
 		if (mask & HCL_LOG_FATAL) write_log (server, logfd, "\x1B[1;31m", 7);
 		else if (mask & HCL_LOG_ERROR) write_log (server, logfd, "\x1B[1;32m", 7);
@@ -297,7 +297,7 @@ static void log_write (hcl_server_t* server, hcl_oow_t wid, unsigned int mask, c
 	write_log (server, logfd, msg, len);
 #endif
 
-	if (xtn->logfd_istty)
+	if (logfd == xtn->logfd && xtn->logfd_istty)
 	{
 		if (mask & (HCL_LOG_FATAL | HCL_LOG_ERROR | HCL_LOG_WARN)) write_log (server, logfd, "\x1B[0m", 4);
 	}
