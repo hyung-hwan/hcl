@@ -24,7 +24,7 @@
     THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include "hcl-s.h"
+#include "hcl-c.h"
 #include "hcl-opt.h"
 #include "hcl-utl.h"
 
@@ -52,8 +52,8 @@
 
 /* ========================================================================= */
 
-typedef struct server_xtn_t server_xtn_t;
-struct server_xtn_t
+typedef struct client_xtn_t client_xtn_t;
+struct client_xtn_t
 {
 	int logfd;
 	unsigned int logmask;
@@ -127,12 +127,12 @@ static int write_all (int fd, const hcl_bch_t* ptr, hcl_oow_t len)
 }
 
 
-static int write_log (hcl_server_t* server, int fd, const hcl_bch_t* ptr, hcl_oow_t len)
+static int write_log (hcl_client_t* client, int fd, const hcl_bch_t* ptr, hcl_oow_t len)
 {
-	server_xtn_t* xtn;
+	client_xtn_t* xtn;
 
 
-	xtn = hcl_server_getxtn(server);
+	xtn = hcl_client_getxtn(client);
 
 	while (len > 0)
 	{
@@ -179,10 +179,10 @@ static int write_log (hcl_server_t* server, int fd, const hcl_bch_t* ptr, hcl_oo
 	return 0;
 }
 
-static void flush_log (hcl_server_t* server, int fd)
+static void flush_log (hcl_client_t* client, int fd)
 {
-	server_xtn_t* xtn;
-	xtn = hcl_server_getxtn(server);
+	client_xtn_t* xtn;
+	xtn = hcl_client_getxtn(client);
 	if (xtn->logbuf.len > 0)
 	{
 		write_all (fd, xtn->logbuf.buf, xtn->logbuf.len);
@@ -190,15 +190,15 @@ static void flush_log (hcl_server_t* server, int fd)
 	}
 }
 
-static void log_write (hcl_server_t* server, hcl_oow_t wid, unsigned int mask, const hcl_ooch_t* msg, hcl_oow_t len)
+static void log_write (hcl_client_t* client, hcl_oow_t wid, unsigned int mask, const hcl_ooch_t* msg, hcl_oow_t len)
 {
 	hcl_bch_t buf[256];
 	hcl_oow_t ucslen, bcslen;
-	server_xtn_t* xtn;
+	client_xtn_t* xtn;
 	hcl_oow_t msgidx;
 	int n, logfd;
 
-	xtn = hcl_server_getxtn(server);
+	xtn = hcl_client_getxtn(client);
 
 	if (mask & HCL_LOG_STDERR)
 	{
@@ -241,21 +241,23 @@ static void log_write (hcl_server_t* server, hcl_oow_t wid, unsigned int mask, c
 			tslen = 25; 
 		}
 
-		write_log (server, logfd, ts, tslen);
+		write_log (client, logfd, ts, tslen);
 
-		if (wid != HCL_SERVER_WID_INVALID)
+#if 0
+		if (wid != HCL_CLIENT_WID_INVALID)
 		{
 			/* TODO: check if the underlying snprintf support %zd */
 			tslen = snprintf (ts, sizeof(ts), "[%zu] ", wid);
-			write_log (server, logfd, ts, tslen);
+			write_log (client, logfd, ts, tslen);
 		}
+#endif
 	}
 
 	if (logfd == xtn->logfd && xtn->logfd_istty)
 	{
-		if (mask & HCL_LOG_FATAL) write_log (server, logfd, "\x1B[1;31m", 7);
-		else if (mask & HCL_LOG_ERROR) write_log (server, logfd, "\x1B[1;32m", 7);
-		else if (mask & HCL_LOG_WARN) write_log (server, logfd, "\x1B[1;33m", 7);
+		if (mask & HCL_LOG_FATAL) write_log (client, logfd, "\x1B[1;31m", 7);
+		else if (mask & HCL_LOG_ERROR) write_log (client, logfd, "\x1B[1;32m", 7);
+		else if (mask & HCL_LOG_WARN) write_log (client, logfd, "\x1B[1;33m", 7);
 	}
 
 #if defined(HCL_OOCH_IS_UCH)
@@ -278,7 +280,7 @@ static void log_write (hcl_server_t* server, hcl_oow_t wid, unsigned int mask, c
 			/*assert (ucslen > 0);*/
 
 			/* attempt to write all converted characters */
-			if (write_log(server, logfd, buf, bcslen) <= -1) break;
+			if (write_log(client, logfd, buf, bcslen) <= -1) break;
 
 			if (n == 0) break;
 			else
@@ -294,20 +296,20 @@ static void log_write (hcl_server_t* server, hcl_oow_t wid, unsigned int mask, c
 		}
 	}
 #else
-	write_log (server, logfd, msg, len);
+	write_log (client, logfd, msg, len);
 #endif
 
 	if (logfd == xtn->logfd && xtn->logfd_istty)
 	{
-		if (mask & (HCL_LOG_FATAL | HCL_LOG_ERROR | HCL_LOG_WARN)) write_log (server, logfd, "\x1B[0m", 4);
+		if (mask & (HCL_LOG_FATAL | HCL_LOG_ERROR | HCL_LOG_WARN)) write_log (client, logfd, "\x1B[0m", 4);
 	}
 
-	flush_log (server, logfd);
+	flush_log (client, logfd);
 }
 
 /* ========================================================================= */
 
-static hcl_server_t* g_server = HCL_NULL;
+static hcl_client_t* g_client = HCL_NULL;
 
 /* ========================================================================= */
 
@@ -315,7 +317,7 @@ typedef void (*signal_handler_t) (int, siginfo_t*, void*);
 
 static void handle_sigint (int sig, siginfo_t* siginfo, void* ctx)
 {
-	if (g_server) hcl_server_stop (g_server);
+	/*if (g_client) hcl_client_stop (g_client);*/
 }
 
 static void set_signal (int sig, signal_handler_t handler)
@@ -357,14 +359,14 @@ static void set_signal_to_default (int sig)
 
 /* ========================================================================= */
 
-static int handle_logopt (hcl_server_t* server, const hcl_bch_t* str)
+static int handle_logopt (hcl_client_t* client, const hcl_bch_t* str)
 {
 	hcl_bch_t* xstr = (hcl_bch_t*)str;
 	hcl_bch_t* cm, * flt;
 	unsigned int logmask;
-	server_xtn_t* xtn;
+	client_xtn_t* xtn;
 
-	xtn = (server_xtn_t*)hcl_server_getxtn(server);
+	xtn = (client_xtn_t*)hcl_client_getxtn(client);
 
 	cm = hcl_findbcharinbcstr(xstr, ',');
 	if (cm) 
@@ -444,13 +446,13 @@ static int handle_logopt (hcl_server_t* server, const hcl_bch_t* str)
 }
 
 #if defined(HCL_BUILD_DEBUG)
-static int handle_dbgopt (hcl_server_t* server, const char* str)
+static int handle_dbgopt (hcl_client_t* client, const char* str)
 {
 	const hcl_bch_t* cm, * flt;
 	hcl_oow_t len;
 	unsigned int trait;
 
-	hcl_server_getoption (server, HCL_SERVER_TRAIT, &trait);
+	hcl_client_getoption (client, HCL_CLIENT_TRAIT, &trait);
 
 	cm = str - 1;
 	do
@@ -459,8 +461,8 @@ static int handle_dbgopt (hcl_server_t* server, const char* str)
 
 		cm = hcl_findbcharinbcstr(flt, ',');
 		len = cm? (cm - flt): hcl_countbcstr(flt);
-		if (hcl_compbcharsbcstr(flt, len, "gc") == 0)  trait |= HCL_SERVER_TRAIT_DEBUG_GC;
-		else if (hcl_compbcharsbcstr(flt, len, "bigint") == 0)  trait |= HCL_SERVER_TRAIT_DEBUG_BIGINT;
+		if (hcl_compbcharsbcstr(flt, len, "gc") == 0)  trait |= HCL_CLIENT_TRAIT_DEBUG_GC;
+		else if (hcl_compbcharsbcstr(flt, len, "bigint") == 0)  trait |= HCL_CLIENT_TRAIT_DEBUG_BIGINT;
 		else
 		{
 			fprintf (stderr, "ERROR: unknown debug option value - %.*s\n", (int)len, flt);
@@ -469,24 +471,11 @@ static int handle_dbgopt (hcl_server_t* server, const char* str)
 	}
 	while (cm);
 
-	hcl_server_setoption (server, HCL_SERVER_TRAIT, &trait);
+	hcl_client_setoption (client, HCL_CLIENT_TRAIT, &trait);
 	return 0;
 }
 #endif
 
-static int handle_incpath (hcl_server_t* server, const char* str)
-{
-#if defined(HCL_OOCH_IS_UCH)
-	hcl_ooch_t incpath[HCL_PATH_MAX + 1];
-	hcl_oow_t bcslen, ucslen;
-
-	ucslen = HCL_COUNTOF(incpath);
-	if (hcl_conv_bcs_to_ucs_with_cmgr(str, &bcslen, incpath, &ucslen, hcl_server_getcmgr(server), 1) <= -1) return -1;
-	return hcl_server_setoption(server, HCL_SERVER_SCRIPT_INCLUDE_PATH, incpath);
-#else
-	return hcl_server_setoption(server, HCL_SERVER_SCRIPT_INCLUDE_PATH, str);
-#endif
-}
 
 /* ========================================================================= */
 
@@ -503,9 +492,6 @@ int main (int argc, char* argv[])
 		{ ":worker-max-count",     '\0' },
 		{ ":worker-stack-size",    '\0' },
 		{ ":worker-idle-timeout",  '\0' },
-		{ ":actor-heap-size",      'm'  },
-		{ ":actor-max-runtime",    '\0' },
-		{ ":script-include-path",  '\0' },
 	#if defined(HCL_BUILD_DEBUG)
 		{ ":debug",       '\0' }, /* NOTE: there is no short option for --debug */
 	#endif
@@ -513,27 +499,25 @@ int main (int argc, char* argv[])
 	};
 	static hcl_bopt_t opt =
 	{
-		"l:m:",
+		"l:",
 		lopt
 	};
 
-	hcl_server_t* server;
-	server_xtn_t* xtn;
-	hcl_server_prim_t server_prim;
+	hcl_client_t* client;
+	client_xtn_t* xtn;
+	hcl_client_prim_t client_prim;
 	int n;
 
 	const char* logopt = HCL_NULL;
 	const char* dbgopt = HCL_NULL;
-	const char* incpath = HCL_NULL;
 	hcl_oow_t worker_max_count = 0;
 	hcl_oow_t worker_stack_size = MIN_ACTOR_HEAP_SIZE;
 	hcl_ntime_t worker_idle_timeout = { 0, 0 };
-	hcl_oow_t actor_heap_size = MIN_ACTOR_HEAP_SIZE;
-	hcl_ntime_t actor_max_runtime = { 0, 0 };
 	int large_pages = 0;
 	unsigned int trait;
 
 	setlocale (LC_ALL, "");
+
 
 	if (argc < 2)
 	{
@@ -548,11 +532,6 @@ int main (int argc, char* argv[])
 		{
 			case 'l':
 				logopt = opt.arg;
-				break;
-
-			case 'm':
-				actor_heap_size = strtoul(opt.arg, HCL_NULL, 0);
-				if (actor_heap_size <= MIN_ACTOR_HEAP_SIZE) actor_heap_size = MIN_ACTOR_HEAP_SIZE;
 				break;
 
 			case '\0':
@@ -572,14 +551,6 @@ int main (int argc, char* argv[])
 				else if (hcl_compbcstr(opt.lngopt, "worker-idle-timeout") == 0)
 				{
 					worker_idle_timeout.sec = strtoul(opt.arg, HCL_NULL, 0);
-				}
-				else if (hcl_compbcstr(opt.lngopt, "actor-max-runtime") == 0)
-				{
-					actor_max_runtime.sec = strtoul(opt.arg, HCL_NULL, 0);
-				}
-				else if (hcl_compbcstr(opt.lngopt, "script-include-path") == 0)
-				{
-					incpath = opt.arg;
 				}
 			#if defined(HCL_BUILD_DEBUG)
 				else if (hcl_compbcstr(opt.lngopt, "debug") == 0)
@@ -605,23 +576,23 @@ int main (int argc, char* argv[])
 
 	if (opt.ind >= argc) goto print_usage;
 
-	memset (&server_prim, 0, HCL_SIZEOF(server_prim));
-	server_prim.log_write = log_write;
+	memset (&client_prim, 0, HCL_SIZEOF(client_prim));
+	client_prim.log_write = log_write;
 
-	server = hcl_server_open(&sys_mmgr, HCL_SIZEOF(server_xtn_t), &server_prim, HCL_NULL);
-	if (!server)
+	client = hcl_client_open(&sys_mmgr, HCL_SIZEOF(client_xtn_t), &client_prim, HCL_NULL);
+	if (!client)
 	{
-		fprintf (stderr, "cannot open server\n");
+		fprintf (stderr, "cannot open client\n");
 		return -1;
 	}
 
-	xtn = (server_xtn_t*)hcl_server_getxtn(server);
+	xtn = (client_xtn_t*)hcl_client_getxtn(client);
 	xtn->logfd = -1;
 	xtn->logfd_istty = 0;
 
 	if (logopt)
 	{
-		if (handle_logopt(server, logopt) <= -1) goto oops;
+		if (handle_logopt(client, logopt) <= -1) goto oops;
 	}
 	else
 	{
@@ -632,49 +603,42 @@ int main (int argc, char* argv[])
 #if defined(HCL_BUILD_DEBUG)
 	if (dbgopt)
 	{
-		if (handle_dbgopt(server, dbgopt) <= -1) goto oops;
+		if (handle_dbgopt(client, dbgopt) <= -1) goto oops;
 	}
 #endif
 
-	if (incpath)
-	{
-		if (handle_incpath(server, incpath) <= -1) goto oops;
-	}
+	hcl_client_getoption (client, HCL_CLIENT_TRAIT, &trait);
+	if (large_pages) trait |= HCL_CLIENT_TRAIT_USE_LARGE_PAGES;
+	else trait &= ~HCL_CLIENT_TRAIT_USE_LARGE_PAGES;
+	hcl_client_setoption (client, HCL_CLIENT_TRAIT, &trait);
 
-	hcl_server_getoption (server, HCL_SERVER_TRAIT, &trait);
-	if (large_pages) trait |= HCL_SERVER_TRAIT_USE_LARGE_PAGES;
-	else trait &= ~HCL_SERVER_TRAIT_USE_LARGE_PAGES;
-	hcl_server_setoption (server, HCL_SERVER_TRAIT, &trait);
+	hcl_client_setoption (client, HCL_CLIENT_WORKER_MAX_COUNT, &worker_max_count);
+	hcl_client_setoption (client, HCL_CLIENT_WORKER_STACK_SIZE, &worker_stack_size);
+	hcl_client_setoption (client, HCL_CLIENT_WORKER_IDLE_TIMEOUT, &worker_idle_timeout);
 
-	hcl_server_setoption (server, HCL_SERVER_WORKER_MAX_COUNT, &worker_max_count);
-	hcl_server_setoption (server, HCL_SERVER_WORKER_STACK_SIZE, &worker_stack_size);
-	hcl_server_setoption (server, HCL_SERVER_WORKER_IDLE_TIMEOUT, &worker_idle_timeout);
-	hcl_server_setoption (server, HCL_SERVER_ACTOR_HEAP_SIZE, &actor_heap_size);
-	hcl_server_setoption (server, HCL_SERVER_ACTOR_MAX_RUNTIME, &actor_max_runtime);
-
-	g_server = server;
+	g_client = client;
 	set_signal (SIGINT, handle_sigint);
 	set_signal_to_ignore (SIGPIPE);
 
-	n = hcl_server_start(server, argv[opt.ind]);
-
+	n = hcl_client_start(client, argv[opt.ind]);
 	set_signal_to_default (SIGINT);
 	set_signal_to_default (SIGPIPE);
-	g_server = NULL;
+	g_client = NULL;
 
 	if (n <= -1)
 	{
-		hcl_server_logbfmt (server, HCL_LOG_APP | HCL_LOG_FATAL, "server error[%d] - %js\n", hcl_server_geterrnum(server), hcl_server_geterrmsg(server));
+	//	hcl_client_logbfmt (client, HCL_LOG_APP | HCL_LOG_FATAL, "client error[%d] - %js\n", hcl_client_geterrnum(client), hcl_client_geterrmsg(client));
+printf ("hcl client error... = %d\n", hcl_client_geterrnum(client));
 	}
 
 	close (xtn->logfd);
 	xtn->logfd = -1;
 	xtn->logfd_istty = 0;
 
-	hcl_server_close (server);
+	hcl_client_close (client);
 	return n;
 
 oops:
-	if (server) hcl_server_close (server);
+	if (client) hcl_client_close (client);
 	return -1;
 }

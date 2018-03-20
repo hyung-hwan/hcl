@@ -68,7 +68,7 @@ typedef void (*hcl_server_log_write_t) (
 	const hcl_ooch_t* msg,
 	hcl_oow_t         len
 );
-	
+
 struct hcl_server_prim_t
 {
 	hcl_server_log_write_t log_write;
@@ -115,7 +115,6 @@ HCL_EXPORT int hcl_server_getoption (
 HCL_EXPORT void* hcl_server_getxtn (
 	hcl_server_t* server
 );
-
 
 HCL_EXPORT hcl_mmgr_t* hcl_server_getmmgr (
 	hcl_server_t* server
