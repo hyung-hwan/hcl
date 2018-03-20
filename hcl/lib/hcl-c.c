@@ -89,7 +89,10 @@ enum hcl_client_state_t
 {
 	HCL_CLIENT_STATE_START,
 	HCL_CLIENT_STATE_IN_REPLY_NAME,
-	HCL_CLIENT_STATE_IN_REPLY_VALUE,
+	HCL_CLIENT_STATE_IN_REPLY_VALUE_START,
+	HCL_CLIENT_STATE_IN_REPLY_VALUE_UNQUOTED,
+	HCL_CLIENT_STATE_IN_REPLY_VALUE_QUOTED,
+	HCL_CLIENT_STATE_IN_REPLY_VALUE_QUOTED_TRAILER,
 	HCL_CLIENT_STATE_IN_HEADER_NAME,
 	HCL_CLIENT_STATE_IN_HEADER_VALUE,
 	HCL_CLIENT_STATE_IN_DATA,
@@ -145,6 +148,19 @@ struct hcl_client_t
 		} tok;
 
 		hcl_client_reply_type_t type;
+		
+		union
+		{
+			struct
+			{
+				hcl_oow_t nsplen; /* length remembered when the white space was shown */
+			} reply_value_unquoted;
+			
+			struct
+			{
+				int escaped;
+			} reply_value_quoted;
+		} u;
 	} rep;
 };
 
@@ -204,6 +220,272 @@ static int add_to_reply_token (hcl_client_t* client, hcl_ooch_t ch)
 	return 0;
 }
 
+static void print_tok (hcl_client_t* client)
+{
+	hcl_oow_t i;
+	printf ("{");
+	for (i = 0; i < client->rep.tok.len; i++)
+		printf ("%lc", client->rep.tok.ptr[i]);
+	printf ("}\n");
+}
+
+static int handle_char (hcl_client_t* client, hcl_ooci_t c)
+{
+	switch (client->state)
+	{
+		case HCL_CLIENT_STATE_START:
+			if (c == HCL_OOCI_EOF)
+			{
+				printf ("unexpected end of reply\n");
+				goto oops;
+			}
+			else if (c == '.')
+			{
+				client->state = HCL_CLIENT_STATE_IN_REPLY_NAME;
+				clear_reply_token (client);
+				if (add_to_reply_token(client, c) <= -1) goto oops;
+				break;
+			}
+			else if (is_spacechar(c)) 
+			{
+				/* skip whitespaces at the beginning of the start line before the reply name */
+				break;
+			}
+			else
+			{
+				/* TODO: set error code? or log error messages? */
+				printf ("reply line not starting with .\n");
+				goto oops;
+			}
+
+		case HCL_CLIENT_STATE_IN_REPLY_NAME:
+			if (is_alphachar(c) || (client->rep.tok.len > 2 && c == '-'))
+			{
+				if (add_to_reply_token(client, c) <= -1) goto oops;
+				break;
+			}
+			else
+			{
+				if (hcl_compoocharsbcstr(client->rep.tok.ptr, client->rep.tok.len, ".OK") == 0)
+				{
+					client->rep.type = HCL_CLIENT_REPLY_TYPE_OK;
+				}
+				else if (hcl_compoocharsbcstr(client->rep.tok.ptr, client->rep.tok.len, ".ERROR") == 0)
+				{
+					client->rep.type = HCL_CLIENT_REPLY_TYPE_ERROR;
+				}
+				else
+				{
+					printf ("unknown reply name - [%.*ls]", (int)client->rep.tok.len, client->rep.tok.ptr);
+					goto oops;
+				}
+
+				client->state = HCL_CLIENT_STATE_IN_REPLY_VALUE_START;
+				clear_reply_token (client);
+				/* [IMPORTANT] fall thru */
+			}
+
+		case HCL_CLIENT_STATE_IN_REPLY_VALUE_START:
+			if (c == HCL_OOCI_EOF)
+			{
+				/* sudden end of EOF without NL */
+				printf ("suddend enf of input without NL\n");
+				/* TOOD: call call back as it it's just a normal reply. and don't goto oops*/
+				goto oops;
+			}
+			else if (is_spacechar(c))
+			{
+				/* do nothing. skip it */
+				break;
+			}
+			else if (c == '\n')
+			{
+				/* no value is specified. switch to a long-format response */
+				client->state = HCL_CLIENT_STATE_IN_HEADER_NAME;
+				HCL_ASSERT (client->dummy_hcl, client->rep.tok.len == 0);
+				client->rep.u.reply_value_quoted.escaped = 0;
+				break;
+			}
+			else if (c == '\"')
+			{
+				client->state = HCL_CLIENT_STATE_IN_REPLY_VALUE_QUOTED;
+				HCL_ASSERT (client->dummy_hcl, client->rep.tok.len == 0);
+				break;
+			}
+			else 
+			{
+				/* the first value character has been encountered */
+				client->state = HCL_CLIENT_STATE_IN_REPLY_VALUE_UNQUOTED;
+				HCL_ASSERT (client->dummy_hcl, client->rep.tok.len == 0);
+				client->rep.u.reply_value_unquoted.nsplen = 0;
+				/* [IMPORTANT] fall thru */
+			}
+
+		case HCL_CLIENT_STATE_IN_REPLY_VALUE_UNQUOTED:
+			if (c == HCL_OOCI_EOF)
+			{
+				/* sudden end of EOF without NL */
+				printf ("suddend enf of input without NL\n");
+				/* TOOD: call call back as it it's just a normal reply. and don't goto oops*/
+				goto oops;
+			}
+			else if (c == '\n')
+			{
+				client->rep.tok.len = client->rep.u.reply_value_unquoted.nsplen;
+printf ("reply value....===>");
+print_tok (client);
+/* TODO: call callback */
+				client->state = HCL_CLIENT_STATE_START;
+				clear_reply_token (client);
+				break;
+			}
+			else
+			{
+				if (add_to_reply_token(client, c) <= -1) goto oops;
+				if (!is_spacechar(c)) client->rep.u.reply_value_unquoted.nsplen = client->rep.tok.len;
+				break;
+			}
+
+		case HCL_CLIENT_STATE_IN_REPLY_VALUE_QUOTED:
+			if (c == HCL_OOCI_EOF)
+			{
+				/* sudden end of EOF without NL */
+				printf ("suddend enf of input witjpit closing quote. -> total failure\n");
+				goto oops;
+			}
+			else 
+			{
+				if (client->rep.u.reply_value_quoted.escaped)
+				{
+					if (c == 'n') c = '\n';
+					else if (c == 'r') c = '\r';
+					/* TODO: more escaping handling */
+				}
+				else if (c == '\\')
+				{
+					client->rep.u.reply_value_quoted.escaped = 1;
+					break;
+				}
+				else if (c == '\"')
+				{
+					client->state = HCL_CLIENT_STATE_IN_REPLY_VALUE_QUOTED_TRAILER;
+					break;
+				}
+
+				client->rep.u.reply_value_quoted.escaped = 0;
+				if (add_to_reply_token(client, c) <= -1) goto oops;
+				break;
+			}
+		
+		case HCL_CLIENT_STATE_IN_REPLY_VALUE_QUOTED_TRAILER:
+			if (c == HCL_OOCI_EOF)
+			{
+				printf ("suddend enf of input witjpit closing quote. -> total failure\n");
+				goto oops;
+			}
+			else if (c == '\n')
+			{
+printf ("reply value....===>");
+print_tok (client);
+				client->state = HCL_CLIENT_STATE_START;
+				clear_reply_token (client);
+				break;
+			}
+			else if (is_spacechar(c))
+			{
+				/* skip white spaces after the closing quote */
+				break;
+			}
+			else
+			{
+				printf ("garbage after a quoted reply value [%lc]\n", c);
+				goto oops;
+			}
+
+		case HCL_CLIENT_STATE_IN_HEADER_NAME:
+			if (c == HCL_OOCI_EOF)
+			{
+				printf ("suddend end of input without a header name\n");
+				goto oops;
+			}
+			else if (client->rep.tok.len == 0)
+			{
+				if (is_spacechar(c))
+				{
+					/* skip whitespaces at the beginning of the start line before the reply name */
+					break;
+				}
+				else if (c != '.')
+				{
+					printf ("header not starting with a period\n");
+					goto oops;
+				}
+
+				if (add_to_reply_token(client, c) <= -1) goto oops;
+				break;
+			}
+			else	if (is_alphachar(c) || (client->rep.tok.len > 2 && c == '-'))
+			{
+				if (add_to_reply_token(client, c) <= -1) goto oops;
+				break;
+			}
+			else
+			{
+				printf ("JKJJJJJJJJJ=>\n");
+				print_tok(client);
+				if (hcl_compoocharsbcstr(client->rep.tok.ptr, client->rep.tok.len, ".ENCODING") == 0)
+				{
+					printf ("encoding....\n");
+				}
+				else if (hcl_compoocharsbcstr(client->rep.tok.ptr, client->rep.tok.len, ".LENGTH") == 0)
+				{
+					printf ("length....\n");
+				}
+				else if (hcl_compoocharsbcstr(client->rep.tok.ptr, client->rep.tok.len, ".DATA") == 0)
+				{
+					printf ("data....\n");
+				}
+				else
+				{
+					printf ("unknown header ---> [%.*ls]\n", (int)client->rep.tok.len, client->rep.tok.ptr);
+					goto oops;
+				}
+
+				client->state = HCL_CLIENT_STATE_IN_HEADER_VALUE;
+				clear_reply_token (client);
+				/* [IMPORTANT] fall thru */
+			}
+
+/*
+echo -n -e '.OK"YOYO   bc\n\" abc"    \n    .ERROR             "XYZ"\n.OK\n.ENCODING chunked\n' |~/xxx/bin/hclc 11111
+ */
+
+		case HCL_CLIENT_STATE_IN_HEADER_VALUE:
+			if (c == HCL_OOCI_EOF)
+			{
+				printf ("sudden end of input whthout header value\n");
+				goto oops;
+			}
+			else if (c == '\n')
+			{
+				printf ("XXXXXXXXXXXXXXxx\n");
+				break;
+			}
+			else 
+			{
+				printf ("add to header value....\n");
+				break;
+			}
+
+			break;
+	}
+
+	return 0;
+	
+oops: 
+	return -1;
+}
+
 static int feed_reply_data (hcl_client_t* client, const hcl_bch_t* data, hcl_oow_t len, hcl_oow_t* xlen)
 {
 	const hcl_bch_t* ptr;
@@ -212,7 +494,7 @@ static int feed_reply_data (hcl_client_t* client, const hcl_bch_t* data, hcl_oow
 	ptr = data;
 	end = ptr + len;
 
-printf ("<<<%.*s>>>\n", (int)len, data);
+//printf ("<<<%.*s>>>\n", (int)len, data);
 	if (client->state == HCL_CLIENT_STATE_IN_BINARY_DATA)
 	{
 	}
@@ -220,16 +502,17 @@ printf ("<<<%.*s>>>\n", (int)len, data);
 	{
 		while (ptr < end)
 		{
-			hcl_ooch_t c;
+			hcl_ooci_t c;
 
 	#if defined(HCL_OOCH_IS_UCH)
 			hcl_oow_t bcslen, ucslen;
+			hcl_ooch_t uc;
 			int n;
 
 			bcslen = end - ptr;
 			ucslen = 1;
 
-			n = hcl_conv_bcsn_to_ucsn_with_cmgr(ptr, &bcslen, &c, &ucslen, client->cmgr, 0);
+			n = hcl_conv_bcsn_to_ucsn_with_cmgr(ptr, &bcslen, &uc, &ucslen, client->cmgr, 0);
 			if (n <= -1)
 			{
 				if (n == -3)
@@ -242,57 +525,13 @@ printf ("<<<%.*s>>>\n", (int)len, data);
 			}
 
 			ptr += bcslen;
+			c = uc;
 	#else
 			c = *ptr++;
 	#endif
 
 printf ("[%lc]\n", c);
-			switch (client->state)
-			{
-				case HCL_CLIENT_STATE_START:
-					if (c == '.')
-					{
-						client->state = HCL_CLIENT_STATE_IN_REPLY_NAME;
-						clear_reply_token (client);
-						if (add_to_reply_token(client, c) <= -1) goto oops;
-					}
-					else if (!is_spacechar(c)) 
-					{
-						/* TODO: set error code? or log error messages? */
-						goto oops;
-					}
-					break;
-				
-				case HCL_CLIENT_STATE_IN_REPLY_NAME:
-					if (is_alphachar(c) || (client->rep.tok.len > 2 && c == '-'))
-					{
-						if (add_to_reply_token(client, c) <= -1) goto oops;
-					}
-					else
-					{
-						if (hcl_compoocharsbcstr(client->rep.tok.ptr, client->rep.tok.len, ".OK") == 0)
-						{
-							client->rep.type = HCL_CLIENT_REPLY_TYPE_OK;
-						}
-						else if (hcl_compoocharsbcstr(client->rep.tok.ptr, client->rep.tok.len, ".ERROR") == 0)
-						{
-							client->rep.type = HCL_CLIENT_REPLY_TYPE_ERROR;
-						}
-
-						clear_reply_token (client);
-						if (add_to_reply_token(client, c) <= -1) goto oops;
-					}
-					break;
-				/*case HCL_CLIENT_STATE_IN_START_LINE:*/
-
-				case HCL_CLIENT_STATE_IN_HEADER_NAME:
-
-					break;
-					
-				case HCL_CLIENT_STATE_IN_HEADER_VALUE:
-
-					break;
-			}
+			if (handle_char(client, c) <= -1) goto oops;
 		}
 	}
 
@@ -303,6 +542,28 @@ oops:
 	/* TODO: compute the number of processes bytes so far and return it via a parameter??? */
 printf ("feed oops....\n");
 	return -1;
+}
+
+
+static int feed_all_reply_data (hcl_client_t* client, hcl_bch_t* buf, hcl_oow_t n, hcl_oow_t* xlen)
+{
+	int x;
+	hcl_oow_t total, ylen;
+
+	total = 0;
+	while (total < n)
+	{
+		x = feed_reply_data(client, &buf[total], n - total, &ylen);
+		if (x <= -1) return -1;
+
+		total += ylen;
+
+		/*if (ylen == 0) break;*/
+		if (x == 0) break; /* incomplete sequence encountered */
+	}
+
+	*xlen = total;
+	return 0;
 }
 
 /* ========================================================================= */
@@ -589,25 +850,6 @@ void hcl_client_freemem (hcl_client_t* client, void* ptr)
 
 
 /* ========================================================================= */
-
-static int feed_all_reply_data (hcl_client_t* client, hcl_bch_t* buf, hcl_oow_t n, hcl_oow_t* xlen)
-{
-	int x;
-	hcl_oow_t total, ylen;
-
-	total = 0;
-	while (total < n)
-	{
-		x = feed_reply_data(client, &buf[total], n - total, &ylen);
-		if (x <= -1) return -1;
-
-		total += ylen;
-		if (ylen == 0) break; /* incomplete sequence */
-	}
-
-	*xlen = total;
-	return 0;
-}
 
 int hcl_client_start (hcl_client_t* client, const hcl_bch_t* addrs)
 {
