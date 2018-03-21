@@ -436,7 +436,7 @@ static int handle_logopt (hcl_client_t* client, const hcl_bch_t* str)
 	return 0;
 }
 
-static void start_reply (hcl_client_t* client, hcl_client_reply_type_t type, const hcl_ooch_t* dptr, hcl_oow_t dlen)
+static int start_reply (hcl_client_t* client, hcl_client_reply_type_t type, const hcl_ooch_t* dptr, hcl_oow_t dlen)
 {
 	if (dptr)
 	{
@@ -446,15 +446,12 @@ static void start_reply (hcl_client_t* client, hcl_client_reply_type_t type, con
 	{
 		printf ("GOT LONG_FORM RESPONSE[%d]\n", (int)type);
 	}
+	return 0;
 }
 
-static void end_reply (hcl_client_t* client, hcl_client_end_reply_state_t state)
+static int end_reply (hcl_client_t* client, hcl_client_end_reply_state_t state)
 {
-	if (state == HCL_CLIENT_END_REPLY_STATE_ERROR)
-	{
-printf (">>>>>>>>>>>>>>>>>>>>> reply error....\n");
-	}
-	else if (state == HCL_CLIENT_END_REPLY_STATE_REVOKED)
+	if (state == HCL_CLIENT_END_REPLY_STATE_REVOKED)
 	{
 printf (">>>>>>>>>>>>>>>>>>>>>> REPLY revoked....\n");
 	}
@@ -462,21 +459,65 @@ printf (">>>>>>>>>>>>>>>>>>>>>> REPLY revoked....\n");
 	{
 printf (">>>>>>>>>>>>>>>>>>>>> REPLY ENDED OK....\n");
 	}
+	return 0;
 }
 
-static void feed_attr (hcl_client_t* client, const hcl_oocs_t* key, const hcl_oocs_t* val)
+static int feed_attr (hcl_client_t* client, const hcl_oocs_t* key, const hcl_oocs_t* val)
 {
 printf ("GOT HEADER ====> [%.*ls] ===> [%.*ls]\n", (int)key->len, key->ptr, (int)val->len, val->ptr);
+	return 0;
 }
 
-static void feed_data (hcl_client_t* client, const void* ptr, hcl_oow_t len)
+static int feed_data (hcl_client_t* client, const void* ptr, hcl_oow_t len)
 {
 printf ("GOT DATA>>>>>>>>>[%.*s]>>>>>>>\n", (int)len, ptr);
+	return 0;
 }
+
 /* ========================================================================= */
 
-#define MIN_WORKER_STACK_SIZE 512000ul
-#define MIN_ACTOR_HEAP_SIZE 512000ul
+static int  process_reply (hcl_client_t* client, const hcl_bch_t* addrs)
+{
+
+	/* connect */
+	/* send request */
+
+	hcl_oow_t xlen, offset;
+	int x;
+	int fd = 0; /* read from stdin for testing */
+	hcl_bch_t buf[256];
+	ssize_t n;
+
+	offset = 0;
+
+	while (1)
+	{
+		n = read(fd, &buf[offset], HCL_SIZEOF(buf) - offset); /* switch to recv  */
+		if (n <= -1) 
+		{
+			printf ("error....%s\n", strerror(n));
+			return -1;
+		}
+		if (n == 0) 
+		{
+			if (hcl_client_getstate(client) != HCL_CLIENT_STATE_START)
+			{
+				printf ("sudden end??? \n");
+			}
+			break;
+		}
+
+		x = hcl_client_feed(client, buf, n, &xlen);
+		if (x <= -1) return -1;
+
+		offset = n - xlen;
+		if (offset > 0) memmove (&buf[0], &buf[xlen], offset);
+	}
+
+
+	return 0;
+}
+
  
 int main (int argc, char* argv[])
 {
@@ -567,7 +608,8 @@ int main (int argc, char* argv[])
 	set_signal (SIGINT, handle_sigint);
 	set_signal_to_ignore (SIGPIPE);
 
-	n = hcl_client_start(client, argv[opt.ind]);
+	n = process_reply(client, argv[opt.ind]);
+
 	set_signal_to_default (SIGINT);
 	set_signal_to_default (SIGPIPE);
 	g_client = NULL;

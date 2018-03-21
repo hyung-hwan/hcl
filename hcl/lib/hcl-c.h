@@ -48,6 +48,27 @@ typedef enum hcl_client_trait_t hcl_client_trait_t;
 
 /* ========================================================================= */
 
+enum hcl_client_state_t
+{
+	HCL_CLIENT_STATE_START,
+	HCL_CLIENT_STATE_IN_REPLY_NAME,
+	HCL_CLIENT_STATE_IN_REPLY_VALUE_START,
+	HCL_CLIENT_STATE_IN_REPLY_VALUE_UNQUOTED,
+	HCL_CLIENT_STATE_IN_REPLY_VALUE_QUOTED,
+	HCL_CLIENT_STATE_IN_REPLY_VALUE_QUOTED_TRAILER,
+	HCL_CLIENT_STATE_IN_ATTR_KEY,
+	HCL_CLIENT_STATE_IN_ATTR_VALUE_START,
+	HCL_CLIENT_STATE_IN_ATTR_VALUE_UNQUOTED,
+	HCL_CLIENT_STATE_IN_ATTR_VALUE_QUOTED,
+	HCL_CLIENT_STATE_IN_ATTR_VALUE_QUOTED_TRAILER,
+
+	HCL_CLIENT_STATE_IN_LENGTH_BOUNDED_DATA,
+	HCL_CLIENT_STATE_IN_CHUNKED_DATA
+};
+typedef enum hcl_client_state_t hcl_client_state_t;
+
+/* ========================================================================= */
+
 enum hcl_client_reply_type_t
 {
 	HCL_CLIENT_REPLY_TYPE_OK = 0,
@@ -62,42 +83,41 @@ typedef void (*hcl_client_log_write_t) (
 	hcl_oow_t         len
 );
 
-typedef void (*hcl_client_start_reply_t) (
+typedef int (*hcl_client_start_reply_t) (
 	hcl_client_t*           client,
 	hcl_client_reply_type_t type,
 	const hcl_ooch_t*       dptr,
 	hcl_oow_t               dlen
 );
 
-typedef void (*hcl_client_feed_attr_t) (
+typedef int (*hcl_client_feed_attr_t) (
 	hcl_client_t*     client,
 	const hcl_oocs_t* key,
 	const hcl_oocs_t* val
 );
 
-typedef void (*hcl_client_start_data_t) (
+typedef int (*hcl_client_start_data_t) (
 	hcl_client_t*     client
 );
 
-typedef void (*hcl_client_feed_data_t) (
+typedef int (*hcl_client_feed_data_t) (
 	hcl_client_t*     client,
 	const void*       ptr,
 	hcl_oow_t         len
 );
 
-typedef void (*hcl_client_end_data_t) (
+typedef int (*hcl_client_end_data_t) (
 	hcl_client_t*     client
 );
 
 enum hcl_client_end_reply_state_t
 {
 	HCL_CLIENT_END_REPLY_STATE_OK,
-	HCL_CLIENT_END_REPLY_STATE_REVOKED,
-	HCL_CLIENT_END_REPLY_STATE_ERROR
+	HCL_CLIENT_END_REPLY_STATE_REVOKED
 };
 typedef enum hcl_client_end_reply_state_t hcl_client_end_reply_state_t;
 
-typedef void (*hcl_client_end_reply_t) (
+typedef int (*hcl_client_end_reply_t) (
 	hcl_client_t*                client,
 	hcl_client_end_reply_state_t state
 );
@@ -130,12 +150,18 @@ HCL_EXPORT void hcl_client_close (
 	hcl_client_t* client
 );
 
-HCL_EXPORT int hcl_client_start (
-	hcl_client_t*    client,
-	const hcl_bch_t* addrs
+HCL_EXPORT void hcl_client_reset (
+	hcl_client_t* client
 );
 
-HCL_EXPORT void hcl_client_stop (
+HCL_EXPORT int hcl_client_feed (
+	hcl_client_t* client,
+	const void*   ptr,
+	hcl_oow_t     len,
+	hcl_oow_t*    xlen
+);
+
+HCL_EXPORT hcl_client_state_t hcl_client_getstate (
 	hcl_client_t* client
 );
 
