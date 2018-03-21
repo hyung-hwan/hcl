@@ -36,38 +36,84 @@ enum hcl_client_option_t
 {
 	HCL_CLIENT_TRAIT,
 	HCL_CLIENT_LOG_MASK,
-	HCL_CLIENT_WORKER_MAX_COUNT,
-	HCL_CLIENT_WORKER_STACK_SIZE,
-	HCL_CLIENT_WORKER_IDLE_TIMEOUT
 };
 typedef enum hcl_client_option_t hcl_client_option_t;
 
 enum hcl_client_trait_t
 {
-#if defined(HCL_BUILD_DEBUG)
-	HCL_CLIENT_TRAIT_DEBUG_GC         = (1 << 0),
-	HCL_CLIENT_TRAIT_DEBUG_BIGINT     = (1 << 1),
-#endif
-
-	HCL_CLIENT_TRAIT_READABLE_PROTO   = (1 << 2),
-	HCL_CLIENT_TRAIT_USE_LARGE_PAGES  = (1 << 3)
+	/* no trait defined at this moment. XXXX is just a placeholder */
+	HCL_CLIENT_XXXX  = (1 << 0)
 };
 typedef enum hcl_client_trait_t hcl_client_trait_t;
 
+/* ========================================================================= */
+
+enum hcl_client_reply_type_t
+{
+	HCL_CLIENT_REPLY_TYPE_OK = 0,
+	HCL_CLIENT_REPLY_TYPE_ERROR = 1
+};
+typedef enum hcl_client_reply_type_t hcl_client_reply_type_t;
+
 typedef void (*hcl_client_log_write_t) (
 	hcl_client_t*     client,
-	hcl_oow_t         wid,
 	unsigned int      mask,
 	const hcl_ooch_t* msg,
 	hcl_oow_t         len
 );
 
+typedef void (*hcl_client_start_reply_t) (
+	hcl_client_t*           client,
+	hcl_client_reply_type_t type,
+	const hcl_ooch_t*       dptr,
+	hcl_oow_t               dlen
+);
+
+typedef void (*hcl_client_feed_attr_t) (
+	hcl_client_t*     client,
+	const hcl_oocs_t* key,
+	const hcl_oocs_t* val
+);
+
+typedef void (*hcl_client_start_data_t) (
+	hcl_client_t*     client
+);
+
+typedef void (*hcl_client_feed_data_t) (
+	hcl_client_t*     client,
+	const void*       ptr,
+	hcl_oow_t         len
+);
+
+typedef void (*hcl_client_end_data_t) (
+	hcl_client_t*     client
+);
+
+enum hcl_client_end_reply_state_t
+{
+	HCL_CLIENT_END_REPLY_STATE_OK,
+	HCL_CLIENT_END_REPLY_STATE_REVOKED,
+	HCL_CLIENT_END_REPLY_STATE_ERROR
+};
+typedef enum hcl_client_end_reply_state_t hcl_client_end_reply_state_t;
+
+typedef void (*hcl_client_end_reply_t) (
+	hcl_client_t*                client,
+	hcl_client_end_reply_state_t state
+);
+
 struct hcl_client_prim_t
 {
-	hcl_client_log_write_t log_write;
+	hcl_client_log_write_t     log_write;
+
+	hcl_client_start_reply_t   start_reply;   /* mandatory */
+	hcl_client_feed_attr_t     feed_attr; /* optional */
+	hcl_client_feed_data_t     feed_data;     /* optional */
+	hcl_client_end_reply_t     end_reply;     /* mandatory */
 };
 typedef struct hcl_client_prim_t hcl_client_prim_t;
 
+/* ========================================================================= */
 
 #if defined(__cplusplus)
 extern "C" {
@@ -141,9 +187,33 @@ HCL_EXPORT void hcl_client_seterrnum (
 	hcl_errnum_t  errnum
 );
 
+HCL_EXPORT void hcl_client_seterrbfmt (
+	hcl_client_t*    client,
+	hcl_errnum_t     errnum,
+	const hcl_bch_t* fmt,
+	...
+);
 
+HCL_EXPORT void hcl_client_seterrufmt (
+	hcl_client_t*    client,
+	hcl_errnum_t     errnum,
+	const hcl_uch_t* fmt,
+	...
+);
 
+HCL_EXPORT void hcl_client_logbfmt (
+	hcl_client_t*    client,
+	unsigned int     mask,
+	const hcl_bch_t* fmt,
+	...
+);
 
+HCL_EXPORT void hcl_client_logufmt (
+	hcl_client_t*    client,
+	unsigned int     mask,
+	const hcl_uch_t* fmt,
+	...
+);
 
 HCL_EXPORT void* hcl_client_allocmem (
 	hcl_client_t* client,
@@ -166,7 +236,6 @@ HCL_EXPORT void hcl_client_freemem (
 	hcl_client_t* client,
 	void*         ptr
 );
-
 
 #if defined(__cplusplus)
 }

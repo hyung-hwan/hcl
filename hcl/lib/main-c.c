@@ -190,7 +190,7 @@ static void flush_log (hcl_client_t* client, int fd)
 	}
 }
 
-static void log_write (hcl_client_t* client, hcl_oow_t wid, unsigned int mask, const hcl_ooch_t* msg, hcl_oow_t len)
+static void log_write (hcl_client_t* client, unsigned int mask, const hcl_ooch_t* msg, hcl_oow_t len)
 {
 	hcl_bch_t buf[256];
 	hcl_oow_t ucslen, bcslen;
@@ -242,15 +242,6 @@ static void log_write (hcl_client_t* client, hcl_oow_t wid, unsigned int mask, c
 		}
 
 		write_log (client, logfd, ts, tslen);
-
-#if 0
-		if (wid != HCL_CLIENT_WID_INVALID)
-		{
-			/* TODO: check if the underlying snprintf support %zd */
-			tslen = snprintf (ts, sizeof(ts), "[%zu] ", wid);
-			write_log (client, logfd, ts, tslen);
-		}
-#endif
 	}
 
 	if (logfd == xtn->logfd && xtn->logfd_istty)
@@ -445,38 +436,43 @@ static int handle_logopt (hcl_client_t* client, const hcl_bch_t* str)
 	return 0;
 }
 
-#if defined(HCL_BUILD_DEBUG)
-static int handle_dbgopt (hcl_client_t* client, const char* str)
+static void start_reply (hcl_client_t* client, hcl_client_reply_type_t type, const hcl_ooch_t* dptr, hcl_oow_t dlen)
 {
-	const hcl_bch_t* cm, * flt;
-	hcl_oow_t len;
-	unsigned int trait;
-
-	hcl_client_getoption (client, HCL_CLIENT_TRAIT, &trait);
-
-	cm = str - 1;
-	do
+	if (dptr)
 	{
-		flt = cm + 1;
-
-		cm = hcl_findbcharinbcstr(flt, ',');
-		len = cm? (cm - flt): hcl_countbcstr(flt);
-		if (hcl_compbcharsbcstr(flt, len, "gc") == 0)  trait |= HCL_CLIENT_TRAIT_DEBUG_GC;
-		else if (hcl_compbcharsbcstr(flt, len, "bigint") == 0)  trait |= HCL_CLIENT_TRAIT_DEBUG_BIGINT;
-		else
-		{
-			fprintf (stderr, "ERROR: unknown debug option value - %.*s\n", (int)len, flt);
-			return -1;
-		}
+		printf ("GOT SHORT-FORM RESPONSE[%d] with data <<%.*ls>>\n", (int)type, (int)dlen, dptr);
 	}
-	while (cm);
-
-	hcl_client_setoption (client, HCL_CLIENT_TRAIT, &trait);
-	return 0;
+	else
+	{
+		printf ("GOT LONG_FORM RESPONSE[%d]\n", (int)type);
+	}
 }
-#endif
 
+static void end_reply (hcl_client_t* client, hcl_client_end_reply_state_t state)
+{
+	if (state == HCL_CLIENT_END_REPLY_STATE_ERROR)
+	{
+printf (">>>>>>>>>>>>>>>>>>>>> reply error....\n");
+	}
+	else if (state == HCL_CLIENT_END_REPLY_STATE_REVOKED)
+	{
+printf (">>>>>>>>>>>>>>>>>>>>>> REPLY revoked....\n");
+	}
+	else
+	{
+printf (">>>>>>>>>>>>>>>>>>>>> REPLY ENDED OK....\n");
+	}
+}
 
+static void feed_attr (hcl_client_t* client, const hcl_oocs_t* key, const hcl_oocs_t* val)
+{
+printf ("GOT HEADER ====> [%.*ls] ===> [%.*ls]\n", (int)key->len, key->ptr, (int)val->len, val->ptr);
+}
+
+static void feed_data (hcl_client_t* client, const void* ptr, hcl_oow_t len)
+{
+printf ("GOT DATA>>>>>>>>>[%.*s]>>>>>>>\n", (int)len, ptr);
+}
 /* ========================================================================= */
 
 #define MIN_WORKER_STACK_SIZE 512000ul
@@ -488,14 +484,7 @@ int main (int argc, char* argv[])
 	static hcl_bopt_lng_t lopt[] =
 	{
 		{ ":log",                  'l'  },
-		{ "large-pages",           '\0' },
-		{ ":worker-max-count",     '\0' },
-		{ ":worker-stack-size",    '\0' },
-		{ ":worker-idle-timeout",  '\0' },
-	#if defined(HCL_BUILD_DEBUG)
-		{ ":debug",       '\0' }, /* NOTE: there is no short option for --debug */
-	#endif
-		{ HCL_NULL,       '\0' }
+		{ HCL_NULL,                '\0' }
 	};
 	static hcl_bopt_t opt =
 	{
@@ -507,14 +496,7 @@ int main (int argc, char* argv[])
 	client_xtn_t* xtn;
 	hcl_client_prim_t client_prim;
 	int n;
-
 	const char* logopt = HCL_NULL;
-	const char* dbgopt = HCL_NULL;
-	hcl_oow_t worker_max_count = 0;
-	hcl_oow_t worker_stack_size = MIN_ACTOR_HEAP_SIZE;
-	hcl_ntime_t worker_idle_timeout = { 0, 0 };
-	int large_pages = 0;
-	unsigned int trait;
 
 	setlocale (LC_ALL, "");
 
@@ -535,30 +517,7 @@ int main (int argc, char* argv[])
 				break;
 
 			case '\0':
-				if (hcl_compbcstr(opt.lngopt, "large-pages") == 0)
-				{
-					large_pages = 1;
-				}
-				else if (hcl_compbcstr(opt.lngopt, "worker-max-count") == 0)
-				{
-					worker_max_count = strtoul(opt.arg, HCL_NULL, 0);
-				}
-				else if (hcl_compbcstr(opt.lngopt, "worker-stack-size") == 0)
-				{
-					worker_stack_size = strtoul(opt.arg, HCL_NULL, 0);
-					if (worker_stack_size <= MIN_WORKER_STACK_SIZE) worker_stack_size = MIN_WORKER_STACK_SIZE;
-				}
-				else if (hcl_compbcstr(opt.lngopt, "worker-idle-timeout") == 0)
-				{
-					worker_idle_timeout.sec = strtoul(opt.arg, HCL_NULL, 0);
-				}
-			#if defined(HCL_BUILD_DEBUG)
-				else if (hcl_compbcstr(opt.lngopt, "debug") == 0)
-				{
-					dbgopt = opt.arg;
-				}
-			#endif
-				else goto print_usage;
+				goto print_usage;
 				break;
 
 			case ':':
@@ -578,6 +537,10 @@ int main (int argc, char* argv[])
 
 	memset (&client_prim, 0, HCL_SIZEOF(client_prim));
 	client_prim.log_write = log_write;
+	client_prim.start_reply = start_reply;
+	client_prim.feed_attr = feed_attr;
+	client_prim.feed_data = feed_data;
+	client_prim.end_reply = end_reply;
 
 	client = hcl_client_open(&sys_mmgr, HCL_SIZEOF(client_xtn_t), &client_prim, HCL_NULL);
 	if (!client)
@@ -600,22 +563,6 @@ int main (int argc, char* argv[])
 		xtn->logmask = HCL_LOG_ALL_TYPES | HCL_LOG_ERROR | HCL_LOG_FATAL;
 	}
 
-#if defined(HCL_BUILD_DEBUG)
-	if (dbgopt)
-	{
-		if (handle_dbgopt(client, dbgopt) <= -1) goto oops;
-	}
-#endif
-
-	hcl_client_getoption (client, HCL_CLIENT_TRAIT, &trait);
-	if (large_pages) trait |= HCL_CLIENT_TRAIT_USE_LARGE_PAGES;
-	else trait &= ~HCL_CLIENT_TRAIT_USE_LARGE_PAGES;
-	hcl_client_setoption (client, HCL_CLIENT_TRAIT, &trait);
-
-	hcl_client_setoption (client, HCL_CLIENT_WORKER_MAX_COUNT, &worker_max_count);
-	hcl_client_setoption (client, HCL_CLIENT_WORKER_STACK_SIZE, &worker_stack_size);
-	hcl_client_setoption (client, HCL_CLIENT_WORKER_IDLE_TIMEOUT, &worker_idle_timeout);
-
 	g_client = client;
 	set_signal (SIGINT, handle_sigint);
 	set_signal_to_ignore (SIGPIPE);
@@ -627,13 +574,15 @@ int main (int argc, char* argv[])
 
 	if (n <= -1)
 	{
-	//	hcl_client_logbfmt (client, HCL_LOG_APP | HCL_LOG_FATAL, "client error[%d] - %js\n", hcl_client_geterrnum(client), hcl_client_geterrmsg(client));
-printf ("hcl client error... = %d\n", hcl_client_geterrnum(client));
+		hcl_client_logbfmt (client, HCL_LOG_APP | HCL_LOG_FATAL, "client error[%d] - %js\n", hcl_client_geterrnum(client), hcl_client_geterrmsg(client));
 	}
 
-	close (xtn->logfd);
-	xtn->logfd = -1;
-	xtn->logfd_istty = 0;
+	if (xtn->logfd >= 0)
+	{
+		close (xtn->logfd);
+		xtn->logfd = -1;
+		xtn->logfd_istty = 0;
+	}
 
 	hcl_client_close (client);
 	return n;

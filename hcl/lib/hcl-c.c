@@ -31,9 +31,11 @@
 #include <string.h>
 #include <errno.h>
 
-#define HCL_SERVER_TOKEN_NAME_ALIGN 64
-#define HCL_SERVER_WID_MAP_ALIGN 512
-#define HCL_SERVER_PROTO_REPLY_BUF_SIZE 1300
+#define HCL_CLIENT_TOKEN_NAME_ALIGN 64
+#define HCL_CLIENT_WID_MAP_ALIGN 512
+#define HCL_CLIENT_PROTO_REPLY_BUF_SIZE 1300
+
+#define HCL_CLIENT_REPLY_MAX_HDRKEY_LEN 128
 
 #if defined(_WIN32)
 #	include <windows.h>
@@ -78,12 +80,18 @@
 #	include <poll.h>
 #endif
 
-enum hcl_client_reply_type_t
+struct dummy_hcl_xtn_t
 {
-	HCL_CLIENT_REPLY_TYPE_OK = 0,
-	HCL_CLIENT_REPLY_TYPE_ERROR = 1
+	hcl_client_t* client;
 };
-typedef enum hcl_client_reply_type_t hcl_client_reply_type_t;
+typedef struct dummy_hcl_xtn_t dummy_hcl_xtn_t;
+
+enum hcl_client_reply_attr_type_t
+{
+	HCL_CLIENT_REPLY_ATTR_TYPE_UNKNOWN,
+	HCL_CLIENT_REPLY_ATTR_TYPE_DATA
+};
+typedef enum hcl_client_reply_attr_type_t hcl_client_reply_attr_type_t;
 
 enum hcl_client_state_t
 {
@@ -93,11 +101,14 @@ enum hcl_client_state_t
 	HCL_CLIENT_STATE_IN_REPLY_VALUE_UNQUOTED,
 	HCL_CLIENT_STATE_IN_REPLY_VALUE_QUOTED,
 	HCL_CLIENT_STATE_IN_REPLY_VALUE_QUOTED_TRAILER,
-	HCL_CLIENT_STATE_IN_HEADER_NAME,
-	HCL_CLIENT_STATE_IN_HEADER_VALUE,
-	HCL_CLIENT_STATE_IN_DATA,
-	HCL_CLIENT_STATE_IN_BINARY_DATA,
-	HCL_CLIENT_STATE_IN_CHUNK,
+	HCL_CLIENT_STATE_IN_ATTR_KEY,
+	HCL_CLIENT_STATE_IN_ATTR_VALUE_START,
+	HCL_CLIENT_STATE_IN_ATTR_VALUE_UNQUOTED,
+	HCL_CLIENT_STATE_IN_ATTR_VALUE_QUOTED,
+	HCL_CLIENT_STATE_IN_ATTR_VALUE_QUOTED_TRAILER,
+
+	HCL_CLIENT_STATE_IN_LENGTH_BOUNDED_DATA,
+	HCL_CLIENT_STATE_IN_CHUNKED_DATA
 };
 typedef enum hcl_client_state_t hcl_client_state_t;
 
@@ -105,7 +116,8 @@ struct hcl_client_t
 {
 	hcl_mmgr_t* mmgr;
 	hcl_cmgr_t* cmgr;
-	/*hcl_t* dummy_hcl;*/
+	hcl_client_prim_t prim;
+	hcl_t* dummy_hcl;
 
 	hcl_errnum_t errnum;
 	struct
@@ -119,11 +131,7 @@ struct hcl_client_t
 	{
 		unsigned int trait;
 		unsigned int logmask;
-		hcl_oow_t worker_max_count;
-		hcl_oow_t worker_stack_size;
-		hcl_ntime_t worker_idle_timeout;
 	} cfg;
-
 
 	struct
 	{
@@ -135,11 +143,6 @@ struct hcl_client_t
 	hcl_client_state_t state;
 	struct
 	{
-		/*
-		hcl_ooch_t* ptr;
-		hcl_oow_t len;
-		hcl_oow_t capa;
-		*/
 		struct
 		{
 			hcl_ooch_t* ptr;
@@ -148,24 +151,77 @@ struct hcl_client_t
 		} tok;
 
 		hcl_client_reply_type_t type;
-		
+		hcl_client_reply_attr_type_t last_attr_type;
+		struct
+		{
+			hcl_ooch_t buf[HCL_CLIENT_REPLY_MAX_HDRKEY_LEN];
+			hcl_oow_t  len;
+		} last_attr_key; /* the last attr key shown */
+
 		union
 		{
 			struct
 			{
 				hcl_oow_t nsplen; /* length remembered when the white space was shown */
 			} reply_value_unquoted;
-			
+
 			struct
 			{
 				int escaped;
 			} reply_value_quoted;
+
+			struct
+			{
+				hcl_oow_t nsplen; /* length remembered when the white space was shown */
+			} attr_value_unquoted;
+
+			struct
+			{
+				int escaped;
+			} attr_value_quoted;
+
+			struct
+			{
+				hcl_oow_t max;
+				hcl_oow_t tally;
+			} length_bounded_data;
+
+			struct
+			{
+				int in_data_part;
+				int negated;
+				hcl_oow_t max; /* chunk length */
+				hcl_oow_t tally; 
+				hcl_oow_t total;
+				hcl_oow_t clcount; 
+			} chunked_data;
 		} u;
 	} rep;
 };
 
+
 /* ========================================================================= */
 
+static void log_write_for_dummy (hcl_t* hcl, unsigned int mask, const hcl_ooch_t* msg, hcl_oow_t len)
+{
+	dummy_hcl_xtn_t* xtn = (dummy_hcl_xtn_t*)hcl_getxtn(hcl);
+	hcl_client_t* client;
+
+	client = xtn->client;
+	client->prim.log_write (client, mask, msg, len);
+}
+
+static void syserrstrb (hcl_t* hcl, int syserr, hcl_bch_t* buf, hcl_oow_t len)
+{
+#if defined(HAVE_STRERROR_R)
+	strerror_r (syserr, buf, len);
+#else
+	/* this may not be thread safe */
+	hcl_copybcstr (buf, len, strerror(syserr));
+#endif
+}
+
+/* ========================================================================= */
 
 static HCL_INLINE int is_spacechar (hcl_bch_t c)
 {
@@ -220,23 +276,36 @@ static int add_to_reply_token (hcl_client_t* client, hcl_ooch_t ch)
 	return 0;
 }
 
-static void print_tok (hcl_client_t* client)
+static HCL_INLINE int is_token (hcl_client_t* client, const hcl_bch_t* str)
+{
+	return hcl_compoocharsbcstr(client->rep.tok.ptr, client->rep.tok.len, str) == 0;
+} 
+
+static HCL_INLINE int is_token_integer (hcl_client_t* client, hcl_oow_t* value)
 {
 	hcl_oow_t i;
-	printf ("{");
-	for (i = 0; i < client->rep.tok.len; i++)
-		printf ("%lc", client->rep.tok.ptr[i]);
-	printf ("}\n");
-}
+	hcl_oow_t v = 0;
 
-static int handle_char (hcl_client_t* client, hcl_ooci_t c)
+	if (client->rep.tok.len <= 0) return 0;
+
+	for (i = 0; i < client->rep.tok.len; i++)
+	{
+		if (!is_digitchar(client->rep.tok.ptr[i])) return 0;
+		v = v * 10 + (client->rep.tok.ptr[i] - '0');
+	}
+
+	*value = v;
+	return 1;
+} 
+
+static int handle_char (hcl_client_t* client, hcl_ooci_t c, hcl_oow_t nbytes)
 {
 	switch (client->state)
 	{
 		case HCL_CLIENT_STATE_START:
 			if (c == HCL_OOCI_EOF)
 			{
-				printf ("unexpected end of reply\n");
+				hcl_client_seterrbfmt (client, HCL_EFINIS, "unexpected end before reply name");
 				goto oops;
 			}
 			else if (c == '.')
@@ -253,8 +322,7 @@ static int handle_char (hcl_client_t* client, hcl_ooci_t c)
 			}
 			else
 			{
-				/* TODO: set error code? or log error messages? */
-				printf ("reply line not starting with .\n");
+				hcl_client_seterrbfmt (client, HCL_EINVAL, "reply line not starting with a period");
 				goto oops;
 			}
 
@@ -266,17 +334,17 @@ static int handle_char (hcl_client_t* client, hcl_ooci_t c)
 			}
 			else
 			{
-				if (hcl_compoocharsbcstr(client->rep.tok.ptr, client->rep.tok.len, ".OK") == 0)
+				if (is_token(client, ".OK"))
 				{
 					client->rep.type = HCL_CLIENT_REPLY_TYPE_OK;
 				}
-				else if (hcl_compoocharsbcstr(client->rep.tok.ptr, client->rep.tok.len, ".ERROR") == 0)
+				else if (is_token(client, ".ERROR"))
 				{
 					client->rep.type = HCL_CLIENT_REPLY_TYPE_ERROR;
 				}
 				else
 				{
-					printf ("unknown reply name - [%.*ls]", (int)client->rep.tok.len, client->rep.tok.ptr);
+					hcl_client_seterrbfmt (client, HCL_EINVAL, "unknown reply name %.*js", client->rep.tok.len, client->rep.tok.ptr);
 					goto oops;
 				}
 
@@ -288,9 +356,7 @@ static int handle_char (hcl_client_t* client, hcl_ooci_t c)
 		case HCL_CLIENT_STATE_IN_REPLY_VALUE_START:
 			if (c == HCL_OOCI_EOF)
 			{
-				/* sudden end of EOF without NL */
-				printf ("suddend enf of input without NL\n");
-				/* TOOD: call call back as it it's just a normal reply. and don't goto oops*/
+				hcl_client_seterrbfmt (client, HCL_EFINIS, "sudden end of reply line without newline");
 				goto oops;
 			}
 			else if (is_spacechar(c))
@@ -300,16 +366,19 @@ static int handle_char (hcl_client_t* client, hcl_ooci_t c)
 			}
 			else if (c == '\n')
 			{
-				/* no value is specified. switch to a long-format response */
-				client->state = HCL_CLIENT_STATE_IN_HEADER_NAME;
+				/* no value is specified. even no whitespaces.
+				 * switch to a long-format response */
+				client->prim.start_reply (client, client->rep.type, HCL_NULL, 0);
+
+				client->state = HCL_CLIENT_STATE_IN_ATTR_KEY;
 				HCL_ASSERT (client->dummy_hcl, client->rep.tok.len == 0);
-				client->rep.u.reply_value_quoted.escaped = 0;
 				break;
 			}
 			else if (c == '\"')
 			{
 				client->state = HCL_CLIENT_STATE_IN_REPLY_VALUE_QUOTED;
 				HCL_ASSERT (client->dummy_hcl, client->rep.tok.len == 0);
+				client->rep.u.reply_value_quoted.escaped = 0;
 				break;
 			}
 			else 
@@ -324,20 +393,13 @@ static int handle_char (hcl_client_t* client, hcl_ooci_t c)
 		case HCL_CLIENT_STATE_IN_REPLY_VALUE_UNQUOTED:
 			if (c == HCL_OOCI_EOF)
 			{
-				/* sudden end of EOF without NL */
-				printf ("suddend enf of input without NL\n");
-				/* TOOD: call call back as it it's just a normal reply. and don't goto oops*/
+				hcl_client_seterrbfmt (client, HCL_EFINIS, "sudden end of reply line without newline");
 				goto oops;
 			}
 			else if (c == '\n')
 			{
 				client->rep.tok.len = client->rep.u.reply_value_unquoted.nsplen;
-printf ("reply value....===>");
-print_tok (client);
-/* TODO: call callback */
-				client->state = HCL_CLIENT_STATE_START;
-				clear_reply_token (client);
-				break;
+				goto reply_value_end;
 			}
 			else
 			{
@@ -349,15 +411,16 @@ print_tok (client);
 		case HCL_CLIENT_STATE_IN_REPLY_VALUE_QUOTED:
 			if (c == HCL_OOCI_EOF)
 			{
-				/* sudden end of EOF without NL */
-				printf ("suddend enf of input witjpit closing quote. -> total failure\n");
+				hcl_client_seterrbfmt (client, HCL_EFINIS, "sudden end of reply line without closing quote");
 				goto oops;
 			}
 			else 
 			{
 				if (client->rep.u.reply_value_quoted.escaped)
 				{
-					if (c == 'n') c = '\n';
+					if (c == '\\') c = '\\';
+					else if (c == '\"') c = '\"';
+					else if (c == 'n') c = '\n';
 					else if (c == 'r') c = '\r';
 					/* TODO: more escaping handling */
 				}
@@ -376,17 +439,23 @@ print_tok (client);
 				if (add_to_reply_token(client, c) <= -1) goto oops;
 				break;
 			}
-		
+
 		case HCL_CLIENT_STATE_IN_REPLY_VALUE_QUOTED_TRAILER:
 			if (c == HCL_OOCI_EOF)
 			{
-				printf ("suddend enf of input witjpit closing quote. -> total failure\n");
+				hcl_client_seterrbfmt (client, HCL_EFINIS, "sudden end of reply line without newline");
 				goto oops;
 			}
 			else if (c == '\n')
 			{
-printf ("reply value....===>");
-print_tok (client);
+			reply_value_end:
+				/* short-form format. the data pointer is passed to the start_reply 
+				 * callback. no end_reply callback is invoked. the data is assumed
+				 * to be in UTF-8 encoding. this is different from the data in the
+				 * long-format reply which is treated as octet stream */
+				client->prim.start_reply (client, client->rep.type, client->rep.tok.ptr, client->rep.tok.len);
+				/* no end_reply() callback for the short-form reply */
+
 				client->state = HCL_CLIENT_STATE_START;
 				clear_reply_token (client);
 				break;
@@ -398,14 +467,14 @@ print_tok (client);
 			}
 			else
 			{
-				printf ("garbage after a quoted reply value [%lc]\n", c);
+				hcl_client_seterrbfmt (client, HCL_EINVAL, "garbage after quoted reply value");
 				goto oops;
 			}
 
-		case HCL_CLIENT_STATE_IN_HEADER_NAME:
+		case HCL_CLIENT_STATE_IN_ATTR_KEY:
 			if (c == HCL_OOCI_EOF)
 			{
-				printf ("suddend end of input without a header name\n");
+				hcl_client_seterrbfmt (client, HCL_EFINIS, "sudden end of attribute line");
 				goto oops;
 			}
 			else if (client->rep.tok.len == 0)
@@ -417,7 +486,7 @@ print_tok (client);
 				}
 				else if (c != '.')
 				{
-					printf ("header not starting with a period\n");
+					hcl_client_seterrbfmt (client, HCL_EINVAL, "attribute name not starting with a period");
 					goto oops;
 				}
 
@@ -426,58 +495,192 @@ print_tok (client);
 			}
 			else	if (is_alphachar(c) || (client->rep.tok.len > 2 && c == '-'))
 			{
+				if (client->rep.tok.len >= HCL_CLIENT_REPLY_MAX_HDRKEY_LEN)
+				{
+					hcl_client_seterrbfmt (client, HCL_EINVAL, "attribute name too long");
+					goto oops;
+				}
 				if (add_to_reply_token(client, c) <= -1) goto oops;
 				break;
 			}
 			else
 			{
-				printf ("JKJJJJJJJJJ=>\n");
-				print_tok(client);
-				if (hcl_compoocharsbcstr(client->rep.tok.ptr, client->rep.tok.len, ".ENCODING") == 0)
+				if (is_token(client, ".DATA"))
 				{
-					printf ("encoding....\n");
+					client->rep.last_attr_type = HCL_CLIENT_REPLY_ATTR_TYPE_DATA;
 				}
-				else if (hcl_compoocharsbcstr(client->rep.tok.ptr, client->rep.tok.len, ".LENGTH") == 0)
-				{
-					printf ("length....\n");
-				}
-				else if (hcl_compoocharsbcstr(client->rep.tok.ptr, client->rep.tok.len, ".DATA") == 0)
-				{
-					printf ("data....\n");
-				}
+				/* PUT more known attribute handling here */
 				else
 				{
-					printf ("unknown header ---> [%.*ls]\n", (int)client->rep.tok.len, client->rep.tok.ptr);
-					goto oops;
+					client->rep.last_attr_type = HCL_CLIENT_REPLY_ATTR_TYPE_UNKNOWN;
 				}
 
-				client->state = HCL_CLIENT_STATE_IN_HEADER_VALUE;
+				HCL_ASSERT (client->dummy_hcl, client->rep.tok.len <= HCL_COUNTOF(client->rep.last_attr_key.buf));
+				hcl_copyoochars (client->rep.last_attr_key.buf, client->rep.tok.ptr, client->rep.tok.len);
+				client->rep.last_attr_key.len = client->rep.tok.len;
+
+				client->state = HCL_CLIENT_STATE_IN_ATTR_VALUE_START;
 				clear_reply_token (client);
 				/* [IMPORTANT] fall thru */
 			}
 
-/*
-echo -n -e '.OK"YOYO   bc\n\" abc"    \n    .ERROR             "XYZ"\n.OK\n.ENCODING chunked\n' |~/xxx/bin/hclc 11111
- */
-
-		case HCL_CLIENT_STATE_IN_HEADER_VALUE:
+		case HCL_CLIENT_STATE_IN_ATTR_VALUE_START:
 			if (c == HCL_OOCI_EOF)
 			{
-				printf ("sudden end of input whthout header value\n");
+				hcl_client_seterrbfmt (client, HCL_EFINIS, "sudden end without attribute value");
 				goto oops;
+			}
+			else if (is_spacechar(c))
+			{
+				/* do nothing. skip it */
+				break;
 			}
 			else if (c == '\n')
 			{
-				printf ("XXXXXXXXXXXXXXxx\n");
+				hcl_client_seterrbfmt (client, HCL_EINVAL, "no attribute value for %.*js\n", client->rep.last_attr_key.len, client->rep.last_attr_key.buf);
+				goto oops;
+			}
+			else if (c == '\"')
+			{
+				client->state = HCL_CLIENT_STATE_IN_ATTR_VALUE_QUOTED;
+				HCL_ASSERT (client->dummy_hcl, client->rep.tok.len == 0);
+				client->rep.u.attr_value_quoted.escaped = 0;
 				break;
 			}
 			else 
 			{
-				printf ("add to header value....\n");
+				/* the first value character has been encountered */
+				client->state = HCL_CLIENT_STATE_IN_ATTR_VALUE_UNQUOTED;
+				HCL_ASSERT (client->dummy_hcl, client->rep.tok.len == 0);
+				client->rep.u.attr_value_unquoted.nsplen = 0;
+				/* [IMPORTANT] fall thru */
+			}
+
+		case HCL_CLIENT_STATE_IN_ATTR_VALUE_UNQUOTED:
+			if (c == HCL_OOCI_EOF)
+			{
+				hcl_client_seterrbfmt (client, HCL_EFINIS, "sudden end of attribute line without newline");
+				goto oops;
+			}
+			else if (c == '\n')
+			{
+				client->rep.tok.len = client->rep.u.attr_value_unquoted.nsplen;
+				goto attr_value_end;
+			}
+			else
+			{
+				if (add_to_reply_token(client, c) <= -1) goto oops;
+				if (!is_spacechar(c)) client->rep.u.attr_value_unquoted.nsplen = client->rep.tok.len;
 				break;
 			}
 
-			break;
+		case HCL_CLIENT_STATE_IN_ATTR_VALUE_QUOTED:
+			if (c == HCL_OOCI_EOF)
+			{
+				hcl_client_seterrbfmt (client, HCL_EFINIS, "sudden end of attribute value without closing quote");
+				goto oops;
+			}
+			else 
+			{
+				if (client->rep.u.attr_value_quoted.escaped)
+				{
+					if (c == '\\') c = '\\';
+					else if (c == '\"') c = '\"';
+					else if (c == 'n') c = '\n';
+					else if (c == 'r') c = '\r';
+					/* TODO: more escaping handling */
+				}
+				else if (c == '\\')
+				{
+					client->rep.u.attr_value_quoted.escaped = 1;
+					break;
+				}
+				else if (c == '\"')
+				{
+					client->state = HCL_CLIENT_STATE_IN_ATTR_VALUE_QUOTED_TRAILER;
+					break;
+				}
+
+				client->rep.u.attr_value_quoted.escaped = 0;
+				if (add_to_reply_token(client, c) <= -1) goto oops;
+				break;
+			}
+
+		case HCL_CLIENT_STATE_IN_ATTR_VALUE_QUOTED_TRAILER:
+			if (c == HCL_OOCI_EOF)
+			{
+				hcl_client_seterrbfmt (client, HCL_EFINIS, "sudden end of attribute line without newline");
+				goto oops;
+			}
+			else if (c == '\n')
+			{
+			attr_value_end:
+				if (client->prim.feed_attr)
+				{
+					hcl_oocs_t key, val;
+					key.ptr = client->rep.last_attr_key.buf;
+					key.len = client->rep.last_attr_key.len;
+					val.ptr = client->rep.tok.ptr;
+					val.len = client->rep.tok.len;
+					client->prim.feed_attr (client, &key, &val);
+				}
+
+				if (client->rep.last_attr_type == HCL_CLIENT_REPLY_ATTR_TYPE_DATA)
+				{
+					hcl_oow_t length;
+
+					/* this must be the last attr. the trailing part are all data */
+					if (is_token(client, "chunked"))
+					{
+						client->state = HCL_CLIENT_STATE_IN_CHUNKED_DATA;
+						HCL_MEMSET (&client->rep.u.chunked_data, 0, HCL_SIZEOF(client->rep.u.chunked_data));
+					}
+					else if (is_token_integer(client, &length))
+					{
+						if (length > 0)
+						{
+							client->state = HCL_CLIENT_STATE_IN_LENGTH_BOUNDED_DATA;
+							/* [NOTE] the max length for the length-bounded transfer scheme is limited
+							 *        by the system word size as of this implementation */
+							client->rep.u.length_bounded_data.max = length; 
+							client->rep.u.length_bounded_data.tally = 0;
+						}
+						else
+						{
+							/* .DATA 0 has been received. this should be end of the reply */
+							client->state = HCL_CLIENT_STATE_START;
+						}
+					}
+					else
+					{
+						hcl_client_seterrbfmt (client, HCL_EINVAL, "invalid attribute value for .DATA - %.*js", client->rep.tok.len, client->rep.tok.ptr);
+						goto oops;
+					}
+				}
+				else
+				{
+					/* continue processing the next attr */
+					client->state = HCL_CLIENT_STATE_IN_ATTR_KEY;
+				}
+
+				clear_reply_token (client);
+				break;
+			}
+			else if (is_spacechar(c))
+			{
+				/* skip white spaces after the closing quote */
+				break;
+			}
+			else
+			{
+				hcl_client_seterrbfmt (client, HCL_EINVAL, "garbage after quoted attribute value for %.*js", client->rep.last_attr_key.len, client->rep.last_attr_key.buf);
+				goto oops;
+			}
+
+		default:
+			/* this function must not be called for .DATA */
+			hcl_client_seterrbfmt (client, HCL_EINTERN, "internal error - must not be called for state %d", client->state);
+			goto oops;
 	}
 
 	return 0;
@@ -494,18 +697,118 @@ static int feed_reply_data (hcl_client_t* client, const hcl_bch_t* data, hcl_oow
 	ptr = data;
 	end = ptr + len;
 
-//printf ("<<<%.*s>>>\n", (int)len, data);
-	if (client->state == HCL_CLIENT_STATE_IN_BINARY_DATA)
+	while (ptr < end)
 	{
-	}
-	else
-	{
-		while (ptr < end)
+		if (client->state == HCL_CLIENT_STATE_IN_LENGTH_BOUNDED_DATA)
+		{
+			/* the data is treated as raw octets by this client */
+			hcl_oow_t capa, avail, taken;
+
+			capa = client->rep.u.length_bounded_data.max - client->rep.u.length_bounded_data.tally;
+			avail = end - ptr;
+			taken = (avail < capa)? avail: capa;
+
+			if (client->prim.feed_data)
+			{
+				client->prim.feed_data (client, ptr, taken);
+			}
+
+			ptr += taken;
+			client->rep.u.length_bounded_data.tally = taken;
+			if (taken == capa)
+			{
+				/* read all data. no more */
+				client->state = HCL_CLIENT_STATE_START;
+				client->prim.end_reply (client, HCL_CLIENT_END_REPLY_STATE_OK);
+			}
+		}
+		else if (client->state == HCL_CLIENT_STATE_IN_CHUNKED_DATA)
+		{
+			/* the data is treated as raw octets by this client */
+			if (client->rep.u.chunked_data.in_data_part)
+			{
+				hcl_oow_t capa, avail, taken;
+
+				capa = client->rep.u.chunked_data.max - client->rep.u.chunked_data.tally;
+				avail = end - ptr;
+				taken = (avail < capa)? avail: capa;
+
+				if (client->prim.feed_data)
+				{
+					client->prim.feed_data (client, ptr, taken);
+				}
+
+				ptr += taken;
+				client->rep.u.chunked_data.tally += taken;
+				client->rep.u.chunked_data.total += taken;
+				if (taken == capa)
+				{
+					/* finished one chunk */
+					client->rep.u.chunked_data.negated = 0;
+					client->rep.u.chunked_data.max = 0;
+					client->rep.u.chunked_data.tally = 0;
+					client->rep.u.chunked_data.clcount = 0;
+					client->rep.u.chunked_data.in_data_part = 0;
+				}
+			}
+			else
+			{
+				while (ptr < end)
+				{
+					hcl_bchu_t bc = (hcl_bchu_t)*ptr;
+					if (bc == '-' && client->rep.u.chunked_data.clcount == 0 && !client->rep.u.chunked_data.negated)
+					{
+						client->rep.u.chunked_data.negated = 1;
+					}
+					else if (bc == ':') 
+					{
+						ptr++;
+
+						if (client->rep.u.chunked_data.clcount == 0)
+						{
+							hcl_client_seterrbfmt (client, HCL_EINVAL, "clone without valid chunk length");
+							goto oops;
+						}
+
+						if (client->rep.u.chunked_data.negated)
+						{
+							client->prim.end_reply (client, HCL_CLIENT_END_REPLY_STATE_REVOKED);
+							client->state = HCL_CLIENT_STATE_START;
+
+						}
+						if (client->rep.u.chunked_data.max == 0)
+						{
+							client->prim.end_reply (client, HCL_CLIENT_END_REPLY_STATE_OK);
+							client->state = HCL_CLIENT_STATE_START;
+						}
+						else
+						{
+							client->rep.u.chunked_data.in_data_part = 1;
+							client->rep.u.chunked_data.tally = 0;
+						}
+						break;
+					}
+					else if (is_digitchar(bc)) 
+					{
+						client->rep.u.chunked_data.max = client->rep.u.chunked_data.max * 10 + (bc - '0');
+						client->rep.u.chunked_data.clcount++;
+						ptr++;
+					}
+					else
+					{
+						hcl_client_seterrbfmt (client, HCL_EINVAL, "invalid chunk length character  - code[%#x]", bc);
+						goto oops;
+					}
+				}
+			}
+		}
+		else
 		{
 			hcl_ooci_t c;
+			hcl_oow_t bcslen;
 
 	#if defined(HCL_OOCH_IS_UCH)
-			hcl_oow_t bcslen, ucslen;
+			hcl_oow_t ucslen;
 			hcl_ooch_t uc;
 			int n;
 
@@ -518,7 +821,6 @@ static int feed_reply_data (hcl_client_t* client, const hcl_bch_t* data, hcl_oow
 				if (n == -3)
 				{
 					/* incomplete sequence */
-					printf ("incompelete....feed me more\n");
 					*xlen = ptr - data;
 					return 0; /* feed more for incomplete sequence */
 				}
@@ -527,11 +829,12 @@ static int feed_reply_data (hcl_client_t* client, const hcl_bch_t* data, hcl_oow
 			ptr += bcslen;
 			c = uc;
 	#else
+			bcslen = 1;
 			c = *ptr++;
 	#endif
 
-printf ("[%lc]\n", c);
-			if (handle_char(client, c) <= -1) goto oops;
+//printf ("[%lc]\n", c);
+			if (handle_char(client, c, bcslen) <= -1) goto oops;
 		}
 	}
 
@@ -540,7 +843,7 @@ printf ("[%lc]\n", c);
 
 oops:
 	/* TODO: compute the number of processes bytes so far and return it via a parameter??? */
-printf ("feed oops....\n");
+/*printf ("feed oops....\n");*/
 	return -1;
 }
 
@@ -571,14 +874,10 @@ static int feed_all_reply_data (hcl_client_t* client, hcl_bch_t* buf, hcl_oow_t 
 hcl_client_t* hcl_client_open (hcl_mmgr_t* mmgr, hcl_oow_t xtnsize, hcl_client_prim_t* prim, hcl_errnum_t* errnum)
 {
 	hcl_client_t* client;
-#if 0
 	hcl_t* hcl;
 	hcl_vmprim_t vmprim;
-	hcl_tmr_t* tmr;
 	dummy_hcl_xtn_t* xtn;
-	int pfd[2], fcv;
-	unsigned int trait;
-#endif
+/*	unsigned int trait;*/
 
 	client = (hcl_client_t*)HCL_MMGR_ALLOC(mmgr, HCL_SIZEOF(*client) + xtnsize);
 	if (!client) 
@@ -587,15 +886,9 @@ hcl_client_t* hcl_client_open (hcl_mmgr_t* mmgr, hcl_oow_t xtnsize, hcl_client_p
 		return HCL_NULL;
 	}
 
-#if 0
 	HCL_MEMSET (&vmprim, 0, HCL_SIZEOF(vmprim));
 	vmprim.log_write = log_write_for_dummy;
 	vmprim.syserrstrb = syserrstrb;
-	vmprim.dl_open = dl_open;
-	vmprim.dl_close = dl_close;
-	vmprim.dl_getsym = dl_getsym;
-	vmprim.vm_gettime = vm_gettime;
-	vmprim.vm_sleep = vm_sleep;
 
 	hcl = hcl_open(mmgr, HCL_SIZEOF(*xtn), 2048, &vmprim, errnum);
 	if (!hcl) 
@@ -604,35 +897,6 @@ hcl_client_t* hcl_client_open (hcl_mmgr_t* mmgr, hcl_oow_t xtnsize, hcl_client_p
 		return HCL_NULL;
 	}
 
-	tmr = hcl_tmr_open(hcl, 0, 1024); /* TOOD: make the timer's default size configurable */
-	if (!tmr)
-	{
-		hcl_close (hcl);
-		HCL_MMGR_FREE (mmgr, client);
-		return HCL_NULL;
-	}
-
-	if (pipe(pfd) <= -1)
-	{
-		hcl_tmr_close (tmr);
-		hcl_close (hcl);
-		HCL_MMGR_FREE (mmgr, client);
-		return HCL_NULL;
-	}
-
-#if defined(O_CLOEXEC)
-	fcv = fcntl(pfd[0], F_GETFD, 0);
-	if (fcv >= 0) fcntl(pfd[0], F_SETFD, fcv | O_CLOEXEC);
-	fcv = fcntl(pfd[1], F_GETFD, 0);
-	if (fcv >= 0) fcntl(pfd[1], F_SETFD, fcv | O_CLOEXEC);
-#endif
-#if defined(O_NONBLOCK)
-	fcv = fcntl(pfd[0], F_GETFL, 0);
-	if (fcv >= 0) fcntl(pfd[0], F_SETFL, fcv | O_NONBLOCK);
-	fcv = fcntl(pfd[1], F_GETFL, 0);
-	if (fcv >= 0) fcntl(pfd[1], F_SETFL, fcv | O_NONBLOCK);
-#endif
-	
 	xtn = (dummy_hcl_xtn_t*)hcl_getxtn(hcl);
 	xtn->client = client;
 
@@ -641,52 +905,31 @@ hcl_client_t* hcl_client_open (hcl_mmgr_t* mmgr, hcl_oow_t xtnsize, hcl_client_p
 	client->cmgr = hcl_get_utf8_cmgr();
 	client->prim = *prim;
 	client->dummy_hcl = hcl;
-	client->tmr = tmr;
 
 	client->cfg.logmask = ~0u;
-	client->cfg.worker_stack_size = 512000UL; 
-	client->cfg.actor_heap_size = 512000UL;
-
-	HCL_INITNTIME (&client->cfg.worker_idle_timeout, 0, 0);
-	HCL_INITNTIME (&client->cfg.actor_max_runtime, 0, 0);
-
-	client->mux_pipe[0] = pfd[0];
-	client->mux_pipe[1] = pfd[1];
-
-	client->wid_map.free_first = HCL_SERVER_WID_INVALID;
-	client->wid_map.free_last = HCL_SERVER_WID_INVALID;
-	
-	pthread_mutex_init (&client->worker_mutex, HCL_NULL);
-	pthread_mutex_init (&client->tmr_mutex, HCL_NULL);
-	pthread_mutex_init (&client->log_mutex, HCL_NULL);
 
 	/* the dummy hcl is used for this client to perform primitive operations
 	 * such as getting system time or logging. so the heap size doesn't 
 	 * need to be changed from the tiny value set above. */
 	hcl_setoption (client->dummy_hcl, HCL_LOG_MASK, &client->cfg.logmask);
 	hcl_setcmgr (client->dummy_hcl, client->cmgr);
-	hcl_getoption (client->dummy_hcl, HCL_TRAIT, &trait);
-#if defined(HCL_BUILD_DEBUG)
-	if (client->cfg.trait & HCL_SERVER_TRAIT_DEBUG_GC) trait |= HCL_DEBUG_GC;
-	if (client->cfg.trait & HCL_SERVER_TRAIT_DEBUG_BIGINT) trait |= HCL_DEBUG_BIGINT;
-#endif
-	hcl_setoption (client->dummy_hcl, HCL_TRAIT, &trait);
-#else
-
-	HCL_MEMSET (client, 0, HCL_SIZEOF(*client) + xtnsize);
-	client->mmgr = mmgr;
-	client->cmgr = hcl_get_utf8_cmgr();
-
-#endif
 
 	return client;
 }
 
 void hcl_client_close (hcl_client_t* client)
 {
+	if (client->rep.tok.ptr)
+	{
+		hcl_client_freemem (client, client->rep.tok.ptr);
+		client->rep.tok.ptr = HCL_NULL;
+		client->rep.tok.len = 0;
+		client->rep.tok.capa = 0;
+	}
+
+	hcl_close (client->dummy_hcl);
 	HCL_MMGR_FREE (client->mmgr, client);
 }
-
 
 int hcl_client_setoption (hcl_client_t* client, hcl_client_option_t id, const void* value)
 {
@@ -694,28 +937,10 @@ int hcl_client_setoption (hcl_client_t* client, hcl_client_option_t id, const vo
 	{
 		case HCL_CLIENT_TRAIT:
 			client->cfg.trait = *(const unsigned int*)value;
-		#if 0
-			if (client->dummy_hcl)
-			{
-				/* setting this affects the dummy hcl immediately.
-				 * existing hcl instances inside worker threads won't get 
-				 * affected. new hcl instances to be created later 
-				 * is supposed to use the new value */
-				unsigned int trait;
-
-				hcl_getoption (client->dummy_hcl, HCL_TRAIT, &trait);
-			#if defined(HCL_BUILD_DEBUG)
-				if (client->cfg.trait & HCL_CLIENT_TRAIT_DEBUG_GC) trait |= HCL_DEBUG_GC;
-				if (client->cfg.trait & HCL_CLIENT_TRAIT_DEBUG_BIGINT) trait |= HCL_DEBUG_BIGINT;
-			#endif
-				hcl_setoption (client->dummy_hcl, HCL_TRAIT, &trait);
-			}
-		#endif
 			return 0;
 
 		case HCL_CLIENT_LOG_MASK:
 			client->cfg.logmask = *(const unsigned int*)value;
-		#if 0
 			if (client->dummy_hcl) 
 			{
 				/* setting this affects the dummy hcl immediately.
@@ -724,19 +949,6 @@ int hcl_client_setoption (hcl_client_t* client, hcl_client_option_t id, const vo
 				 * is supposed to use the new value */
 				hcl_setoption (client->dummy_hcl, HCL_LOG_MASK, value);
 			}
-		#endif
-			return 0;
-
-		case HCL_CLIENT_WORKER_MAX_COUNT:
-			client->cfg.worker_max_count = *(hcl_oow_t*)value;
-			return 0;
-
-		case HCL_CLIENT_WORKER_STACK_SIZE:
-			client->cfg.worker_stack_size = *(hcl_oow_t*)value;
-			return 0;
-
-		case HCL_CLIENT_WORKER_IDLE_TIMEOUT:
-			client->cfg.worker_idle_timeout = *(hcl_ntime_t*)value;
 			return 0;
 	}
 
@@ -754,18 +966,6 @@ int hcl_client_getoption (hcl_client_t* client, hcl_client_option_t id, void* va
 
 		case HCL_CLIENT_LOG_MASK:
 			*(unsigned int*)value = client->cfg.logmask;
-			return 0;
-
-		case HCL_CLIENT_WORKER_MAX_COUNT:
-			*(hcl_oow_t*)value = client->cfg.worker_max_count;
-			return 0;
-
-		case HCL_CLIENT_WORKER_STACK_SIZE:
-			*(hcl_oow_t*)value = client->cfg.worker_stack_size;
-			return 0;
-
-		case HCL_CLIENT_WORKER_IDLE_TIMEOUT:
-			*(hcl_ntime_t*)value = client->cfg.worker_idle_timeout;
 			return 0;
 	};
 
@@ -817,6 +1017,54 @@ void hcl_client_seterrnum (hcl_client_t* client, hcl_errnum_t errnum)
 	client->errmsg.len = 0;
 }
 
+void hcl_client_seterrbfmt (hcl_client_t* client, hcl_errnum_t errnum, const hcl_bch_t* fmt, ...)
+{
+	va_list ap;
+
+	va_start (ap, fmt);
+	hcl_seterrbfmtv (client->dummy_hcl, errnum, fmt, ap);
+	va_end (ap);
+
+	HCL_ASSERT (client->dummy_hcl, HCL_COUNTOF(client->errmsg.buf) == HCL_COUNTOF(client->dummy_hcl->errmsg.buf));
+	client->errnum = errnum;
+	hcl_copyoochars (client->errmsg.buf, client->dummy_hcl->errmsg.buf, HCL_COUNTOF(client->errmsg.buf));
+	client->errmsg.len = client->dummy_hcl->errmsg.len;
+}
+
+void hcl_client_seterrufmt (hcl_client_t* client, hcl_errnum_t errnum, const hcl_uch_t* fmt, ...)
+{
+	va_list ap;
+
+	va_start (ap, fmt);
+	hcl_seterrufmtv (client->dummy_hcl, errnum, fmt, ap);
+	va_end (ap);
+
+	HCL_ASSERT (client->dummy_hcl, HCL_COUNTOF(client->errmsg.buf) == HCL_COUNTOF(client->dummy_hcl->errmsg.buf));
+	client->errnum = errnum;
+	hcl_copyoochars (client->errmsg.buf, client->dummy_hcl->errmsg.buf, HCL_COUNTOF(client->errmsg.buf));
+	client->errmsg.len = client->dummy_hcl->errmsg.len;
+}
+
+/* ========================================================================= */
+
+void hcl_client_logbfmt (hcl_client_t* client, unsigned int mask, const hcl_bch_t* fmt, ...)
+{
+	va_list ap;
+	va_start (ap, fmt);
+	hcl_logbfmtv (client->dummy_hcl, mask, fmt, ap);
+	va_end (ap);
+}
+
+void hcl_client_logufmt (hcl_client_t* client, unsigned int mask, const hcl_uch_t* fmt, ...)
+{
+	va_list ap;
+	va_start (ap, fmt);
+	hcl_logufmtv (client->dummy_hcl, mask, fmt, ap);
+	va_end (ap);
+}
+
+/* ========================================================================= */
+
 void* hcl_client_allocmem (hcl_client_t* client, hcl_oow_t size)
 {
 	void* ptr;
@@ -847,7 +1095,6 @@ void hcl_client_freemem (hcl_client_t* client, void* ptr)
 {
 	HCL_MMGR_FREE (client->mmgr, ptr);
 }
-
 
 /* ========================================================================= */
 
@@ -887,7 +1134,6 @@ int hcl_client_start (hcl_client_t* client, const hcl_bch_t* addrs)
 		if (offset > 0) HCL_MEMMOVE (&buf[0], &buf[xlen], offset);
 	}
 
-printf ("hcl client start returns success\n");
 	return 0;
 }
 

@@ -53,8 +53,7 @@ enum hcl_server_trait_t
 	HCL_SERVER_TRAIT_DEBUG_BIGINT     = (1 << 1),
 #endif
 
-	HCL_SERVER_TRAIT_READABLE_PROTO   = (1 << 2),
-	HCL_SERVER_TRAIT_USE_LARGE_PAGES  = (1 << 3)
+	HCL_SERVER_TRAIT_USE_LARGE_PAGES  = (1 << 2)
 };
 typedef enum hcl_server_trait_t hcl_server_trait_t;
 

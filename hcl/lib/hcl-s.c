@@ -161,7 +161,6 @@ struct dummy_hcl_xtn_t
 };
 typedef struct dummy_hcl_xtn_t dummy_hcl_xtn_t;
 
-
 enum hcl_server_proto_token_type_t
 {
 	HCL_SERVER_PROTO_TOKEN_EOF,
@@ -276,7 +275,7 @@ struct hcl_server_wid_map_data_t
 	} u;
 };
 typedef struct hcl_server_wid_map_data_t hcl_server_wid_map_data_t;
-		
+
 struct hcl_server_t
 {
 	hcl_mmgr_t*  mmgr;
@@ -1111,12 +1110,12 @@ static int write_reply_chunk (hcl_server_proto_t* proto)
 		if (proto->reply.nchunks <= 0)
 		{
 			/* this is the first chunk */
-			iov[count].iov_base = ".OK\n.ENCODING chunked\n.DATA\n";
-			iov[count++].iov_len = 28;
+			iov[count].iov_base = ".OK\n.DATA chunked\n";
+			iov[count++].iov_len = 18;
 		}
 
 		iov[count].iov_base = cl,
-		iov[count++].iov_len = snprintf(cl, HCL_SIZEOF(cl), "%s%zu:", (((proto->worker->server->cfg.trait & HCL_SERVER_TRAIT_READABLE_PROTO) && proto->reply.nchunks > 0)? "\n": ""), proto->reply.len); 
+		iov[count++].iov_len = snprintf(cl, HCL_SIZEOF(cl), "%zu:", proto->reply.len); 
 	}
 	iov[count].iov_base = proto->reply.buf;
 	iov[count++].iov_len = proto->reply.len;
@@ -1245,14 +1244,14 @@ int hcl_server_proto_end_reply (hcl_server_proto_t* proto, const hcl_ooch_t* fai
 			/* some chunks have beed emitted. but at the end, an error has occurred.
 			 * send -1: as the last chunk. the receiver must rub out the reply
 			 * buffer received so far and expect the following .ERROR response */
-			static hcl_ooch_t err0[] = { '-','1',':','\n' };
+			static hcl_ooch_t err0[] = { '-','1',':' };
 			if (proto->reply.len > 0 && write_reply_chunk(proto) <= -1) return -1;
 
 			proto->reply.type = HCL_SERVER_PROTO_REPLY_SIMPLE; /* switch to the simple mode forcibly */
 			proto->reply.nchunks = 0;
 			proto->reply.len = 0;
 
-			if (hcl_server_proto_feed_reply(proto, err0, 4, 0) <= -1) return -1;
+			if (hcl_server_proto_feed_reply(proto, err0, 3, 0) <= -1) return -1;
 			goto simple_error;
 		}
 	}

@@ -667,9 +667,12 @@ int main (int argc, char* argv[])
 		hcl_server_logbfmt (server, HCL_LOG_APP | HCL_LOG_FATAL, "server error[%d] - %js\n", hcl_server_geterrnum(server), hcl_server_geterrmsg(server));
 	}
 
-	close (xtn->logfd);
-	xtn->logfd = -1;
-	xtn->logfd_istty = 0;
+	if (xtn->logfd >= 0)
+	{
+		close (xtn->logfd);
+		xtn->logfd = -1;
+		xtn->logfd_istty = 0;
+	}
 
 	hcl_server_close (server);
 	return n;
