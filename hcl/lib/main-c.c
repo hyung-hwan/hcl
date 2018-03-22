@@ -47,6 +47,8 @@
 #	include <sys/uio.h>
 #endif
 
+#include <sys/types.h>
+#include <sys/socket.h>
 #include <unistd.h>
 #include <fcntl.h>
 
@@ -64,6 +66,8 @@ struct client_xtn_t
 		hcl_bch_t buf[4096];
 		hcl_oow_t len;
 	} logbuf;
+
+	int reply_count;
 };
 
 /* ========================================================================= */
@@ -451,12 +455,16 @@ static int start_reply (hcl_client_t* client, hcl_client_reply_type_t type, cons
 
 static int end_reply (hcl_client_t* client, hcl_client_end_reply_state_t state)
 {
+	client_xtn_t* client_xtn;
+	client_xtn = hcl_client_getxtn(client);
+
 	if (state == HCL_CLIENT_END_REPLY_STATE_REVOKED)
 	{
 printf (">>>>>>>>>>>>>>>>>>>>>> REPLY revoked....\n");
 	}
 	else
 	{
+		client_xtn->reply_count++;
 printf (">>>>>>>>>>>>>>>>>>>>> REPLY ENDED OK....\n");
 	}
 	return 0;
@@ -470,55 +478,128 @@ printf ("GOT HEADER ====> [%.*ls] ===> [%.*ls]\n", (int)key->len, key->ptr, (int
 
 static int feed_data (hcl_client_t* client, const void* ptr, hcl_oow_t len)
 {
-printf ("GOT DATA>>>>>>>>>[%.*s]>>>>>>>\n", (int)len, ptr);
+//printf ("GOT DATA>>>>>>>>>[%.*s]>>>>>>>\n", (int)len, ptr);
+printf ("%.*s", (int)len, ptr);
 	return 0;
 }
 
 /* ========================================================================= */
 
-static int  process_reply (hcl_client_t* client, const hcl_bch_t* addrs)
+static int handle_request (hcl_client_t* client, const char* ipaddr, const char* script)
 {
-
-	/* connect */
-	/* send request */
+	hcl_sckaddr_t sckaddr;
+	hcl_scklen_t scklen;
+	int sckfam;
+	int sck;
+	struct iovec iov[10];
+	int index, count;
 
 	hcl_oow_t xlen, offset;
 	int x;
-	int fd = 0; /* read from stdin for testing */
 	hcl_bch_t buf[256];
 	ssize_t n;
 
-	offset = 0;
+	client_xtn_t* client_xtn;
 
+	client_xtn = hcl_client_getxtn(client);
+
+	sckfam = hcl_bchars_to_sckaddr(ipaddr, strlen(ipaddr), &sckaddr, &scklen);
+	if (sckfam <= -1) 
+	{
+		fprintf (stderr, "cannot convert ip address - %s\n", ipaddr);
+		return -1;
+	}
+
+	sck = socket (sckfam, SOCK_STREAM, 0);
+	if (sck <= -1) 
+	{
+		fprintf (stderr, "cannot create a socket for %s\n", ipaddr);
+		return -1;
+	}
+
+
+	if (connect(sck, (struct sockaddr*)&sckaddr, scklen) <= -1)
+	{
+		fprintf (stderr, "cannot connect to %s\n", ipaddr);
+		close (sck);
+		return -1;
+	}
+
+	count = 0;
+	iov[count].iov_base = ".SCRIPT (do ";
+	iov[count++].iov_len = 12;
+	iov[count].iov_base = (char*)script;
+	iov[count++].iov_len = strlen(script);
+	/* the script above must not include trailing newlines */
+	iov[count].iov_base = ")\n";
+	iov[count++].iov_len = 2;
+
+	index = 0;
 	while (1)
 	{
-		n = read(fd, &buf[offset], HCL_SIZEOF(buf) - offset); /* switch to recv  */
+		ssize_t nwritten;
+		struct msghdr msg;
+
+		memset (&msg, 0, HCL_SIZEOF(msg));
+		msg.msg_iov = (struct iovec*)&iov[index];
+		msg.msg_iovlen = count - index;
+		nwritten = sendmsg(sck, &msg, 0);
+		/*nwritten = writev(proto->worker->sck, (const struct iovec*)&iov[index], count - index);*/
+		if (nwritten <= -1) 
+		{
+			/* error occurred inside the worker thread shouldn't affect the error information
+			 * in the server object. so here, i just log a message */
+			fprintf (stderr, "Unable to sendmsg on %d - %s\n", sck, strerror(errno));
+			goto oops;
+		}
+
+		while (index < count && (size_t)nwritten >= iov[index].iov_len)
+			nwritten -= iov[index++].iov_len;
+
+		if (index == count) break;
+
+		iov[index].iov_base = (void*)((hcl_uint8_t*)iov[index].iov_base + nwritten);
+		iov[index].iov_len -= nwritten;
+	}
+
+	client_xtn->reply_count = 0;
+
+/* TODO: implement timeout? */
+	offset = 0;
+	while (client_xtn->reply_count == 0)
+	{
+		n = read(sck, &buf[offset], HCL_SIZEOF(buf) - offset); /* switch to recv  */
 		if (n <= -1) 
 		{
-			printf ("error....%s\n", strerror(n));
-			return -1;
+			fprintf (stderr, "Unable to read from %d - %s\n", sck, strerror(n));
+			goto oops;
 		}
 		if (n == 0) 
 		{
 			if (hcl_client_getstate(client) != HCL_CLIENT_STATE_START)
 			{
-				printf ("sudden end??? \n");
+				fprintf (stderr, "Sudden end of reply\n");
+				goto oops;
 			}
 			break;
 		}
 
 		x = hcl_client_feed(client, buf, n, &xlen);
-		if (x <= -1) return -1;
+		if (x <= -1) goto oops;
 
 		offset = n - xlen;
 		if (offset > 0) memmove (&buf[0], &buf[xlen], offset);
 	}
 
-
+/* TODO: we can check if the buffer has all been consumed. if not, there is trailing garbage.. */
+	close (sck);
 	return 0;
+
+oops:
+	if (sck >= 0) close (sck);
+	return -1;
 }
 
- 
 int main (int argc, char* argv[])
 {
 	hcl_bci_t c;
@@ -545,7 +626,7 @@ int main (int argc, char* argv[])
 	if (argc < 2)
 	{
 	print_usage:
-		fprintf (stderr, "Usage: %s bind-address:port\n", argv[0]);
+		fprintf (stderr, "Usage: %s bind-address:port script-to-run\n", argv[0]);
 		return -1;
 	}
 
@@ -574,7 +655,8 @@ int main (int argc, char* argv[])
 		}
 	}
 
-	if (opt.ind >= argc) goto print_usage;
+	/* needs 2 fixed arguments */
+	if (opt.ind + 1 >= argc) goto print_usage;
 
 	memset (&client_prim, 0, HCL_SIZEOF(client_prim));
 	client_prim.log_write = log_write;
@@ -608,7 +690,8 @@ int main (int argc, char* argv[])
 	set_signal (SIGINT, handle_sigint);
 	set_signal_to_ignore (SIGPIPE);
 
-	n = process_reply(client, argv[opt.ind]);
+
+	n = handle_request (client, argv[opt.ind], argv[opt.ind + 1]);
 
 	set_signal_to_default (SIGINT);
 	set_signal_to_default (SIGPIPE);

@@ -1108,3 +1108,42 @@ hcl_uint128_t hcl_hton128 (hcl_uint128_t x)
 }
 
 #endif
+
+/* --------------------------------------------------------------- */
+
+#include <netinet/in.h>
+
+union sockaddr_t
+{
+	struct sockaddr_in in4;
+#if (HCL_SIZEOF_STRUCT_SOCKADDR_IN6 > 0)
+	struct sockaddr_in6 in6;
+#endif
+};
+typedef union sockaddr_t sockaddr_t;
+
+#undef ooch_t
+#undef oocs_t
+#undef str_to_ipv4
+#undef str_to_ipv6
+#undef str_to_sockaddr
+
+#define ooch_t hcl_bch_t
+#define oocs_t hcl_bcs_t
+#define str_to_ipv4 bchars_to_ipv4
+#define str_to_ipv6 bchars_to_ipv6
+#define str_to_sockaddr hcl_bcharstosckaddr
+#include "sa-utl.h"
+
+#undef ooch_t
+#undef oocs_t
+#undef str_to_ipv4
+#undef str_to_ipv6
+#undef str_to_sockaddr
+
+#define ooch_t hcl_uch_t
+#define oocs_t hcl_ucs_t
+#define str_to_ipv4 uchars_to_ipv4
+#define str_to_ipv6 uchars_to_ipv6
+#define str_to_sockaddr hcl_ucharstosckaddr
+#include "sa-utl.h"

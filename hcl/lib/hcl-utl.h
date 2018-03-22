@@ -102,19 +102,82 @@
 	                (((qse_uint32_t)(x) & (qse_uint32_t)0xff000000UL) >> 24) ))
 
 #if defined(HCL_ENDIAN_LITTLE)
-#       define HCL_CONST_NTOH16(x) HCL_CONST_SWAP16(x)
-#       define HCL_CONST_HTON16(x) HCL_CONST_SWAP16(x)
-#       define HCL_CONST_NTOH32(x) HCL_CONST_SWAP32(x)
-#       define HCL_CONST_HTON32(x) HCL_CONST_SWAP32(x)
+#	define HCL_CONST_NTOH16(x) HCL_CONST_SWAP16(x)
+#	define HCL_CONST_HTON16(x) HCL_CONST_SWAP16(x)
+#	define HCL_CONST_NTOH32(x) HCL_CONST_SWAP32(x)
+#	define HCL_CONST_HTON32(x) HCL_CONST_SWAP32(x)
 #elif defined(HCL_ENDIAN_BIG)
-#       define HCL_CONST_NTOH16(x) (x)
-#       define HCL_CONST_HTON16(x) (x)
-#       define HCL_CONST_NTOH32(x) (x)
-#       define HCL_CONST_HTON32(x) (x)
+#	define HCL_CONST_NTOH16(x) (x)
+#	define HCL_CONST_HTON16(x) (x)
+#	define HCL_CONST_NTOH32(x) (x)
+#	define HCL_CONST_HTON32(x) (x)
 #else
-#       error UNKNOWN ENDIAN
+#	error UNKNOWN ENDIAN
 #endif
 
+
+
+
+#if (HCL_SIZEOF_SOCKLEN_T == 1)
+	#if defined(HCL_SOCKLEN_T_IS_SIGNED)
+		typedef hcl_int8_t hcl_scklen_t;
+	#else
+		typedef hcl_uint8_t hcl_scklen_t;
+	#endif
+#elif (HCL_SIZEOF_SOCKLEN_T == 2)
+	#if defined(HCL_SOCKLEN_T_IS_SIGNED)
+		typedef hcl_int16_t hcl_scklen_t;
+	#else
+		typedef hcl_uint16_t hcl_scklen_t;
+	#endif
+#elif (HCL_SIZEOF_SOCKLEN_T == 4)
+	#if defined(HCL_SOCKLEN_T_IS_SIGNED)
+		typedef hcl_int32_t hcl_scklen_t;
+	#else
+		typedef hcl_uint32_t hcl_scklen_t;
+	#endif
+#elif (HCL_SIZEOF_SOCKLEN_T == 8)
+	#if defined(HCL_SOCKLEN_T_IS_SIGNED)
+		typedef hcl_int64_t hcl_scklen_t;
+	#else
+		typedef hcl_uint64_t hcl_scklen_t;
+	#endif
+#else
+	#undef HCL_SIZEOF_SOCKLEN_T
+	#define HCL_SIZEOF_SOCKLEN_T HCL_SIZEOF_INT
+	#define HCL_SOCKLEN_T_IS_SIGNED
+	typedef int hcl_scklen_t;
+#endif
+
+
+struct hcl_sckaddr_t
+{
+#define HCL_SCKADDR_DATA_SIZE 0
+
+#if (HCL_SIZEOF_STRUCT_SOCKADDR_IN > HCL_SCKADDR_DATA_SIZE)
+	#undef HCL_SCKADDR_DATA_SIZE
+	#define HCL_SCKADDR_DATA_SIZE HCL_SIZEOF_STRUCT_SOCKADDR_IN
+#endif
+#if (HCL_SIZEOF_STRUCT_SOCKADDR_IN6 > HCL_SCKADDR_DATA_SIZE)
+	#undef HCL_SCKADDR_DATA_SIZE
+	#define HCL_SCKADDR_DATA_SIZE HCL_SIZEOF_STRUCT_SOCKADDR_IN6
+#endif
+#if (HCL_SIZEOF_STRUCT_SOCKADDR_UN > HCL_SCKADDR_DATA_SIZE)
+	#undef HCL_SCKADDR_DATA_SIZE
+	#define HCL_SCKADDR_DATA_SIZE HCL_SIZEOF_STRUCT_SOCKADDR_UN
+#endif
+#if (HCL_SIZEOF_STRUCT_SOCKADDR_LL > HCL_SCKADDR_DATA_SIZE)
+	#undef HCL_SCKADDR_DATA_SIZE
+	#define HCL_SCKADDR_DATA_SIZE HCL_SIZEOF_STRUCT_SOCKADDR_LL
+#endif
+
+#if (HCL_SCKADDR_DATA_SIZE == 0)
+	#undef HCL_SCKADDR_DATA_SIZE
+	#define HCL_SCKADDR_DATA_SIZE 64
+#endif
+	hcl_uint8_t storage[HCL_SCKADDR_DATA_SIZE];
+};
+typedef struct hcl_sckaddr_t hcl_sckaddr_t;
 
 #if defined(__cplusplus)
 extern "C" {
@@ -532,6 +595,45 @@ HCL_EXPORT hcl_uint128_t hcl_ntoh128 (
 HCL_EXPORT hcl_uint128_t hcl_hton128 (
 	hcl_uint128_t x
 );
+#endif
+
+
+HCL_EXPORT int hcl_ucharstosckaddr (
+	hcl_t*           hcl,
+	const hcl_uch_t* str,
+	hcl_oow_t        len,
+	hcl_sckaddr_t*   sckaddr,
+	hcl_scklen_t*    scklen
+);
+
+HCL_EXPORT int hcl_bcharstosckaddr (
+	hcl_t*           hcl,
+	const hcl_bch_t* str,
+	hcl_oow_t        len,
+	hcl_sckaddr_t*   sckaddr,
+	hcl_scklen_t*    scklen
+);
+
+#if defined(HCL_HAVE_INLINE)
+	static HCL_INLINE int hcl_uchars_to_sckaddr (const hcl_uch_t* str, hcl_oow_t len, hcl_sckaddr_t* sckaddr, hcl_scklen_t* scklen)
+	{
+		return hcl_ucharstosckaddr(HCL_NULL, str, len, sckaddr, scklen);
+	}
+	static HCL_INLINE int hcl_bchars_to_sckaddr (const hcl_bch_t* str, hcl_oow_t len, hcl_sckaddr_t* sckaddr, hcl_scklen_t* scklen)
+	{
+		return hcl_bcharstosckaddr(HCL_NULL, str, len, sckaddr, scklen);
+	}
+#else
+	#define hcl_uchars_to_sckaddr(str,len,sckaddr,scklen) hcl_ucharstosckaddr(HCL_NULL,str,len,sckaddr,scklen)
+	#define hcl_bchars_to_sckaddr(str,len,sckaddr,scklen) hcl_bcharstosckaddr(HCL_NULL,str,len,sckaddr,scklen)
+#endif
+
+#if defined(HCL_OOCH_IS_UCH)
+#	define hcl_oocharstosckaddr hcl_ucharstosckaddr
+#	define hcl_oochars_to_sckaddr hcl_uchars_to_sckaddr
+#else
+#	define hcl_oocharstosckaddr hcl_bcharstosckaddr
+#	define hcl_oochars_to_sckaddr hcl_bchars_to_sckaddr
 #endif
 
 #if defined(__cplusplus)

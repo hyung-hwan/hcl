@@ -2,7 +2,7 @@ static int str_to_ipv4 (const ooch_t* str, hcl_oow_t len, struct in_addr* inaddr
 {
 	const ooch_t* end;
 	int dots = 0, digits = 0;
-	hcl_uint32_t acc = 0, addr = 0;	
+	hcl_uint32_t acc = 0, addr = 0;
 	ooch_t c;
 
 	end = str + len;
@@ -153,18 +153,19 @@ static int str_to_ipv6 (const ooch_t* src, hcl_oow_t len, struct in6_addr* inadd
 #endif
 
 
-static int str_to_sockaddr (hcl_server_t* server, const ooch_t* str, hcl_oow_t len, sockaddr_t* nwad, socklen_t* socklen)
+int str_to_sockaddr (hcl_t* hcl, const ooch_t* str, hcl_oow_t len, hcl_sckaddr_t* sckaddr, hcl_scklen_t* scklen)
 {
 	const ooch_t* p;
 	const ooch_t* end;
 	oocs_t tmp;
+	sockaddr_t* nwad = (hcl_sckaddr_t*)sckaddr;
 
 	p = str;
 	end = str + len;
 
 	if (p >= end) 
 	{
-		hcl_server_seterrbfmt (server, HCL_EINVAL, "blank address");
+		if (hcl) hcl_seterrbfmt (hcl, HCL_EINVAL, "blank address");
 		return -1;
 	}
 
@@ -190,7 +191,7 @@ static int str_to_sockaddr (hcl_server_t* server, const ooch_t* str, hcl_oow_t l
 			if (p >= end)
 			{
 				/* premature end */
-				hcl_server_seterrbfmt (server, HCL_EINVAL, "scope id blank");
+				if (hcl) hcl_seterrbfmt (hcl, HCL_EINVAL, "scope id blank");
 				return -1;
 			}
 
@@ -203,7 +204,7 @@ static int str_to_sockaddr (hcl_server_t* server, const ooch_t* str, hcl_oow_t l
 					x = nwad->in6.sin6_scope_id * 10 + (*p - '0');
 					if (x < nwad->in6.sin6_scope_id) 
 					{
-						hcl_server_seterrbfmt (server, HCL_EINVAL, "scope id too large");
+						if (hcl) hcl_seterrbfmt (hcl, HCL_EINVAL, "scope id too large");
 						return -1; /* overflow */
 					}
 					nwad->in6.sin6_scope_id = x;
@@ -250,7 +251,6 @@ TODO:
 				goto unrecog;
 			}
 
-
 			while (p < end && *p != '%') p++;
 			tmp.len = p - tmp.ptr;
 
@@ -266,7 +266,7 @@ TODO:
 				if (p >= end)
 				{
 					/* premature end */
-					hcl_server_seterrbfmt (server, HCL_EINVAL, "scope id blank");
+					if (hcl) hcl_seterrbfmt (hcl, HCL_EINVAL, "scope id blank");
 					return -1;
 				}
 
@@ -279,7 +279,7 @@ TODO:
 						x = nwad->in6.sin6_scope_id * 10 + (*p - '0');
 						if (x < nwad->in6.sin6_scope_id) 
 						{
-							hcl_server_seterrbfmt (server, HCL_EINVAL, "scope id too large");
+							if (hcl) hcl_seterrbfmt (hcl, HCL_EINVAL, "scope id too large");
 							return -1; /* overflow */
 						}
 						nwad->in6.sin6_scope_id = x;
@@ -304,7 +304,7 @@ TODO
 			if (p < end) goto unrecog; /* some gargage after the end? */
 
 			nwad->in6.sin6_family = AF_INET6;
-			*socklen = HCL_SIZEOF(nwad->in6);
+			*scklen = HCL_SIZEOF(nwad->in6);
 			return nwad->in6.sin6_family;
 		#else
 			goto unrecog;
@@ -334,7 +334,7 @@ TODO
 		if (tmp.len <= 0 || tmp.len >= 6 || 
 		    port > HCL_TYPE_MAX(hcl_uint16_t)) 
 		{
-			hcl_server_seterrbfmt (server, HCL_EINVAL, "port number blank or too large");
+			if (hcl) hcl_seterrbfmt (hcl, HCL_EINVAL, "port number blank or too large");
 			return -1;
 		}
 
@@ -348,15 +348,14 @@ TODO
 	#endif
 	}
 
-	*socklen = (nwad->in4.sin_family == AF_INET)? HCL_SIZEOF(nwad->in4): HCL_SIZEOF(nwad->in6);
+	*scklen = (nwad->in4.sin_family == AF_INET)? HCL_SIZEOF(nwad->in4): HCL_SIZEOF(nwad->in6);
 	return nwad->in4.sin_family;
-	
-	
+
 unrecog:
-	hcl_server_seterrbfmt (server, HCL_EINVAL, "unrecognized address");
+	if (hcl) hcl_seterrbfmt (hcl, HCL_EINVAL, "unrecognized address");
 	return -1;
 	
 no_rbrack:
-	hcl_server_seterrbfmt (server, HCL_EINVAL, "missing right bracket");
+	if (hcl) hcl_seterrbfmt (hcl, HCL_EINVAL, "missing right bracket");
 	return -1;
 }

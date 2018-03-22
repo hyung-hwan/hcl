@@ -992,34 +992,6 @@ static void fini_hcl (hcl_t* hcl)
 */
 /* ========================================================================= */
 
-
-#undef ooch_t
-#undef oocs_t
-#undef str_to_ipv4
-#undef str_to_ipv6
-#undef str_to_sockaddr
-
-#define ooch_t hcl_bch_t
-#define oocs_t hcl_bcs_t
-#define str_to_ipv4 bchars_to_ipv4
-#define str_to_ipv6 bchars_to_ipv6
-#define str_to_sockaddr bchars_to_sockaddr
-#include "sa-utl.h"
-
-#undef ooch_t
-#undef oocs_t
-#undef str_to_ipv4
-#undef str_to_ipv6
-#undef str_to_sockaddr
-
-#define ooch_t hcl_uch_t
-#define oocs_t hcl_ucs_t
-#define str_to_ipv4 uchars_to_ipv4
-#define str_to_ipv6 uchars_to_ipv6
-#define str_to_sockaddr uchars_to_sockaddr
-#include "sa-utl.h"
-/* ========================================================================= */
-
 #define SERVER_LOGMASK_INFO (HCL_LOG_INFO | HCL_LOG_APP)
 #define SERVER_LOGMASK_ERROR (HCL_LOG_ERROR | HCL_LOG_APP)
 
@@ -2276,7 +2248,7 @@ static void set_err_with_syserr (hcl_server_t* server, int syserr, const char* b
 
 int hcl_server_start (hcl_server_t* server, const hcl_bch_t* addrs)
 {
-	sockaddr_t srv_addr;
+	hcl_sckaddr_t srv_addr;
 	int srv_fd, sck_fam, optval, xret = 0;
 	socklen_t srv_len;
 	pthread_attr_t thr_attr;
@@ -2284,7 +2256,7 @@ int hcl_server_start (hcl_server_t* server, const hcl_bch_t* addrs)
 /* TODO: interprete 'addrs' as a command-separated address list 
  *  192.168.1.1:20,[::1]:20,127.0.0.1:345
  */
-	sck_fam = bchars_to_sockaddr(server, addrs, hcl_countbcstr(addrs), &srv_addr, &srv_len);
+	sck_fam = hcl_bchars_to_sckaddr(addrs, hcl_countbcstr(addrs), &srv_addr, &srv_len);
 	if (sck_fam <= -1) 
 	{
 		hcl_server_seterrbfmt (server, HCL_EINVAL, "unable to convert address - %hs", addrs);
@@ -2519,7 +2491,7 @@ int hcl_server_getoption (hcl_server_t* server, hcl_server_option_t id, void* va
 		case HCL_SERVER_ACTOR_MAX_RUNTIME:
 			*(hcl_ntime_t*)value = server->cfg.actor_max_runtime;
 			return 0;
-			
+
 		case HCL_SERVER_SCRIPT_INCLUDE_PATH:
 			*(hcl_ooch_t**)value = server->cfg.script_include_path;
 			return 0;
