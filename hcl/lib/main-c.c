@@ -68,6 +68,7 @@ struct client_xtn_t
 	} logbuf;
 
 	int reply_count;
+	hcl_oow_t data_length;
 };
 
 /* ========================================================================= */
@@ -449,7 +450,8 @@ static int start_reply (hcl_client_t* client, hcl_client_reply_type_t type, cons
 	{
 		/* short-form response - no end_reply will be called */
 		client_xtn->reply_count++;
-		fflush (stdout);
+		/*fflush (stdout);*/
+		printf ("\nTOTAL DATA %lu bytes\n", (unsigned long int)client_xtn->data_length);
 	}
 	else
 	{
@@ -470,7 +472,8 @@ static int end_reply (hcl_client_t* client, hcl_client_end_reply_state_t state)
 	else
 	{
 		client_xtn->reply_count++;
-		fflush (stdout);
+		/*fflush (stdout);*/
+		printf ("\nTOTAL DATA %lu bytes\n", (unsigned long int)client_xtn->data_length);
 	}
 	return 0;
 }
@@ -482,7 +485,17 @@ static int feed_attr (hcl_client_t* client, const hcl_oocs_t* key, const hcl_ooc
 
 static int feed_data (hcl_client_t* client, const void* ptr, hcl_oow_t len)
 {
-	printf ("%.*s", (int)len, ptr);
+	client_xtn_t* client_xtn;
+
+	client_xtn = hcl_client_getxtn(client);
+	client_xtn->data_length += len;
+
+	if (write_all(0, ptr, len) <= -1)
+	{
+		hcl_client_seterrbfmt (client, HCL_EIOERR, "unabled to write data");
+		return -1;
+	}
+
 	return 0;
 }
 
@@ -563,6 +576,7 @@ static int handle_request (hcl_client_t* client, const char* ipaddr, const char*
 		iov[index].iov_len -= nwritten;
 	}
 
+	client_xtn->data_length = 0;
 	client_xtn->reply_count = 0;
 
 /* TODO: implement timeout? */
