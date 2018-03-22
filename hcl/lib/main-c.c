@@ -501,7 +501,7 @@ static int feed_data (hcl_client_t* client, const void* ptr, hcl_oow_t len)
 
 /* ========================================================================= */
 
-static int handle_request (hcl_client_t* client, const char* ipaddr, const char* script)
+static int handle_request (hcl_client_t* client, const char* ipaddr, const char* script, int shut_wr_after_req)
 {
 	hcl_sckaddr_t sckaddr;
 	hcl_scklen_t scklen;
@@ -576,6 +576,8 @@ static int handle_request (hcl_client_t* client, const char* ipaddr, const char*
 		iov[index].iov_len -= nwritten;
 	}
 
+	if (shut_wr_after_req) shutdown (sck, SHUT_WR);
+
 	client_xtn->data_length = 0;
 	client_xtn->reply_count = 0;
 
@@ -583,7 +585,7 @@ static int handle_request (hcl_client_t* client, const char* ipaddr, const char*
 	avail = 0;
 	while (client_xtn->reply_count == 0)
 	{
-		n = read(sck, &buf[avail], HCL_SIZEOF(buf) - avail); /* switch to recv  */
+		n = recv(sck, &buf[avail], HCL_SIZEOF(buf) - avail, 0);
 		if (n <= -1) 
 		{
 			fprintf (stderr, "Unable to read from %d - %s\n", sck, strerror(n));
@@ -601,7 +603,11 @@ static int handle_request (hcl_client_t* client, const char* ipaddr, const char*
 
 		avail += n;;
 		x = hcl_client_feed(client, buf, avail, &used);
-		if (x <= -1) goto oops;
+		if (x <= -1) 
+		{
+			fprintf (stderr, "Client error [%d]\n", hcl_client_geterrnum(client));
+			goto oops;
+		}
 
 		avail -= used;
 		if (avail > 0) memmove (&buf[0], &buf[used], avail);
@@ -622,6 +628,7 @@ int main (int argc, char* argv[])
 	static hcl_bopt_lng_t lopt[] =
 	{
 		{ ":log",                  'l'  },
+		{ "shutwr",                '\0' },
 		{ HCL_NULL,                '\0' }
 	};
 	static hcl_bopt_t opt =
@@ -635,14 +642,14 @@ int main (int argc, char* argv[])
 	hcl_client_prim_t client_prim;
 	int n;
 	const char* logopt = HCL_NULL;
+	int shut_wr_after_req = 0;
 
 	setlocale (LC_ALL, "");
-
 
 	if (argc < 2)
 	{
 	print_usage:
-		fprintf (stderr, "Usage: %s bind-address:port script-to-run\n", argv[0]);
+		fprintf (stderr, "Usage: %s [-l/--log log-options] [--shutwr] bind-address:port script-to-run\n", argv[0]);
 		return -1;
 	}
 
@@ -655,7 +662,14 @@ int main (int argc, char* argv[])
 				break;
 
 			case '\0':
-				goto print_usage;
+				if (hcl_compbcstr(opt.lngopt, "shutwr") == 0)
+				{
+					shut_wr_after_req = 1;
+				}
+				else
+				{
+					goto print_usage;
+				}
 				break;
 
 			case ':':
@@ -706,17 +720,11 @@ int main (int argc, char* argv[])
 	set_signal (SIGINT, handle_sigint);
 	set_signal_to_ignore (SIGPIPE);
 
-
-	n = handle_request (client, argv[opt.ind], argv[opt.ind + 1]);
+	n = handle_request (client, argv[opt.ind], argv[opt.ind + 1], shut_wr_after_req);
 
 	set_signal_to_default (SIGINT);
 	set_signal_to_default (SIGPIPE);
 	g_client = NULL;
-
-	if (n <= -1)
-	{
-		hcl_client_logbfmt (client, HCL_LOG_APP | HCL_LOG_FATAL, "client error[%d] - %js\n", hcl_client_geterrnum(client), hcl_client_geterrmsg(client));
-	}
 
 	if (xtn->logfd >= 0)
 	{

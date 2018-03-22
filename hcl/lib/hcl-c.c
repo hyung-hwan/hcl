@@ -666,10 +666,11 @@ static int feed_reply_data (hcl_client_t* client, const hcl_bch_t* data, hcl_oow
 			}
 
 			ptr += taken;
-			client->rep.u.length_bounded_data.tally = taken;
+			client->rep.u.length_bounded_data.tally += taken;
 			if (taken == capa)
 			{
 				/* read all data. no more */
+				HCL_ASSERT (client->dummy_hcl, client->rep.u.length_bounded_data.max == client->rep.u.length_bounded_data.tally);
 				client->state = HCL_CLIENT_STATE_START;
 				if (client->prim.end_reply(client, HCL_CLIENT_END_REPLY_STATE_OK) <= -1) goto oops;
 			}

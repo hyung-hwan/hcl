@@ -456,30 +456,40 @@ static HCL_INLINE int read_input (hcl_t* hcl, hcl_ioinarg_t* arg)
 	worker_hcl_xtn_t* xtn = (worker_hcl_xtn_t*)hcl_getxtn(hcl);
 	bb_t* bb;
 	hcl_oow_t bcslen, ucslen, remlen;
+	hcl_server_worker_t* worker;
 	int x;
 
 	bb = (bb_t*)arg->handle;
 	HCL_ASSERT (hcl, bb != HCL_NULL && bb->fd >= 0);
 
-	if (bb->fd == xtn->proto->worker->sck)
+	worker = xtn->proto->worker;
+
+	if (bb->fd == worker->sck)
 	{
 		ssize_t x;
+		hcl_server_t* server;
+
+		server = worker->server;
 
 	start_over:
 		while (1)
 		{
 			int n;
 			struct pollfd pfd;
-			
-			if (xtn->proto->worker->server->stopreq)
+			int tmout, actual_tmout;
+
+			if (server->stopreq)
 			{
 				hcl_seterrbfmt (hcl, HCL_EGENERIC, "stop requested");
 				return -1;
 			}
 
+			tmout = HCL_SECNSEC_TO_MSEC(server->cfg.worker_idle_timeout.sec, server->cfg.worker_idle_timeout.nsec);
+			actual_tmout = (tmout <= 0)? 10000: tmout;
+
 			pfd.fd = bb->fd;
 			pfd.events = POLLIN | POLLERR;
-			n = poll(&pfd, 1, 10000); /* TOOD: adjust this interval base on the worker_idle_timeout? */
+			n = poll(&pfd, 1, actual_tmout);
 			if (n <= -1)
 			{
 				if (errno == EINTR) goto start_over;
@@ -488,7 +498,12 @@ static HCL_INLINE int read_input (hcl_t* hcl, hcl_ioinarg_t* arg)
 			}
 			else if (n >= 1) break;
 
-/* TOOD: idle timeout check - compute idling time and check it against server->cfg.worker_idle_timeout */
+			/* timed out - no activity on the pfd */
+			if (tmout > 0)
+			{
+				hcl_seterrbfmt (hcl, HCL_EGENERIC, "no activity on the worker socket %d", worker->sck);
+				return -1;
+			}
 		}
 		
 		x = recv(bb->fd, &bb->buf[bb->len], HCL_COUNTOF(bb->buf) - bb->len, 0);
