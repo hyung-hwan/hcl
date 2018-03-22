@@ -442,13 +442,18 @@ static int handle_logopt (hcl_client_t* client, const hcl_bch_t* str)
 
 static int start_reply (hcl_client_t* client, hcl_client_reply_type_t type, const hcl_ooch_t* dptr, hcl_oow_t dlen)
 {
+	client_xtn_t* client_xtn;
+	client_xtn = hcl_client_getxtn(client);
+
 	if (dptr)
 	{
-		printf ("GOT SHORT-FORM RESPONSE[%d] with data <<%.*ls>>\n", (int)type, (int)dlen, dptr);
+		/* short-form response - no end_reply will be called */
+		client_xtn->reply_count++;
+		fflush (stdout);
 	}
 	else
 	{
-		printf ("GOT LONG_FORM RESPONSE[%d]\n", (int)type);
+		/* long-form response */
 	}
 	return 0;
 }
@@ -460,26 +465,24 @@ static int end_reply (hcl_client_t* client, hcl_client_end_reply_state_t state)
 
 	if (state == HCL_CLIENT_END_REPLY_STATE_REVOKED)
 	{
-printf (">>>>>>>>>>>>>>>>>>>>>> REPLY revoked....\n");
+		/* nothing to do here */
 	}
 	else
 	{
 		client_xtn->reply_count++;
-printf (">>>>>>>>>>>>>>>>>>>>> REPLY ENDED OK....\n");
+		fflush (stdout);
 	}
 	return 0;
 }
 
 static int feed_attr (hcl_client_t* client, const hcl_oocs_t* key, const hcl_oocs_t* val)
 {
-printf ("GOT HEADER ====> [%.*ls] ===> [%.*ls]\n", (int)key->len, key->ptr, (int)val->len, val->ptr);
 	return 0;
 }
 
 static int feed_data (hcl_client_t* client, const void* ptr, hcl_oow_t len)
 {
-//printf ("GOT DATA>>>>>>>>>[%.*s]>>>>>>>\n", (int)len, ptr);
-printf ("%.*s", (int)len, ptr);
+	printf ("%.*s", (int)len, ptr);
 	return 0;
 }
 
@@ -490,11 +493,11 @@ static int handle_request (hcl_client_t* client, const char* ipaddr, const char*
 	hcl_sckaddr_t sckaddr;
 	hcl_scklen_t scklen;
 	int sckfam;
-	int sck;
-	struct iovec iov[10];
+	int sck = -1;
+	struct iovec iov[3];
 	int index, count;
 
-	hcl_oow_t xlen, offset;
+	hcl_oow_t used, avail;
 	int x;
 	hcl_bch_t buf[256];
 	ssize_t n;
@@ -507,22 +510,20 @@ static int handle_request (hcl_client_t* client, const char* ipaddr, const char*
 	if (sckfam <= -1) 
 	{
 		fprintf (stderr, "cannot convert ip address - %s\n", ipaddr);
-		return -1;
+		goto oops;
 	}
 
 	sck = socket (sckfam, SOCK_STREAM, 0);
 	if (sck <= -1) 
 	{
 		fprintf (stderr, "cannot create a socket for %s\n", ipaddr);
-		return -1;
+		goto oops;
 	}
-
 
 	if (connect(sck, (struct sockaddr*)&sckaddr, scklen) <= -1)
 	{
 		fprintf (stderr, "cannot connect to %s\n", ipaddr);
-		close (sck);
-		return -1;
+		goto oops;
 	}
 
 	count = 0;
@@ -565,10 +566,10 @@ static int handle_request (hcl_client_t* client, const char* ipaddr, const char*
 	client_xtn->reply_count = 0;
 
 /* TODO: implement timeout? */
-	offset = 0;
+	avail = 0;
 	while (client_xtn->reply_count == 0)
 	{
-		n = read(sck, &buf[offset], HCL_SIZEOF(buf) - offset); /* switch to recv  */
+		n = read(sck, &buf[avail], HCL_SIZEOF(buf) - avail); /* switch to recv  */
 		if (n <= -1) 
 		{
 			fprintf (stderr, "Unable to read from %d - %s\n", sck, strerror(n));
@@ -584,11 +585,12 @@ static int handle_request (hcl_client_t* client, const char* ipaddr, const char*
 			break;
 		}
 
-		x = hcl_client_feed(client, buf, n, &xlen);
+		avail += n;;
+		x = hcl_client_feed(client, buf, avail, &used);
 		if (x <= -1) goto oops;
 
-		offset = n - xlen;
-		if (offset > 0) memmove (&buf[0], &buf[xlen], offset);
+		avail -= used;
+		if (avail > 0) memmove (&buf[0], &buf[used], avail);
 	}
 
 /* TODO: we can check if the buffer has all been consumed. if not, there is trailing garbage.. */

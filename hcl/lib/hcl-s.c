@@ -128,16 +128,6 @@
 #	endif
 #endif
 
-
-union sockaddr_t
-{
-	struct sockaddr_in in4;
-#if (HCL_SIZEOF_STRUCT_SOCKADDR_IN6 > 0)
-	struct sockaddr_in6 in6;
-#endif
-};
-typedef union sockaddr_t sockaddr_t;
-
 struct bb_t
 {
 	char buf[1024];
@@ -251,7 +241,7 @@ struct hcl_server_worker_t
 	hcl_oow_t wid;
 
 	int sck;
-	sockaddr_t peeraddr;
+	hcl_sckaddr_t peeraddr;
 
 	int claimed;
 	
@@ -2002,7 +1992,7 @@ static HCL_INLINE void release_wid (hcl_server_t* server, hcl_server_worker_t* w
 	worker->wid = HCL_SERVER_WID_INVALID;
 }
 
-static hcl_server_worker_t* alloc_worker (hcl_server_t* server, int cli_sck, const sockaddr_t* peeraddr)
+static hcl_server_worker_t* alloc_worker (hcl_server_t* server, int cli_sck, const hcl_sckaddr_t* peeraddr)
 {
 	hcl_server_worker_t* worker;
 
@@ -2250,7 +2240,7 @@ int hcl_server_start (hcl_server_t* server, const hcl_bch_t* addrs)
 {
 	hcl_sckaddr_t srv_addr;
 	int srv_fd, sck_fam, optval, xret = 0;
-	socklen_t srv_len;
+	hcl_scklen_t srv_len;
 	pthread_attr_t thr_attr;
 
 /* TODO: interprete 'addrs' as a command-separated address list 
@@ -2293,9 +2283,9 @@ int hcl_server_start (hcl_server_t* server, const hcl_bch_t* addrs)
 	server->stopreq = 0;
 	while (!server->stopreq)
 	{
-		sockaddr_t cli_addr;
+		hcl_sckaddr_t cli_addr;
 		int cli_fd;
-		socklen_t cli_len;
+		hcl_scklen_t cli_len;
 		pthread_t thr;
 		hcl_ntime_t tmout;
 		hcl_server_worker_t* worker;
