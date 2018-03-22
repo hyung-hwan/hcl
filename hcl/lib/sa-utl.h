@@ -158,7 +158,7 @@ int str_to_sockaddr (hcl_t* hcl, const ooch_t* str, hcl_oow_t len, hcl_sckaddr_t
 	const ooch_t* p;
 	const ooch_t* end;
 	oocs_t tmp;
-	sockaddr_t* nwad = (hcl_sckaddr_t*)sckaddr;
+	sockaddr_t* nwad = (sockaddr_t*)sckaddr;
 
 	p = str;
 	end = str + len;
