@@ -407,7 +407,7 @@ static HCL_INLINE int open_input (hcl_t* hcl, hcl_ioinarg_t* arg)
 		#if defined(HCL_OOCH_IS_UCH)
 			hcl_convootobcstr (hcl, server->cfg.script_include_path, &ucslen, bb->fn, &parlen);
 		#else
-			hcl_copybchars (bb->fn, fn, server->cfg.script_include_path);
+			hcl_copybchars (bb->fn, server->cfg.script_include_path, parlen);
 		#endif
 			if (!IS_PATH_SEP(bb->fn[parlen])) bb->fn[parlen++] = PATH_SEP_CHAR; /* +2 was used in hcl_callocmem() for this (+1 for this, +1 for '\0' */
 		}
@@ -2314,8 +2314,10 @@ static int setup_listeners (hcl_server_t* server, const hcl_bch_t* addrs)
 		return -1;
 	}
 
+#if defined(O_CLOEXEC)
 	fcv = fcntl(ep_fd, F_GETFD, 0);
 	if (fcv >= 0) fcntl(ep_fd, F_SETFD, fcv | O_CLOEXEC);
+#endif
 
 	HCL_MEMSET (&ev, 0, HCL_SIZEOF(ev));
 	ev.events = EPOLLIN | EPOLLHUP | EPOLLERR;
@@ -2361,8 +2363,10 @@ static int setup_listeners (hcl_server_t* server, const hcl_bch_t* addrs)
 		optval = 1;
 		setsockopt (srv_fd, SOL_SOCKET, SO_REUSEADDR, &optval, HCL_SIZEOF(int));
 
+	#if defined(O_CLOEXEC)
 		fcv = fcntl(srv_fd, F_GETFD, 0);
 		if (fcv >= 0) fcntl(srv_fd, F_SETFD, fcv | O_CLOEXEC);
+	#endif
 
 		if (bind(srv_fd, (struct sockaddr*)&srv_addr, srv_len) == -1)
 		{
@@ -2494,8 +2498,10 @@ int hcl_server_start (hcl_server_t* server, const hcl_bch_t* addrs)
 					break;
 				}
 
+			#if defined(O_CLOEXEC)
 				fcv = fcntl(cli_fd, F_GETFD, 0);
 				if (fcv >= 0) fcntl(cli_fd, F_SETFD, fcv | O_CLOEXEC);
+			#endif
 
 				if (server->cfg.worker_max_count > 0)
 				{
