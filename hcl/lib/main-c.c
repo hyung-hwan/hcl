@@ -446,9 +446,17 @@ static int start_reply (hcl_client_t* client, hcl_client_reply_type_t type, cons
 	client_xtn_t* client_xtn;
 	client_xtn = hcl_client_getxtn(client);
 
+	if (client_xtn->reply_count > 0)
+	{
+		hcl_client_seterrbfmt (client, HCL_EFLOOD, "redundant reply received\n");
+		return -1;
+	}
+
 	if (dptr)
 	{
 		/* short-form response - no end_reply will be called */
+		
+
 		client_xtn->reply_count++;
 		/*fflush (stdout);*/
 		printf ("\nTOTAL DATA %lu bytes\n", (unsigned long int)client_xtn->data_length);
@@ -605,7 +613,18 @@ static int handle_request (hcl_client_t* client, const char* ipaddr, const char*
 		x = hcl_client_feed(client, buf, avail, &used);
 		if (x <= -1) 
 		{
-			fprintf (stderr, "Client error [%d]\n", hcl_client_geterrnum(client));
+		#if defined(HCL_OOCH_IS_UCH)
+			hcl_errnum_t errnum = hcl_client_geterrnum(client);
+			const hcl_ooch_t* errmsg = hcl_client_geterrmsg(client);
+			hcl_bch_t errbuf[2048];
+			hcl_oow_t ucslen, bcslen;
+
+			bcslen = HCL_COUNTOF(errbuf);
+			hcl_conv_ucs_to_bcs_with_cmgr (errmsg, &ucslen, errbuf, &bcslen, hcl_client_getcmgr(client));
+			fprintf (stderr, "Client error [%d] - %s\n", (int)errnum, errbuf);
+		#else
+			fprintf (stderr, "Client error [%d] - %s\n", (int)hcl_client_geterrnum(client), hcl_client_geterrmsg(client));
+		#endif
 			goto oops;
 		}
 
