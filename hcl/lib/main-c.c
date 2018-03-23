@@ -49,6 +49,7 @@
 
 #include <sys/types.h>
 #include <sys/socket.h>
+#include <netinet/in.h>
 #include <unistd.h>
 #include <fcntl.h>
 
@@ -537,13 +538,32 @@ static int handle_request (hcl_client_t* client, const char* ipaddr, const char*
 	sck = socket (sckfam, SOCK_STREAM, 0);
 	if (sck <= -1) 
 	{
-		fprintf (stderr, "cannot create a socket for %s\n", ipaddr);
+		fprintf (stderr, "cannot create a socket for %s - %s\n", ipaddr, strerror(errno));
 		goto oops;
+	}
+
+	if (sckfam == AF_INET)
+	{
+		struct sockaddr_in anyaddr;
+		int opt = 1;
+		setsockopt(sck, SOL_SOCKET, SO_REUSEADDR, (char *)&opt, sizeof(opt));
+		memset (&anyaddr, 0, HCL_SIZEOF(anyaddr));
+		anyaddr.sin_family = sckfam;
+		bind(sck, (struct sockaddr *)&anyaddr, scklen);
+	}
+	else if (sckfam == AF_INET6)
+	{
+		struct sockaddr_in6 anyaddr;
+		int opt = 1;
+		setsockopt(sck, SOL_SOCKET, SO_REUSEADDR, (char *)&opt, sizeof(opt));
+		memset (&anyaddr, 0, HCL_SIZEOF(anyaddr));
+		anyaddr.sin6_family = sckfam;
+		bind(sck, (struct sockaddr *)&anyaddr, scklen);
 	}
 
 	if (connect(sck, (struct sockaddr*)&sckaddr, scklen) <= -1)
 	{
-		fprintf (stderr, "cannot connect to %s\n", ipaddr);
+		fprintf (stderr, "cannot connect to %s - %s\n", ipaddr, strerror(errno));
 		goto oops;
 	}
 
@@ -633,6 +653,17 @@ static int handle_request (hcl_client_t* client, const char* ipaddr, const char*
 	}
 
 /* TODO: we can check if the buffer has all been consumed. if not, there is trailing garbage.. */
+
+	/*shutdown (sck, (shut_wr_after_req? SHUT_RD: SHUT_RDWR));*/
+	if (!shut_wr_after_req) shutdown (sck, SHUT_RDWR);
+
+	/*{
+		struct linger linger;
+		linger.l_onoff = 1;
+		linger.l_linger = 0;
+		setsockopt (sck, SOL_SOCKET, SO_LINGER, (char *) &linger, sizeof(linger));
+	}*/
+
 	close (sck);
 	return 0;
 

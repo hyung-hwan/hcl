@@ -1639,7 +1639,6 @@ int hcl_server_proto_handle_request (hcl_server_proto_t* proto)
 				HCL_LOG0 (proto->hcl, SERVER_LOGMASK_ERROR, "Unexpected EOF without .END\n");
 				return -1;
 			}
-
 			/* drop connection silently */
 			return 0;
 
@@ -2193,7 +2192,6 @@ static void purge_all_workers (hcl_server_t* server, hcl_server_worker_state_t w
 		{
 			zap_worker_in_server (server, worker);
 			worker->claimed = 1;
-
 			if (worker->sck >= 0) shutdown (worker->sck, SHUT_RDWR);
 		}
 		pthread_mutex_unlock (&server->worker_mutex);
@@ -2367,6 +2365,10 @@ static int setup_listeners (hcl_server_t* server, const hcl_bch_t* addrs)
 		fcv = fcntl(srv_fd, F_GETFD, 0);
 		if (fcv >= 0) fcntl(srv_fd, F_SETFD, fcv | O_CLOEXEC);
 	#endif
+	#if defined(O_NONBLOCK)
+		fcv = fcntl(srv_fd, F_GETFL, 0);
+		if (fcv >= 0) fcntl(srv_fd, F_SETFL, fcv | O_NONBLOCK);
+	#endif
 
 		if (bind(srv_fd, (struct sockaddr*)&srv_addr, srv_len) == -1)
 		{
@@ -2492,6 +2494,13 @@ int hcl_server_start (hcl_server_t* server, const hcl_bch_t* addrs)
 				{
 					if (server->stopreq) break; /* normal termination requested */
 					if (errno == EINTR) continue; /* interrupted but no termination requested */
+				#if defined(EWOULDBLOCK) && defined(EAGAIN) && (EWOULDBLOCK != EAGAIN)
+					if (errno == EWOULDBLOCK || errno == EAGAIN) continue;
+				#elif defined(EWOULDBLOCK)
+					if (errno == EWOULDBLOCK) continue;
+				#elif defined(EAGAIN)
+					if (errno == EAGAIN) continue;
+				#endif
 
 					set_err_with_syserr (server, errno, "unable to accept worker on server socket %d", evp->data.fd);
 					xret = -1;
