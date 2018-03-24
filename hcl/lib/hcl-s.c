@@ -282,7 +282,20 @@ struct hcl_server_t
 	hcl_mmgr_t*  mmgr;
 	hcl_cmgr_t*  cmgr;
 	hcl_server_prim_t prim;
+
+	/* [NOTE]
+	 *  this dummy_hcl is used when the main thread requires logging mostly.
+	 *  as there is no explicit locking when calling HCL_LOG() functions,
+	 *  the code must ensure that the logging functions are called in the
+	 *  context of the main server thraed only.  error message setting is
+	 *  also performed in the main thread context for the same reason.
+	 * 
+	 *  however, you may have noticed mixed use of HCL_ASSERT with dummy_hcl
+	 *  in both the server thread context and the client thread contexts.
+	 *  it should be ok as assertion is only for debugging and it's operation
+	 *  is thread safe. */
 	hcl_t* dummy_hcl;
+
 	hcl_tmr_t* tmr;
 
 	hcl_errnum_t errnum;
@@ -1451,7 +1464,7 @@ static int get_token (hcl_server_proto_t* proto)
 static void exec_runtime_handler (hcl_tmr_t* tmr, const hcl_ntime_t* now, hcl_tmr_event_t* evt)
 {
 	/* [NOTE] this handler is executed in the main server thread 
-	 *         when it calls hcl_tmr_fire() */
+	 *         when it calls hcl_tmr_fire().  */
 
 	hcl_server_proto_t* proto;
 	proto = (hcl_server_proto_t*)evt->ctx;
@@ -2068,6 +2081,7 @@ static void close_worker_socket (hcl_server_worker_t* worker)
 		}
 		else
 		{
+			/* this should be in the main server thread. i use dummy_hcl for logging */
 			HCL_LOG2 (worker->server->dummy_hcl, SERVER_LOGMASK_INFO, "Closing worker socket %d [%zu]\n", worker->sck, worker->wid);
 		}
 		close (worker->sck);
@@ -2085,6 +2099,7 @@ static void free_worker (hcl_server_worker_t* worker)
 	}
 	else
 	{
+		/* this should be in the main server thread. i use dummy_hcl for logging */
 		HCL_LOG1 (worker->server->dummy_hcl, SERVER_LOGMASK_INFO, "Killing worker [%zu]\n", worker->wid);
 	}
 
@@ -2442,8 +2457,8 @@ int hcl_server_start (hcl_server_t* server, const hcl_bch_t* addrs)
 	while (!server->stopreq)
 	{
 		hcl_sckaddr_t cli_addr;
-		int cli_fd;
 		hcl_scklen_t cli_len;
+		int cli_fd;
 		pthread_t thr;
 		hcl_ntime_t tmout;
 		hcl_server_worker_t* worker;
@@ -2474,6 +2489,7 @@ int hcl_server_start (hcl_server_t* server, const hcl_bch_t* addrs)
 		while (n > 0)
 		{
 			struct epoll_event* evp;
+
 			--n;
 
 			evp = &server->listener.ev_buf[n];
@@ -2518,14 +2534,18 @@ int hcl_server_start (hcl_server_t* server, const hcl_bch_t* addrs)
 					pthread_mutex_lock (&server->worker_mutex);
 					flood = (server->worker_list[HCL_SERVER_WORKER_STATE_ALIVE].count >= server->cfg.worker_max_count);
 					pthread_mutex_unlock (&server->worker_mutex);
-					if (flood) goto unable_to_accomodate;
+					if (flood) 
+					{
+						HCL_LOG1 (server->dummy_hcl, SERVER_LOGMASK_ERROR, "Not accepting connection for too many workers - socket %d\n", cli_fd);
+						goto drop_connection;
+					}
 				}
 
 				worker = alloc_worker(server, cli_fd, &cli_addr);
 				if (!worker)
 				{
-				unable_to_accomodate:
 					HCL_LOG1 (server->dummy_hcl, SERVER_LOGMASK_ERROR, "Unable to accomodate worker - socket %d\n", cli_fd);
+				drop_connection:
 					close (cli_fd);
 				}
 				else
@@ -2536,6 +2556,7 @@ int hcl_server_start (hcl_server_t* server, const hcl_bch_t* addrs)
 						free_worker (worker);
 					}
 				}
+				
 			}
 		}
 	}
