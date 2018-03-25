@@ -636,6 +636,16 @@ HCL_EXPORT int hcl_bcharstosckaddr (
 #	define hcl_oochars_to_sckaddr hcl_bchars_to_sckaddr
 #endif
 
+/**
+ * The hcl_get_sckaddr_info() function returns the socket family.
+ * if \a scklen is not #HCL_NULL, it also sets the actual address length
+ * in the memory pointed to by it.
+ */
+HCL_EXPORT int hcl_get_sckaddr_info (
+	const hcl_sckaddr_t* sckaddr,
+	hcl_scklen_t*        scklen
+);
+
 #if defined(__cplusplus)
 }
 #endif

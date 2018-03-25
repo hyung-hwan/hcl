@@ -510,7 +510,7 @@ static int feed_data (hcl_client_t* client, const void* ptr, hcl_oow_t len)
 
 /* ========================================================================= */
 
-static int handle_request (hcl_client_t* client, const char* ipaddr, const char* script, int shut_wr_after_req)
+static int handle_request (hcl_client_t* client, const char* ipaddr, const char* script, int reuse_addr, int shut_wr_after_req)
 {
 	hcl_sckaddr_t sckaddr;
 	hcl_scklen_t scklen;
@@ -542,23 +542,26 @@ static int handle_request (hcl_client_t* client, const char* ipaddr, const char*
 		goto oops;
 	}
 
-	if (sckfam == AF_INET)
+	if (reuse_addr)
 	{
-		struct sockaddr_in anyaddr;
-		int opt = 1;
-		setsockopt(sck, SOL_SOCKET, SO_REUSEADDR, (char *)&opt, sizeof(opt));
-		memset (&anyaddr, 0, HCL_SIZEOF(anyaddr));
-		anyaddr.sin_family = sckfam;
-		bind(sck, (struct sockaddr *)&anyaddr, scklen);
-	}
-	else if (sckfam == AF_INET6)
-	{
-		struct sockaddr_in6 anyaddr;
-		int opt = 1;
-		setsockopt(sck, SOL_SOCKET, SO_REUSEADDR, (char *)&opt, sizeof(opt));
-		memset (&anyaddr, 0, HCL_SIZEOF(anyaddr));
-		anyaddr.sin6_family = sckfam;
-		bind(sck, (struct sockaddr *)&anyaddr, scklen);
+		if (sckfam == AF_INET)
+		{
+			struct sockaddr_in anyaddr;
+			int opt = 1;
+			setsockopt(sck, SOL_SOCKET, SO_REUSEADDR, (char *)&opt, sizeof(opt));
+			memset (&anyaddr, 0, HCL_SIZEOF(anyaddr));
+			anyaddr.sin_family = sckfam;
+			bind(sck, (struct sockaddr *)&anyaddr, scklen);
+		}
+		else if (sckfam == AF_INET6)
+		{
+			struct sockaddr_in6 anyaddr;
+			int opt = 1;
+			setsockopt(sck, SOL_SOCKET, SO_REUSEADDR, (char *)&opt, sizeof(opt));
+			memset (&anyaddr, 0, HCL_SIZEOF(anyaddr));
+			anyaddr.sin6_family = sckfam;
+			bind(sck, (struct sockaddr *)&anyaddr, scklen);
+		}
 	}
 
 	if (connect(sck, (struct sockaddr*)&sckaddr, scklen) <= -1)
@@ -678,6 +681,7 @@ int main (int argc, char* argv[])
 	static hcl_bopt_lng_t lopt[] =
 	{
 		{ ":log",                  'l'  },
+		{ "reuseaddr",             '\0' },
 		{ "shutwr",                '\0' },
 		{ HCL_NULL,                '\0' }
 	};
@@ -692,6 +696,7 @@ int main (int argc, char* argv[])
 	hcl_client_prim_t client_prim;
 	int n;
 	const char* logopt = HCL_NULL;
+	int reuse_addr = 0;
 	int shut_wr_after_req = 0;
 
 	setlocale (LC_ALL, "");
@@ -699,7 +704,7 @@ int main (int argc, char* argv[])
 	if (argc < 2)
 	{
 	print_usage:
-		fprintf (stderr, "Usage: %s [-l/--log log-options] [--shutwr] bind-address:port script-to-run\n", argv[0]);
+		fprintf (stderr, "Usage: %s [-l/--log log-options] [--reuseaddr] [--shutwr] bind-address:port script-to-run\n", argv[0]);
 		return -1;
 	}
 
@@ -712,7 +717,11 @@ int main (int argc, char* argv[])
 				break;
 
 			case '\0':
-				if (hcl_compbcstr(opt.lngopt, "shutwr") == 0)
+				if (hcl_compbcstr(opt.lngopt, "reuseaddr") == 0)
+				{
+					reuse_addr = 1;
+				}
+				else if (hcl_compbcstr(opt.lngopt, "shutwr") == 0)
 				{
 					shut_wr_after_req = 1;
 				}
@@ -770,7 +779,7 @@ int main (int argc, char* argv[])
 	set_signal (SIGINT, handle_sigint);
 	set_signal_to_ignore (SIGPIPE);
 
-	n = handle_request (client, argv[opt.ind], argv[opt.ind + 1], shut_wr_after_req);
+	n = handle_request (client, argv[opt.ind], argv[opt.ind + 1], reuse_addr, shut_wr_after_req);
 
 	set_signal_to_default (SIGINT);
 	set_signal_to_default (SIGPIPE);

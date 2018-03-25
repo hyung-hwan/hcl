@@ -1115,7 +1115,10 @@ hcl_uint128_t hcl_hton128 (hcl_uint128_t x)
 
 union sockaddr_t
 {
+	struct sockaddr sa;
+#if (HCL_SIZEOF_STRUCT_SOCKADDR_IN > 0)
 	struct sockaddr_in in4;
+#endif
 #if (HCL_SIZEOF_STRUCT_SOCKADDR_IN6 > 0)
 	struct sockaddr_in6 in6;
 #endif
@@ -1147,3 +1150,31 @@ typedef union sockaddr_t sockaddr_t;
 #define str_to_ipv6 uchars_to_ipv6
 #define str_to_sockaddr hcl_ucharstosckaddr
 #include "sa-utl.h"
+
+
+int hcl_get_sckaddr_info (const hcl_sckaddr_t* sckaddr, hcl_scklen_t* scklen)
+{
+	sockaddr_t* sa = (sockaddr_t*)sckaddr;
+	if (scklen)
+	{
+		switch (sa->sa.sa_family)
+		{
+		#if (HCL_SIZEOF_STRUCT_SOCKADDR_IN > 0)
+			case AF_INET:
+				*scklen = HCL_SIZEOF(sa->in4);
+				break;
+		#endif
+
+		#if (HCL_SIZEOF_STRUCT_SOCKADDR_IN6 > 0)
+			case AF_INET6:
+				*scklen = HCL_SIZEOF(sa->in6);
+				break;
+		#endif
+
+			default:
+				*scklen = 0; /* unknown */
+				break;
+		}
+	}
+	return sa->sa.sa_family;
+}
