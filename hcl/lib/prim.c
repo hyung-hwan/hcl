@@ -262,6 +262,43 @@ static hcl_pfrc_t pf_eqk (hcl_t* hcl, hcl_mod_t* mod, hcl_ooi_t nargs)
 	return HCL_PF_SUCCESS;
 }
 
+static hcl_pfrc_t pf_nqv (hcl_t* hcl, hcl_mod_t* mod, hcl_ooi_t nargs)
+{
+	hcl_oop_t a0, a1, rv;
+
+	a0 = HCL_STACK_GETARG(hcl, nargs, 0);
+	a1 = HCL_STACK_GETARG(hcl, nargs, 1);
+
+	rv = (a0 != a1? hcl->_true: hcl->_false);
+
+	HCL_STACK_SETRET (hcl, nargs, rv);
+	return HCL_PF_SUCCESS;
+}
+
+static hcl_pfrc_t pf_nql (hcl_t* hcl, hcl_mod_t* mod, hcl_ooi_t nargs)
+{
+	int n;
+	n = hcl_equalobjs(hcl, HCL_STACK_GETARG(hcl, nargs, 0), HCL_STACK_GETARG(hcl, nargs, 1));
+	if (n <= -1) return HCL_PF_FAILURE;
+
+	HCL_STACK_SETRET (hcl, nargs, (!n? hcl->_true: hcl->_false));
+	return HCL_PF_SUCCESS;
+}
+
+static hcl_pfrc_t pf_nqk (hcl_t* hcl, hcl_mod_t* mod, hcl_ooi_t nargs)
+{
+	/* not equal kind? */
+	hcl_oop_t a0, a1, rv;
+
+	a0 = HCL_STACK_GETARG(hcl, nargs, 0);
+	a1 = HCL_STACK_GETARG(hcl, nargs, 1);
+
+	rv = (HCL_BRANDOF(hcl, a0) != HCL_BRANDOF(hcl, a1)? hcl->_true: hcl->_false);
+
+	HCL_STACK_SETRET (hcl, nargs, rv);
+	return HCL_PF_SUCCESS;
+}
+
 static hcl_pfrc_t pf_not (hcl_t* hcl, hcl_mod_t* mod, hcl_ooi_t nargs)
 {
 	hcl_oop_t arg, rv;
@@ -425,6 +462,63 @@ static hcl_pfrc_t pf_integer_rem (hcl_t* hcl, hcl_mod_t* mod, hcl_ooi_t nargs)
 	return HCL_PF_SUCCESS;
 }
 
+static hcl_pfrc_t pf_integer_gt (hcl_t* hcl, hcl_mod_t* mod, hcl_ooi_t nargs)
+{
+	hcl_oop_t ret;
+	ret = hcl_gtints(hcl, HCL_STACK_GETARG(hcl, nargs, 0), HCL_STACK_GETARG(hcl, nargs, 1));
+	if (!ret) return HCL_PF_FAILURE;
+
+	HCL_STACK_SETRET (hcl, nargs, ret);
+	return HCL_PF_SUCCESS;
+}
+
+
+static hcl_pfrc_t pf_integer_ge (hcl_t* hcl, hcl_mod_t* mod, hcl_ooi_t nargs)
+{
+	hcl_oop_t ret;
+	ret = hcl_geints(hcl, HCL_STACK_GETARG(hcl, nargs, 0), HCL_STACK_GETARG(hcl, nargs, 1));
+	if (!ret) return HCL_PF_FAILURE;
+
+	HCL_STACK_SETRET (hcl, nargs, ret);
+	return HCL_PF_SUCCESS;
+}
+
+static hcl_pfrc_t pf_integer_lt (hcl_t* hcl, hcl_mod_t* mod, hcl_ooi_t nargs)
+{
+	hcl_oop_t ret;
+	ret = hcl_ltints(hcl, HCL_STACK_GETARG(hcl, nargs, 0), HCL_STACK_GETARG(hcl, nargs, 1));
+	if (!ret) return HCL_PF_FAILURE;
+
+	HCL_STACK_SETRET (hcl, nargs, ret);
+	return HCL_PF_SUCCESS;
+}
+static hcl_pfrc_t pf_integer_le (hcl_t* hcl, hcl_mod_t* mod, hcl_ooi_t nargs)
+{
+	hcl_oop_t ret;
+	ret = hcl_leints(hcl, HCL_STACK_GETARG(hcl, nargs, 0), HCL_STACK_GETARG(hcl, nargs, 1));
+	if (!ret) return HCL_PF_FAILURE;
+
+	HCL_STACK_SETRET (hcl, nargs, ret);
+	return HCL_PF_SUCCESS;
+}
+static hcl_pfrc_t pf_integer_eq (hcl_t* hcl, hcl_mod_t* mod, hcl_ooi_t nargs)
+{
+	hcl_oop_t ret;
+	ret = hcl_eqints(hcl, HCL_STACK_GETARG(hcl, nargs, 0), HCL_STACK_GETARG(hcl, nargs, 1));
+	if (!ret) return HCL_PF_FAILURE;
+
+	HCL_STACK_SETRET (hcl, nargs, ret);
+	return HCL_PF_SUCCESS;
+}
+static hcl_pfrc_t pf_integer_ne (hcl_t* hcl, hcl_mod_t* mod, hcl_ooi_t nargs)
+{
+	hcl_oop_t ret;
+	ret = hcl_neints(hcl, HCL_STACK_GETARG(hcl, nargs, 0), HCL_STACK_GETARG(hcl, nargs, 1));
+	if (!ret) return HCL_PF_FAILURE;
+
+	HCL_STACK_SETRET (hcl, nargs, ret);
+	return HCL_PF_SUCCESS;
+}
 /* ------------------------------------------------------------------------- */
 
 static pf_t builtin_prims[] =
@@ -443,24 +537,22 @@ static pf_t builtin_prims[] =
 	{ 2, 2,                       pf_eqv,           4,  { 'e','q','v','?' } },
 	{ 2, 2,                       pf_eql,           4,  { 'e','q','l','?' } },
 	{ 2, 2,                       pf_eqk,           4,  { 'e','q','k','?' } },
-
-	/*
-	{ 2, 2,                       pf_gt,            1,  { '>' } },
-	{ 2, 2,                       pf_ge,            2,  { '>','=' } },
-	{ 2, 2,                       pf_lt,            1,  { '<' } },
-	{ 2, 2,                       pf_le,            2,  { '<','=' } },
-	{ 2, 2,                       pf_eq,            1,  { '=' } },
-	{ 2, 2,                       pf_ne,            2,  { '/','=' } },
-
-	{ 2, 2,                       pf_max,           3,  { 'm','a','x' } },
-	{ 2, 2,                       pf_min,           3,  { 'm','i','n' } },
-	*/
+	{ 2, 2,                       pf_nqv,           4,  { 'n','q','v','?' } },
+	{ 2, 2,                       pf_nql,           4,  { 'n','q','l','?' } },
+	{ 2, 2,                       pf_nqk,           4,  { 'n','q','k','?' } },
 
 	{ 1, HCL_TYPE_MAX(hcl_oow_t), pf_integer_add,   1,  { '+' } },
 	{ 1, HCL_TYPE_MAX(hcl_oow_t), pf_integer_sub,   1,  { '-' } },
 	{ 1, HCL_TYPE_MAX(hcl_oow_t), pf_integer_mul,   1,  { '*' } },
 	{ 1, HCL_TYPE_MAX(hcl_oow_t), pf_integer_quo,   1,  { '/' } },
 	{ 2, HCL_TYPE_MAX(hcl_oow_t), pf_integer_rem,   3,  { 'm','o','d' } },
+
+	{ 2, 2,                       pf_integer_gt,    1,  { '>' } },
+	{ 2, 2,                       pf_integer_ge,    2,  { '>','=' } },
+	{ 2, 2,                       pf_integer_lt,    1,  { '<' } },
+	{ 2, 2,                       pf_integer_le,    2,  { '<','=' } },
+	{ 2, 2,                       pf_integer_eq,    1,  { '=' } },
+	{ 2, 2,                       pf_integer_ne,    2,  { '/','=' } },
 };
 
 
