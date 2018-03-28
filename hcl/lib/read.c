@@ -126,7 +126,7 @@ static int string_to_ooi (hcl_t* hcl, hcl_oocs_t* str, int radixed, hcl_ooi_t* n
 
 		if (*ptr != '#') 
 		{
-			hcl_seterrnum (hcl, HCL_EINVAL);
+			hcl_seterrbfmt (hcl, HCL_EINVAL, "radixed number not starting with # - %*.js", str->len, str->ptr);
 			return -1;
 		}
 		ptr++; /* skip '#' */
@@ -136,7 +136,7 @@ static int string_to_ooi (hcl_t* hcl, hcl_oocs_t* str, int radixed, hcl_ooi_t* n
 		else if (*ptr == 'b') base = 2;
 		else
 		{
-			hcl_seterrnum (hcl, HCL_EINVAL);
+			hcl_seterrbfmt (hcl, HCL_EINVAL, "invalid radix specifier - %c", *ptr);
 			return -1;
 		}
 		ptr++;
@@ -152,7 +152,7 @@ static int string_to_ooi (hcl_t* hcl, hcl_oocs_t* str, int radixed, hcl_ooi_t* n
 		if (value < old_value) 
 		{
 			/* overflow must have occurred */
-			hcl_seterrnum (hcl, HCL_ERANGE);
+			hcl_seterrbfmt (hcl, HCL_ERANGE, "number too big - %.*js", str->len, str->ptr);
 			return -1;
 		}
 		old_value = value;
@@ -162,13 +162,13 @@ static int string_to_ooi (hcl_t* hcl, hcl_oocs_t* str, int radixed, hcl_ooi_t* n
 	if (ptr < end)
 	{
 		/* trailing garbage? */
-		hcl_seterrnum (hcl, HCL_EINVAL);
+		hcl_seterrbfmt (hcl, HCL_EINVAL, "trailing garbage after numeric literal - %.*js", str->len, str->ptr);
 		return -1;
 	}
 
 	if (value > HCL_TYPE_MAX(hcl_ooi_t) + (negsign? 1: 0)) /* assume 2's complement */
 	{
-		hcl_seterrnum (hcl, HCL_ERANGE);
+		hcl_seterrbfmt (hcl, HCL_ERANGE, "number too big - %.*js", str->len, str->ptr);
 		return -1;
 	}
 
@@ -218,7 +218,7 @@ static hcl_oop_t string_to_num (hcl_t* hcl, hcl_oocs_t* str, int radixed)
 
 		if (*ptr != '#') 
 		{
-			hcl_seterrnum (hcl, HCL_EINVAL);
+			hcl_seterrbfmt(hcl, HCL_EINVAL, "radixed number not starting with # - %.*js", str->len, str->ptr);
 			return HCL_NULL;
 		}
 		ptr++; /* skip '#' */
@@ -228,7 +228,7 @@ static hcl_oop_t string_to_num (hcl_t* hcl, hcl_oocs_t* str, int radixed)
 		else if (*ptr == 'b') base = 2;
 		else
 		{
-			hcl_seterrnum (hcl, HCL_EINVAL);
+			hcl_seterrbfmt (hcl, HCL_EINVAL, "invalid radix specifier - %c", *ptr);
 			return HCL_NULL;
 		}
 		ptr++;
@@ -239,6 +239,47 @@ static hcl_oop_t string_to_num (hcl_t* hcl, hcl_oocs_t* str, int radixed)
 /* TODO: handle floating point numbers ... etc */
 	if (negsign) base = -base;
 	return hcl_strtoint(hcl, ptr, end - ptr, base);
+}
+
+static hcl_oop_t string_to_fpdec (hcl_t* hcl, hcl_oocs_t* str, const hcl_ioloc_t* loc)
+{
+	hcl_oow_t pos;
+	hcl_oow_t scale = 0;
+	hcl_oop_t v;
+	hcl_oop_fpdec_t f;
+
+	pos = str->len;
+	while (pos > 0)
+	{
+		pos--;
+		if (str->ptr[pos] == '.')
+		{
+			scale = str->len - pos - 1;
+			if (scale > HCL_SMOOI_MAX)
+			{
+				hcl_setsynerrbfmt (hcl, HCL_SYNERR_NUMRANGE, loc, str, "too many digits after decimal point");
+				return HCL_NULL;
+			}
+
+			if (scale > 0) HCL_MEMMOVE (&str->ptr[pos], &str->ptr[pos + 1], scale * HCL_SIZEOF(str->ptr[0]));
+		}
+	}
+
+	v = hcl_strtoint(hcl, str->ptr, str->len - 1, 10);
+	if (scale > 0) HCL_MEMMOVE (&str->ptr[pos + 1], &str->ptr[pos], scale * HCL_SIZEOF(str->ptr[0]));
+	if (!v) return HCL_NULL;
+
+	hcl_pushtmp (hcl, &v);
+	f = (hcl_oop_fpdec_t)hcl_makearray (hcl, HCL_FPDEC_NAMED_INSTVARS, 0);
+	hcl_poptmp (hcl);
+
+	if (!f) return HCL_NULL;
+
+	HCL_OBJ_SET_FLAGS_BRAND(f, HCL_BRAND_FPDEC);
+	f->value = v;
+	f->scale = HCL_SMOOI_TO_OOP(scale);
+
+	return f;
 }
 
 static HCL_INLINE int is_spacechar (hcl_ooci_t c)
@@ -352,7 +393,7 @@ static int copy_string_to (hcl_t* hcl, const hcl_oocs_t* src, hcl_oocs_t* dst, h
 #define CLEAR_TOKEN_NAME(hcl) ((hcl)->c->tok.name.len = 0)
 #define SET_TOKEN_TYPE(hcl,tv) ((hcl)->c->tok.type = (tv))
 
-#define TOKEN_TYPE(hc) ((hcl)->c->tok.type)
+#define TOKEN_TYPE(hcl) ((hcl)->c->tok.type)
 #define TOKEN_NAME(hcl) (&(hcl)->c->tok.name)
 #define TOKEN_NAME_CAPA(hcl) ((hcl)->c->tok.name_capa)
 #define TOKEN_NAME_LEN(hcl) ((hcl)->c->tok.name.len)
@@ -1114,18 +1155,25 @@ retry:
 		case '0': case '1': case '2': case '3': case '4':
 		case '5': case '6': case '7': case '8': case '9':
 		numlit:
-			/* TODO: floating-pointer number */
 			SET_TOKEN_TYPE (hcl, HCL_IOTOK_NUMLIT);
 			while (1)
 			{
 				ADD_TOKEN_CHAR (hcl, c);
 				GET_CHAR_TO (hcl, c);
+				if (TOKEN_TYPE(hcl) == HCL_IOTOK_NUMLIT && c == '.')
+				{
+					SET_TOKEN_TYPE (hcl, HCL_IOTOK_FPDECLIT);
+					ADD_TOKEN_CHAR (hcl, c);
+					GET_CHAR_TO (hcl, c);
+				}
+
 				if (!is_digitchar(c))
 				{
 					unget_char (hcl, &hcl->c->lxc);
 					break;
 				}
 			}
+
 			break;
 
 		default:
@@ -1999,7 +2047,6 @@ static int read_object (hcl_t* hcl)
 
 			case HCL_IOTOK_VBAR:
 /* TODO: think wheter to allow | | inside a quoted list... */
-
 /* TODO: revise this part ... */
 				if (array_level > 0)
 				{
@@ -2072,6 +2119,10 @@ static int read_object (hcl_t* hcl)
 			case HCL_IOTOK_NUMLIT:
 			case HCL_IOTOK_RADNUMLIT:
 				obj = string_to_num(hcl, TOKEN_NAME(hcl), TOKEN_TYPE(hcl) == HCL_IOTOK_RADNUMLIT);
+				break;
+
+			case HCL_IOTOK_FPDECLIT:
+				obj = string_to_fpdec(hcl, TOKEN_NAME(hcl), TOKEN_LOC(hcl));
 				break;
 
 			/*
@@ -2299,7 +2350,7 @@ int hcl_attachio (hcl_t* hcl, hcl_ioimpl_t reader, hcl_ioimpl_t printer)
 
 	if (!reader || !printer)
 	{
-		hcl_seterrnum (hcl, HCL_EINVAL);
+		hcl_seterrbfmt (hcl, HCL_EINVAL, "reader and/or printer not supplied");
 		return -1;
 	}
 

@@ -101,7 +101,7 @@ enum hcl_synerrnum_t
 	HCL_SYNERR_HASHLIT,       /* wrong hashed literal */
 	HCL_SYNERR_CHARLIT,       /* wrong character literal */
 	HCL_SYNERR_RADNUMLIT ,    /* invalid numeric literal with radix */
-	HCL_SYNERR_INTRANGE,      /* integer range error */
+	HCL_SYNERR_NUMRANGE,      /* number range error */
 	HCL_SYNERR_ERRORLIT,      /* wrong error literal */
 	HCL_SYNERR_SMPTRLIT,      /* wrong smptr literal */
 
@@ -551,6 +551,16 @@ struct hcl_dic_t
 	hcl_oop_oop_t bucket; /* Array */
 };
 
+#define HCL_FPDEC_NAMED_INSTVARS 2
+typedef struct hcl_fpdec_t hcl_fpdec_t;
+typedef struct hcl_fpdec_t* hcl_oop_fpdec_t;
+struct hcl_fpdec_t
+{
+	HCL_OBJ_HEADER;
+	hcl_oop_t value; /* smooi or bigint */
+	hcl_oop_t scale; /* smooi, positive */
+};
+
 #define HCL_CONTEXT_NAMED_INSTVARS 8
 typedef struct hcl_context_t hcl_context_t;
 typedef struct hcl_context_t* hcl_oop_context_t;
@@ -693,12 +703,36 @@ struct hcl_heap_t
  * VIRTUAL MACHINE PRIMITIVES
  * ========================================================================= */
 
-typedef void* (*hcl_alloc_heap_t) (hcl_t* hcl, hcl_oow_t size);
-typedef void (*hcl_free_heap_t) (hcl_t* hcl, void* ptr);
+typedef void* (*hcl_alloc_heap_t) (
+	hcl_t*             hcl,
+	hcl_oow_t          size
+);
 
-typedef void (*hcl_log_write_t) (hcl_t* hcl, unsigned int mask, const hcl_ooch_t* msg, hcl_oow_t len);
-typedef void (*hcl_syserrstrb_t) (hcl_t* hcl, int syserr, hcl_bch_t* buf, hcl_oow_t len);
-typedef void (*hcl_syserrstru_t) (hcl_t* hcl, int syserr, hcl_uch_t* buf, hcl_oow_t len);
+typedef void (*hcl_free_heap_t) (
+	hcl_t*             hcl,
+	void*              ptr
+);
+
+typedef void (*hcl_log_write_t) (
+	hcl_t*             hcl,
+	unsigned int       mask,
+	const hcl_ooch_t*  msg,
+	hcl_oow_t          len
+);
+
+typedef void (*hcl_syserrstrb_t) (
+	hcl_t*             hcl,
+	int                syserr,
+	hcl_bch_t*         buf,
+	hcl_oow_t          len
+);
+
+typedef void (*hcl_syserrstru_t) (
+	hcl_t*             hcl,
+	int                syserr,
+	hcl_uch_t*         buf,
+	hcl_oow_t          len
+);
 
 enum hcl_vmprim_opendl_flag_t
 {
@@ -706,12 +740,31 @@ enum hcl_vmprim_opendl_flag_t
 };
 typedef enum hcl_vmprim_opendl_flag_t hcl_vmprim_opendl_flag_t;
 
-typedef void* (*hcl_vmprim_dlopen_t) (hcl_t* hcl, const hcl_ooch_t* name, int flags);
-typedef void (*hcl_vmprim_dlclose_t) (hcl_t* hcl, void* handle);
-typedef void* (*hcl_vmprim_dlgetsym_t) (hcl_t* hcl, void* handle, const hcl_ooch_t* name);
+typedef void* (*hcl_vmprim_dlopen_t) (
+	hcl_t*             hcl,
+	const hcl_ooch_t*  name,
+	int                flags
+);
 
-typedef void (*hcl_vmprim_gettime_t) (hcl_t* hcl, hcl_ntime_t* now);
-typedef void (*hcl_vmprim_sleep_t) (hcl_t* hcl, const hcl_ntime_t* duration);
+typedef void (*hcl_vmprim_dlclose_t) (
+	hcl_t*             hcl,
+	void*              handle
+);
+
+typedef void* (*hcl_vmprim_dlgetsym_t) (
+	hcl_t*             hcl,
+	void*              handle,
+	const hcl_ooch_t*  name
+);
+
+typedef void (*hcl_vmprim_gettime_t) (
+	hcl_t*             hcl,
+	hcl_ntime_t*       now
+);
+
+typedef void (*hcl_vmprim_sleep_t) (
+	hcl_t*             hcl,
+	const hcl_ntime_t* duration);
 
 struct hcl_vmprim_t
 {
@@ -1324,6 +1377,7 @@ enum hcl_brand_t
 	HCL_BRAND_SYMBOL,
 	HCL_BRAND_STRING,
 	HCL_BRAND_DIC,
+	HCL_BRAND_FPDEC, /* fixed-point decimal */
 
 	HCL_BRAND_CFRAME,/* compiler frame */
 	HCL_BRAND_PRIM,

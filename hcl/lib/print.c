@@ -284,6 +284,22 @@ next:
 			break;
 		}
 
+		case HCL_BRAND_FPDEC:
+		{
+			hcl_oop_t tmp;
+			hcl_oop_fpdec_t f = (hcl_oop_fpdec_t)obj;
+			hcl_ooi_t scale;
+
+			scale = HCL_OOP_TO_SMOOI(f->scale);
+
+			tmp = hcl_inttostr(hcl, f->value, 10, -1);
+			if (!tmp) return -1;
+
+			HCL_ASSERT (hcl, (hcl_oop_t)tmp == hcl->_nil); 
+			if (outbfmt(hcl, mask, "%.*js.%.*js", hcl->inttostr.xbuf.len - scale, hcl->inttostr.xbuf.ptr, scale, &hcl->inttostr.xbuf.ptr[hcl->inttostr.xbuf.len - scale]) <= -1) return -1;
+			break;
+		}
+
 #if 0
 		case HCL_BRAND_REAL:
 		{

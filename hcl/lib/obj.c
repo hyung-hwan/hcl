@@ -268,6 +268,7 @@ hcl_oop_t hcl_makestring (hcl_t* hcl, const hcl_ooch_t* ptr, hcl_oow_t len, int 
 	return alloc_numeric_array(hcl, HCL_BRAND_STRING, ptr, len, HCL_OBJ_TYPE_CHAR, HCL_SIZEOF(hcl_ooch_t), 1, ngc);
 }
 
+
 /* ------------------------------------------------------------------------ *
  * NGC HANDLING
  * ------------------------------------------------------------------------ */
