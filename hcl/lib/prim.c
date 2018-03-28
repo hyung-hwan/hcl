@@ -385,7 +385,8 @@ static hcl_pfrc_t pf_integer_add (hcl_t* hcl, hcl_mod_t* mod, hcl_ooi_t nargs)
 	for (i = 1; i < nargs; i++)
 	{
 		arg = HCL_STACK_GETARG(hcl, nargs, i);
-		ret = hcl_addints(hcl, ret, arg);
+		/*ret = hcl_addints(hcl, ret, arg);*/
+		ret = hcl_addnums(hcl, ret, arg);
 		if (!ret) return HCL_PF_FAILURE;
 	}
 
@@ -402,7 +403,8 @@ static hcl_pfrc_t pf_integer_sub (hcl_t* hcl, hcl_mod_t* mod, hcl_ooi_t nargs)
 	for (i = 1; i < nargs; i++)
 	{
 		arg = HCL_STACK_GETARG(hcl, nargs, i);
-		ret = hcl_subints(hcl, ret, arg);
+		/*ret = hcl_subints(hcl, ret, arg);*/
+		ret = hcl_subnums(hcl, ret, arg);
 		if (!ret) return HCL_PF_FAILURE;
 	}
 

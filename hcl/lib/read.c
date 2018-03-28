@@ -246,7 +246,6 @@ static hcl_oop_t string_to_fpdec (hcl_t* hcl, hcl_oocs_t* str, const hcl_ioloc_t
 	hcl_oow_t pos;
 	hcl_oow_t scale = 0;
 	hcl_oop_t v;
-	hcl_oop_fpdec_t f;
 
 	pos = str->len;
 	while (pos > 0)
@@ -269,17 +268,7 @@ static hcl_oop_t string_to_fpdec (hcl_t* hcl, hcl_oocs_t* str, const hcl_ioloc_t
 	if (scale > 0) HCL_MEMMOVE (&str->ptr[pos + 1], &str->ptr[pos], scale * HCL_SIZEOF(str->ptr[0]));
 	if (!v) return HCL_NULL;
 
-	hcl_pushtmp (hcl, &v);
-	f = (hcl_oop_fpdec_t)hcl_makearray (hcl, HCL_FPDEC_NAMED_INSTVARS, 0);
-	hcl_poptmp (hcl);
-
-	if (!f) return HCL_NULL;
-
-	HCL_OBJ_SET_FLAGS_BRAND(f, HCL_BRAND_FPDEC);
-	f->value = v;
-	f->scale = HCL_SMOOI_TO_OOP(scale);
-
-	return f;
+	return hcl_makefpdec (hcl, v, scale);
 }
 
 static HCL_INLINE int is_spacechar (hcl_ooci_t c)

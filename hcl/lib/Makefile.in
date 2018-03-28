@@ -160,10 +160,10 @@ am_libhcl_la_OBJECTS = libhcl_la-bigint.lo libhcl_la-comp.lo \
 	libhcl_la-debug.lo libhcl_la-decode.lo libhcl_la-dic.lo \
 	libhcl_la-err.lo libhcl_la-exec.lo libhcl_la-gc.lo \
 	libhcl_la-hcl.lo libhcl_la-heap.lo libhcl_la-logfmt.lo \
-	libhcl_la-obj.lo libhcl_la-opt.lo libhcl_la-prim.lo \
-	libhcl_la-print.lo libhcl_la-rbt.lo libhcl_la-read.lo \
-	libhcl_la-sym.lo libhcl_la-tmr.lo libhcl_la-utf8.lo \
-	libhcl_la-utl.lo
+	libhcl_la-number.lo libhcl_la-obj.lo libhcl_la-opt.lo \
+	libhcl_la-prim.lo libhcl_la-print.lo libhcl_la-rbt.lo \
+	libhcl_la-read.lo libhcl_la-sym.lo libhcl_la-tmr.lo \
+	libhcl_la-utf8.lo libhcl_la-utl.lo
 libhcl_la_OBJECTS = $(am_libhcl_la_OBJECTS)
 AM_V_lt = $(am__v_lt_@AM_V@)
 am__v_lt_ = $(am__v_lt_@AM_DEFAULT_V@)
@@ -420,6 +420,7 @@ pdfdir = @pdfdir@
 prefix = @prefix@
 program_transform_name = @program_transform_name@
 psdir = @psdir@
+runstatedir = @runstatedir@
 sbindir = @sbindir@
 sharedstatedir = @sharedstatedir@
 srcdir = @srcdir@
@@ -468,6 +469,7 @@ libhcl_la_SOURCES = \
 	hcl.c \
 	heap.c \
 	logfmt.c \
+	number.c \
 	obj.c \
 	opt-imp.h \
 	opt.c \
@@ -684,6 +686,7 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libhcl_la-hcl.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libhcl_la-heap.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libhcl_la-logfmt.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libhcl_la-number.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libhcl_la-obj.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libhcl_la-opt.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libhcl_la-prim.Plo@am__quote@
@@ -797,6 +800,13 @@ libhcl_la-logfmt.lo: logfmt.c
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='logfmt.c' object='libhcl_la-logfmt.lo' libtool=yes @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libhcl_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o libhcl_la-logfmt.lo `test -f 'logfmt.c' || echo '$(srcdir)/'`logfmt.c
+
+libhcl_la-number.lo: number.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libhcl_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT libhcl_la-number.lo -MD -MP -MF $(DEPDIR)/libhcl_la-number.Tpo -c -o libhcl_la-number.lo `test -f 'number.c' || echo '$(srcdir)/'`number.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/libhcl_la-number.Tpo $(DEPDIR)/libhcl_la-number.Plo
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='number.c' object='libhcl_la-number.lo' libtool=yes @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libhcl_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o libhcl_la-number.lo `test -f 'number.c' || echo '$(srcdir)/'`number.c
 
 libhcl_la-obj.lo: obj.c
 @am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libhcl_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT libhcl_la-obj.lo -MD -MP -MF $(DEPDIR)/libhcl_la-obj.Tpo -c -o libhcl_la-obj.lo `test -f 'obj.c' || echo '$(srcdir)/'`obj.c

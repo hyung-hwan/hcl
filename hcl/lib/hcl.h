@@ -1435,6 +1435,7 @@ typedef enum hcl_concode_t hcl_concode_t;
 #define HCL_IS_NBIGINT(hcl,v) (HCL_OOP_IS_POINTER(v) && HCL_OBJ_GET_FLAGS_BRAND(v) == HCL_BRAND_NBIGINT)
 #define HCL_IS_BIGINT(hcl,v) (HCL_OOP_IS_POINTER(v) && (HCL_OBJ_GET_FLAGS_BRAND(v) == HCL_BRAND_PBIGINT || HCL_OBJ_GET_FLAGS_BRAND(v) == HCL_BRAND_NBIGINT))
 #define HCL_IS_STRING(hcl,v) (HCL_OOP_IS_POINTER(v) && HCL_OBJ_GET_FLAGS_BRAND(v) == HCL_BRAND_STRING)
+#define HCL_IS_FPDEC(hcl,v) (HCL_OOP_IS_POINTER(v) && HCL_OBJ_GET_FLAGS_BRAND(v) == HCL_BRAND_FPDEC)
 
 #define HCL_CONS_CAR(v)  (((hcl_cons_t*)(v))->car)
 #define HCL_CONS_CDR(v)  (((hcl_cons_t*)(v))->cdr)
@@ -1903,6 +1904,12 @@ HCL_EXPORT hcl_oop_t hcl_makestring (
 	const hcl_ooch_t* ptr,
 	hcl_oow_t         len,
 	int               ngc
+);
+
+HCL_EXPORT hcl_oop_t hcl_makefpdec (
+	hcl_t*            hcl,
+	hcl_oop_t         value,
+	hcl_ooi_t         scale
 );
 
 HCL_EXPORT hcl_oop_t hcl_makedic (

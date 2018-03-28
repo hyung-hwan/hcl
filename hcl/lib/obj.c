@@ -269,6 +269,28 @@ hcl_oop_t hcl_makestring (hcl_t* hcl, const hcl_ooch_t* ptr, hcl_oow_t len, int 
 }
 
 
+hcl_oop_t hcl_makefpdec (hcl_t* hcl, hcl_oop_t value, hcl_ooi_t scale)
+{
+	hcl_oop_fpdec_t f;
+
+	if (!HCL_IN_SMOOI_RANGE(scale))
+	{
+		hcl_seterrbfmt (hcl, HCL_EINVAL, "fpdec scale too large - %zd", scale);
+		return HCL_NULL;
+	}
+	
+	hcl_pushtmp (hcl, &value);
+	f = (hcl_oop_fpdec_t)hcl_allocoopobj (hcl, HCL_BRAND_FPDEC, HCL_FPDEC_NAMED_INSTVARS);
+	hcl_poptmp (hcl);
+
+	if (!f) return HCL_NULL;
+
+	f->value = value;
+	f->scale = HCL_SMOOI_TO_OOP(scale);
+
+	return (hcl_oop_t)f;
+}
+
 /* ------------------------------------------------------------------------ *
  * NGC HANDLING
  * ------------------------------------------------------------------------ */

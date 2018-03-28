@@ -56,6 +56,7 @@ libhcl_la_SOURCES = \
 	hcl.c \
 	heap.c \
 	logfmt.c \
+	number.c \
 	obj.c \
 	opt-imp.h \
 	opt.c \
