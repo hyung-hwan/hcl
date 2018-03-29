@@ -124,10 +124,14 @@ static struct
 static HCL_INLINE int print_single_char (hcl_t* hcl, int mask, hcl_ooch_t ch, hcl_outbfmt_t outbfmt)
 {
 	hcl_oochu_t chu = (hcl_oochu_t)ch;
+	if (chu == '\\' || chu == '\"')
+	{
+		if (outbfmt(hcl, mask, "\\%jc", chu) <= -1) return -1;
+	}
 #if defined(HCL_OOCH_IS_UCH)
-	if (chu < ' ') 
+	else if (chu < ' ') 
 #else
-	if (chu < ' ' || chu >= 0x80) 
+	else if (chu < ' ' || chu >= 0x80) 
 #endif
 	{
 		hcl_oochu_t escaped;
@@ -168,7 +172,7 @@ static HCL_INLINE int print_single_char (hcl_t* hcl, int mask, hcl_ooch_t ch, hc
 		#if (HCL_SIZEOF_OOCH_T >= 4)
 			if (chu >= 0x10000u)
 			{
-				if (outbfmt(hcl, mask, "\\U%X", chu) <= -1) return -1;
+				if (outbfmt(hcl, mask, "\\U%08X", chu) <= -1) return -1;
 			}
 			else 
 		#endif
@@ -176,12 +180,12 @@ static HCL_INLINE int print_single_char (hcl_t* hcl, int mask, hcl_ooch_t ch, hc
 		#if (HCL_SIZEOF_OOCH_T >= 2)
 				if (chu >= 0x100u)
 				{
-					if (outbfmt(hcl, mask, "\\u%X", chu) <= -1) return -1;
+					if (outbfmt(hcl, mask, "\\u%04X", chu) <= -1) return -1;
 				}
 				else
 		#endif
 				{
-					if (outbfmt(hcl, mask, "\\x%X", chu) <= -1) return -1;
+					if (outbfmt(hcl, mask, "\\x%02X", chu) <= -1) return -1;
 				}
 			}
 		}
@@ -336,7 +340,7 @@ next:
 			for (i = 0; i < HCL_OBJ_GET_SIZE(obj); i++)
 			{
 				ch = ((hcl_oop_char_t)obj)->slot[i];
-				if (ch < ' ') 
+				if (ch < ' ' || ch == '\"' || ch == '\\') 
 				{
 					escape = 1;
 					break;
