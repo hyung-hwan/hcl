@@ -1178,14 +1178,49 @@ void hcl_server_proto_start_reply (hcl_server_proto_t* proto)
 
 int hcl_server_proto_feed_reply (hcl_server_proto_t* proto, const hcl_ooch_t* ptr, hcl_oow_t len, int escape)
 {
-#if defined(HCL_OOCH_IS_BCH)
-	/* nothing */
-#else
+#if defined(HCL_OOCH_IS_UCH)
 	hcl_oow_t bcslen, ucslen, donelen;
 	int x;
-#endif
 
-#if defined(HCL_OOCH_IS_BCH)
+	donelen = 0;
+	while (donelen < len)
+	{
+		if (escape)
+		{
+			if (ptr[donelen] == '\\' || ptr[donelen] == '\"')
+			{
+				/* i know that these characters don't need encoding conversion */
+				if (proto->reply.len >= HCL_COUNTOF(proto->reply.buf) && write_reply_chunk(proto) <=-1) return -1;
+				proto->reply.buf[proto->reply.len++] = '\\';
+			}
+			bcslen = HCL_COUNTOF(proto->reply.buf) - proto->reply.len;
+			if (bcslen < HCL_BCSIZE_MAX)
+			{
+				if (write_reply_chunk(proto) <=-1) return -1;
+				bcslen = HCL_COUNTOF(proto->reply.buf) - proto->reply.len;
+			}
+			ucslen = 1; /* i must go one by one for escaping */
+		}
+		else
+		{
+			bcslen = HCL_COUNTOF(proto->reply.buf) - proto->reply.len;
+			if (bcslen < HCL_BCSIZE_MAX)
+			{
+				if (write_reply_chunk(proto) <=-1) return -1;
+				bcslen = HCL_COUNTOF(proto->reply.buf) - proto->reply.len;
+			}
+			ucslen = len - donelen;
+		}
+
+		x = hcl_convootobchars(proto->hcl, &ptr[donelen], &ucslen, &proto->reply.buf[proto->reply.len], &bcslen);
+		if (x <= -1 && ucslen <= 0) return -1;
+
+		donelen += ucslen;
+		proto->reply.len += bcslen;
+	}
+
+	return 0;
+#else
 	while (len > 0)
 	{
 		if (escape && (*ptr == '\\' || *ptr == '\"'))
@@ -1200,33 +1235,7 @@ int hcl_server_proto_feed_reply (hcl_server_proto_t* proto, const hcl_ooch_t* pt
 	}
 
 	return 0;
-#else
-	donelen = 0;
-	while (donelen < len)
-	{
-		if (escape && (*ptr == '\\' || *ptr == '\"'))
-		{
-			/* i know that these characters don't need encoding conversion */
-			if (proto->reply.len >= HCL_COUNTOF(proto->reply.buf) && write_reply_chunk(proto) <=-1) return -1;
-			proto->reply.buf[proto->reply.len++] = '\\';
-		}
-
-		bcslen = HCL_COUNTOF(proto->reply.buf) - proto->reply.len;
-		if (bcslen < HCL_BCSIZE_MAX)
-		{
-			if (write_reply_chunk(proto) <=-1) return -1;
-			bcslen = HCL_COUNTOF(proto->reply.buf) - proto->reply.len;
-		}
-		ucslen = len - donelen;
-
-		x = hcl_convootobchars(proto->hcl, &ptr[donelen], &ucslen, &proto->reply.buf[proto->reply.len], &bcslen);
-		if (x <= -1 && ucslen <= 0) return -1;
-
-		donelen += ucslen;
-		proto->reply.len += bcslen;
-	}
 #endif
-	return 0;
 }
 
 int hcl_server_proto_end_reply (hcl_server_proto_t* proto, const hcl_ooch_t* failmsg)
@@ -2254,14 +2263,15 @@ static void set_err_with_syserr (hcl_server_t* server, int syserr, const char* b
 		hcl_seterrbfmtv (hcl, errnum, bfmt, ap);
 		va_end (ap);
 
-	#if defined(HCL_OOCH_IS_BCH)
-		hcl->errmsg.len += hcl_copybcstr(&hcl->errmsg.buf[hcl->errmsg.len], HCL_COUNTOF(hcl->errmsg.buf) - hcl->errmsg.len, b_dash);
-		hcl->errmsg.len += hcl_copybcstr(&hcl->errmsg.buf[hcl->errmsg.len], HCL_COUNTOF(hcl->errmsg.buf) - hcl->errmsg.len, hcl->errmsg.tmpbuf.bch);
-	#else
+	#if defined(HCL_OOCH_IS_UCH)
 		hcl->errmsg.len += hcl_copyucstr(&hcl->errmsg.buf[hcl->errmsg.len], HCL_COUNTOF(hcl->errmsg.buf) - hcl->errmsg.len, u_dash);
 		tmplen2 = HCL_COUNTOF(hcl->errmsg.buf) - hcl->errmsg.len;
 		hcl_convbtoucstr (hcl, hcl->errmsg.tmpbuf.bch, &tmplen, &hcl->errmsg.buf[hcl->errmsg.len], &tmplen2);
 		hcl->errmsg.len += tmplen2; /* ignore conversion errors */
+	#else
+		hcl->errmsg.len += hcl_copybcstr(&hcl->errmsg.buf[hcl->errmsg.len], HCL_COUNTOF(hcl->errmsg.buf) - hcl->errmsg.len, b_dash);
+		hcl->errmsg.len += hcl_copybcstr(&hcl->errmsg.buf[hcl->errmsg.len], HCL_COUNTOF(hcl->errmsg.buf) - hcl->errmsg.len, hcl->errmsg.tmpbuf.bch);
+
 	#endif
 	}
 	else
@@ -2274,14 +2284,14 @@ static void set_err_with_syserr (hcl_server_t* server, int syserr, const char* b
 		hcl_seterrbfmtv (hcl, errnum, bfmt, ap);
 		va_end (ap);
 
-	#if defined(HCL_OOCH_IS_BCH)
+	#if defined(HCL_OOCH_IS_UCH)
+		hcl->errmsg.len += hcl_copyucstr(&hcl->errmsg.buf[hcl->errmsg.len], HCL_COUNTOF(hcl->errmsg.buf) - hcl->errmsg.len, u_dash);
+		hcl->errmsg.len += hcl_copyucstr(&hcl->errmsg.buf[hcl->errmsg.len], HCL_COUNTOF(hcl->errmsg.buf) - hcl->errmsg.len, hcl->errmsg.tmpbuf.uch);
+	#else
 		hcl->errmsg.len += hcl_copybcstr(&hcl->errmsg.buf[hcl->errmsg.len], HCL_COUNTOF(hcl->errmsg.buf) - hcl->errmsg.len, b_dash);
 		tmplen2 = HCL_COUNTOF(hcl->errmsg.buf) - hcl->errmsg.len;
 		hcl_convutobcstr (hcl, hcl->errmsg.tmpbuf.uch, &tmplen, &hcl->errmsg.buf[hcl->errmsg.len], &tmplen2);
 		hcl->errmsg.len += tmplen2; /* ignore conversion errors */
-	#else
-		hcl->errmsg.len += hcl_copyucstr(&hcl->errmsg.buf[hcl->errmsg.len], HCL_COUNTOF(hcl->errmsg.buf) - hcl->errmsg.len, u_dash);
-		hcl->errmsg.len += hcl_copyucstr(&hcl->errmsg.buf[hcl->errmsg.len], HCL_COUNTOF(hcl->errmsg.buf) - hcl->errmsg.len, hcl->errmsg.tmpbuf.uch);
 	#endif
 	}
 
@@ -2747,6 +2757,7 @@ void hcl_server_seterrufmt (hcl_server_t* server, hcl_errnum_t errnum, const hcl
 	va_end (ap);
 
 	HCL_ASSERT (server->dummy_hcl, HCL_COUNTOF(server->errmsg.buf) == HCL_COUNTOF(server->dummy_hcl->errmsg.buf));
+	server->errnum = errnum;
 	server->errnum = errnum;
 	hcl_copyoochars (server->errmsg.buf, server->dummy_hcl->errmsg.buf, HCL_COUNTOF(server->errmsg.buf));
 	server->errmsg.len = server->dummy_hcl->errmsg.len;

@@ -231,8 +231,10 @@ static HCL_INLINE int is_token_integer (hcl_client_t* client, hcl_oow_t* value)
 	return 1;
 } 
 
-static HCL_INLINE hcl_ooch_t escape (hcl_ooch_t c)
+static HCL_INLINE hcl_ooch_t unescape (hcl_ooch_t c)
 {
+	/* as of this writing, the server side only escapes \ and ".
+	 * i don't know if n, r, f, t, v should be supported here */
 	switch (c)
 	{
 		case 'n': return '\n';
@@ -364,8 +366,7 @@ static int handle_char (hcl_client_t* client, hcl_ooci_t c, hcl_oow_t nbytes)
 			{
 				if (client->rep.u.reply_value_quoted.escaped)
 				{
-					c = escape(c);
-					/* TODO: more escaping handling \xXXX \uXXXX \UXXXXX */
+					c = unescape(c);
 				}
 				else if (c == '\\')
 				{
@@ -540,7 +541,7 @@ static int handle_char (hcl_client_t* client, hcl_ooci_t c, hcl_oow_t nbytes)
 			{
 				if (client->rep.u.attr_value_quoted.escaped)
 				{
-					c = escape(c);
+					c = unescape(c);
 					/* TODO: more escaping handling like \0NNN \xXXXX \uXXXX \UXXXX */
 				}
 				else if (c == '\\')

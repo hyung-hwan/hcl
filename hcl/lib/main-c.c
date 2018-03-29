@@ -449,18 +449,33 @@ static int start_reply (hcl_client_t* client, hcl_client_reply_type_t type, cons
 
 	if (client_xtn->reply_count > 0)
 	{
-		hcl_client_seterrbfmt (client, HCL_EFLOOD, "redundant reply received\n");
+		hcl_client_seterrbfmt (client, HCL_EFLOOD, "\n<<WARNING>> redundant reply received\n");
 		return -1;
 	}
 
 	if (dptr)
 	{
 		/* short-form response - no end_reply will be called */
-		
+		if (type == HCL_CLIENT_REPLY_TYPE_ERROR)
+		{
+		#if defined(HCL_OOCH_IS_UCH)
+			hcl_bch_t bcs[256];
+			hcl_oow_t bcslen;
 
-		client_xtn->reply_count++;
+			hcl_conv_ucsn_to_bcsn_with_cmgr (dptr, &dlen, bcs, &bcslen, hcl_client_getcmgr(client));
+			printf ("\nERROR - [%.*s]\n", (int)bcslen, bcs);
+		#else
+			printf ("\nERROR - [%.*s]\n", (int)dlen, dptr);
+		#endif
+		}
+		else
+		{
+			printf ("\nTOTAL DATA %lu bytes\n", (unsigned long int)client_xtn->data_length);
+		}
+
 		/*fflush (stdout);*/
-		printf ("\nTOTAL DATA %lu bytes\n", (unsigned long int)client_xtn->data_length);
+		client_xtn->reply_count++;
+
 	}
 	else
 	{
@@ -477,6 +492,8 @@ static int end_reply (hcl_client_t* client, hcl_client_end_reply_state_t state)
 	if (state == HCL_CLIENT_END_REPLY_STATE_REVOKED)
 	{
 		/* nothing to do here */
+		printf ("\n<<WARNING>> REPLY(%lu bytes) received so far has been revoked\n", (unsigned long int)client_xtn->data_length);
+		client_xtn->data_length = 0;
 	}
 	else
 	{
@@ -501,7 +518,7 @@ static int feed_data (hcl_client_t* client, const void* ptr, hcl_oow_t len)
 
 	if (write_all(0, ptr, len) <= -1)
 	{
-		hcl_client_seterrbfmt (client, HCL_EIOERR, "unabled to write data");
+		hcl_client_seterrbfmt (client, HCL_EIOERR, "unable to write data");
 		return -1;
 	}
 
