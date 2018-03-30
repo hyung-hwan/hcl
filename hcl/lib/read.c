@@ -260,12 +260,14 @@ static hcl_oop_t string_to_fpdec (hcl_t* hcl, hcl_oocs_t* str, const hcl_ioloc_t
 				return HCL_NULL;
 			}
 
-			if (scale > 0) HCL_MEMMOVE (&str->ptr[pos], &str->ptr[pos + 1], scale * HCL_SIZEOF(str->ptr[0]));
+			HCL_ASSERT (hcl, scale > 0);
+			/*if (scale > 0)*/ HCL_MEMMOVE (&str->ptr[pos], &str->ptr[pos + 1], scale * HCL_SIZEOF(str->ptr[0]));
+			break;
 		}
 	}
 
 	v = hcl_strtoint(hcl, str->ptr, str->len - 1, 10);
-	if (scale > 0) HCL_MEMMOVE (&str->ptr[pos + 1], &str->ptr[pos], scale * HCL_SIZEOF(str->ptr[0]));
+	/*if (scale > 0)*/ HCL_MEMMOVE (&str->ptr[pos + 1], &str->ptr[pos], scale * HCL_SIZEOF(str->ptr[0]));
 	if (!v) return HCL_NULL;
 
 	return hcl_makefpdec (hcl, v, scale);
@@ -1156,7 +1158,8 @@ retry:
 					GET_CHAR_TO (hcl, c);
 					if (!is_digitchar(c))
 					{
-						hcl_setsynerrbfmt (hcl, HCL_SYNERR_NUMLIT, TOKEN_LOC(hcl), TOKEN_NAME(hcl), "invalid numeric literal with no digit after fixed-point");
+						/* the first character after the decimal point is not a decimal digit */
+						hcl_setsynerrbfmt (hcl, HCL_SYNERR_NUMLIT, TOKEN_LOC(hcl), TOKEN_NAME(hcl), "invalid numeric literal with no digit after decimal point");
 						return -1;
 					}
 				}

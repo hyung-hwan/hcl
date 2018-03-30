@@ -96,6 +96,26 @@ static hcl_ooi_t equalize_scale (hcl_t* hcl, hcl_oop_t* x, hcl_oop_t* y)
 	return xs;
 }
 
+static hcl_oop_t truncate (hcl_t* hcl, hcl_oop_t iv, hcl_ooi_t cs, hcl_ooi_t ns)
+{
+	/* this function truncates an existing fixed-point decimal.
+	 * it doesn't create a new object */
+
+	if (cs > ns)
+	{
+		do
+		{
+			/* TODO: optimizatino... less divisions */
+			iv = hcl_divints(hcl, iv, HCL_SMOOI_TO_OOP(10), 0, HCL_NULL);
+			if (!iv) return HCL_NULL;
+			cs--;
+		}
+		while (cs > ns);
+	}
+
+	return iv;
+}
+
 hcl_oop_t hcl_addnums (hcl_t* hcl, hcl_oop_t x, hcl_oop_t y)
 {
 	if (!HCL_IS_FPDEC(hcl, x) && !HCL_IS_FPDEC(hcl, y))
@@ -156,7 +176,7 @@ hcl_oop_t hcl_subnums (hcl_t* hcl, hcl_oop_t x, hcl_oop_t y)
 
 hcl_oop_t hcl_mulnums (hcl_t* hcl, hcl_oop_t x, hcl_oop_t y)
 {
-	hcl_ooi_t xs, ys, scale;
+	hcl_ooi_t xs, ys, cs, ns;
 	hcl_oop_t nv;
 	hcl_oop_t xv, yv;
 
@@ -189,15 +209,20 @@ hcl_oop_t hcl_mulnums (hcl_t* hcl, hcl_oop_t x, hcl_oop_t y)
 	nv = hcl_mulints(hcl, xv, yv);
 	if (!nv) return HCL_NULL;
 
-	scale = xs + ys;
-	if (scale > HCL_SMOOI_MAX)
-	{
-		/* TODO: limit scale */
-	}
+	cs = xs + ys; 
+	if (cs <= 0) return nv; /* the result must be an integer */
 
-	return hcl_makefpdec(hcl, nv, scale);
+	ns = (xs > ys)? xs: ys;
+
+	/* cs may be larger than HCL_SMOOI_MAX. but ns is guaranteed to be
+	 * equal to or less than HCL_SMOOI_MAX */
+	HCL_ASSERT (hcl, ns > 0 && ns <= HCL_SMOOI_MAX);
+
+	nv = truncate(hcl, nv, cs, ns);
+	if (!nv) return HCL_NULL;
+
+	return hcl_makefpdec(hcl, nv, ns);
 }
-
 
 hcl_oop_t hcl_divnums (hcl_t* hcl, hcl_oop_t x, hcl_oop_t y)
 {
