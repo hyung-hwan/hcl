@@ -273,7 +273,11 @@ hcl_oop_t hcl_makefpdec (hcl_t* hcl, hcl_oop_t value, hcl_ooi_t scale)
 {
 	hcl_oop_fpdec_t f;
 
-	if (!HCL_IN_SMOOI_RANGE(scale))
+	HCL_ASSERT (hcl, hcl_isint(hcl, value));
+
+	if (scale <= 0) return value; /* if scale is 0 or less, return the value as it it */
+
+	if (scale > HCL_SMOOI_MAX)
 	{
 		hcl_seterrbfmt (hcl, HCL_EINVAL, "fpdec scale too large - %zd", scale);
 		return HCL_NULL;

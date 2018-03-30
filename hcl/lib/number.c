@@ -233,7 +233,7 @@ hcl_oop_t hcl_divnums (hcl_t* hcl, hcl_oop_t x, hcl_oop_t y)
 
 	nv = xv;
 
-	hcl_pushtmp (hcl, &y);
+	hcl_pushtmp (hcl, &yv);
 	for (i = 0; i < ys; i++)
 	{
 		nv = hcl_mulints(hcl, nv, HCL_SMOOI_TO_OOP(10));
@@ -244,7 +244,7 @@ hcl_oop_t hcl_divnums (hcl_t* hcl, hcl_oop_t x, hcl_oop_t y)
 		}
 	}
 
-	nv = hcl_divints(hcl, nv, y, 0, HCL_NULL);
+	nv = hcl_divints(hcl, nv, yv, 0, HCL_NULL);
 	hcl_poptmp (hcl);
 	if (!nv) return HCL_NULL;
 

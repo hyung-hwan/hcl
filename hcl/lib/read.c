@@ -719,7 +719,7 @@ static int get_radix_number (hcl_t* hcl, hcl_ooci_t rc, int radix)
 
 	if (CHAR_TO_NUM(c, radix) >= radix)
 	{
-		hcl_setsynerrbfmt (hcl, HCL_SYNERR_RADNUMLIT, TOKEN_LOC(hcl), TOKEN_NAME(hcl), 
+		hcl_setsynerrbfmt (hcl, HCL_SYNERR_NUMLIT, TOKEN_LOC(hcl), TOKEN_NAME(hcl), 
 			"no digit after radix specifier in %.*js", hcl->c->tok.name.len, hcl->c->tok.name.ptr);
 		return -1;
 	}
@@ -740,7 +740,7 @@ static int get_radix_number (hcl_t* hcl, hcl_ooci_t rc, int radix)
 		}
 		while (!is_delimiter(c));
 
-		hcl_setsynerrbfmt (hcl, HCL_SYNERR_RADNUMLIT, TOKEN_LOC(hcl), TOKEN_NAME(hcl),
+		hcl_setsynerrbfmt (hcl, HCL_SYNERR_NUMLIT, TOKEN_LOC(hcl), TOKEN_NAME(hcl),
 			"invalid digit in radixed number in %.*js", hcl->c->tok.name.len, hcl->c->tok.name.ptr);
 		return -1;
 	}
@@ -1154,6 +1154,11 @@ retry:
 					SET_TOKEN_TYPE (hcl, HCL_IOTOK_FPDECLIT);
 					ADD_TOKEN_CHAR (hcl, c);
 					GET_CHAR_TO (hcl, c);
+					if (!is_digitchar(c))
+					{
+						hcl_setsynerrbfmt (hcl, HCL_SYNERR_NUMLIT, TOKEN_LOC(hcl), TOKEN_NAME(hcl), "invalid numeric literal with no digit after fixed-point");
+						return -1;
+					}
 				}
 
 				if (!is_digitchar(c))
