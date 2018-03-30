@@ -290,17 +290,56 @@ next:
 
 		case HCL_BRAND_FPDEC:
 		{
-			hcl_oop_t tmp;
 			hcl_oop_fpdec_t f = (hcl_oop_fpdec_t)obj;
 			hcl_ooi_t scale;
 
 			scale = HCL_OOP_TO_SMOOI(f->scale);
 
-			tmp = hcl_inttostr(hcl, f->value, 10, -1);
-			if (!tmp) return -1;
+			if (f->value == HCL_SMOOI_TO_OOP(0))
+			{
+				if (scale == 0)
+				{
+					if (outbfmt(hcl, mask, "0.") <= -1) return -1;
+				}
+				else
+				{
+					if (outbfmt(hcl, mask, "0.%0*d", scale, 0) <= -1) return -1;
+				}
+			}
+			else 
+			{
+				hcl_oop_t tmp;
+				hcl_oow_t len, adj;
 
-			HCL_ASSERT (hcl, (hcl_oop_t)tmp == hcl->_nil); 
-			if (outbfmt(hcl, mask, "%.*js.%.*js", hcl->inttostr.xbuf.len - scale, hcl->inttostr.xbuf.ptr, scale, &hcl->inttostr.xbuf.ptr[hcl->inttostr.xbuf.len - scale]) <= -1) return -1;
+				tmp = hcl_inttostr(hcl, f->value, 10, -1);
+				if (!tmp) return -1;
+
+				adj = (hcl->inttostr.xbuf.ptr[0] == '-');
+				len = hcl->inttostr.xbuf.len - adj;
+
+				if (len <= scale)
+				{
+					if (scale == len)
+					{
+						if (outbfmt(hcl, mask, "%.*js0.%.*js", 
+							adj, hcl->inttostr.xbuf.ptr,
+							len, &hcl->inttostr.xbuf.ptr[adj]) <= -1) return -1;
+					}
+					else
+					{
+						if (outbfmt(hcl, mask, "%.*js0.%0*d%.*js", 
+							adj, hcl->inttostr.xbuf.ptr,
+							scale - len, 0,
+							len, &hcl->inttostr.xbuf.ptr[adj]) <= -1) return -1;
+					}
+				}
+				else
+				{
+					hcl_ooi_t ndigits;
+					ndigits = hcl->inttostr.xbuf.len - scale;
+					if (outbfmt(hcl, mask, "%.*js.%.*js", ndigits, hcl->inttostr.xbuf.ptr, scale, &hcl->inttostr.xbuf.ptr[ndigits]) <= -1) return -1;
+				}
+			}
 			break;
 		}
 

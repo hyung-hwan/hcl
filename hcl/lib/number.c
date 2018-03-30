@@ -26,35 +26,71 @@
 
 #include "hcl-prv.h"
 
-static hcl_ooi_t equalize_scale (hcl_t* hcl, hcl_oop_fpdec_t x, hcl_oop_fpdec_t y)
+
+static hcl_ooi_t equalize_scale (hcl_t* hcl, hcl_oop_t* x, hcl_oop_t* y)
 {
 	hcl_ooi_t xs, ys;
+	hcl_oop_t nv;
+	hcl_oop_t xv, yv;
+
+	/* this function assumes that x and y are protected by the caller */
+
+	xs = 0;
+	xv = *x;
+	if (HCL_IS_FPDEC(hcl, xv))
+	{
+		xs = HCL_OOP_TO_SMOOI(((hcl_oop_fpdec_t)xv)->scale);
+		xv = ((hcl_oop_fpdec_t)xv)->value;
+	}
+	else if (!hcl_isint(hcl, xv))
+	{
+		hcl_seterrbfmt (hcl, HCL_EINVAL, "parameter not numeric - %O", xv);
+		return -1;
+	}
 	
-	xs = HCL_OOP_TO_SMOOI(x->scale);
-	ys = HCL_OOP_TO_SMOOI(y->scale);
+	ys = 0;
+	yv = *y;
+	if (HCL_IS_FPDEC(hcl, *y))
+	{
+		ys = HCL_OOP_TO_SMOOI(((hcl_oop_fpdec_t)yv)->scale);
+		yv = ((hcl_oop_fpdec_t)yv)->value;
+	}
+	else if (!hcl_isint(hcl, yv))
+	{
+		hcl_seterrbfmt (hcl, HCL_EINVAL, "parameter not numeric - %O", yv);
+		return -1;
+	}
 
 	if (xs < ys)
 	{
-	/* TODO: don't change x or y. create new objects */
-		x->scale = y->scale;
-		hcl_pushtmp(hcl, &x);
+		nv = xv;
 		while (xs < ys)
 		{
-			x->value = hcl_mulints(hcl, x->value, HCL_SMOOI_TO_OOP(10));
+			/* TODO: optmize this. less multiplications */
+			nv = hcl_mulints(hcl, nv, HCL_SMOOI_TO_OOP(10));
+			if (!nv) return -1;
 			xs++;
 		}
-		hcl_poptmp(hcl);
+
+		nv = hcl_makefpdec(hcl, nv, xs);
+		if (!nv) return -1;
+
+		*x = nv;
 	}
 	else if (xs > ys)
 	{
-		y->scale = x->scale;
-		hcl_pushtmp(hcl, &y);
+		nv = yv;
 		while (ys < xs)
 		{
-			y->value = hcl_mulints(hcl, y->value, HCL_SMOOI_TO_OOP(10));
+			nv = hcl_mulints(hcl, nv, HCL_SMOOI_TO_OOP(10));
+			if (!nv) return -1;
 			ys++;
 		}
-		hcl_poptmp(hcl);
+
+		nv = hcl_makefpdec(hcl, nv, ys);
+		if (!nv) return -1;
+
+		*y = nv;
 	}
 
 	return xs;
@@ -62,65 +98,155 @@ static hcl_ooi_t equalize_scale (hcl_t* hcl, hcl_oop_fpdec_t x, hcl_oop_fpdec_t 
 
 hcl_oop_t hcl_addnums (hcl_t* hcl, hcl_oop_t x, hcl_oop_t y)
 {
-	if (HCL_IS_FPDEC(hcl, x))
+	if (!HCL_IS_FPDEC(hcl, x) && !HCL_IS_FPDEC(hcl, y))
 	{
-		if (HCL_IS_FPDEC(hcl, y))
-		{
-			hcl_oop_t v;
-			hcl_ooi_t scale;
-
-/* TODO: error handling */
-			hcl_pushtmp (hcl, &x);
-			hcl_pushtmp (hcl, &y);
-			scale = equalize_scale (hcl, x, y);
-			v = hcl_addints(hcl, ((hcl_oop_fpdec_t)x)->value, ((hcl_oop_fpdec_t)y)->value);
-			hcl_poptmps (hcl, 2);
-			return hcl_makefpdec(hcl, v, scale);
-		}
-		else
-		{
-		}
+		/* both are probably integers */
+		return hcl_addints(hcl, x, y);
 	}
 	else
 	{
-		if (HCL_IS_FPDEC(hcl, y))
+		hcl_oop_t v;
+		hcl_ooi_t scale;
+
+		hcl_pushtmp (hcl, &x);
+		hcl_pushtmp (hcl, &y);
+
+		scale = equalize_scale(hcl, &x, &y);
+		if (scale <= -1) 
 		{
+			hcl_poptmps (hcl, 2);
+			return HCL_NULL;
 		}
-		else
-		{
-			return hcl_addints(hcl, x, y);
-		}
+		v = hcl_addints(hcl, ((hcl_oop_fpdec_t)x)->value, ((hcl_oop_fpdec_t)y)->value);
+		hcl_poptmps (hcl, 2);
+		if (!v) return HCL_NULL;
+
+		return hcl_makefpdec(hcl, v, scale);
 	}
 }
 
 hcl_oop_t hcl_subnums (hcl_t* hcl, hcl_oop_t x, hcl_oop_t y)
 {
-	if (HCL_IS_FPDEC(hcl, x))
+	if (!HCL_IS_FPDEC(hcl, x) && !HCL_IS_FPDEC(hcl, y))
 	{
-		if (HCL_IS_FPDEC(hcl, y))
-		{
-			hcl_oop_t v;
-			hcl_ooi_t scale;
-
-			hcl_pushtmp (hcl, &x);
-			hcl_pushtmp (hcl, &y);
-			scale = equalize_scale (hcl, x, y);
-			v = hcl_subints(hcl, ((hcl_oop_fpdec_t)x)->value, ((hcl_oop_fpdec_t)y)->value);
-			hcl_poptmps (hcl, 2);
-			return hcl_makefpdec(hcl, v, scale);
-		}
-		else
-		{
-		}
+		/* both are probably integers */
+		return hcl_subints(hcl, x, y);
 	}
 	else
 	{
-		if (HCL_IS_FPDEC(hcl, y))
+		hcl_oop_t v;
+		hcl_ooi_t scale;
+
+		hcl_pushtmp (hcl, &x);
+		hcl_pushtmp (hcl, &y);
+
+		scale = equalize_scale(hcl, &x, &y);
+		if (scale <= -1) 
 		{
+			hcl_poptmps (hcl, 2);
+			return HCL_NULL;
 		}
-		else
+		v = hcl_subints(hcl, ((hcl_oop_fpdec_t)x)->value, ((hcl_oop_fpdec_t)y)->value);
+		hcl_poptmps (hcl, 2);
+		if (!v) return HCL_NULL;
+
+		return hcl_makefpdec(hcl, v, scale);
+	}
+}
+
+hcl_oop_t hcl_mulnums (hcl_t* hcl, hcl_oop_t x, hcl_oop_t y)
+{
+	hcl_ooi_t xs, ys, scale;
+	hcl_oop_t nv;
+	hcl_oop_t xv, yv;
+
+	xs = 0;
+	xv = x;
+	if (HCL_IS_FPDEC(hcl, xv))
+	{
+		xs = HCL_OOP_TO_SMOOI(((hcl_oop_fpdec_t)xv)->scale);
+		xv = ((hcl_oop_fpdec_t)xv)->value;
+	}
+	else if (!hcl_isint(hcl, xv))
+	{
+		hcl_seterrbfmt (hcl, HCL_EINVAL, "parameter not numeric - %O", xv);
+		return HCL_NULL;
+	}
+	
+	ys = 0;
+	yv = y;
+	if (HCL_IS_FPDEC(hcl, y))
+	{
+		ys = HCL_OOP_TO_SMOOI(((hcl_oop_fpdec_t)yv)->scale);
+		yv = ((hcl_oop_fpdec_t)yv)->value;
+	}
+	else if (!hcl_isint(hcl, yv))
+	{
+		hcl_seterrbfmt (hcl, HCL_EINVAL, "parameter not numeric - %O", yv);
+		return HCL_NULL;
+	}
+
+	nv = hcl_mulints(hcl, xv, yv);
+	if (!nv) return HCL_NULL;
+
+	scale = xs + ys;
+	if (scale > HCL_SMOOI_MAX)
+	{
+		/* TODO: limit scale */
+	}
+
+	return hcl_makefpdec(hcl, nv, scale);
+}
+
+
+hcl_oop_t hcl_divnums (hcl_t* hcl, hcl_oop_t x, hcl_oop_t y)
+{
+	hcl_ooi_t xs, ys, i;
+	hcl_oop_t nv;
+	hcl_oop_t xv, yv;
+
+	xs = 0;
+	xv = x;
+	if (HCL_IS_FPDEC(hcl, xv))
+	{
+		xs = HCL_OOP_TO_SMOOI(((hcl_oop_fpdec_t)xv)->scale);
+		xv = ((hcl_oop_fpdec_t)xv)->value;
+	}
+	else if (!hcl_isint(hcl, xv))
+	{
+		hcl_seterrbfmt (hcl, HCL_EINVAL, "parameter not numeric - %O", xv);
+		return HCL_NULL;
+	}
+
+	ys = 0;
+	yv = y;
+	if (HCL_IS_FPDEC(hcl, y))
+	{
+		ys = HCL_OOP_TO_SMOOI(((hcl_oop_fpdec_t)yv)->scale);
+		yv = ((hcl_oop_fpdec_t)yv)->value;
+	}
+	else if (!hcl_isint(hcl, yv))
+	{
+		hcl_seterrbfmt (hcl, HCL_EINVAL, "parameter not numeric - %O", yv);
+		return HCL_NULL;
+	}
+
+	nv = xv;
+
+	hcl_pushtmp (hcl, &y);
+	for (i = 0; i < ys; i++)
+	{
+		nv = hcl_mulints(hcl, nv, HCL_SMOOI_TO_OOP(10));
+		if (!nv) 
 		{
-			return hcl_subints(hcl, x, y);
+			hcl_poptmp (hcl);
+			return HCL_NULL;
 		}
 	}
+
+	nv = hcl_divints(hcl, nv, y, 0, HCL_NULL);
+	hcl_poptmp (hcl);
+	if (!nv) return HCL_NULL;
+
+	return hcl_makefpdec(hcl, nv, xs);
 }
