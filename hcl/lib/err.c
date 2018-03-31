@@ -193,7 +193,34 @@ static const hcl_bch_t* synerr_to_errstr (hcl_synerrnum_t errnum)
 
 hcl_errnum_t hcl_syserr_to_errnum (int e)
 {
-#if defined(__OS2__)
+#if defined(_WIN32)
+	switch (e) 
+	{ 
+		case ERROR_NOT_ENOUGH_MEMORY: 
+		case ERROR_OUTOFMEMORY: 
+			return HCL_ESYSMEM; 
+		case ERROR_INVALID_PARAMETER: 
+		case ERROR_INVALID_HANDLE: 
+		case ERROR_INVALID_NAME: 
+			return HCL_EINVAL; 
+		case ERROR_ACCESS_DENIED: 
+		case ERROR_SHARING_VIOLATION: 
+			return HCL_EACCES; 
+		case ERROR_FILE_NOT_FOUND: 
+		case ERROR_PATH_NOT_FOUND: 
+			return HCL_ENOENT; 
+		case ERROR_ALREADY_EXISTS: 
+		case ERROR_FILE_EXISTS: 
+			return HCL_EEXIST; 
+		case ERROR_BROKEN_PIPE: 
+			return HCL_EPIPE; 
+
+		/*TODO: add more mappings */
+		default: 
+			return HCL_ESYSERR; 
+	}
+
+#elif defined(__OS2__)
 	/* APIRET e */
 	switch (e)
 	{

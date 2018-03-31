@@ -34,10 +34,13 @@
 #include <errno.h>
 #include <locale.h>
 
-
 #if defined(_WIN32)
 #	include <windows.h>
 #	include <tchar.h>
+#	include <io.h>
+#	include <fcntl.h>
+#	include <time.h>
+#	include <signal.h>
 #	if defined(HCL_HAVE_CFG_H) && defined(HCL_ENABLE_LIBLTDL)
 #		include <ltdl.h>
 #		define USE_LTDL
@@ -136,6 +139,9 @@ struct bb_t
 typedef struct xtn_t xtn_t;
 struct xtn_t
 {
+#if defined(_WIN32)
+	HANDLE waitable_timer;
+#endif
 	const char* read_path; /* main source file */
 	const char* print_path; 
 
@@ -264,7 +270,9 @@ static HCL_INLINE int open_input (hcl_t* hcl, hcl_ioinarg_t* arg)
 
 	if (!arg->includer)
 	{
+	#if defined(HAVE_ISATTY)
 		xtn->reader_istty = isatty(fileno(bb->fp));
+	#endif
 	}
 
 	arg->handle = bb;
@@ -654,25 +662,37 @@ static void log_write (hcl_t* hcl, unsigned int mask, const hcl_ooch_t* msg, hcl
 		struct tm tm, *tmp;
 
 		now = time(NULL);
-	#if defined(__DOS__)
-		tmp = localtime (&now);
-		tslen = strftime (ts, sizeof(ts), "%Y-%m-%d %H:%M:%S ", tmp); /* no timezone info */
+	#if defined(_WIN32)
+		tmp = localtime(&now);
+		tslen = strftime(ts, sizeof(ts), "%Y-%m-%d %H:%M:%S %z ", tmp);
 		if (tslen == 0) 
 		{
-			strcpy (ts, "0000-00-00 00:00:00");
-			tslen = 19; 
+			tslen = strftime(ts, sizeof(ts), "%Y-%m-%d %H:%M:%S ", tmp);
+			if (tslen == 0)
+			{
+				strcpy (ts, "0000-00-00 00:00:00 +0000 ");
+				tslen = 26; 
+			}
+		}
+	#elif defined(__DOS__)
+		tmp = localtime(&now);
+		tslen = strftime(ts, sizeof(ts), "%Y-%m-%d %H:%M:%S ", tmp); /* no timezone info */
+		if (tslen == 0) 
+		{
+			strcpy (ts, "0000-00-00 00:00:00 ");
+			tslen = 20; 
 		}
 	#else
 		tmp = localtime_r (&now, &tm);
 		#if defined(HAVE_STRFTIME_SMALL_Z)
-		tslen = strftime (ts, sizeof(ts), "%Y-%m-%d %H:%M:%S %z ", tmp);
+		tslen = strftime(ts, sizeof(ts), "%Y-%m-%d %H:%M:%S %z ", tmp);
 		#else
-		tslen = strftime (ts, sizeof(ts), "%Y-%m-%d %H:%M:%S %Z ", tmp); 
+		tslen = strftime(ts, sizeof(ts), "%Y-%m-%d %H:%M:%S %Z ", tmp); 
 		#endif
 		if (tslen == 0) 
 		{
-			strcpy (ts, "0000-00-00 00:00:00 +0000");
-			tslen = 25; 
+			strcpy (ts, "0000-00-00 00:00:00 +0000 ");
+			tslen = 26; 
 		}
 	#endif
 		write_log (hcl, logfd, ts, tslen);
@@ -876,7 +896,7 @@ static void* dl_open (hcl_t* hcl, const hcl_ooch_t* name, int flags)
 /* TODO: support various platforms */
 	/* TODO: implemenent this */
 	HCL_DEBUG1 (hcl, "Dynamic loading not implemented - cannot open %js\n", name);
-	hcl_seterrnum (hcl, HCL_ENOIMPL, "dynamic loading not implemented - cannot open %js", name);
+	hcl_seterrbfmt (hcl, HCL_ENOIMPL, "dynamic loading not implemented - cannot open %js", name);
 	return HCL_NULL;
 #endif
 }
@@ -1033,8 +1053,8 @@ static void vm_sleep (hcl_t* hcl, const hcl_ntime_t* dur)
 	{
 		LARGE_INTEGER li;
 		li.QuadPart = -HCL_SECNSEC_TO_NSEC(dur->sec, dur->nsec);
-		if(SetWaitableTimer(timer, &li, 0, HCL_NULL, HCL_NULL, FALSE) == FALSE) goto normal_sleep;
-		WaitForSingleObject(timer, INFINITE);
+		if(SetWaitableTimer(xtn->waitable_timer, &li, 0, HCL_NULL, HCL_NULL, FALSE) == FALSE) goto normal_sleep;
+		WaitForSingleObject(xtn->waitable_timer, INFINITE);
 	}
 	else
 	{
@@ -1104,7 +1124,8 @@ static int vm_startup (hcl_t* hcl)
 #if defined(_WIN32)
 	xtn_t* xtn = (xtn_t*)hcl_getxtn(hcl);
 	xtn->waitable_timer = CreateWaitableTimer(HCL_NULL, TRUE, HCL_NULL);
-
+	xtn->vm_running = 1;
+	return 0;
 #else
 
 	xtn_t* xtn = (xtn_t*)hcl_getxtn(hcl);
@@ -1216,7 +1237,7 @@ oops:
 static void vm_cleanup (hcl_t* hcl)
 {
 #if defined(_WIN32)
-	xtn_t* xtn = (xatn_t*)hcl_getxtn(hcl);
+	xtn_t* xtn = (xtn_t*)hcl_getxtn(hcl);
 	if (xtn->waitable_timer)
 	{
 		CloseHandle (xtn->waitable_timer);
@@ -1376,8 +1397,11 @@ static int handle_logopt (hcl_t* hcl, const hcl_bch_t* str)
 		logmask = HCL_LOG_ALL_LEVELS | HCL_LOG_ALL_TYPES;
 	}
 
-	
-	xtn->logfd = open (xstr, O_CREAT | O_WRONLY | O_APPEND , 0644);
+#if defined(_WIN32)
+	xtn->logfd = _open(xstr, _O_CREAT | _O_WRONLY | _O_APPEND | _O_BINARY , 0644);
+#else
+	xtn->logfd = open(xstr, O_CREAT | O_WRONLY | O_APPEND , 0644);
+#endif
 	if (xtn->logfd == -1)
 	{
 		fprintf (stderr, "ERROR: cannot open a log file %s\n", xstr);
@@ -1541,19 +1565,22 @@ static void cancel_tick (void)
 
 /* ========================================================================= */
 
-#if defined(__MSDOS__) && defined(_INTELC32_)
+#if defined(_WIN32) || defined(__MSDOS__) || defined(__OS2__) || defined(macintosh)
 typedef void(*signal_handler_t)(int);
 #elif defined(macintosh)
-typedef void(*signal_handler_t)(int);
+typedef void(*signal_handler_t)(int); /* TODO: */
 #else
 typedef void(*signal_handler_t)(int, siginfo_t*, void*);
 #endif
 
 
-#if defined(__MSDOS__) && defined(_INTELC32_)
-	/* TODO: implement this */
+#if defined(_WIN32) || defined(__MSDOS__) || defined(__OS2__) 
+static void handle_sigint (int sig)
+{
+	if (g_hcl) hcl_abort (g_hcl);
+}
 #elif defined(macintosh)
-	/* TODO: implement this */
+/* TODO */
 #else
 static void handle_sigint (int sig, siginfo_t* siginfo, void* ctx)
 {
@@ -1563,8 +1590,8 @@ static void handle_sigint (int sig, siginfo_t* siginfo, void* ctx)
 
 static void set_signal (int sig, signal_handler_t handler)
 {
-#if defined(__MSDOS__) && defined(_INTELC32_)
-	/* TODO: implement this */
+#if defined(_WIN32) || defined(__MSDOS__) || defined(__OS2__) 
+	signal (sig, handler);
 #elif defined(macintosh)
 	/* TODO: implement this */
 #else
@@ -1582,8 +1609,8 @@ static void set_signal (int sig, signal_handler_t handler)
 
 static void set_signal_to_default (int sig)
 {
-#if defined(__MSDOS__) && defined(_INTELC32_)
-	/* TODO: implement this */
+#if defined(_WIN32) || defined(__MSDOS__) || defined(__OS2__) 
+	signal (sig, SIG_DFL);
 #elif defined(macintosh)
 	/* TODO: implement this */
 #else

@@ -1111,7 +1111,20 @@ hcl_uint128_t hcl_hton128 (hcl_uint128_t x)
 
 /* --------------------------------------------------------------- */
 
-#include <netinet/in.h>
+#if defined(_WIN32)
+#	include <winsock2.h>
+#	include <ws2tcpip.h> /* sockaddr_in6 */
+#	include <windows.h>
+#elif defined(__OS2__)
+#	if defined(TCPV40HDRS)
+#		define  BSD_SELECT
+#	endif
+#	include <types.h>
+#	include <sys/socket.h>
+#	include <netinet/in.h>
+#else
+#	include <netinet/in.h>
+#endif
 
 union sockaddr_t
 {
