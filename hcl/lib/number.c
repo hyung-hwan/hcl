@@ -96,7 +96,7 @@ static hcl_ooi_t equalize_scale (hcl_t* hcl, hcl_oop_t* x, hcl_oop_t* y)
 	return xs;
 }
 
-static hcl_oop_t truncate (hcl_t* hcl, hcl_oop_t iv, hcl_ooi_t cs, hcl_ooi_t ns)
+hcl_oop_t hcl_truncfpdecval (hcl_t* hcl, hcl_oop_t iv, hcl_ooi_t cs, hcl_ooi_t ns)
 {
 	/* this function truncates an existing fixed-point decimal.
 	 * it doesn't create a new object */
@@ -218,7 +218,7 @@ hcl_oop_t hcl_mulnums (hcl_t* hcl, hcl_oop_t x, hcl_oop_t y)
 	 * equal to or less than HCL_SMOOI_MAX */
 	HCL_ASSERT (hcl, ns > 0 && ns <= HCL_SMOOI_MAX);
 
-	nv = truncate(hcl, nv, cs, ns);
+	nv = hcl_truncfpdecval(hcl, nv, cs, ns);
 	if (!nv) return HCL_NULL;
 
 	return hcl_makefpdec(hcl, nv, ns);

@@ -520,7 +520,7 @@ static int put_prch (hcl_t* hcl, int mask, hcl_ooch_t ch, hcl_oow_t len)
 
 	while (len > 0)
 	{
-		seglen = (len > HCL_COUNTOF(str))? len = HCL_COUNTOF(str): len;
+		seglen = (len > HCL_COUNTOF(str))? HCL_COUNTOF(str): len;
 		for (i = 0; i < seglen; i++) str[i] = ch;
 
 		n = put_prcs (hcl, mask, str, seglen);
@@ -949,23 +949,54 @@ static HCL_INLINE int print_formatted (hcl_t* hcl, hcl_ooi_t nargs, hcl_fmtout_t
 		case 'i': /* signed conversion */
 			base = 10;
 			sign = 1;
-			goto number;
+			goto print_integer;
 		case 'o': 
 			base = 8;
-			goto number;
+			goto print_integer;
 		case 'u':
 			base = 10;
-			goto number;
+			goto print_integer;
 		case 'X':
 			base = 16;
-			goto number;
+			goto print_integer;
 		case 'x':
 			base = -16;
-			goto number;
+			goto print_integer;
 		case 'b':
 			base = 2;
-			goto number;
+			goto print_integer;
 		/* end of integer conversions */
+
+		case 'f':
+		{
+			const hcl_ooch_t* nsptr;
+			hcl_oow_t nslen;
+			hcl_oow_t scale = 0;
+
+			GET_NEXT_ARG_TO (hcl, nargs, &arg_state, arg);
+			if (HCL_OOP_IS_CHAR(arg)) 
+			{
+				arg = HCL_SMOOI_TO_OOP(HCL_OOP_TO_CHAR(arg));
+			}
+			else if (HCL_IS_FPDEC(hcl, arg))
+			{
+				hcl_oop_fpdec_t fa = (hcl_oop_fpdec_t)arg;
+				scale = HCL_OOP_TO_SMOOI(fa->scale);
+				arg = fa->value;
+			}
+
+			if (!hcl_inttostr(hcl, arg, 10, -1)) 
+			{
+				HCL_LOG1 (hcl, HCL_LOG_WARN | HCL_LOG_UNTYPED, "unable to convert integer %O to string \n", arg);
+				goto invalid_format;
+			}
+
+			nsptr = hcl->inttostr.xbuf.ptr;
+			nslen = hcl->inttostr.xbuf.len;
+
+			PRINT_OOCS (nsptr, nslen);
+			break;
+		}
 
 		case 'c':
 		case 'C':
@@ -1022,23 +1053,54 @@ static HCL_INLINE int print_formatted (hcl_t* hcl, hcl_ooi_t nargs, hcl_fmtout_t
 			if (hcl_outfmtobj(hcl, (data->mask | HCL_LOG_PREFER_JSON), arg, outbfmt) <= -1) goto oops;
 			break;
 
-		number:
+		print_integer:
 		{
 			const hcl_ooch_t* nsptr;
 			hcl_oow_t nslen;
 
 			GET_NEXT_ARG_TO (hcl, nargs, &arg_state, arg);
-			if (HCL_OOP_IS_CHAR(arg)) arg = HCL_SMOOI_TO_OOP(HCL_OOP_TO_CHAR(arg));
+			if (HCL_OOP_IS_CHAR(arg)) 
+			{
+				arg = HCL_SMOOI_TO_OOP(HCL_OOP_TO_CHAR(arg));
+			}
+			else if (HCL_IS_FPDEC(hcl, arg))
+			{
+				hcl_oop_t nv;
+				hcl_oop_fpdec_t fa = (hcl_oop_fpdec_t)arg;
+
+				/* the given number for integer output is a fixed-point decimal.
+				 * i will drop all digits after the fixed point */
+				hcl_pushtmp (hcl, &arg);
+				nv = hcl_truncfpdecval(hcl, fa->value, HCL_OOP_TO_SMOOI(fa->scale), 0);
+				hcl_poptmp (hcl);
+				if (!nv)
+				{
+					HCL_LOG1 (hcl, HCL_LOG_WARN | HCL_LOG_UNTYPED, "unable to truncate a fixed-point number %O to an integer for output\n", arg);
+					goto invalid_format;
+				}
+
+				arg = nv;
+			}
 
 			if (!hcl_inttostr(hcl, arg, base, -1)) 
 			{
 				/*hcl_seterrbfmt (hcl, HCL_EINVAL, "not a valid number - %O", arg);
 				goto oops;*/
+				HCL_LOG1 (hcl, HCL_LOG_WARN | HCL_LOG_UNTYPED, "unable to convert integer %O to string \n", arg);
 				goto invalid_format;
 			}
 
 			nsptr = hcl->inttostr.xbuf.ptr;
 			nslen = hcl->inttostr.xbuf.len;
+
+			if (nsptr[0] == '-') 
+			{
+				/* a negative number was given. i must skip the minus sign 
+				 * added by hcl_inttostr() for a negative number. */
+				HCL_ASSERT (hcl, (HCL_OOP_IS_SMOOI(arg) && HCL_OOP_TO_SMOOI(arg) < 0) || HCL_IS_NBIGINT(hcl,arg));
+				nsptr++;
+				nslen--; 
+			} 
 
 			extra = nslen;
 			if (sign && ((HCL_OOP_IS_SMOOI(arg) && HCL_OOP_TO_SMOOI(arg) < 0) || HCL_IS_NBIGINT(hcl,arg))) neg = 1;
@@ -1175,7 +1237,7 @@ int hcl_logfmtst (hcl_t* hcl, hcl_ooi_t nargs)
  * -------------------------------------------------------------------------- */
 static int put_sprcs (hcl_t* hcl, int mask, const hcl_ooch_t* ptr, hcl_oow_t len)
 {
-	if (hcl->sprintf.xbuf.len >= hcl->sprintf.xbuf.capa)
+	if (len > hcl->sprintf.xbuf.capa - hcl->sprintf.xbuf.len)
 	{
 		hcl_ooch_t* tmp;
 		hcl_oow_t newcapa;
@@ -1197,7 +1259,7 @@ static int put_sprcs (hcl_t* hcl, int mask, const hcl_ooch_t* ptr, hcl_oow_t len
 
 static int put_sprch (hcl_t* hcl, int mask, hcl_ooch_t ch, hcl_oow_t len)
 {
-	if (hcl->sprintf.xbuf.len >= hcl->sprintf.xbuf.capa)
+	if (len > hcl->sprintf.xbuf.capa - hcl->sprintf.xbuf.len)
 	{
 		hcl_ooch_t* tmp;
 		hcl_oow_t newcapa;
@@ -1288,6 +1350,7 @@ hcl_ooi_t hcl_sproutufmt (hcl_t* hcl, int mask, const hcl_uch_t* fmt, ...)
 int hcl_sprintfmtst (hcl_t* hcl, hcl_ooi_t nargs)
 {
 	hcl_fmtout_t fo;
+
 	HCL_MEMSET (&fo, 0, HCL_SIZEOF(fo));
 	fo.putch = put_sprch;
 	fo.putcs = put_sprcs;

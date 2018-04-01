@@ -990,6 +990,13 @@ hcl_oop_t hcl_divnums (
 	hcl_oop_t    y
 );
 
+hcl_oop_t hcl_truncfpdecval (
+	hcl_t*       hcl,
+	hcl_oop_t    iv, /* integer */
+	hcl_ooi_t    cs, /* current scale */
+	hcl_ooi_t    ns  /* new scale */
+);
+
 /* ========================================================================= */
 /* comp.c                                                                    */
 /* ========================================================================= */
