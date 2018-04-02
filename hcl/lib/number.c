@@ -216,12 +216,12 @@ static hcl_oop_t mul_nums (hcl_t* hcl, hcl_oop_t x, hcl_oop_t y, int mult)
 
 	/* cs may be larger than HCL_SMOOI_MAX. but ns is guaranteed to be
 	 * equal to or less than HCL_SMOOI_MAX */
-	HCL_ASSERT (hcl, ns > 0 && ns <= HCL_SMOOI_MAX);
+	HCL_ASSERT (hcl, ns <= HCL_SMOOI_MAX);
 
 	nv = hcl_truncfpdecval(hcl, nv, cs, ns);
 	if (!nv) return HCL_NULL;
 
-	return hcl_makefpdec(hcl, nv, ns);
+	return (ns <= 0)? nv: hcl_makefpdec(hcl, nv, ns);
 }
 
 hcl_oop_t hcl_mulnums (hcl_t* hcl, hcl_oop_t x, hcl_oop_t y)
