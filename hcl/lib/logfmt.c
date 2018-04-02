@@ -987,14 +987,107 @@ static HCL_INLINE int print_formatted (hcl_t* hcl, hcl_ooi_t nargs, hcl_fmtout_t
 
 			if (!hcl_inttostr(hcl, arg, 10, -1)) 
 			{
-				HCL_LOG1 (hcl, HCL_LOG_WARN | HCL_LOG_UNTYPED, "unable to convert integer %O to string \n", arg);
+				HCL_LOG1 (hcl, HCL_LOG_WARN | HCL_LOG_UNTYPED, "unable to convert %O to string \n", arg);
 				goto invalid_format;
 			}
 
 			nsptr = hcl->inttostr.xbuf.ptr;
 			nslen = hcl->inttostr.xbuf.len;
+			HCL_ASSERT (hcl, nslen > 0);
 
-			PRINT_OOCS (nsptr, nslen);
+			if (nsptr[0] == '-')
+			{
+				HCL_ASSERT (hcl, (HCL_OOP_IS_SMOOI(arg) && HCL_OOP_TO_SMOOI(arg) < 0) || HCL_IS_NBIGINT(hcl,arg));
+				nsptr++;
+				nslen--;
+				neg = 1;
+			}
+
+			if (!(flagc & FLAGC_DOT)) 
+			{
+				precision = scale;
+				if (precision <= 0) precision = 1;
+			}
+
+			if ((flagc & FLAGC_DOT) && precision < scale)  
+			{
+				hcl_oow_t diff  = scale - precision;
+				scale = precision;
+				nslen = (nslen < diff)? 0: (nslen - diff);
+			}
+
+			if (nslen < scale + 1)
+			{
+				extra = 1;
+				if (precision > 0) extra += 1 + scale;
+			}
+			else
+			{
+				extra = 0;
+				if (nslen > 0) extra += nslen - scale;
+				if (precision > 0)
+				{
+					extra += 1;
+					if (nslen > 0) extra += scale;
+				}
+			}
+
+			if (neg) extra++;
+			else if (flagc & FLAGC_SIGN) extra++;
+			else if (flagc & FLAGC_SPACE) extra++;
+
+			if ((flagc & FLAGC_DOT) && precision > scale) 
+			{
+				/* trailing zeros in the fractional part */
+				extra += precision - scale;
+			}
+
+			if (!(flagc & FLAGC_LEFTADJ) && !(flagc & FLAGC_ZEROPAD) && width > extra)
+			{
+				width -= extra;
+				PRINT_OOCH (padc, width);
+				width = 0;
+			}
+			if (neg) PRINT_OOCH ('-', 1);
+			else if (flagc & FLAGC_SIGN) PRINT_OOCH ('+', 1);
+			else if (flagc & FLAGC_SPACE) PRINT_OOCH (' ', 1);
+
+			if (!(flagc & FLAGC_LEFTADJ) && width > extra)
+			{
+				width -= extra;
+				PRINT_OOCH (padc, width);
+			}
+
+			if (nslen < scale + 1)
+			{
+				PRINT_OOCH ('0', 1);
+				if (precision > 0)
+				{
+					PRINT_OOCH ('.', 1);
+					PRINT_OOCH ('0', scale - nslen);
+					PRINT_OOCS (nsptr, nslen);
+				}
+			}
+			else
+			{
+				if (nslen > 0) PRINT_OOCS (nsptr, nslen - scale);
+				if (precision > 0) 
+				{
+					PRINT_OOCH ('.', 1);
+					if (nslen > 0) PRINT_OOCS (&nsptr[nslen - scale], scale);
+				}
+			}
+			if (precision > scale) 
+			{
+				/* trailing zeros in the fractional part */
+				PRINT_OOCH ('0', precision - scale);
+			}
+
+			if ((flagc & FLAGC_LEFTADJ) && width > extra)
+			{
+				width -= extra;
+				PRINT_OOCH (padc, width);
+			}
 			break;
 		}
 
@@ -1093,6 +1186,7 @@ static HCL_INLINE int print_formatted (hcl_t* hcl, hcl_ooi_t nargs, hcl_fmtout_t
 			nsptr = hcl->inttostr.xbuf.ptr;
 			nslen = hcl->inttostr.xbuf.len;
 
+			HCL_ASSERT (hcl, nslen > 0);
 			if (nsptr[0] == '-') 
 			{
 				/* a negative number was given. i must skip the minus sign 
