@@ -174,7 +174,7 @@ hcl_oop_t hcl_subnums (hcl_t* hcl, hcl_oop_t x, hcl_oop_t y)
 	}
 }
 
-hcl_oop_t hcl_mulnums (hcl_t* hcl, hcl_oop_t x, hcl_oop_t y)
+static hcl_oop_t mul_nums (hcl_t* hcl, hcl_oop_t x, hcl_oop_t y, int mult)
 {
 	hcl_ooi_t xs, ys, cs, ns;
 	hcl_oop_t nv;
@@ -212,7 +212,7 @@ hcl_oop_t hcl_mulnums (hcl_t* hcl, hcl_oop_t x, hcl_oop_t y)
 	cs = xs + ys; 
 	if (cs <= 0) return nv; /* the result must be an integer */
 
-	ns = (xs > ys)? xs: ys;
+	ns = (mult || xs > ys)? xs: ys;
 
 	/* cs may be larger than HCL_SMOOI_MAX. but ns is guaranteed to be
 	 * equal to or less than HCL_SMOOI_MAX */
@@ -222,6 +222,18 @@ hcl_oop_t hcl_mulnums (hcl_t* hcl, hcl_oop_t x, hcl_oop_t y)
 	if (!nv) return HCL_NULL;
 
 	return hcl_makefpdec(hcl, nv, ns);
+}
+
+hcl_oop_t hcl_mulnums (hcl_t* hcl, hcl_oop_t x, hcl_oop_t y)
+{
+	/* (* 1.00 12.123) => 12.123 */
+	return mul_nums(hcl, x, y, 0);
+}
+
+hcl_oop_t hcl_mltnums (hcl_t* hcl, hcl_oop_t x, hcl_oop_t y)
+{
+	/* (mlt 1.00 12.123) =>  12.12 */
+	return mul_nums(hcl, x, y, 1);
 }
 
 hcl_oop_t hcl_divnums (hcl_t* hcl, hcl_oop_t x, hcl_oop_t y)

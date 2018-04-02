@@ -984,6 +984,12 @@ hcl_oop_t hcl_mulnums (
 	hcl_oop_t    y
 );
 
+hcl_oop_t hcl_mltnums (
+	hcl_t*       hcl,
+	hcl_oop_t    x,
+	hcl_oop_t    y
+);
+
 hcl_oop_t hcl_divnums (
 	hcl_t*       hcl,
 	hcl_oop_t    x,

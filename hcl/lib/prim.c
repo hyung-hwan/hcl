@@ -376,7 +376,7 @@ static hcl_pfrc_t pf_or (hcl_t* hcl, hcl_mod_t* mod, hcl_ooi_t nargs)
 
 /* ------------------------------------------------------------------------- */
 
-static hcl_pfrc_t pf_integer_add (hcl_t* hcl, hcl_mod_t* mod, hcl_ooi_t nargs)
+static hcl_pfrc_t pf_number_add (hcl_t* hcl, hcl_mod_t* mod, hcl_ooi_t nargs)
 {
 	hcl_ooi_t i;
 	hcl_oop_t arg, ret;
@@ -394,7 +394,7 @@ static hcl_pfrc_t pf_integer_add (hcl_t* hcl, hcl_mod_t* mod, hcl_ooi_t nargs)
 	return HCL_PF_SUCCESS;
 }
 
-static hcl_pfrc_t pf_integer_sub (hcl_t* hcl, hcl_mod_t* mod, hcl_ooi_t nargs)
+static hcl_pfrc_t pf_number_sub (hcl_t* hcl, hcl_mod_t* mod, hcl_ooi_t nargs)
 {
 	hcl_ooi_t i;
 	hcl_oop_t arg, ret;
@@ -412,7 +412,7 @@ static hcl_pfrc_t pf_integer_sub (hcl_t* hcl, hcl_mod_t* mod, hcl_ooi_t nargs)
 	return HCL_PF_SUCCESS;
 }
 
-static hcl_pfrc_t pf_integer_mul (hcl_t* hcl, hcl_mod_t* mod, hcl_ooi_t nargs)
+static hcl_pfrc_t pf_number_mul (hcl_t* hcl, hcl_mod_t* mod, hcl_ooi_t nargs)
 {
 	hcl_ooi_t i;
 	hcl_oop_t arg, ret;
@@ -430,7 +430,24 @@ static hcl_pfrc_t pf_integer_mul (hcl_t* hcl, hcl_mod_t* mod, hcl_ooi_t nargs)
 	return HCL_PF_SUCCESS;
 }
 
-static hcl_pfrc_t pf_integer_div (hcl_t* hcl, hcl_mod_t* mod, hcl_ooi_t nargs)
+static hcl_pfrc_t pf_number_mlt (hcl_t* hcl, hcl_mod_t* mod, hcl_ooi_t nargs)
+{
+	hcl_ooi_t i;
+	hcl_oop_t arg, ret;
+
+	ret = HCL_STACK_GETARG(hcl, nargs, 0);
+	for (i = 1; i < nargs; i++)
+	{
+		arg = HCL_STACK_GETARG(hcl, nargs, i);
+		ret = hcl_mltnums(hcl, ret, arg);
+		if (!ret) return HCL_PF_FAILURE;
+	}
+
+	HCL_STACK_SETRET (hcl, nargs, ret);
+	return HCL_PF_SUCCESS;
+}
+
+static hcl_pfrc_t pf_number_div (hcl_t* hcl, hcl_mod_t* mod, hcl_ooi_t nargs)
 {
 	hcl_ooi_t i;
 	hcl_oop_t arg, ret;
@@ -447,7 +464,7 @@ static hcl_pfrc_t pf_integer_div (hcl_t* hcl, hcl_mod_t* mod, hcl_ooi_t nargs)
 	return HCL_PF_SUCCESS;
 }
 
-static hcl_pfrc_t pf_integer_quo (hcl_t* hcl, hcl_mod_t* mod, hcl_ooi_t nargs)
+static hcl_pfrc_t pf_number_quo (hcl_t* hcl, hcl_mod_t* mod, hcl_ooi_t nargs)
 {
 	hcl_ooi_t i;
 	hcl_oop_t arg, ret;
@@ -464,7 +481,7 @@ static hcl_pfrc_t pf_integer_quo (hcl_t* hcl, hcl_mod_t* mod, hcl_ooi_t nargs)
 	return HCL_PF_SUCCESS;
 }
 
-static hcl_pfrc_t pf_integer_rem (hcl_t* hcl, hcl_mod_t* mod, hcl_ooi_t nargs)
+static hcl_pfrc_t pf_number_rem (hcl_t* hcl, hcl_mod_t* mod, hcl_ooi_t nargs)
 {
 	hcl_ooi_t i;
 	hcl_oop_t arg, ret, rem;
@@ -482,7 +499,7 @@ static hcl_pfrc_t pf_integer_rem (hcl_t* hcl, hcl_mod_t* mod, hcl_ooi_t nargs)
 	return HCL_PF_SUCCESS;
 }
 
-static hcl_pfrc_t pf_integer_gt (hcl_t* hcl, hcl_mod_t* mod, hcl_ooi_t nargs)
+static hcl_pfrc_t pf_number_gt (hcl_t* hcl, hcl_mod_t* mod, hcl_ooi_t nargs)
 {
 	hcl_oop_t ret;
 	ret = hcl_gtnums(hcl, HCL_STACK_GETARG(hcl, nargs, 0), HCL_STACK_GETARG(hcl, nargs, 1));
@@ -493,7 +510,7 @@ static hcl_pfrc_t pf_integer_gt (hcl_t* hcl, hcl_mod_t* mod, hcl_ooi_t nargs)
 }
 
 
-static hcl_pfrc_t pf_integer_ge (hcl_t* hcl, hcl_mod_t* mod, hcl_ooi_t nargs)
+static hcl_pfrc_t pf_number_ge (hcl_t* hcl, hcl_mod_t* mod, hcl_ooi_t nargs)
 {
 	hcl_oop_t ret;
 	ret = hcl_genums(hcl, HCL_STACK_GETARG(hcl, nargs, 0), HCL_STACK_GETARG(hcl, nargs, 1));
@@ -503,7 +520,7 @@ static hcl_pfrc_t pf_integer_ge (hcl_t* hcl, hcl_mod_t* mod, hcl_ooi_t nargs)
 	return HCL_PF_SUCCESS;
 }
 
-static hcl_pfrc_t pf_integer_lt (hcl_t* hcl, hcl_mod_t* mod, hcl_ooi_t nargs)
+static hcl_pfrc_t pf_number_lt (hcl_t* hcl, hcl_mod_t* mod, hcl_ooi_t nargs)
 {
 	hcl_oop_t ret;
 	ret = hcl_ltnums(hcl, HCL_STACK_GETARG(hcl, nargs, 0), HCL_STACK_GETARG(hcl, nargs, 1));
@@ -512,7 +529,7 @@ static hcl_pfrc_t pf_integer_lt (hcl_t* hcl, hcl_mod_t* mod, hcl_ooi_t nargs)
 	HCL_STACK_SETRET (hcl, nargs, ret);
 	return HCL_PF_SUCCESS;
 }
-static hcl_pfrc_t pf_integer_le (hcl_t* hcl, hcl_mod_t* mod, hcl_ooi_t nargs)
+static hcl_pfrc_t pf_number_le (hcl_t* hcl, hcl_mod_t* mod, hcl_ooi_t nargs)
 {
 	hcl_oop_t ret;
 	ret = hcl_lenums(hcl, HCL_STACK_GETARG(hcl, nargs, 0), HCL_STACK_GETARG(hcl, nargs, 1));
@@ -521,7 +538,7 @@ static hcl_pfrc_t pf_integer_le (hcl_t* hcl, hcl_mod_t* mod, hcl_ooi_t nargs)
 	HCL_STACK_SETRET (hcl, nargs, ret);
 	return HCL_PF_SUCCESS;
 }
-static hcl_pfrc_t pf_integer_eq (hcl_t* hcl, hcl_mod_t* mod, hcl_ooi_t nargs)
+static hcl_pfrc_t pf_number_eq (hcl_t* hcl, hcl_mod_t* mod, hcl_ooi_t nargs)
 {
 	hcl_oop_t ret;
 	ret = hcl_eqnums(hcl, HCL_STACK_GETARG(hcl, nargs, 0), HCL_STACK_GETARG(hcl, nargs, 1));
@@ -530,7 +547,7 @@ static hcl_pfrc_t pf_integer_eq (hcl_t* hcl, hcl_mod_t* mod, hcl_ooi_t nargs)
 	HCL_STACK_SETRET (hcl, nargs, ret);
 	return HCL_PF_SUCCESS;
 }
-static hcl_pfrc_t pf_integer_ne (hcl_t* hcl, hcl_mod_t* mod, hcl_ooi_t nargs)
+static hcl_pfrc_t pf_number_ne (hcl_t* hcl, hcl_mod_t* mod, hcl_ooi_t nargs)
 {
 	hcl_oop_t ret;
 	ret = hcl_nenums(hcl, HCL_STACK_GETARG(hcl, nargs, 0), HCL_STACK_GETARG(hcl, nargs, 1));
@@ -561,19 +578,20 @@ static pf_t builtin_prims[] =
 	{ 2, 2,                       pf_nql,           4,  { 'n','q','l','?' } },
 	{ 2, 2,                       pf_nqk,           4,  { 'n','q','k','?' } },
 
-	{ 1, HCL_TYPE_MAX(hcl_oow_t), pf_integer_add,   1,  { '+' } },
-	{ 1, HCL_TYPE_MAX(hcl_oow_t), pf_integer_sub,   1,  { '-' } },
-	{ 1, HCL_TYPE_MAX(hcl_oow_t), pf_integer_mul,   1,  { '*' } },
-	{ 1, HCL_TYPE_MAX(hcl_oow_t), pf_integer_div,   1,  { '/' } },
-	{ 1, HCL_TYPE_MAX(hcl_oow_t), pf_integer_quo,   3,  { 'q','u','o' } },
-	{ 2, HCL_TYPE_MAX(hcl_oow_t), pf_integer_rem,   3,  { 'm','o','d' } },
+	{ 1, HCL_TYPE_MAX(hcl_oow_t), pf_number_add,    1,  { '+' } },
+	{ 1, HCL_TYPE_MAX(hcl_oow_t), pf_number_sub,    1,  { '-' } },
+	{ 1, HCL_TYPE_MAX(hcl_oow_t), pf_number_mul,    1,  { '*' } },
+	{ 1, HCL_TYPE_MAX(hcl_oow_t), pf_number_mlt,    3,  { 'm','l','t' } },
+	{ 1, HCL_TYPE_MAX(hcl_oow_t), pf_number_div,    1,  { '/' } },
+	{ 1, HCL_TYPE_MAX(hcl_oow_t), pf_number_quo,    3,  { 'q','u','o' } },
+	{ 2, HCL_TYPE_MAX(hcl_oow_t), pf_number_rem,    3,  { 'm','o','d' } },
 
-	{ 2, 2,                       pf_integer_gt,    1,  { '>' } },
-	{ 2, 2,                       pf_integer_ge,    2,  { '>','=' } },
-	{ 2, 2,                       pf_integer_lt,    1,  { '<' } },
-	{ 2, 2,                       pf_integer_le,    2,  { '<','=' } },
-	{ 2, 2,                       pf_integer_eq,    1,  { '=' } },
-	{ 2, 2,                       pf_integer_ne,    2,  { '/','=' } },
+	{ 2, 2,                       pf_number_gt,     1,  { '>' } },
+	{ 2, 2,                       pf_number_ge,     2,  { '>','=' } },
+	{ 2, 2,                       pf_number_lt,     1,  { '<' } },
+	{ 2, 2,                       pf_number_le,     2,  { '<','=' } },
+	{ 2, 2,                       pf_number_eq,     1,  { '=' } },
+	{ 2, 2,                       pf_number_ne,     2,  { '/','=' } },
 };
 
 
