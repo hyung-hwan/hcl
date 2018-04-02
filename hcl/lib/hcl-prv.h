@@ -997,6 +997,41 @@ hcl_oop_t hcl_truncfpdecval (
 	hcl_ooi_t    ns  /* new scale */
 );
 
+hcl_oop_t hcl_gtnums (
+	hcl_t*       hcl,
+	hcl_oop_t    x,
+	hcl_oop_t    y
+);
+
+hcl_oop_t hcl_genums (
+	hcl_t*       hcl,
+	hcl_oop_t    x,
+	hcl_oop_t    y
+);
+
+hcl_oop_t hcl_ltnums (
+	hcl_t*       hcl,
+	hcl_oop_t    x,
+	hcl_oop_t    y
+);
+
+hcl_oop_t hcl_lenums (
+	hcl_t*       hcl,
+	hcl_oop_t    x,
+	hcl_oop_t    y
+);
+
+hcl_oop_t hcl_eqnums (
+	hcl_t*       hcl,
+	hcl_oop_t    x,
+	hcl_oop_t    y
+);
+
+hcl_oop_t hcl_nenums (
+	hcl_t*       hcl,
+	hcl_oop_t    x,
+	hcl_oop_t    y
+);
 /* ========================================================================= */
 /* comp.c                                                                    */
 /* ========================================================================= */

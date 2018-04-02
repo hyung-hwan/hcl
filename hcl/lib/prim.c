@@ -485,7 +485,7 @@ static hcl_pfrc_t pf_integer_rem (hcl_t* hcl, hcl_mod_t* mod, hcl_ooi_t nargs)
 static hcl_pfrc_t pf_integer_gt (hcl_t* hcl, hcl_mod_t* mod, hcl_ooi_t nargs)
 {
 	hcl_oop_t ret;
-	ret = hcl_gtints(hcl, HCL_STACK_GETARG(hcl, nargs, 0), HCL_STACK_GETARG(hcl, nargs, 1));
+	ret = hcl_gtnums(hcl, HCL_STACK_GETARG(hcl, nargs, 0), HCL_STACK_GETARG(hcl, nargs, 1));
 	if (!ret) return HCL_PF_FAILURE;
 
 	HCL_STACK_SETRET (hcl, nargs, ret);
@@ -496,7 +496,7 @@ static hcl_pfrc_t pf_integer_gt (hcl_t* hcl, hcl_mod_t* mod, hcl_ooi_t nargs)
 static hcl_pfrc_t pf_integer_ge (hcl_t* hcl, hcl_mod_t* mod, hcl_ooi_t nargs)
 {
 	hcl_oop_t ret;
-	ret = hcl_geints(hcl, HCL_STACK_GETARG(hcl, nargs, 0), HCL_STACK_GETARG(hcl, nargs, 1));
+	ret = hcl_genums(hcl, HCL_STACK_GETARG(hcl, nargs, 0), HCL_STACK_GETARG(hcl, nargs, 1));
 	if (!ret) return HCL_PF_FAILURE;
 
 	HCL_STACK_SETRET (hcl, nargs, ret);
@@ -506,7 +506,7 @@ static hcl_pfrc_t pf_integer_ge (hcl_t* hcl, hcl_mod_t* mod, hcl_ooi_t nargs)
 static hcl_pfrc_t pf_integer_lt (hcl_t* hcl, hcl_mod_t* mod, hcl_ooi_t nargs)
 {
 	hcl_oop_t ret;
-	ret = hcl_ltints(hcl, HCL_STACK_GETARG(hcl, nargs, 0), HCL_STACK_GETARG(hcl, nargs, 1));
+	ret = hcl_ltnums(hcl, HCL_STACK_GETARG(hcl, nargs, 0), HCL_STACK_GETARG(hcl, nargs, 1));
 	if (!ret) return HCL_PF_FAILURE;
 
 	HCL_STACK_SETRET (hcl, nargs, ret);
@@ -515,7 +515,7 @@ static hcl_pfrc_t pf_integer_lt (hcl_t* hcl, hcl_mod_t* mod, hcl_ooi_t nargs)
 static hcl_pfrc_t pf_integer_le (hcl_t* hcl, hcl_mod_t* mod, hcl_ooi_t nargs)
 {
 	hcl_oop_t ret;
-	ret = hcl_leints(hcl, HCL_STACK_GETARG(hcl, nargs, 0), HCL_STACK_GETARG(hcl, nargs, 1));
+	ret = hcl_lenums(hcl, HCL_STACK_GETARG(hcl, nargs, 0), HCL_STACK_GETARG(hcl, nargs, 1));
 	if (!ret) return HCL_PF_FAILURE;
 
 	HCL_STACK_SETRET (hcl, nargs, ret);
@@ -524,7 +524,7 @@ static hcl_pfrc_t pf_integer_le (hcl_t* hcl, hcl_mod_t* mod, hcl_ooi_t nargs)
 static hcl_pfrc_t pf_integer_eq (hcl_t* hcl, hcl_mod_t* mod, hcl_ooi_t nargs)
 {
 	hcl_oop_t ret;
-	ret = hcl_eqints(hcl, HCL_STACK_GETARG(hcl, nargs, 0), HCL_STACK_GETARG(hcl, nargs, 1));
+	ret = hcl_eqnums(hcl, HCL_STACK_GETARG(hcl, nargs, 0), HCL_STACK_GETARG(hcl, nargs, 1));
 	if (!ret) return HCL_PF_FAILURE;
 
 	HCL_STACK_SETRET (hcl, nargs, ret);
@@ -533,7 +533,7 @@ static hcl_pfrc_t pf_integer_eq (hcl_t* hcl, hcl_mod_t* mod, hcl_ooi_t nargs)
 static hcl_pfrc_t pf_integer_ne (hcl_t* hcl, hcl_mod_t* mod, hcl_ooi_t nargs)
 {
 	hcl_oop_t ret;
-	ret = hcl_neints(hcl, HCL_STACK_GETARG(hcl, nargs, 0), HCL_STACK_GETARG(hcl, nargs, 1));
+	ret = hcl_nenums(hcl, HCL_STACK_GETARG(hcl, nargs, 0), HCL_STACK_GETARG(hcl, nargs, 1));
 	if (!ret) return HCL_PF_FAILURE;
 
 	HCL_STACK_SETRET (hcl, nargs, ret);

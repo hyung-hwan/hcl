@@ -275,3 +275,60 @@ hcl_oop_t hcl_divnums (hcl_t* hcl, hcl_oop_t x, hcl_oop_t y)
 
 	return hcl_makefpdec(hcl, nv, xs);
 }
+
+static hcl_oop_t comp_nums (hcl_t* hcl, hcl_oop_t x, hcl_oop_t y, hcl_oop_t (*comper) (hcl_t*, hcl_oop_t, hcl_oop_t))
+{
+	if (!HCL_IS_FPDEC(hcl, x) && !HCL_IS_FPDEC(hcl, y))
+	{
+		/* both are probably integers */
+		return comper(hcl, x, y);
+	}
+	else
+	{
+		hcl_oop_t v;
+		hcl_ooi_t scale;
+
+		hcl_pushtmp (hcl, &x);
+		hcl_pushtmp (hcl, &y);
+
+		scale = equalize_scale(hcl, &x, &y);
+		if (scale <= -1) 
+		{
+			hcl_poptmps (hcl, 2);
+			return HCL_NULL;
+		}
+		v = comper(hcl, ((hcl_oop_fpdec_t)x)->value, ((hcl_oop_fpdec_t)y)->value);
+		hcl_poptmps (hcl, 2);
+		return v;
+	}
+}
+
+
+hcl_oop_t hcl_gtnums (hcl_t* hcl, hcl_oop_t x, hcl_oop_t y)
+{
+	return comp_nums(hcl, x, y, hcl_gtints);
+}
+hcl_oop_t hcl_genums (hcl_t* hcl, hcl_oop_t x, hcl_oop_t y)
+{
+	return comp_nums(hcl, x, y, hcl_geints);
+}
+
+
+hcl_oop_t hcl_ltnums (hcl_t* hcl, hcl_oop_t x, hcl_oop_t y)
+{
+	return comp_nums(hcl, x, y, hcl_ltints);
+}
+hcl_oop_t hcl_lenums (hcl_t* hcl, hcl_oop_t x, hcl_oop_t y)
+{
+	return comp_nums(hcl, x, y, hcl_leints);
+}
+
+
+hcl_oop_t hcl_eqnums (hcl_t* hcl, hcl_oop_t x, hcl_oop_t y)
+{
+	return comp_nums(hcl, x, y, hcl_eqints);
+}
+hcl_oop_t hcl_nenums (hcl_t* hcl, hcl_oop_t x, hcl_oop_t y)
+{
+	return comp_nums(hcl, x, y, hcl_neints);
+}
