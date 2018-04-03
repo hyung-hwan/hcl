@@ -2035,7 +2035,7 @@ hcl_oop_t hcl_divints (hcl_t* hcl, hcl_oop_t x, hcl_oop_t y, int modulo, hcl_oop
 		}
 	}
 
-	x_neg = HCL_IS_PBIGINT(hcl, x);
+	x_neg = HCL_IS_NBIGINT(hcl, x);
 	y_neg = HCL_IS_NBIGINT(hcl, y);
 
 	hcl_pushtmp (hcl, &x);
