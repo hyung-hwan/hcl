@@ -335,7 +335,6 @@ hcl_oop_t hcl_lenums (hcl_t* hcl, hcl_oop_t x, hcl_oop_t y)
 	return comp_nums(hcl, x, y, hcl_leints);
 }
 
-
 hcl_oop_t hcl_eqnums (hcl_t* hcl, hcl_oop_t x, hcl_oop_t y)
 {
 	return comp_nums(hcl, x, y, hcl_eqints);
@@ -343,4 +342,26 @@ hcl_oop_t hcl_eqnums (hcl_t* hcl, hcl_oop_t x, hcl_oop_t y)
 hcl_oop_t hcl_nenums (hcl_t* hcl, hcl_oop_t x, hcl_oop_t y)
 {
 	return comp_nums(hcl, x, y, hcl_neints);
+}
+
+hcl_oop_t hcl_sqrtnum (hcl_t* hcl, hcl_oop_t x)
+{
+	if (!HCL_IS_FPDEC(hcl, x))
+	{
+		return hcl_sqrtint(hcl, x);
+	}
+	else
+	{
+		/* TODO: debug this part... this part is buggy. not complete yet */
+		hcl_oop_t v;
+		hcl_ooi_t scale;
+		
+		scale = HCL_OOP_TO_SMOOI(((hcl_oop_fpdec_t)x)->scale);
+		v = ((hcl_oop_fpdec_t)x)->value;
+
+		v = hcl_sqrtint(hcl, v);
+		if (!v) return HCL_NULL;
+
+		return hcl_makefpdec(hcl, v, scale / 2);
+	}
 }

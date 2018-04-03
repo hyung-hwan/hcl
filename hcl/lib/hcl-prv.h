@@ -940,6 +940,11 @@ hcl_oop_t hcl_leints (
 	hcl_oop_t y
 );
 
+hcl_oop_t hcl_sqrtint (
+	hcl_t*    hcl,
+	hcl_oop_t x
+);
+
 hcl_oop_t hcl_strtoint (
 	hcl_t*            hcl,
 	const hcl_ooch_t* str,
@@ -1038,6 +1043,13 @@ hcl_oop_t hcl_nenums (
 	hcl_oop_t    x,
 	hcl_oop_t    y
 );
+
+hcl_oop_t hcl_sqrtnum (
+	hcl_t*       hcl,
+	hcl_oop_t    x
+);
+
+
 /* ========================================================================= */
 /* comp.c                                                                    */
 /* ========================================================================= */

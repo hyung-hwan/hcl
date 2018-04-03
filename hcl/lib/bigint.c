@@ -3952,6 +3952,62 @@ oops_einval:
 	return HCL_NULL;
 }
 
+hcl_oop_t hcl_sqrtint (hcl_t* hcl, hcl_oop_t x)
+{
+	/* TODO: find a faster and more efficient algorithm??? */
+	hcl_oop_t a, b, m, m2, t;
+	
+	a = hcl->_nil;
+	b = hcl->_nil;
+	m = hcl->_nil;
+	m2 = hcl->_nil;
+
+	hcl_pushtmp (hcl, &x);
+	hcl_pushtmp (hcl, &a);
+	hcl_pushtmp (hcl, &b);
+	hcl_pushtmp (hcl, &m);
+	hcl_pushtmp (hcl, &m2);
+	
+	a = HCL_SMOOI_TO_OOP(1);
+	b = hcl_bitshiftint(hcl, x, HCL_SMOOI_TO_OOP(-5));
+	if (!b) goto oops;
+	b = hcl_addints(hcl, b, HCL_SMOOI_TO_OOP(8));
+	if (!b) goto oops;
+
+	while (1)
+	{
+		t = hcl_geints(hcl, b, a);
+		if (!t) return HCL_NULL;
+		if (t == hcl->_false) break;
+
+		m = hcl_addints(hcl, a, b);
+		if (!m) goto oops;
+		m = hcl_bitshiftint(hcl, m, HCL_SMOOI_TO_OOP(-1));
+		if (!m) goto oops;
+		m2 = hcl_mulints(hcl, m, m);
+		if (!m2) goto oops;
+		t = hcl_gtints(hcl, m2, x);
+		if (!t) return HCL_NULL;
+		if (t == hcl->_true)
+		{
+			b = hcl_subints(hcl, m, HCL_SMOOI_TO_OOP(1));
+			if (!b) goto oops;
+		}
+		else
+		{
+			a = hcl_addints(hcl, m, HCL_SMOOI_TO_OOP(1));
+			if (!a) goto oops;
+		}
+	}
+
+	hcl_poptmps (hcl, 5);
+	return hcl_subints(hcl, a, HCL_SMOOI_TO_OOP(1));
+
+oops:
+	hcl_poptmps (hcl, 5);
+	return HCL_NULL;
+}
+
 hcl_oop_t hcl_inttostr (hcl_t* hcl, hcl_oop_t num, int radix, int ngc)
 {
 	hcl_ooi_t v = 0;

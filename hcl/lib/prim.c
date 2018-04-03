@@ -499,6 +499,16 @@ static hcl_pfrc_t pf_number_rem (hcl_t* hcl, hcl_mod_t* mod, hcl_ooi_t nargs)
 	return HCL_PF_SUCCESS;
 }
 
+static hcl_pfrc_t pf_number_sqrt (hcl_t* hcl, hcl_mod_t* mod, hcl_ooi_t nargs)
+{
+	hcl_oop_t ret;
+	ret = hcl_sqrtnum(hcl, HCL_STACK_GETARG(hcl, nargs, 0)); /*TODO: change to hcl_sqrtnum()*/
+	if (!ret) return HCL_PF_FAILURE;
+
+	HCL_STACK_SETRET (hcl, nargs, ret);
+	return HCL_PF_SUCCESS;
+}
+
 static hcl_pfrc_t pf_number_gt (hcl_t* hcl, hcl_mod_t* mod, hcl_ooi_t nargs)
 {
 	hcl_oop_t ret;
@@ -585,6 +595,7 @@ static pf_t builtin_prims[] =
 	{ 1, HCL_TYPE_MAX(hcl_oow_t), pf_number_div,    1,  { '/' } },
 	{ 1, HCL_TYPE_MAX(hcl_oow_t), pf_number_quo,    3,  { 'q','u','o' } },
 	{ 2, HCL_TYPE_MAX(hcl_oow_t), pf_number_rem,    3,  { 'm','o','d' } },
+	{ 1, 1,                       pf_number_sqrt,   4,  { 's','q','r','t' } },
 
 	{ 2, 2,                       pf_number_gt,     1,  { '>' } },
 	{ 2, 2,                       pf_number_ge,     2,  { '>','=' } },
