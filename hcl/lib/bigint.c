@@ -3956,7 +3956,14 @@ hcl_oop_t hcl_sqrtint (hcl_t* hcl, hcl_oop_t x)
 {
 	/* TODO: find a faster and more efficient algorithm??? */
 	hcl_oop_t a, b, m, m2, t;
-	
+	int neg;
+
+	if (!hcl_isint(hcl, x)) 
+	{
+		hcl_seterrbfmt (hcl, HCL_EINVAL, "parameter not integer - %O", x);
+		return HCL_NULL;
+	}
+
 	a = hcl->_nil;
 	b = hcl->_nil;
 	m = hcl->_nil;
@@ -3967,7 +3974,19 @@ hcl_oop_t hcl_sqrtint (hcl_t* hcl, hcl_oop_t x)
 	hcl_pushtmp (hcl, &b);
 	hcl_pushtmp (hcl, &m);
 	hcl_pushtmp (hcl, &m2);
-	
+
+	a = hcl_ltints(hcl, x, HCL_SMOOI_TO_OOP(0));
+	if (!a) goto oops;
+	if (a == hcl->_true)
+	{
+		/* the given number is a negative number.
+		 * i will arrange the return value to be negative. */
+		x = hcl_negateint(hcl, x);
+		if (!x) goto oops;
+		neg = 1;
+	}
+	else neg = 0;
+
 	a = HCL_SMOOI_TO_OOP(1);
 	b = hcl_bitshiftint(hcl, x, HCL_SMOOI_TO_OOP(-5));
 	if (!b) goto oops;
@@ -4001,7 +4020,11 @@ hcl_oop_t hcl_sqrtint (hcl_t* hcl, hcl_oop_t x)
 	}
 
 	hcl_poptmps (hcl, 5);
-	return hcl_subints(hcl, a, HCL_SMOOI_TO_OOP(1));
+	x = hcl_subints(hcl, a, HCL_SMOOI_TO_OOP(1));
+	if (!x) return HCL_NULL;
+
+	if (neg) x = hcl_negateint(hcl, x);
+	return x;
 
 oops:
 	hcl_poptmps (hcl, 5);

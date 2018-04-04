@@ -352,16 +352,25 @@ hcl_oop_t hcl_sqrtnum (hcl_t* hcl, hcl_oop_t x)
 	}
 	else
 	{
-		/* TODO: debug this part... this part is buggy. not complete yet */
 		hcl_oop_t v;
-		hcl_ooi_t scale;
-		
+		hcl_ooi_t i, scale;
+
 		scale = HCL_OOP_TO_SMOOI(((hcl_oop_fpdec_t)x)->scale);
+
 		v = ((hcl_oop_fpdec_t)x)->value;
+		for (i = 0; i < scale ; i++)
+		{
+			v = hcl_mulints(hcl, v, HCL_SMOOI_TO_OOP(10));
+			if (!v)
+			{
+				hcl_poptmp (hcl);
+				return HCL_NULL;
+			}
+		}
 
 		v = hcl_sqrtint(hcl, v);
 		if (!v) return HCL_NULL;
 
-		return hcl_makefpdec(hcl, v, scale / 2);
+		return hcl_makefpdec(hcl, v, scale);
 	}
 }
