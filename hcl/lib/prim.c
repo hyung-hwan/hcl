@@ -657,11 +657,11 @@ static pf_t builtin_prims[] =
 	{ 2, 2,                       pf_number_ne,       2,  { '/','=' } },
 
 	/* bitwise operations are supported for integers only */
-	{ 2, 2,                       pf_integer_band,   11,  { 'b','i','t','w','i','s','e','-','a','n','d' } },
-	{ 2, 2,                       pf_integer_bor,    10,  { 'b','i','t','w','i','s','e','-','o','r' } },
-	{ 2, 2,                       pf_integer_bxor,   11,  { 'b','i','t','w','i','s','e','-','x','o','r' } },
-	{ 1, 1,                       pf_integer_bnot,   11,  { 'b','i','t','w','i','s','e','-','n','o','t' } },
-	{ 2, 2,                       pf_integer_bshift, 13,  { 'b','i','t','w','i','s','e','-','s','h','i','f','t'  } },
+	{ 2, 2,                       pf_integer_band,    7,  { 'b','i','t','-','a','n','d' } },
+	{ 2, 2,                       pf_integer_bor,     6,  { 'b','i','t','-','o','r' } },
+	{ 2, 2,                       pf_integer_bxor,    7,  { 'b','i','t','-','x','o','r' } },
+	{ 1, 1,                       pf_integer_bnot,    7,  { 'b','i','t','-','n','o','t' } },
+	{ 2, 2,                       pf_integer_bshift,  9,  { 'b','i','t','-','s','h','i','f','t'  } },
 };
 
 
