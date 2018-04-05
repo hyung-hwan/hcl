@@ -33,7 +33,7 @@ struct pf_t
 	hcl_pfimpl_t impl;
 
 	hcl_oow_t namelen;
-	hcl_ooch_t name[10];
+	hcl_ooch_t name[32];
 };
 typedef struct pf_t pf_t;
 
@@ -566,43 +566,102 @@ static hcl_pfrc_t pf_number_ne (hcl_t* hcl, hcl_mod_t* mod, hcl_ooi_t nargs)
 	HCL_STACK_SETRET (hcl, nargs, ret);
 	return HCL_PF_SUCCESS;
 }
+
+
+
+static hcl_pfrc_t pf_integer_band (hcl_t* hcl, hcl_mod_t* mod, hcl_ooi_t nargs)
+{
+	hcl_oop_t ret;
+	ret = hcl_bitandints(hcl, HCL_STACK_GETARG(hcl, nargs, 0), HCL_STACK_GETARG(hcl, nargs, 1));
+	if (!ret) return HCL_PF_FAILURE;
+
+	HCL_STACK_SETRET (hcl, nargs, ret);
+	return HCL_PF_SUCCESS;
+}
+
+static hcl_pfrc_t pf_integer_bor (hcl_t* hcl, hcl_mod_t* mod, hcl_ooi_t nargs)
+{
+	hcl_oop_t ret;
+	ret = hcl_bitorints(hcl, HCL_STACK_GETARG(hcl, nargs, 0), HCL_STACK_GETARG(hcl, nargs, 1));
+	if (!ret) return HCL_PF_FAILURE;
+
+	HCL_STACK_SETRET (hcl, nargs, ret);
+	return HCL_PF_SUCCESS;
+}
+static hcl_pfrc_t pf_integer_bxor (hcl_t* hcl, hcl_mod_t* mod, hcl_ooi_t nargs)
+{
+	hcl_oop_t ret;
+	ret = hcl_bitxorints(hcl, HCL_STACK_GETARG(hcl, nargs, 0), HCL_STACK_GETARG(hcl, nargs, 1));
+	if (!ret) return HCL_PF_FAILURE;
+
+	HCL_STACK_SETRET (hcl, nargs, ret);
+	return HCL_PF_SUCCESS;
+}
+static hcl_pfrc_t pf_integer_bnot (hcl_t* hcl, hcl_mod_t* mod, hcl_ooi_t nargs)
+{
+	hcl_oop_t ret;
+	ret = hcl_bitinvint(hcl, HCL_STACK_GETARG(hcl, nargs, 0));
+	if (!ret) return HCL_PF_FAILURE;
+
+	HCL_STACK_SETRET (hcl, nargs, ret);
+	return HCL_PF_SUCCESS;
+}
+static hcl_pfrc_t pf_integer_bshift (hcl_t* hcl, hcl_mod_t* mod, hcl_ooi_t nargs)
+{
+	hcl_oop_t ret;
+	ret = hcl_bitshiftint(hcl, HCL_STACK_GETARG(hcl, nargs, 0), HCL_STACK_GETARG(hcl, nargs, 1));
+	if (!ret) return HCL_PF_FAILURE;
+
+	HCL_STACK_SETRET (hcl, nargs, ret);
+	return HCL_PF_SUCCESS;
+}
+
 /* ------------------------------------------------------------------------- */
 
 static pf_t builtin_prims[] =
 {
-	{ 0, HCL_TYPE_MAX(hcl_oow_t), pf_log,           3,  { 'l','o','g' } },
-	{ 1, HCL_TYPE_MAX(hcl_oow_t), pf_logf,          4,  { 'l','o','g','f' } },
-	{ 1, HCL_TYPE_MAX(hcl_oow_t), pf_printf,        6,  { 'p','r','i','n','t','f' } },
-	{ 1, HCL_TYPE_MAX(hcl_oow_t), pf_sprintf,       7,  { 's','p','r','i','n','t','f' } },
+	{ 0, HCL_TYPE_MAX(hcl_oow_t), pf_log,             3,  { 'l','o','g' } },
+	{ 1, HCL_TYPE_MAX(hcl_oow_t), pf_logf,            4,  { 'l','o','g','f' } },
+	{ 1, HCL_TYPE_MAX(hcl_oow_t), pf_printf,          6,  { 'p','r','i','n','t','f' } },
+	{ 1, HCL_TYPE_MAX(hcl_oow_t), pf_sprintf,         7,  { 's','p','r','i','n','t','f' } },
 
-	{ 0, 0,                       pf_gc,            2,  { 'g','c' } },
+	{ 0, 0,                       pf_gc,              2,  { 'g','c' } },
 
-	{ 1, 1,                       pf_not,           3,  { 'n','o','t' } }, 
-	{ 2, HCL_TYPE_MAX(hcl_oow_t), pf_and,           4,  { '_','a','n','d' } },
-	{ 2, HCL_TYPE_MAX(hcl_oow_t), pf_or,            3,  { '_','o','r' } },
+	{ 1, 1,                       pf_not,             3,  { 'n','o','t' } }, 
+	/* this is a long-circuit logical and the short-curcuit 'and' is treated as a special form */
+	{ 2, HCL_TYPE_MAX(hcl_oow_t), pf_and,             4,  { '_','a','n','d' } },
+	/* this is a long-cirtuit logical or. the short-circuit 'or' is treated as a special form */
+	{ 2, HCL_TYPE_MAX(hcl_oow_t), pf_or,              3,  { '_','o','r' } },
 
-	{ 2, 2,                       pf_eqv,           4,  { 'e','q','v','?' } },
-	{ 2, 2,                       pf_eql,           4,  { 'e','q','l','?' } },
-	{ 2, 2,                       pf_eqk,           4,  { 'e','q','k','?' } },
-	{ 2, 2,                       pf_nqv,           4,  { 'n','q','v','?' } },
-	{ 2, 2,                       pf_nql,           4,  { 'n','q','l','?' } },
-	{ 2, 2,                       pf_nqk,           4,  { 'n','q','k','?' } },
+	{ 2, 2,                       pf_eqv,             4,  { 'e','q','v','?' } },
+	{ 2, 2,                       pf_eql,             4,  { 'e','q','l','?' } },
+	{ 2, 2,                       pf_eqk,             4,  { 'e','q','k','?' } },
+	{ 2, 2,                       pf_nqv,             4,  { 'n','q','v','?' } },
+	{ 2, 2,                       pf_nql,             4,  { 'n','q','l','?' } },
+	{ 2, 2,                       pf_nqk,             4,  { 'n','q','k','?' } },
 
-	{ 1, HCL_TYPE_MAX(hcl_oow_t), pf_number_add,    1,  { '+' } },
-	{ 1, HCL_TYPE_MAX(hcl_oow_t), pf_number_sub,    1,  { '-' } },
-	{ 1, HCL_TYPE_MAX(hcl_oow_t), pf_number_mul,    1,  { '*' } },
-	{ 1, HCL_TYPE_MAX(hcl_oow_t), pf_number_mlt,    3,  { 'm','l','t' } },
-	{ 1, HCL_TYPE_MAX(hcl_oow_t), pf_number_div,    1,  { '/' } },
-	{ 1, HCL_TYPE_MAX(hcl_oow_t), pf_number_quo,    3,  { 'q','u','o' } },
-	{ 2, HCL_TYPE_MAX(hcl_oow_t), pf_number_rem,    3,  { 'm','o','d' } },
-	{ 1, 1,                       pf_number_sqrt,   4,  { 's','q','r','t' } },
+	{ 1, HCL_TYPE_MAX(hcl_oow_t), pf_number_add,      1,  { '+' } },
+	{ 1, HCL_TYPE_MAX(hcl_oow_t), pf_number_sub,      1,  { '-' } },
+	{ 1, HCL_TYPE_MAX(hcl_oow_t), pf_number_mul,      1,  { '*' } },
+	{ 1, HCL_TYPE_MAX(hcl_oow_t), pf_number_mlt,      3,  { 'm','l','t' } },
+	{ 1, HCL_TYPE_MAX(hcl_oow_t), pf_number_div,      1,  { '/' } },
+	{ 1, HCL_TYPE_MAX(hcl_oow_t), pf_number_quo,      3,  { 'q','u','o' } },
+	{ 2, HCL_TYPE_MAX(hcl_oow_t), pf_number_rem,      3,  { 'm','o','d' } },
+	{ 1, 1,                       pf_number_sqrt,     4,  { 's','q','r','t' } },
 
-	{ 2, 2,                       pf_number_gt,     1,  { '>' } },
-	{ 2, 2,                       pf_number_ge,     2,  { '>','=' } },
-	{ 2, 2,                       pf_number_lt,     1,  { '<' } },
-	{ 2, 2,                       pf_number_le,     2,  { '<','=' } },
-	{ 2, 2,                       pf_number_eq,     1,  { '=' } },
-	{ 2, 2,                       pf_number_ne,     2,  { '/','=' } },
+	{ 2, 2,                       pf_number_gt,       1,  { '>' } },
+	{ 2, 2,                       pf_number_ge,       2,  { '>','=' } },
+	{ 2, 2,                       pf_number_lt,       1,  { '<' } },
+	{ 2, 2,                       pf_number_le,       2,  { '<','=' } },
+	{ 2, 2,                       pf_number_eq,       1,  { '=' } },
+	{ 2, 2,                       pf_number_ne,       2,  { '/','=' } },
+
+	/* bitwise operations are supported for integers only */
+	{ 2, 2,                       pf_integer_band,   11,  { 'b','i','t','w','i','s','e','-','a','n','d' } },
+	{ 2, 2,                       pf_integer_bor,    10,  { 'b','i','t','w','i','s','e','-','o','r' } },
+	{ 2, 2,                       pf_integer_bxor,   11,  { 'b','i','t','w','i','s','e','-','x','o','r' } },
+	{ 1, 1,                       pf_integer_bnot,   11,  { 'b','i','t','w','i','s','e','-','n','o','t' } },
+	{ 2, 2,                       pf_integer_bshift, 13,  { 'b','i','t','w','i','s','e','-','s','h','i','f','t'  } },
 };
 
 
