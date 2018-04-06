@@ -84,11 +84,11 @@ enum hcl_errnum_t
 	HCL_EIOERR,    /**< I/O error */
 	HCL_EECERR,    /**< encoding conversion error */
 	HCL_EBUFFULL,  /**< buffer full */
-	HCL_ESYNERR,  /**< syntax error */
-	HCL_ECALL,    /**< runtime error - cannot call */
+	HCL_ESYNERR,   /**< syntax error */
+	HCL_ECALL,     /**< runtime error - cannot call */
 	
-	HCL_ERECALL,  /**< runtime error - cannot call again */
-	HCL_ECALLARG  /**< runtime error - wrong number of arguments to call */
+	HCL_ERECALL,   /**< runtime error - cannot call again */
+	HCL_ECALLARG   /**< runtime error - wrong number of arguments to call */
 };
 typedef enum hcl_errnum_t hcl_errnum_t;
 

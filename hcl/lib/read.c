@@ -2407,7 +2407,7 @@ int hcl_unreadchar (hcl_t* hcl, const hcl_iolxc_t* c)
 {
 	if (hcl->c->nungots >= HCL_COUNTOF(hcl->c->ungot))
 	{
-		hcl_seterrnum (hcl, HCL_EBUFFULL);
+		hcl_seterrbfmt (hcl, HCL_EBUFFULL, "character unread buffer full");
 		return -1;
 	}
 

@@ -667,8 +667,6 @@ void hcl_seterrbfmt (hcl_t* hcl, hcl_errnum_t errnum, const hcl_bch_t* fmt, ...)
 	hcl_fmtout_t fo;
 
 	if (hcl->shuterr) return;
-
-	hcl->errnum = errnum;
 	hcl->errmsg.len = 0;
 
 	fo.mask = 0; /* not used */
@@ -678,6 +676,8 @@ void hcl_seterrbfmt (hcl_t* hcl, hcl_errnum_t errnum, const hcl_bch_t* fmt, ...)
 	va_start (ap, fmt);
 	_errbfmtv (hcl, fmt, &fo, ap);
 	va_end (ap);
+
+	hcl->errnum = errnum;
 }
 
 void hcl_seterrufmt (hcl_t* hcl, hcl_errnum_t errnum, const hcl_uch_t* fmt, ...)
@@ -686,8 +686,6 @@ void hcl_seterrufmt (hcl_t* hcl, hcl_errnum_t errnum, const hcl_uch_t* fmt, ...)
 	hcl_fmtout_t fo;
 
 	if (hcl->shuterr) return;
-
-	hcl->errnum = errnum;
 	hcl->errmsg.len = 0;
 
 	fo.mask = 0; /* not used */
@@ -697,6 +695,8 @@ void hcl_seterrufmt (hcl_t* hcl, hcl_errnum_t errnum, const hcl_uch_t* fmt, ...)
 	va_start (ap, fmt);
 	_errufmtv (hcl, fmt, &fo, ap);
 	va_end (ap);
+
+	hcl->errnum = errnum;
 }
 
 
@@ -705,8 +705,6 @@ void hcl_seterrbfmtv (hcl_t* hcl, hcl_errnum_t errnum, const hcl_bch_t* fmt, va_
 	hcl_fmtout_t fo;
 
 	if (hcl->shuterr) return;
-
-	hcl->errnum = errnum;
 	hcl->errmsg.len = 0;
 
 	fo.mask = 0; /* not used */
@@ -714,6 +712,7 @@ void hcl_seterrbfmtv (hcl_t* hcl, hcl_errnum_t errnum, const hcl_bch_t* fmt, va_
 	fo.putcs = put_errcs;
 
 	_errbfmtv (hcl, fmt, &fo, ap);
+	hcl->errnum = errnum;
 }
 
 void hcl_seterrufmtv (hcl_t* hcl, hcl_errnum_t errnum, const hcl_uch_t* fmt, va_list ap)
@@ -721,8 +720,6 @@ void hcl_seterrufmtv (hcl_t* hcl, hcl_errnum_t errnum, const hcl_uch_t* fmt, va_
 	hcl_fmtout_t fo;
 
 	if (hcl->shuterr) return;
-
-	hcl->errnum = errnum;
 	hcl->errmsg.len = 0;
 
 	fo.mask = 0; /* not used */
@@ -730,6 +727,7 @@ void hcl_seterrufmtv (hcl_t* hcl, hcl_errnum_t errnum, const hcl_uch_t* fmt, va_
 	fo.putcs = put_errcs;
 
 	_errufmtv (hcl, fmt, &fo, ap);
+	hcl->errnum = errnum;
 }
 
 /* -------------------------------------------------------------------------- 
