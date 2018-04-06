@@ -1810,8 +1810,7 @@ static int read_object (hcl_t* hcl)
 		switch (TOKEN_TYPE(hcl)) 
 		{
 			default:
-				hcl_seterrbfmt (hcl, HCL_EINTERN, "invalid token(type %d) encountered - %.*js", 
-					TOKEN_TYPE(hcl), TOKEN_NAME_LEN(hcl), TOKEN_NAME_PTR(hcl));
+				hcl_setsynerr (hcl, HCL_SYNERR_ILTOK, TOKEN_LOC(hcl), TOKEN_NAME(hcl));
 				return -1;
 
 			case HCL_IOTOK_EOF:

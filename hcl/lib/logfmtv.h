@@ -165,7 +165,8 @@ static int logfmtv (hcl_t* hcl, const fmtchar_t* fmt, hcl_fmtout_t* data, va_lis
 			/* fmtchar is uch. ooch is bch. convert uch to bch */
 			ucslen = 1;
 			bcslen = HCL_COUNTOF(bcsbuf);
-			if (hcl_convutooochars(hcl, &fch, &ucslen, bcsbuf, &bcslen) <= -1) goto oops;
+			/*if (hcl_convutooochars(hcl, &fch, &ucslen, bcsbuf, &bcslen) <= -1) goto oops;*/
+			if (hcl_conv_ucsn_to_bcsn_with_cmgr( &fch, &ucslen, bcsbuf, &bcslen, hcl->cmgr) <= -1) goto oops;
 			PUT_OOCS (bcsbuf, bcslen);
 		}
 		#endif
@@ -467,7 +468,8 @@ static int logfmtv (hcl_t* hcl, const fmtchar_t* fmt, hcl_fmtout_t* data, va_lis
 			/* get the length */
 			for (bslen = 0; bsp[bslen]; bslen++);
 
-			if (hcl_convbtooochars(hcl, bsp, &bslen, HCL_NULL, &slen) <= -1) goto oops;
+			/*if (hcl_convbtooochars(hcl, bsp, &bslen, HCL_NULL, &slen) <= -1) goto oops;*/
+			if (hcl_conv_bcsn_to_ucsn_with_cmgr(bsp, &bslen, HCL_NULL, &slen, hcl->cmgr, 0) <= -1) goto oops;
 
 			/* slen holds the length after conversion */
 			n = slen;
@@ -487,7 +489,8 @@ static int logfmtv (hcl_t* hcl, const fmtchar_t* fmt, hcl_fmtout_t* data, va_lis
 					conv_len = HCL_COUNTOF(conv_buf);
 
 					/* this must not fail since the dry-run above was successful */
-					hcl_convbtooochars (hcl, &bsp[tot_len], &src_len, conv_buf, &conv_len);
+					/*hcl_convbtooochars (hcl, &bsp[tot_len], &src_len, conv_buf, &conv_len);*/
+					hcl_conv_bcsn_to_ucsn_with_cmgr (&bsp[tot_len], &src_len, conv_buf, &conv_len, hcl->cmgr, 0);
 					tot_len += src_len;
 
 					if (conv_len > n) conv_len = n;
@@ -536,7 +539,8 @@ static int logfmtv (hcl_t* hcl, const fmtchar_t* fmt, hcl_fmtout_t* data, va_lis
 			/* get the length */
 			for (uslen = 0; usp[uslen]; uslen++);
 
-			if (hcl_convutooochars(hcl, usp, &uslen, HCL_NULL, &slen) <= -1) goto oops;
+			/*if (hcl_convutooochars(hcl, usp, &uslen, HCL_NULL, &slen) <= -1) goto oops;*/
+			if (hcl_conv_ucsn_to_bcsn_with_cmgr(usp, &uslen, HCL_NULL, &slen, hcl->cmgr) <= -1) goto oops;
 
 			/* slen holds the length after conversion */
 			n = slen;
@@ -555,7 +559,8 @@ static int logfmtv (hcl_t* hcl, const fmtchar_t* fmt, hcl_fmtout_t* data, va_lis
 					conv_len = HCL_COUNTOF(conv_buf);
 
 					/* this must not fail since the dry-run above was successful */
-					hcl_convutooochars (hcl, &usp[tot_len], &src_len, conv_buf, &conv_len);
+					/*hcl_convutooochars (hcl, &usp[tot_len], &src_len, conv_buf, &conv_len);*/
+					hcl_conv_ucsn_to_bcsn_with_cmgr (hcl, &usp[tot_len], &src_len, conv_buf, &conv_len, hcl->cmgr);
 					tot_len += src_len;
 
 					if (conv_len > n) conv_len = n;

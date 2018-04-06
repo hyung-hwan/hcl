@@ -85,6 +85,7 @@ static char* synerrstr[] =
 {
 	"no error",
 	"illegal character",
+	"illegal token",
 	"comment not closed",
 	"string/character not closed",
 	"invalid hashed literal",

@@ -96,6 +96,7 @@ enum hcl_synerrnum_t
 {
 	HCL_SYNERR_NOERR,
 	HCL_SYNERR_ILCHR,         /* illegal character */
+	HCL_SYNERR_ILTOK,         /* invalid token */
 	HCL_SYNERR_CMTNC,         /* comment not closed */
 	HCL_SYNERR_STRCHRNC,      /* string/character not closed */
 	HCL_SYNERR_HASHLIT,       /* wrong hashed literal */
