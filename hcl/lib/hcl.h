@@ -104,6 +104,7 @@ enum hcl_synerrnum_t
 	HCL_SYNERR_NUMRANGE,      /* number range error */
 	HCL_SYNERR_ERRORLIT,      /* wrong error literal */
 	HCL_SYNERR_SMPTRLIT,      /* wrong smptr literal */
+	HCL_SYNERR_MSEGIDENT,     /* wrong multi-segment identifier */
 
 	HCL_SYNERR_EOF,           /* sudden end of input */
 	HCL_SYNERR_LPAREN,        /* ( expected */
@@ -116,8 +117,14 @@ enum hcl_synerrnum_t
 	HCL_SYNERR_BYTERANGE,     /* byte too small or too large */
 	HCL_SYNERR_NESTING,       /* nesting level too deep */
 
+	HCL_SYNERR_COMMA,         /* , expected */
 	HCL_SYNERR_VBARBANNED,    /* | disallowed */
 	HCL_SYNERR_DOTBANNED,     /* . disallowed */
+	HCL_SYNERR_COMMABANNED,   /* , disallowed */
+	HCL_SYNERR_COLONBANNED,   /* : disallowed */
+	HCL_SYNERR_COMMANOVALUE,  /* no value after , */
+	HCL_SYNERR_COLONNOVALUE,  /* no value after : */
+	HCL_SYNERR_NOSEP,         /* no seperator between array/dictionary elements */
 	HCL_SYNERR_INCLUDE,       /* #include error */
 
 	HCL_SYNERR_LOOPFLOOD,     /* loop body too big */

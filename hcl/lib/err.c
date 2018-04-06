@@ -93,6 +93,7 @@ static char* synerrstr[] =
 	"out of integer range",
 	"wrong error literal",
 	"wrong smptr literal",
+	"wrong multi-segment identifer",
 
 	"sudden end of input",
 	"( expected",
@@ -105,8 +106,14 @@ static char* synerrstr[] =
 	"byte too small or too large",
 	"nesting level too deep",
 
+	", expected",
 	"| disallowed",
 	". disallowed",
+	", disallowed",
+	": disallowed",
+	"no value after ,",
+	"no value after :",
+	"no separator between array/dictionary elements",
 	"#include error",
 
 	"loop body too big",

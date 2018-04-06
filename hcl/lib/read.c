@@ -45,12 +45,9 @@ static struct voca_t
 {
 	hcl_oow_t len;
 	hcl_ooch_t str[11];
-} vocas[] = {
-	
-	{  6, { '#','f','a','l','s','e'                                       } },
+} vocas[] = 
+{
 	{  8, { '#','i','n','c','l','u','d','e'                               } },
-	{  4, { '#','n','i','l'                                               } },
-	{  5, { '#','t','r','u','e'                                           } },
 	{ 11, { '#','\\','b','a','c','k','s','p','a','c','e'                  } },
 	{ 10, { '#','\\','l','i','n','e','f','e','e','d'                      } },
 	{  9, { '#','\\','n','e','w','l','i','n','e'                          } },
@@ -66,11 +63,7 @@ static struct voca_t
 
 enum voca_id_t
 {
-	VOCA_FALSE,
 	VOCA_INCLUDE,
-	VOCA_NIL,
-	VOCA_TRUE,
-
 	VOCA_BACKSPACE,
 	VOCA_LINEFEED,
 	VOCA_NEWLINE,
@@ -91,7 +84,10 @@ enum list_flag_t
 {
 	QUOTED     = (1 << 0),
 	DOTTED     = (1 << 1),
-	CLOSED     = (1 << 2)
+	COMMAED    = (1 << 2),
+	COLONED    = (1 << 3),
+	CLOSED     = (1 << 4),
+	JSON       = (1 << 5)
 };
 
 #define LIST_FLAG_GET_CONCODE(x) (((x) >> 8) & 0xFF)
@@ -776,9 +772,8 @@ static int get_sharp_token (hcl_t* hcl)
 	 * #\xHHHH  unicode character
 	 * #\UHHHH  unicode character
 	 * #\uHHHH  unicode character
-	 * #( )     array
 	 * #[ ]     byte array
-	 * #{ }     dictionary
+	 * #{ }     qlist
 	 */
 
 	switch (c)
@@ -933,22 +928,16 @@ static int get_sharp_token (hcl_t* hcl)
 			unget_char (hcl, &hcl->c->lxc);
 			break;
 
-		case '(': /* #( - array opener */
-			ADD_TOKEN_CHAR (hcl, '#');
-			ADD_TOKEN_CHAR(hcl, c);
-			SET_TOKEN_TYPE (hcl, HCL_IOTOK_APAREN);
-			break;
-
 		case '[': /* #[ - byte array opener */
 			ADD_TOKEN_CHAR (hcl, '#');
 			ADD_TOKEN_CHAR(hcl, c);
 			SET_TOKEN_TYPE (hcl, HCL_IOTOK_BAPAREN);
 			break;
 
-		case '{': /* #{ - dictionary opener */
+		case '{': /* #{ - qlist opener */
 			ADD_TOKEN_CHAR (hcl, '#');
 			ADD_TOKEN_CHAR(hcl, c);
-			SET_TOKEN_TYPE (hcl, HCL_IOTOK_DPAREN);
+			SET_TOKEN_TYPE (hcl, HCL_IOTOK_QLPAREN);
 			break;
 
 		default:
@@ -972,18 +961,6 @@ static int get_sharp_token (hcl_t* hcl)
 			{
 				SET_TOKEN_TYPE (hcl, HCL_IOTOK_INCLUDE);
 			}
-			else if (does_token_name_match (hcl, VOCA_NIL))
-			{
-				SET_TOKEN_TYPE (hcl, HCL_IOTOK_NIL);
-			}
-			else if (does_token_name_match (hcl, VOCA_TRUE))
-			{
-				SET_TOKEN_TYPE (hcl, HCL_IOTOK_TRUE);
-			}
-			else if (does_token_name_match (hcl, VOCA_FALSE))
-			{
-				SET_TOKEN_TYPE (hcl, HCL_IOTOK_FALSE);
-			}
 			else
 			{
 				hcl_setsynerrbfmt (hcl, HCL_SYNERR_HASHLIT, TOKEN_LOC(hcl), TOKEN_NAME(hcl),
@@ -996,6 +973,29 @@ static int get_sharp_token (hcl_t* hcl)
 	}
 
 	return 0;
+}
+
+static hcl_iotok_type_t classify_ident_token (hcl_t* hcl, const hcl_oocs_t* v)
+{
+	hcl_oow_t i;
+	struct 
+	{
+		hcl_oow_t len;
+		hcl_ooch_t name[10];
+		hcl_iotok_type_t type;
+	} tab[] =
+	{
+		{ 4, { 'n','u','l','l' },     HCL_IOTOK_NIL },
+		{ 4, { 't','r','u','e' },     HCL_IOTOK_TRUE },
+		{ 5, { 'f','a','l','s','e' }, HCL_IOTOK_FALSE }
+	};
+
+	for (i = 0; i < HCL_COUNTOF(tab); i++)
+	{
+		if (hcl_compoochars(v->ptr, v->len, tab[i].name, tab[i].len) == 0) return tab[i].type;
+	}
+
+	return HCL_IOTOK_IDENT;
 }
 
 static int get_token (hcl_t* hcl)
@@ -1074,6 +1074,16 @@ retry:
 
 		case '.':
 			SET_TOKEN_TYPE (hcl, HCL_IOTOK_DOT);
+			ADD_TOKEN_CHAR (hcl, c);
+			break;
+
+		case ',':
+			SET_TOKEN_TYPE (hcl, HCL_IOTOK_COMMA);
+			ADD_TOKEN_CHAR (hcl, c);
+			break;
+
+		case ':':
+			SET_TOKEN_TYPE (hcl, HCL_IOTOK_COLON);
 			ADD_TOKEN_CHAR (hcl, c);
 			break;
 
@@ -1190,6 +1200,15 @@ retry:
 				if (c == '.')
 				{
 					hcl_iolxc_t period;
+					hcl_iotok_type_t type;
+
+					type = classify_ident_token(hcl, TOKEN_NAME(hcl));
+					if (type != HCL_IOTOK_IDENT) 
+					{
+						SET_TOKEN_TYPE (hcl, type);
+						unget_char (hcl, &hcl->c->lxc);
+						break;
+					}
 
 					period = hcl->c->lxc;
 
@@ -1197,14 +1216,27 @@ retry:
 					GET_CHAR_TO (hcl, c);
 					if (!is_delimiter(c))
 					{
+						hcl_oow_t start;
+						hcl_oocs_t seg;
+
 						SET_TOKEN_TYPE (hcl, HCL_IOTOK_IDENT_DOTTED);
 						ADD_TOKEN_CHAR (hcl, '.');
+
+						start = TOKEN_NAME_LEN(hcl);
 						do
 						{
 							ADD_TOKEN_CHAR (hcl, c);
 							GET_CHAR_TO (hcl, c);
 						}
 						while (!is_delimiter(c));
+
+						seg.ptr = &TOKEN_NAME_CHAR(hcl,start);
+						seg.len = TOKEN_NAME_LEN(hcl) - start;
+						if (classify_ident_token(hcl, &seg) != HCL_IOTOK_IDENT) 
+						{
+							hcl_setsynerr (hcl, HCL_SYNERR_MSEGIDENT, TOKEN_LOC(hcl), TOKEN_NAME(hcl));
+							return -1;
+						}
 
 						if (c == '.') goto read_more_seg;
 
@@ -1225,7 +1257,12 @@ retry:
 				}
 			}
 
-
+			if (TOKEN_TYPE(hcl) == HCL_IOTOK_IDENT)
+			{
+				hcl_iotok_type_t type;
+				type = classify_ident_token(hcl, TOKEN_NAME(hcl));
+				SET_TOKEN_TYPE (hcl, type);
+			}
 			break;
 	}
 
@@ -1361,60 +1398,9 @@ static int end_include (hcl_t* hcl)
 	return 1; /* ended the included file successfully */
 }
 
-#if defined(USE_CONS_STACK)
-static HCL_INLINE hcl_oop_t push (hcl_t* hcl, hcl_oop_t obj)
-{
-	hcl_oop_t cons;
-
-	cons = hcl_makecons (hcl, obj, hcl->c->r.s);
-	if (cons == HCL_NULL) return HCL_NULL;
-
-	hcl->c->r.s = cons;
-
-	/* return the top of the stack which is the containing cons cell */
-	return cons;
-}
-
-static HCL_INLINE void pop (hcl_t* hcl)
-{
-	/* the stack is empty. called pop() more than push()? */
-	HCL_ASSERT (hcl, !HCL_IS_NIL(hcl,hcl->c->r.s));
-	hcl->c->r.s = HCL_CONS_CDR(hcl->c->r.s);
-}
-#endif
 
 static HCL_INLINE hcl_oop_t enter_list (hcl_t* hcl, int flagv)
 {
-#if defined(USE_CONS_STACK)
-	/* upon entering a list, it pushes three cells into a stack.
-	 *
-	 * stack(hcl->c->r.s)--+
-	 *                  V
-	 *             +---cons--+    
-	 *         +------  |  -------+
-	 *      car|   +---------+    |cdr
-	 *         V                  |
-	 *        nil#1               V
-	 *                          +---cons--+
-	 *                      +------  |  --------+
-	 *                   car|   +---------+     |cdr
-	 *                      v                   |
-	 *                     nil#2                V
-	 *                                       +---cons--+
-	 *                                   +------  | --------+
-	 *                                car|   +---------+    |cdr
-	 *                                   V                  |
-	 *                                flag number           V
-	 *                                                  previous stack top
-	 *
-	 * nil#1 to store the first element in the list.
-	 * nil#2 to store the last element in the list.
-	 * both to be updated in chain_to_list() as items are added.
-	 */
-	return (push(hcl, HCL_SMOOI_TO_OOP(flagv)) == HCL_NULL ||
-	        push(hcl, hcl->_nil) == HCL_NULL ||
-	        push(hcl, hcl->_nil) == HCL_NULL)? HCL_NULL: hcl->c->r.s;
-#else
 	hcl_oop_oop_t rsa;
 
 	/* upon entering a list, it pushes a frame of 4 slots.
@@ -1422,38 +1408,22 @@ static HCL_INLINE hcl_oop_t enter_list (hcl_t* hcl, int flagv)
 	 * rsa[1] stores the last element in the list.
 	 * both are updated in chain_to_list() as items are added. 
 	 * rsa[2] stores the flag value.
-	 * rsa[3] stores the pointer to the previous top frame. */
-	rsa = (hcl_oop_oop_t)hcl_makearray(hcl, 4, 0);
+	 * rsa[3] stores the pointer to the previous top frame. 
+	 * rsa[4] stores the number of elements in the list */
+	rsa = (hcl_oop_oop_t)hcl_makearray(hcl, 5, 0);
 	if (!rsa) return HCL_NULL;
 
 	rsa->slot[2] = HCL_SMOOI_TO_OOP(flagv);
 	rsa->slot[3] = hcl->c->r.s; /* push */
 	hcl->c->r.s = (hcl_oop_t)rsa; 
 
+	rsa->slot[4] = HCL_SMOOI_TO_OOP(0);
+
 	return hcl->c->r.s;
-#endif
 }
 
 static HCL_INLINE hcl_oop_t leave_list (hcl_t* hcl, int* flagv, int* oldflagv)
 {
-#if defined(USE_CONS_STACK)
-	hcl_oop_t head;
-	int fv, concode;
-
-	/* the stack must not be empty - cannot leave a list without entering it */
-	HCL_ASSERT (hcl, !HCL_IS_NIL(hcl,hcl->c->r.s));
-	/*head = HCL_CONS_CAR(HCL_CONS_CDR(hcl->c->r.s));*/
-
-	/* upon leaving a list, it pops the three cells off the stack */
-	pop (hcl);
-
-	head = HCL_CONS_CAR(hcl->c->r.s);
-	pop (hcl);
-
-	fv = HCL_OOP_TO_SMOOI(HCL_CONS_CAR(hcl->c->r.s));
-	concode = LIST_FLAG_GET_CONCODE(fv);
-	pop (hcl);
-#else
 	hcl_oop_oop_t rsa;
 	hcl_oop_t head;
 	int fv, concode;
@@ -1470,7 +1440,12 @@ static HCL_INLINE hcl_oop_t leave_list (hcl_t* hcl, int* flagv, int* oldflagv)
 
 	hcl->c->r.s = rsa->slot[3]; /* pop off  */
 	rsa->slot[3] = hcl->_nil;
-#endif
+
+	if (fv & (COMMAED | COLONED))
+	{
+		hcl_setsynerr (hcl, ((fv & COMMAED)? HCL_SYNERR_COMMANOVALUE: HCL_SYNERR_COLONNOVALUE), TOKEN_LOC(hcl), HCL_NULL);
+		return HCL_NULL;
+	}
 
 #if 0
 	/* TODO: literalize the list if all the elements are all literals */
@@ -1524,15 +1499,9 @@ done:
 	else
 	{
 		/* restore the flag for the outer returning level */
-#if defined(USE_CONS_STACK)
-		hcl_oop_t flag = HCL_CONS_CDR(HCL_CONS_CDR(hcl->c->r.s));
-		HCL_ASSERT (hcl, HCL_OOP_IS_SMOOI(HCL_CONS_CAR(flag)));
-		*flagv = HCL_OOP_TO_SMOOI(HCL_CONS_CAR(flag));
-#else
 		rsa = (hcl_oop_oop_t)hcl->c->r.s;
 		HCL_ASSERT (hcl, HCL_OOP_IS_SMOOI(rsa->slot[2]));
 		*flagv = HCL_OOP_TO_SMOOI(rsa->slot[2]);
-#endif
 	}
 
 	/* return the head of the list being left */
@@ -1562,24 +1531,9 @@ done:
 
 static HCL_INLINE int can_dot_list (hcl_t* hcl)
 {
-#if defined(USE_CONS_STACK)
-	hcl_oop_t cons;
-	int flagv;
-
-	HCL_ASSERT (hcl, !HCL_IS_NIL(hcl,hcl->c->r.s));
-
-	/* mark the state that a dot has appeared in the list */
-	cons = HCL_CONS_CDR(HCL_CONS_CDR(hcl->c->r.s));
-	flagv = HCL_OOP_TO_SMOOI(HCL_CONS_CAR(cons));
-
-	if (LIST_FLAG_GET_CONCODE(flagv) != HCL_CONCODE_QLIST) return 0;
-
-	flagv |= DOTTED;
-	HCL_CONS_CAR(cons) = HCL_SMOOI_TO_OOP(flagv);
-	return 1;
-#else
 	hcl_oop_oop_t rsa;
 	int flagv;
+	hcl_ooi_t count;
 
 	HCL_ASSERT (hcl, !HCL_IS_NIL(hcl,hcl->c->r.s));
 
@@ -1587,38 +1541,96 @@ static HCL_INLINE int can_dot_list (hcl_t* hcl)
 	rsa = (hcl_oop_oop_t)hcl->c->r.s;
 	HCL_ASSERT (hcl, HCL_OOP_IS_SMOOI(rsa->slot[2]));
 	flagv = HCL_OOP_TO_SMOOI(rsa->slot[2]);
+	count = HCL_OOP_TO_SMOOI(rsa->slot[4]);
 
+	if (count <= 0) return 0;
 	if (LIST_FLAG_GET_CONCODE(flagv) != HCL_CONCODE_QLIST) return 0;
 
 	flagv |= DOTTED;
 	rsa->slot[2] = HCL_SMOOI_TO_OOP(flagv);
 	return 1;
-#endif
+}
+
+static HCL_INLINE int can_comma_list (hcl_t* hcl)
+{
+	hcl_oop_oop_t rsa;
+	int flagv;
+	hcl_ooi_t count;
+
+	HCL_ASSERT (hcl, !HCL_IS_NIL(hcl,hcl->c->r.s));
+
+	rsa = (hcl_oop_oop_t)hcl->c->r.s;
+	HCL_ASSERT (hcl, HCL_OOP_IS_SMOOI(rsa->slot[2]));
+	flagv = HCL_OOP_TO_SMOOI(rsa->slot[2]);
+	count = HCL_OOP_TO_SMOOI(rsa->slot[4]);
+
+	if (count <= 0) return 0;
+	if (count == 1) flagv |= JSON;
+	else if (!(flagv & JSON)) return 0;
+	if (flagv & (COMMAED | COLONED)) return 0;
+
+	if (LIST_FLAG_GET_CONCODE(flagv) == HCL_CONCODE_DIC)
+	{
+		if (count & 1) return 0;
+	}
+	else if (LIST_FLAG_GET_CONCODE(flagv) != HCL_CONCODE_ARRAY && 
+	         LIST_FLAG_GET_CONCODE(flagv) != HCL_CONCODE_BYTEARRAY)
+	{
+		return 0;
+	}
+
+	flagv |= COMMAED;
+	rsa->slot[2] = HCL_SMOOI_TO_OOP(flagv);
+	return 1;
+}
+
+static HCL_INLINE int can_colon_list (hcl_t* hcl)
+{
+	hcl_oop_oop_t rsa;
+	int flagv;
+	hcl_ooi_t count;
+
+	HCL_ASSERT (hcl, !HCL_IS_NIL(hcl,hcl->c->r.s));
+
+	/* mark the state that a dot has appeared in the list */
+	rsa = (hcl_oop_oop_t)hcl->c->r.s;
+	HCL_ASSERT (hcl, HCL_OOP_IS_SMOOI(rsa->slot[2]));
+	flagv = HCL_OOP_TO_SMOOI(rsa->slot[2]);
+	count = HCL_OOP_TO_SMOOI(rsa->slot[4]);
+
+	if (count <= 0) return 0;
+	if (count == 1) flagv |= JSON;
+	else if (!(flagv & JSON)) return 0;
+
+	if (flagv & (COMMAED | COLONED)) return 0;
+
+	if (LIST_FLAG_GET_CONCODE(flagv) != HCL_CONCODE_DIC) return 0;
+
+	count = HCL_OOP_TO_SMOOI(rsa->slot[4]);
+	if (!(count & 1)) return 0;
+
+	flagv |= COMMAED;
+	rsa->slot[2] = HCL_SMOOI_TO_OOP(flagv);
+	return 1;
+}
+
+static HCL_INLINE void clear_comma_colon_flag (hcl_t* hcl)
+{
+	hcl_oop_oop_t rsa;
+	int flagv;
+
+	HCL_ASSERT (hcl, !HCL_IS_NIL(hcl,hcl->c->r.s));
+
+	rsa = (hcl_oop_oop_t)hcl->c->r.s;
+	HCL_ASSERT (hcl, HCL_OOP_IS_SMOOI(rsa->slot[2]));
+	flagv = HCL_OOP_TO_SMOOI(rsa->slot[2]);
+
+	flagv &= ~(COMMAED | COLONED);
+	rsa->slot[2] = HCL_SMOOI_TO_OOP(flagv);
 }
 
 static hcl_oop_t chain_to_list (hcl_t* hcl, hcl_oop_t obj)
 {
-#if defined(USE_CONS_STACK)
-	hcl_oop_t head, tail, flag;
-	int flagv;
-
-	/* the stack top is the pair pointing to the list tail */
-	tail = hcl->c->r.s;
-	HCL_ASSERT (hcl, !HCL_IS_NIL(hcl,tail));
-
-	/* the pair pointing to the list head is below the tail cell
-	 * connected via cdr. */
-	head = HCL_CONS_CDR(tail);
-	HCL_ASSERT (hcl, !HCL_IS_NIL(hcl,head));
-
-	/* the pair pointing to the flag is below the head cell
-	 * connected via cdr */
-	flag = HCL_CONS_CDR(head);
-
-	/* retrieve the numeric flag value */
-	HCL_ASSERT (hcl, HCL_OOP_IS_SMOOI(HCL_CONS_CAR(flag)));
-	flagv = (int)HCL_OOP_TO_SMOOI(HCL_CONS_CAR(flag));
-#else
 	hcl_oop_oop_t rsa;
 	int flagv;
 
@@ -1626,7 +1638,6 @@ static hcl_oop_t chain_to_list (hcl_t* hcl, hcl_oop_t obj)
 	rsa = (hcl_oop_oop_t)hcl->c->r.s;
 	HCL_ASSERT (hcl, HCL_OOP_IS_SMOOI(rsa->slot[2]));
 	flagv = (int)HCL_OOP_TO_SMOOI(rsa->slot[2]);
-#endif
 
 	if (flagv & CLOSED)
 	{
@@ -1641,18 +1652,8 @@ static hcl_oop_t chain_to_list (hcl_t* hcl, hcl_oop_t obj)
 	}
 	else if (flagv & DOTTED)
 	{
-#if defined(USE_CONS_STACK)
-		/* the list must not be empty to have reached the dotted state */
-		HCL_ASSERT (hcl, !HCL_IS_NIL(hcl,HCL_CONS_CAR(tail)));
+		hcl_ooi_t count;
 
-		/* chain the object via 'cdr' of the tail cell */
-		HCL_CONS_CDR(HCL_CONS_CAR(tail)) = obj;
-
-		/* update the flag to CLOSED so that you can have more than
-		 * one item after the dot. */
-		flagv |= CLOSED;
-		HCL_CONS_CAR(flag) = HCL_SMOOI_TO_OOP(flagv);
-#else
 		/* the list must not be empty to have reached the dotted state */
 		HCL_ASSERT (hcl, !HCL_IS_NIL(hcl,rsa->slot[1]));
 
@@ -1663,36 +1664,25 @@ static hcl_oop_t chain_to_list (hcl_t* hcl, hcl_oop_t obj)
 		 * one item after the dot. */
 		flagv |= CLOSED;
 		rsa->slot[2] = HCL_SMOOI_TO_OOP(flagv);
-#endif
+
+		count = HCL_OOP_TO_SMOOI(rsa->slot[4]) + 1;
+		rsa->slot[4] = HCL_SMOOI_TO_OOP(count);
 	}
 	else
 	{
 		hcl_oop_t cons;
+		hcl_ooi_t count;
 
-#if defined(USE_CONS_STACK)
-		hcl_pushtmp (hcl, &head);
-		hcl_pushtmp (hcl, &tail);
-		cons = hcl_makecons(hcl, obj, hcl->_nil);
-		hcl_poptmps (hcl, 2);
-		if (cons == HCL_NULL) return HCL_NULL;
+		count = HCL_OOP_TO_SMOOI(rsa->slot[4]);
 
-		if (HCL_IS_NIL(hcl, HCL_CONS_CAR(head)))
+		if ((flagv & JSON) && count > 0 && !(flagv & (COMMAED | COLONED)))
 		{
-			/* the list head is not set yet. it is the first
-			 * element added to the list. let both head and tail
-			 * point to the new cons cell */
-			HCL_ASSERT (hcl, HCL_IS_NIL (hcl, HCL_CONS_CAR(tail)));
-			HCL_CONS_CAR(head) = cons; 
-			HCL_CONS_CAR(tail) = cons;
+			/* there is no separator between array/dictionary elements 
+			 * for instance, [1 2] { 10 20 } */
+			hcl_setsynerr (hcl, HCL_SYNERR_NOSEP, TOKEN_LOC(hcl), HCL_NULL);
+			return HCL_NULL;
 		}
-		else
-		{
-			/* the new cons cell is not the first element.
-			 * append it to the list */
-			HCL_CONS_CDR(HCL_CONS_CAR(tail)) = cons;
-			HCL_CONS_CAR(tail) = cons;
-		}
-#else
+
 		hcl_pushtmp (hcl, (hcl_oop_t*)&rsa);
 		cons = hcl_makecons(hcl, obj, hcl->_nil);
 		hcl_poptmp (hcl);
@@ -1714,103 +1704,25 @@ static hcl_oop_t chain_to_list (hcl_t* hcl, hcl_oop_t obj)
 			HCL_CONS_CDR(rsa->slot[1]) = cons;
 			rsa->slot[1] = cons;
 		}
-#endif
+
+		count++;
+		rsa->slot[4] = HCL_SMOOI_TO_OOP(count);
 	}
 
 	return obj;
 }
 
+#if 0
 static HCL_INLINE int is_list_empty (hcl_t* hcl)
 {
-#if defined(USE_CONS_STACK)
-	/* the stack must not be empty */
-	HCL_ASSERT (hcl, !HCL_IS_NIL(hcl,hcl->c->r.s));
-
-	/* if the tail pointer is pointing to nil, the list is empty */
-	return HCL_IS_NIL(hcl,HCL_CONS_CAR(hcl->c->r.s));
-#else
 	hcl_oop_oop_t rsa;
 	/* the stack must not be empty */
 	HCL_ASSERT (hcl, !HCL_IS_NIL(hcl,hcl->c->r.s));
 	rsa = (hcl_oop_oop_t)hcl->c->r.s;
 	/* if the tail pointer is pointing to nil, the list is empty */
 	return HCL_IS_NIL(hcl, rsa->slot[1]);
+}
 #endif
-}
-
-static int add_to_byte_array_literal_buffer (hcl_t* hcl, hcl_oob_t b)
-{
-	if (hcl->c->r.balit.size >= hcl->c->r.balit.capa)
-	{
-		hcl_oob_t* tmp;
-		hcl_oow_t new_capa;
-
-		new_capa = HCL_ALIGN (hcl->c->r.balit.size + 1, BALIT_BUFFER_ALIGN);
-		tmp = (hcl_oob_t*)hcl_reallocmem (hcl, hcl->c->r.balit.ptr, new_capa * HCL_SIZEOF(*tmp));
-		if (!tmp) return -1;
-
-		hcl->c->r.balit.capa = new_capa;
-		hcl->c->r.balit.ptr = tmp;
-	}
-
-/* TODO: overflow check of hcl->c->r.balit.size itself */
-	hcl->c->r.balit.ptr[hcl->c->r.balit.size++] = b;
-	return 0;
-}
-
-static int get_byte_array_literal (hcl_t* hcl, hcl_oop_t* xlit)
-{
-	hcl_ooi_t tmp;
-	hcl_oop_t ba;
-
-	HCL_ASSERT (hcl, hcl->c->r.balit.size == 0);
-
-	HCL_ASSERT (hcl, TOKEN_TYPE(hcl) == HCL_IOTOK_BAPAREN);
-	GET_TOKEN(hcl); /* skip #[ */
-
-	while (TOKEN_TYPE(hcl) == HCL_IOTOK_NUMLIT || TOKEN_TYPE(hcl) == HCL_IOTOK_RADNUMLIT)
-	{
-		/* TODO: check if the number is an integer */
-
-		if (string_to_ooi(hcl, TOKEN_NAME(hcl), TOKEN_TYPE(hcl) == HCL_IOTOK_RADNUMLIT, &tmp) <= -1)
-		{
-			/* the token reader reads a valid token. no other errors
-			 * than the range error must not occur */
-			HCL_ASSERT (hcl, hcl->errnum == HCL_ERANGE);
-
-			/* if the token is out of the SMOOI range, it's too big or 
-			 * to small to be a byte */
-			hcl_setsynerr (hcl, HCL_SYNERR_BYTERANGE, TOKEN_LOC(hcl), TOKEN_NAME(hcl));
-			return -1;
-		}
-		else if (tmp < 0 || tmp > 255)
-		{
-			hcl_setsynerr (hcl, HCL_SYNERR_BYTERANGE, TOKEN_LOC(hcl), TOKEN_NAME(hcl));
-			return -1;
-		}
-
-		if (add_to_byte_array_literal_buffer(hcl, tmp) <= -1) return -1;
-		GET_TOKEN (hcl);
-	}
-
-	if (TOKEN_TYPE(hcl) != HCL_IOTOK_RBRACK)
-	{
-		hcl_setsynerr (hcl, HCL_SYNERR_RBRACK, TOKEN_LOC(hcl), TOKEN_NAME(hcl));
-		return -1;
-	}
-
-	ba = hcl_makebytearray (hcl, hcl->c->r.balit.ptr, hcl->c->r.balit.size);
-	if (!ba) 
-	{
-		hcl->c->r.balit.size = 0; /* reset literal count... */
-		return -1;
-	}
-
-	*xlit = ba;
-
-	hcl->c->r.balit.size = 0; /* reset literal count... */
-	return 0;
-}
 
 
 static int add_to_symbol_array_literal_buffer (hcl_t* hcl, hcl_oop_t b)
@@ -1841,7 +1753,7 @@ static int get_symbol_array_literal (hcl_t* hcl, hcl_oop_t* xlit)
 	HCL_ASSERT (hcl, hcl->c->r.salit.size == 0);
 
 	HCL_ASSERT (hcl, TOKEN_TYPE(hcl) == HCL_IOTOK_VBAR);
-	GET_TOKEN(hcl); /* skip #[ */
+	GET_TOKEN(hcl);
 
 	while (TOKEN_TYPE(hcl) == HCL_IOTOK_IDENT /* || TOKEN_TYPE(hcl) == HCL_IOTOK_IDENT_DOTTED */)
 	{
@@ -1918,20 +1830,20 @@ static int read_object (hcl_t* hcl)
 				if (begin_include(hcl) <= -1) return -1;
 				goto redo;
 
-			case HCL_IOTOK_APAREN:
-				flagv = 0;
+			case HCL_IOTOK_LBRACK:
 				LIST_FLAG_SET_CONCODE (flagv, HCL_CONCODE_ARRAY);
 				goto start_list;
+			case HCL_IOTOK_LBRACE:
+				LIST_FLAG_SET_CONCODE (flagv, HCL_CONCODE_DIC);
+				goto start_list;
+
 			case HCL_IOTOK_BAPAREN:
 				flagv = 0;
 				LIST_FLAG_SET_CONCODE (flagv, HCL_CONCODE_BYTEARRAY);
 				goto start_list;
-			case HCL_IOTOK_DPAREN:
-				flagv = 0;
-				LIST_FLAG_SET_CONCODE (flagv, HCL_CONCODE_DIC);
-				goto start_list;
+
 #if 0
-			case HCL_IOTOK_LBRACK:
+			case HCL_IOTOK_QLBRACK:
 				flagv = 0;
 				LIST_FLAG_SET_CONCODE (flagv, HCL_CONCODE_QLIST);
 				goto start_list;
@@ -1958,7 +1870,7 @@ static int read_object (hcl_t* hcl)
 				goto redo;
 
 			case HCL_IOTOK_DOT:
-				if (level <= 0 || is_list_empty(hcl) || !can_dot_list(hcl))
+				if (level <= 0 || !can_dot_list(hcl))
 				{
 					/* cannot have a period:
 					 *   1. at the top level - not inside ()
@@ -1971,8 +1883,28 @@ static int read_object (hcl_t* hcl)
 				GET_TOKEN (hcl);
 				goto redo;
 
-			case HCL_IOTOK_RPAREN: /* xlist (), array #() */
-			case HCL_IOTOK_RBRACK: /* byte array #[], qlist[] */
+			case HCL_IOTOK_COLON:
+				if (level <= 0 || !can_colon_list(hcl))
+				{
+					hcl_setsynerr (hcl, HCL_SYNERR_COLONBANNED, TOKEN_LOC(hcl), HCL_NULL); 
+					return -1;
+				}
+
+				GET_TOKEN (hcl);
+				goto redo;
+
+			case HCL_IOTOK_COMMA:
+				if (level <= 0 || !can_comma_list(hcl))
+				{
+					hcl_setsynerr (hcl, HCL_SYNERR_COMMABANNED, TOKEN_LOC(hcl), HCL_NULL); 
+					return -1;
+				}
+
+				GET_TOKEN (hcl);
+				goto redo;
+
+			case HCL_IOTOK_RPAREN: /* xlist (), byte array #() */
+			case HCL_IOTOK_RBRACK: /* array #[], qlist[] */
 			case HCL_IOTOK_RBRACE: /* dictionary #{} */
 			{
 				static struct 
@@ -1982,10 +1914,10 @@ static int read_object (hcl_t* hcl)
 				} req[] =
 				{
 					{ HCL_IOTOK_RPAREN, HCL_SYNERR_RPAREN }, /* XLIST     ()  */
-					{ HCL_IOTOK_RPAREN, HCL_SYNERR_RPAREN }, /* ARRAY     #() */
+					{ HCL_IOTOK_RBRACK, HCL_SYNERR_RBRACK }, /* ARRAY     [] */
 					{ HCL_IOTOK_RBRACK, HCL_SYNERR_RBRACK }, /* BYTEARRAY #[] */
-					{ HCL_IOTOK_RBRACE, HCL_SYNERR_RBRACE }, /* DIC       #{} */
-					{ HCL_IOTOK_RBRACK, HCL_SYNERR_RBRACK }  /* QLIST     []  */
+					{ HCL_IOTOK_RBRACE, HCL_SYNERR_RBRACE }, /* DIC       {} */
+					{ HCL_IOTOK_RBRACE, HCL_SYNERR_RBRACE }  /* QLIST     ${}  */
 				};
 
 				int oldflagv;
@@ -2035,12 +1967,6 @@ static int read_object (hcl_t* hcl)
 				if (LIST_FLAG_GET_CONCODE(oldflagv) == HCL_CONCODE_ARRAY) array_level--;
 				break;
 			}
-
-#if 0
-			case HCL_IOTOK_BAPAREN:
-				if (get_byte_array_literal(hcl, &obj) <= -1) return -1;
-				break;
-#endif
 
 			case HCL_IOTOK_VBAR:
 /* TODO: think wheter to allow | | inside a quoted list... */
@@ -2225,6 +2151,7 @@ static int read_object (hcl_t* hcl)
 		/* if not, append the element read into the current list.
 		 * if we are not at the top level, we must be in a list */
 		if (chain_to_list(hcl, obj) == HCL_NULL) return -1;
+		clear_comma_colon_flag (hcl);
 
 		/* read the next token */
 		GET_TOKEN (hcl);

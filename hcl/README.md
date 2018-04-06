@@ -4,9 +4,12 @@
 
 A HCL program is composed of more expressions.
 
+## Keywords
+nil
+true
+false
 
 ## Special Form Expression
-
 * and
 * break
 * defun
@@ -21,11 +24,8 @@ A HCL program is composed of more expressions.
 * until
 * while
 
-## literals
 
-* #nil
-* #true
-* #false
+## literals
 * integer
 * character
 * small pointer

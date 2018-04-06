@@ -83,10 +83,6 @@ enum
 	WORD_TRUE,
 	WORD_FALSE,
 
-	WORD_NIL_JSON, /* this must be greater than WORD_NIL by 3 */
-	WORD_TRUE_JSON,  /* this must be greater than WORD_TRUE by 3 */
-	WORD_FALSE_JSON, /* this must be greater than WORD_FALSE by 3 */
-
 	WORD_SET,
 	WORD_CFRAME,
 	WORD_PRIM,
@@ -103,10 +99,6 @@ static struct
 	hcl_ooch_t ptr[20];
 } word[] =
 {
-	{  4,  { '#','n', 'i', 'l' } },
-	{  5,  { '#','t', 'r', 'u', 'e' } },
-	{  6,  { '#','f', 'a', 'l', 's', 'e' } },
-
 	{  4,  { 'n', 'u', 'l', 'l' } },
 	{  4,  { 't', 'r', 'u', 'e' } },
 	{  5,  { 'f', 'a', 'l', 's', 'e' } },
@@ -212,20 +204,20 @@ static HCL_INLINE int outfmt_obj (hcl_t* hcl, int mask, hcl_oop_t obj, hcl_outbf
 
 	static const hcl_bch_t *opening_parens[][2] =
 	{
-		{ "(",  "(" },   /*HCL_CONCODE_XLIST */
-		{ "#(", "[" },  /*HCL_CONCODE_ARRAY */
+		{ "(",  "(" },  /*HCL_CONCODE_XLIST */
+		{ "[",  "[" },  /*HCL_CONCODE_ARRAY */
 		{ "#[", "[" },  /*HCL_CONCODE_BYTEARRAY */
-		{ "#{", "{" },  /*HCL_CONCODE_DIC */
-		{ "[",  "]" }  /*HCL_CONCODE_QLIST */
+		{ "{",  "{" },  /*HCL_CONCODE_DIC */
+		{ "#{", "[" }   /*HCL_CONCODE_QLIST */
 	};
 
 	static const hcl_bch_t *closing_parens[][2] =
 	{
 		{ ")",  ")" },   /*HCL_CONCODE_XLIST */
-		{ ")",  "]" },   /*HCL_CONCODE_ARRAY */
+		{ "]",  "]" },   /*HCL_CONCODE_ARRAY */
 		{ "]",  "]" },   /*HCL_CONCODE_BYTEARRAY */
 		{ "}",  "}" },   /*HCL_CONCODE_DIC */
-		{ "]",  "]" }    /*HCL_CONCODE_QLIST */
+		{ "}",  "]" }    /*HCL_CONCODE_QLIST */
 	};
 
 	static const hcl_bch_t* breakers[][2] = 
@@ -261,15 +253,15 @@ next:
 		}
 
 		case HCL_BRAND_NIL:
-			word_index = WORD_NIL + (json * 3);
+			word_index = WORD_NIL;
 			goto print_word;
 
 		case HCL_BRAND_TRUE:
-			word_index = WORD_TRUE + (json * 3);
+			word_index = WORD_TRUE;
 			goto print_word;
 
 		case HCL_BRAND_FALSE:
-			word_index = WORD_FALSE + (json * 3);
+			word_index = WORD_FALSE;
 			goto print_word;
 
 		case HCL_BRAND_PBIGINT:
@@ -705,14 +697,14 @@ done:
 				goto resume_array;
 
 			case PRINT_STACK_ARRAY_END:
-				if (outbfmt(hcl, mask, ")") <= -1) return -1;
+				if (outbfmt(hcl, mask, closing_parens[HCL_CONCODE_ARRAY][json]) <= -1) return -1;
 				break;
 
 			case PRINT_STACK_DIC:
 				goto resume_dic;
 
 			case PRINT_STACK_DIC_END:
-				if (outbfmt(hcl, mask, "}") <= -1) return -1;
+				if (outbfmt(hcl, mask, closing_parens[HCL_CONCODE_BYTEARRAY][json]) <= -1) return -1;
 				break;
 
 			default:
