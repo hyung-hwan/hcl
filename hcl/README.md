@@ -5,9 +5,9 @@
 A HCL program is composed of more expressions.
 
 ## Keywords
-nil
-true
-false
+* nil
+* true
+* false
 
 ## Special Form Expression
 * and
@@ -37,6 +37,27 @@ false
 
 ## Builtin functions
 
+* not
+* _and
+* _or
 * eqv?
+* eql?
 * eqk?
+* nqv?
+* nql?
+* nqk?
+* sprintf
 * printf
+* +
+* -
+* *
+* mlt
+* /
+* quo
+* mod
+* sqrt
+* bit-and
+* bit-or
+* bit-xor
+* bit-not
+* bit-shift
