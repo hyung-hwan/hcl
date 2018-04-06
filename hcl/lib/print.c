@@ -704,7 +704,7 @@ done:
 				goto resume_dic;
 
 			case PRINT_STACK_DIC_END:
-				if (outbfmt(hcl, mask, closing_parens[HCL_CONCODE_BYTEARRAY][json]) <= -1) return -1;
+				if (outbfmt(hcl, mask, closing_parens[HCL_CONCODE_DIC][json]) <= -1) return -1;
 				break;
 
 			default:
