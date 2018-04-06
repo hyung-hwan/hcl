@@ -163,7 +163,7 @@ enum hcl_iotok_type_t
 	HCL_IOTOK_LPAREN,
 	HCL_IOTOK_RPAREN,
 	HCL_IOTOK_BAPAREN,  /* #[ */
-	HCL_IOTOK_QLPAREN,  /* #{ */
+	HCL_IOTOK_QLPAREN,  /* #( */
 	HCL_IOTOK_LBRACK,   /* [ */
 	HCL_IOTOK_RBRACK,   /* ] */
 	HCL_IOTOK_LBRACE,   /* { */

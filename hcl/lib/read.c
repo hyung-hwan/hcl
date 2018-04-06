@@ -934,7 +934,7 @@ static int get_sharp_token (hcl_t* hcl)
 			SET_TOKEN_TYPE (hcl, HCL_IOTOK_BAPAREN);
 			break;
 
-		case '{': /* #{ - qlist opener */
+		case '(': /* #( - qlist opener */
 			ADD_TOKEN_CHAR (hcl, '#');
 			ADD_TOKEN_CHAR(hcl, c);
 			SET_TOKEN_TYPE (hcl, HCL_IOTOK_QLPAREN);
@@ -1810,7 +1810,7 @@ static int read_object (hcl_t* hcl)
 		switch (TOKEN_TYPE(hcl)) 
 		{
 			default:
-				hcl_seterrbfmt (hcl, HCL_EINTERN, "invalid token encountered - %d %.*js", 
+				hcl_seterrbfmt (hcl, HCL_EINTERN, "invalid token(type %d) encountered - %.*js", 
 					TOKEN_TYPE(hcl), TOKEN_NAME_LEN(hcl), TOKEN_NAME_PTR(hcl));
 				return -1;
 
@@ -1830,25 +1830,28 @@ static int read_object (hcl_t* hcl)
 				if (begin_include(hcl) <= -1) return -1;
 				goto redo;
 
-			case HCL_IOTOK_LBRACK:
+			case HCL_IOTOK_LBRACK: /* [] */
+				flagv = 0;
 				LIST_FLAG_SET_CONCODE (flagv, HCL_CONCODE_ARRAY);
 				goto start_list;
-			case HCL_IOTOK_LBRACE:
-				LIST_FLAG_SET_CONCODE (flagv, HCL_CONCODE_DIC);
-				goto start_list;
 
-			case HCL_IOTOK_BAPAREN:
+			case HCL_IOTOK_BAPAREN: /* #[] */
 				flagv = 0;
 				LIST_FLAG_SET_CONCODE (flagv, HCL_CONCODE_BYTEARRAY);
 				goto start_list;
 
+			case HCL_IOTOK_LBRACE: /* {} */
+				flagv = 0;
+				LIST_FLAG_SET_CONCODE (flagv, HCL_CONCODE_DIC);
+				goto start_list;
+
 #if 0
-			case HCL_IOTOK_QLBRACK:
+			case HCL_IOTOK_QLPAREN: /* #() */
 				flagv = 0;
 				LIST_FLAG_SET_CONCODE (flagv, HCL_CONCODE_QLIST);
 				goto start_list;
 #endif
-			case HCL_IOTOK_LPAREN:
+			case HCL_IOTOK_LPAREN: /* () */
 				flagv = 0;
 				LIST_FLAG_SET_CONCODE (flagv, HCL_CONCODE_XLIST);
 			start_list:
@@ -1917,7 +1920,7 @@ static int read_object (hcl_t* hcl)
 					{ HCL_IOTOK_RBRACK, HCL_SYNERR_RBRACK }, /* ARRAY     [] */
 					{ HCL_IOTOK_RBRACK, HCL_SYNERR_RBRACK }, /* BYTEARRAY #[] */
 					{ HCL_IOTOK_RBRACE, HCL_SYNERR_RBRACE }, /* DIC       {} */
-					{ HCL_IOTOK_RBRACE, HCL_SYNERR_RBRACE }  /* QLIST     ${}  */
+					{ HCL_IOTOK_RPAREN, HCL_SYNERR_RPAREN }  /* QLIST     $()  */
 				};
 
 				int oldflagv;
