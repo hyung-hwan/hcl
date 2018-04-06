@@ -538,13 +538,13 @@ HCL_EXPORT int hcl_conv_utf8_to_ucstr (
 );
 
 
-HCL_EXPORT hcl_oow_t hcl_uctoutf8 (
+HCL_EXPORT hcl_oow_t hcl_uc_to_utf8 (
 	hcl_uch_t    uc,
 	hcl_bch_t*   utf8,
 	hcl_oow_t    size
 );
 
-HCL_EXPORT hcl_oow_t hcl_utf8touc (
+HCL_EXPORT hcl_oow_t hcl_utf8_to_uc (
 	const hcl_bch_t* utf8,
 	hcl_oow_t        size,
 	hcl_uch_t*       uc

@@ -777,13 +777,13 @@ hcl_oop_process_t hcl_makeproc (
 /* ========================================================================= */
 /* utf8.c                                                                    */
 /* ========================================================================= */
-hcl_oow_t hcl_uctoutf8 (
+hcl_oow_t hcl_uc_to_utf8 (
 	hcl_uch_t    uc,
 	hcl_bch_t*   utf8,
 	hcl_oow_t    size
 );
 
-hcl_oow_t hcl_utf8touc (
+hcl_oow_t hcl_utf8_to_uc (
 	const hcl_bch_t* utf8,
 	hcl_oow_t        size,
 	hcl_uch_t*       uc
@@ -797,7 +797,7 @@ int hcl_ucstoutf8 (
 );
 
 /**
- * The hcl_utf8toucs() function converts a UTF8 string to a uncide string.
+ * The hcl_utf8_to_ucs() function converts a UTF8 string to a uncide string.
  *
  * It never returns -2 if \a ucs is #HCL_NULL.
  *
@@ -807,7 +807,7 @@ int hcl_ucstoutf8 (
  *  hcl_oow_t ucslen = HCL_COUNTOF(buf), n;
  *  hcl_oow_t bcslen = 11;
  *  int n;
- *  n = hcl_utf8toucs (bcs, &bcslen, ucs, &ucslen);
+ *  n = hcl_utf8_to_ucs (bcs, &bcslen, ucs, &ucslen);
  *  if (n <= -1) { invalid/incomplenete sequence or buffer to small }
  * \endcode
  *
@@ -824,7 +824,7 @@ int hcl_ucstoutf8 (
  *         -2 if the wide-character string buffer is too small.
  *         -3 if \a bcs is not a complete sequence.
  */
-int hcl_utf8toucs (
+int hcl_utf8_to_ucs (
 	const hcl_bch_t*   bcs,
 	hcl_oow_t*         bcslen,
 	hcl_uch_t*         ucs,

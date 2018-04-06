@@ -79,7 +79,7 @@ static HCL_INLINE __utf8_t* get_utf8_slot (hcl_uch_t uc)
 	return HCL_NULL; /* invalid character */
 }
 
-hcl_oow_t hcl_uctoutf8 (hcl_uch_t uc, hcl_bch_t* utf8, hcl_oow_t size)
+hcl_oow_t hcl_uc_to_utf8 (hcl_uch_t uc, hcl_bch_t* utf8, hcl_oow_t size)
 {
 	__utf8_t* cur = get_utf8_slot (uc);
 
@@ -106,7 +106,7 @@ hcl_oow_t hcl_uctoutf8 (hcl_uch_t uc, hcl_bch_t* utf8, hcl_oow_t size)
 	return (hcl_oow_t)cur->length;
 }
 
-hcl_oow_t hcl_utf8touc (const hcl_bch_t* utf8, hcl_oow_t size, hcl_uch_t* uc)
+hcl_oow_t hcl_utf8_to_uc (const hcl_bch_t* utf8, hcl_oow_t size, hcl_uch_t* uc)
 {
 	__utf8_t* cur, * end;
 

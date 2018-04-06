@@ -687,8 +687,8 @@ HCL_INLINE int hcl_conv_ucs_to_bcs_with_cmgr (
 
 static hcl_cmgr_t utf8_cmgr =
 {
-	hcl_utf8touc,
-	hcl_uctoutf8
+	hcl_utf8_to_uc,
+	hcl_uc_to_utf8
 };
 
 hcl_cmgr_t* hcl_get_utf8_cmgr (void)
