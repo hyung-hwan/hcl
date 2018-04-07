@@ -371,6 +371,9 @@ static int copy_string_to (hcl_t* hcl, const hcl_oocs_t* src, hcl_oocs_t* dst, h
 #define GET_TOKEN_WITH_ERRRET(hcl, v_ret) \
 	do { if (get_token(hcl) <= -1) return v_ret; } while (0)
 
+#define GET_TOKEN_WITH_GOTO(hcl, goto_label) \
+	do { if (get_token(hcl) <= -1) goto goto_label; } while (0)
+
 #define ADD_TOKEN_STR(hcl,s,l) \
 	do { if (add_token_str(hcl, s, l) <= -1) return -1; } while (0)
 
@@ -1325,14 +1328,14 @@ static int begin_include (hcl_t* hcl)
 	/*arg->nl = '\0';*/
 	arg->includer = hcl->c->curinp;
 
-	if (hcl->c->reader (hcl, HCL_IO_OPEN, arg) <= -1) 
+	if (hcl->c->reader(hcl, HCL_IO_OPEN, arg) <= -1) 
 	{
 		hcl_setsynerrbfmt (hcl, HCL_SYNERR_INCLUDE, TOKEN_LOC(hcl), TOKEN_NAME(hcl), "unable to include %js", io_name);
 		goto oops;
 	}
 
 #if 0
-	GET_TOKEN (hcl);
+	GET_TOKEN_WITH_GOTO (hcl, oops);
 	if (TOKEN_TYPE(hcl) != HCL_IOTOK_DOT)
 	{
 		/* check if a period is following the includee name */
@@ -1753,36 +1756,32 @@ static int get_symbol_array_literal (hcl_t* hcl, hcl_oop_t* xlit)
 	HCL_ASSERT (hcl, hcl->c->r.salit.size == 0);
 
 	HCL_ASSERT (hcl, TOKEN_TYPE(hcl) == HCL_IOTOK_VBAR);
-	GET_TOKEN(hcl);
+	GET_TOKEN_WITH_GOTO(hcl, oops);
 
 	while (TOKEN_TYPE(hcl) == HCL_IOTOK_IDENT /* || TOKEN_TYPE(hcl) == HCL_IOTOK_IDENT_DOTTED */)
 	{
 		sym = hcl_makesymbol(hcl, TOKEN_NAME_PTR(hcl), TOKEN_NAME_LEN(hcl));
-		if (!sym) return -1;
+		if (!sym) goto oops;
 
 		if (HCL_OBJ_GET_FLAGS_SYNCODE(sym) || HCL_OBJ_GET_FLAGS_KERNEL(sym))
 		{
 			hcl_setsynerrbfmt (hcl, HCL_SYNERR_BANNEDVARNAME, HCL_NULL, HCL_NULL,
 				"special symbol not to be declared as a variable - %O", sym); /* TOOD: error location */
-			return -1;
+			goto oops;
 		}
 
-		if (add_to_symbol_array_literal_buffer(hcl, sym) <= -1) return -1;
-		GET_TOKEN (hcl);
+		if (add_to_symbol_array_literal_buffer(hcl, sym) <= -1) goto oops;
+		GET_TOKEN_WITH_GOTO (hcl, oops);
 	}
 
 	if (TOKEN_TYPE(hcl) != HCL_IOTOK_VBAR)
 	{
 		hcl_setsynerr (hcl, HCL_SYNERR_VBAR, TOKEN_LOC(hcl), TOKEN_NAME(hcl));
-		return -1;
+		goto oops;
 	}
 
 	sa = hcl_makearray(hcl, hcl->c->r.salit.size, 0);
-	if (!sa) 
-	{
-		hcl->c->r.salit.size = 0; /* reset literal count... */
-		return -1;
-	}
+	if (!sa) goto oops;
 
 	for (i = 0; i < hcl->c->r.salit.size; i++)
 		((hcl_oop_oop_t)sa)->slot[i] = hcl->c->r.salit.ptr[i];
@@ -1794,6 +1793,10 @@ static int get_symbol_array_literal (hcl_t* hcl, hcl_oop_t* xlit)
 
 	hcl->c->r.salit.size = 0; /* reset literal count... */
 	return 0;
+
+oops:
+	hcl->c->r.salit.size = 0; /* reset literal count... */
+	return -1;
 }
 
 static int read_object (hcl_t* hcl)
