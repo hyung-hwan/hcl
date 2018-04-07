@@ -502,7 +502,17 @@ static hcl_pfrc_t pf_number_rem (hcl_t* hcl, hcl_mod_t* mod, hcl_ooi_t nargs)
 static hcl_pfrc_t pf_number_sqrt (hcl_t* hcl, hcl_mod_t* mod, hcl_ooi_t nargs)
 {
 	hcl_oop_t ret;
-	ret = hcl_sqrtnum(hcl, HCL_STACK_GETARG(hcl, nargs, 0)); /*TODO: change to hcl_sqrtnum()*/
+	ret = hcl_sqrtnum(hcl, HCL_STACK_GETARG(hcl, nargs, 0));
+	if (!ret) return HCL_PF_FAILURE;
+
+	HCL_STACK_SETRET (hcl, nargs, ret);
+	return HCL_PF_SUCCESS;
+}
+
+static hcl_pfrc_t pf_number_abs (hcl_t* hcl, hcl_mod_t* mod, hcl_ooi_t nargs)
+{
+	hcl_oop_t ret;
+	ret = hcl_absnum(hcl, HCL_STACK_GETARG(hcl, nargs, 0)); 
 	if (!ret) return HCL_PF_FAILURE;
 
 	HCL_STACK_SETRET (hcl, nargs, ret);
@@ -640,6 +650,12 @@ static pf_t builtin_prims[] =
 	{ 2, 2,                       pf_nql,             4,  { 'n','q','l','?' } },
 	{ 2, 2,                       pf_nqk,             4,  { 'n','q','k','?' } },
 
+/*
+	{ 1, 1,                       pf_is_null,         4,  { 'n','u','l','l','?' } },
+	{ 1, 1,                       pf_is_integer,      8,  { 'i','n','t','e','g','e','r','?' } },
+	{ 1, 1,                       pf_is_string,       7,  { 's','t','r','i','n','g','?' } },
+*/
+
 	{ 1, HCL_TYPE_MAX(hcl_oow_t), pf_number_add,      1,  { '+' } },
 	{ 1, HCL_TYPE_MAX(hcl_oow_t), pf_number_sub,      1,  { '-' } },
 	{ 1, HCL_TYPE_MAX(hcl_oow_t), pf_number_mul,      1,  { '*' } },
@@ -648,6 +664,7 @@ static pf_t builtin_prims[] =
 	{ 1, HCL_TYPE_MAX(hcl_oow_t), pf_number_quo,      3,  { 'q','u','o' } },
 	{ 2, HCL_TYPE_MAX(hcl_oow_t), pf_number_rem,      3,  { 'm','o','d' } },
 	{ 1, 1,                       pf_number_sqrt,     4,  { 's','q','r','t' } },
+	{ 1, 1,                       pf_number_abs,      3,  { 'a','b','s' } },
 
 	{ 2, 2,                       pf_number_gt,       1,  { '>' } },
 	{ 2, 2,                       pf_number_ge,       2,  { '>','=' } },

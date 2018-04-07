@@ -946,6 +946,11 @@ hcl_oop_t hcl_sqrtint (
 	hcl_oop_t x
 );
 
+hcl_oop_t hcl_absint (
+	hcl_t*    hcl,
+	hcl_oop_t x
+);
+
 hcl_oop_t hcl_strtoint (
 	hcl_t*            hcl,
 	const hcl_ooch_t* str,
@@ -1050,13 +1055,9 @@ hcl_oop_t hcl_sqrtnum (
 	hcl_oop_t    x
 );
 
-
-/* ========================================================================= */
-/* comp.c                                                                    */
-/* ========================================================================= */
-HCL_EXPORT int hcl_compile (
-	hcl_t*         hcl,
-	hcl_oop_t      expr
+hcl_oop_t hcl_absnum (
+	hcl_t*       hcl,
+	hcl_oop_t    x
 );
 
 /* ========================================================================= */

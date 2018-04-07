@@ -374,3 +374,24 @@ hcl_oop_t hcl_sqrtnum (hcl_t* hcl, hcl_oop_t x)
 		return hcl_makefpdec(hcl, v, scale);
 	}
 }
+
+hcl_oop_t hcl_absnum (hcl_t* hcl, hcl_oop_t x)
+{
+	if (!HCL_IS_FPDEC(hcl, x))
+	{
+		return hcl_absint(hcl, x);
+	}
+	else
+	{
+		hcl_oop_t v;
+		hcl_ooi_t scale;
+
+		scale = HCL_OOP_TO_SMOOI(((hcl_oop_fpdec_t)x)->scale);
+		v = ((hcl_oop_fpdec_t)x)->value;
+		
+		v = hcl_absint(hcl, v);
+		if (!v) return HCL_NULL;
+		
+		return hcl_makefpdec(hcl, v, scale);
+	}
+}

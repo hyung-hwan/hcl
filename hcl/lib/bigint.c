@@ -4031,6 +4031,32 @@ oops:
 	return HCL_NULL;
 }
 
+
+hcl_oop_t hcl_absint (hcl_t* hcl, hcl_oop_t x)
+{
+	if (HCL_OOP_IS_SMOOI(x))
+	{
+		hcl_ooi_t v;
+		v = HCL_OOP_TO_SMOOI(x);
+		if (v < 0) 
+		{
+			v = -v;
+			x = HCL_SMOOI_TO_OOP(v);
+		}
+	}
+	else if (HCL_IS_NBIGINT(hcl, x))
+	{
+		x = _clone_bigint(hcl, x, HCL_OBJ_GET_SIZE(x), HCL_BRAND_PBIGINT);
+	}
+	else if (!HCL_IS_PBIGINT(hcl, x))
+	{
+		hcl_seterrbfmt (hcl, HCL_EINVAL, "parameter not integer - %O", x);
+		return HCL_NULL;
+	}
+
+	return x;
+}
+
 hcl_oop_t hcl_inttostr (hcl_t* hcl, hcl_oop_t num, int radix, int ngc)
 {
 	hcl_ooi_t v = 0;
