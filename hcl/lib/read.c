@@ -1753,7 +1753,9 @@ static int get_symbol_array_literal (hcl_t* hcl, hcl_oop_t* xlit)
 	hcl_oop_t sa, sym;
 	hcl_oow_t i;
 
-	HCL_ASSERT (hcl, hcl->c->r.salit.size == 0);
+	/* if the program is not buggy, salit.size must be 0 here. */
+	HCL_ASSERT (hcl, hcl->c->r.salit.size == 0); 
+	hcl->c->r.salit.size = 0; /* i want to set it to 0 in case it's buggy */
 
 	HCL_ASSERT (hcl, TOKEN_TYPE(hcl) == HCL_IOTOK_VBAR);
 	GET_TOKEN_WITH_GOTO(hcl, oops);

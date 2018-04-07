@@ -48,9 +48,9 @@ A HCL program is composed of more expressions.
 * nqk?
 * sprintf
 * printf
-* +
-* -
-* *
+* _+_
+* _-_
+* _*_
 * mlt
 * /
 * quo
@@ -61,3 +61,15 @@ A HCL program is composed of more expressions.
 * bit-xor
 * bit-not
 * bit-shift
+
+## Defining a function
+
+(defun function-name (arguments)
+	| local variables |
+	function body
+)
+
+(set function-name (lambda (arguments)
+	| local variables |
+	function body
+)
