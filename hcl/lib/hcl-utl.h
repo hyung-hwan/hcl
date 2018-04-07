@@ -183,7 +183,7 @@ typedef struct hcl_sckaddr_t hcl_sckaddr_t;
 extern "C" {
 #endif
 
-HCL_EXPORT hcl_oow_t hcl_hashbytes (
+HCL_EXPORT hcl_oow_t hcl_hash_bytes (
 	const hcl_oob_t* ptr,
 	hcl_oow_t        len
 );
@@ -191,28 +191,28 @@ HCL_EXPORT hcl_oow_t hcl_hashbytes (
 #if defined(HCL_HAVE_INLINE)
 	static HCL_INLINE hcl_oow_t hcl_hashbchars (const hcl_bch_t* ptr, hcl_oow_t len)
 	{
-		return hcl_hashbytes((const hcl_oob_t*)ptr, len * HCL_SIZEOF(hcl_bch_t));
+		return hcl_hash_bytes((const hcl_oob_t*)ptr, len * HCL_SIZEOF(hcl_bch_t));
 	}
 
 	static HCL_INLINE hcl_oow_t hcl_hashuchars (const hcl_uch_t* ptr, hcl_oow_t len)
 	{
-		return hcl_hashbytes((const hcl_oob_t*)ptr, len * HCL_SIZEOF(hcl_uch_t));
+		return hcl_hash_bytes((const hcl_oob_t*)ptr, len * HCL_SIZEOF(hcl_uch_t));
 	}
 
 	static HCL_INLINE hcl_oow_t hcl_hashwords (const hcl_oow_t* ptr, hcl_oow_t len)
 	{
-		return hcl_hashbytes((const hcl_oob_t*)ptr, len * HCL_SIZEOF(hcl_oow_t));
+		return hcl_hash_bytes((const hcl_oob_t*)ptr, len * HCL_SIZEOF(hcl_oow_t));
 	}
 
 	static HCL_INLINE hcl_oow_t hcl_hashhalfwords (const hcl_oohw_t* ptr, hcl_oow_t len)
 	{
-		return hcl_hashbytes((const hcl_oob_t*)ptr, len * HCL_SIZEOF(hcl_oohw_t));
+		return hcl_hash_bytes((const hcl_oob_t*)ptr, len * HCL_SIZEOF(hcl_oohw_t));
 	}
 #else
-#	define hcl_hashbchars(ptr,len)    hcl_hashbytes((const hcl_oob_t*)ptr, len * HCL_SIZEOF(hcl_bch_t))
-#	define hcl_hashuchars(ptr,len)    hcl_hashbytes((const hcl_oob_t*)ptr, len * HCL_SIZEOF(hcl_uch_t))
-#	define hcl_hashwords(ptr,len)     hcl_hashbytes((const hcl_oob_t*)ptr, len * HCL_SIZEOF(hcl_oow_t))
-#	define hcl_hashhalfwords(ptr,len) hcl_hashbytes((const hcl_oob_t*)ptr, len * HCL_SIZEOF(hcl_oohw_t))
+#	define hcl_hashbchars(ptr,len)    hcl_hash_bytes((const hcl_oob_t*)ptr, len * HCL_SIZEOF(hcl_bch_t))
+#	define hcl_hashuchars(ptr,len)    hcl_hash_bytes((const hcl_oob_t*)ptr, len * HCL_SIZEOF(hcl_uch_t))
+#	define hcl_hashwords(ptr,len)     hcl_hash_bytes((const hcl_oob_t*)ptr, len * HCL_SIZEOF(hcl_oow_t))
+#	define hcl_hashhalfwords(ptr,len) hcl_hash_bytes((const hcl_oob_t*)ptr, len * HCL_SIZEOF(hcl_oohw_t))
 #endif
 
 #if defined(HCL_OOCH_IS_UCH)
@@ -222,199 +222,180 @@ HCL_EXPORT hcl_oow_t hcl_hashbytes (
 #endif
 
 /**
- * The hcl_equaluchars() function determines equality of two strings
+ * The hcl_equal_uchars() function determines equality of two strings
  * of the same length \a len.
  */
-HCL_EXPORT int hcl_equaluchars (
+HCL_EXPORT int hcl_equal_uchars (
 	const hcl_uch_t* str1,
 	const hcl_uch_t* str2,
 	hcl_oow_t        len
 );
 
-HCL_EXPORT int hcl_equalbchars (
+HCL_EXPORT int hcl_equal_bchars (
 	const hcl_bch_t* str1,
 	const hcl_bch_t* str2,
 	hcl_oow_t        len
 );
 
-HCL_EXPORT int hcl_compuchars (
+HCL_EXPORT int hcl_comp_uchars (
 	const hcl_uch_t* str1,
 	hcl_oow_t        len1,
 	const hcl_uch_t* str2,
 	hcl_oow_t        len2
 );
 
-HCL_EXPORT int hcl_compbchars (
+HCL_EXPORT int hcl_comp_bchars (
 	const hcl_bch_t* str1,
 	hcl_oow_t        len1,
 	const hcl_bch_t* str2,
 	hcl_oow_t        len2
 );
 
-HCL_EXPORT int hcl_compucstr (
+HCL_EXPORT int hcl_comp_ucstr (
 	const hcl_uch_t* str1,
 	const hcl_uch_t* str2
 );
 
-HCL_EXPORT int hcl_compbcstr (
+HCL_EXPORT int hcl_comp_bcstr (
 	const hcl_bch_t* str1,
 	const hcl_bch_t* str2
 );
 
-HCL_EXPORT int hcl_compucbcstr (
+HCL_EXPORT int hcl_comp_ucstr_bcstr (
 	const hcl_uch_t* str1,
 	const hcl_bch_t* str2
 );
 
-HCL_EXPORT int hcl_compucharsucstr (
+HCL_EXPORT int hcl_comp_uchars_ucstr (
 	const hcl_uch_t* str1,
 	hcl_oow_t        len,
 	const hcl_uch_t* str2
 );
 
-HCL_EXPORT int hcl_compucharsbcstr (
+HCL_EXPORT int hcl_comp_uchars_bcstr (
 	const hcl_uch_t* str1,
 	hcl_oow_t        len,
 	const hcl_bch_t* str2
 );
 
-HCL_EXPORT int hcl_compbcharsbcstr (
+HCL_EXPORT int hcl_comp_bchars_bcstr (
 	const hcl_bch_t* str1,
 	hcl_oow_t        len,
 	const hcl_bch_t* str2
 );
 
-HCL_EXPORT int hcl_compbcharsucstr (
+HCL_EXPORT int hcl_comp_bchars_ucstr (
 	const hcl_bch_t* str1,
 	hcl_oow_t        len,
 	const hcl_uch_t* str2
 );
 
-HCL_EXPORT void hcl_copyuchars (
+HCL_EXPORT void hcl_copy_uchars (
 	hcl_uch_t*       dst,
 	const hcl_uch_t* src,
 	hcl_oow_t        len
 );
 
-HCL_EXPORT void hcl_copybchars (
+HCL_EXPORT void hcl_copy_bchars (
 	hcl_bch_t*       dst,
 	const hcl_bch_t* src,
 	hcl_oow_t        len
 );
 
-HCL_EXPORT void hcl_copybtouchars (
+HCL_EXPORT void hcl_copy_bchars_to_uchars (
 	hcl_uch_t*       dst,
 	const hcl_bch_t* src,
 	hcl_oow_t        len
 );
 
-HCL_EXPORT hcl_oow_t hcl_copyucstr (
+HCL_EXPORT hcl_oow_t hcl_copy_ucstr (
 	hcl_uch_t*       dst,
 	hcl_oow_t        len,
 	const hcl_uch_t* src
 );
 
-HCL_EXPORT hcl_oow_t hcl_copybcstr (
+HCL_EXPORT hcl_oow_t hcl_copy_bcstr (
 	hcl_bch_t*       dst,
 	hcl_oow_t        len,
 	const hcl_bch_t* src
 );
 
-HCL_EXPORT hcl_uch_t* hcl_finduchar (
+HCL_EXPORT hcl_uch_t* hcl_find_uchar (
 	const hcl_uch_t* ptr,
 	hcl_oow_t        len,
 	hcl_uch_t        c
 );
 
-HCL_EXPORT hcl_bch_t* hcl_findbchar (
+HCL_EXPORT hcl_bch_t* hcl_find_bchar (
 	const hcl_bch_t* ptr,
 	hcl_oow_t        len,
 	hcl_bch_t        c
 );
 
-HCL_EXPORT hcl_uch_t* hcl_rfinduchar (
+HCL_EXPORT hcl_uch_t* hcl_rfind_uchar (
 	const hcl_uch_t* ptr,
 	hcl_oow_t        len,
 	hcl_uch_t        c
 );
 
-HCL_EXPORT hcl_bch_t* hcl_rfindbchar (
+HCL_EXPORT hcl_bch_t* hcl_rfind_bchar (
 	const hcl_bch_t* ptr,
 	hcl_oow_t        len,
 	hcl_bch_t        c
 );
 
-HCL_EXPORT hcl_uch_t* hcl_finducharinucstr (
+HCL_EXPORT hcl_uch_t* hcl_find_uchar_in_ucstr (
 	const hcl_uch_t* ptr,
 	hcl_uch_t        c
 );
 
-HCL_EXPORT hcl_bch_t* hcl_findbcharinbcstr (
+HCL_EXPORT hcl_bch_t* hcl_find_bchar_in_bcstr (
 	const hcl_bch_t* ptr,
 	hcl_bch_t        c
 );
 
-HCL_EXPORT hcl_oow_t hcl_countucstr (
+HCL_EXPORT hcl_oow_t hcl_count_ucstr (
 	const hcl_uch_t* str
 );
 
-HCL_EXPORT hcl_oow_t hcl_countbcstr (
+HCL_EXPORT hcl_oow_t hcl_count_bcstr (
 	const hcl_bch_t* str
 );
 
 #if defined(HCL_OOCH_IS_UCH)
-#	define hcl_equaloochars(str1,str2,len) hcl_equaluchars(str1,str2,len)
-#	define hcl_compoochars(str1,len1,str2,len2) hcl_compuchars(str1,len1,str2,len2)
-#	define hcl_compoocbcstr(str1,str2) hcl_compucbcstr(str1,str2)
-#	define hcl_compoocharsbcstr(str1,len1,str2) hcl_compucharsbcstr(str1,len1,str2)
-#	define hcl_compoocharsucstr(str1,len1,str2) hcl_compucharsucstr(str1,len1,str2)
-#	define hcl_compoocharsoocstr(str1,len1,str2) hcl_compucharsucstr(str1,len1,str2)
-#	define hcl_compoocstr(str1,str2) hcl_compucstr(str1,str2)
-#	define hcl_copyoochars(dst,src,len) hcl_copyuchars(dst,src,len)
-#	define hcl_copybctooochars(dst,src,len) hcl_copybtouchars(dst,src,len)
-#	define hcl_copyoocstr(dst,len,src) hcl_copyucstr(dst,len,src)
-#	define hcl_findoochar(ptr,len,c) hcl_finduchar(ptr,len,c)
-#	define hcl_rfindoochar(ptr,len,c) hcl_rfinduchar(ptr,len,c)
-#	define hcl_findoocharinoocstr(ptr,c) hcl_finducharinucstr(ptr,c)
-#	define hcl_countoocstr(str) hcl_countucstr(str)
+#	define hcl_equal_oochars(str1,str2,len) hcl_equal_uchars(str1,str2,len)
+#	define hcl_comp_oochars(str1,len1,str2,len2) hcl_comp_uchars(str1,len1,str2,len2)
+#	define hcl_comp_oocstr_bcstr(str1,str2) hcl_comp_ucstr_bcstr(str1,str2)
+#	define hcl_comp_oochars_bcstr(str1,len1,str2) hcl_comp_uchars_bcstr(str1,len1,str2)
+#	define hcl_comp_oochars_ucstr(str1,len1,str2) hcl_comp_uchars_ucstr(str1,len1,str2)
+#	define hcl_comp_oochars_oocstr(str1,len1,str2) hcl_comp_uchars_ucstr(str1,len1,str2)
+#	define hcl_comp_oocstr(str1,str2) hcl_comp_ucstr(str1,str2)
+#	define hcl_copy_oochars(dst,src,len) hcl_copy_uchars(dst,src,len)
+#	define hcl_copy_bchars_to_oochars(dst,src,len) hcl_copy_bchars_to_uchars(dst,src,len)
+#	define hcl_copy_oocstr(dst,len,src) hcl_copy_ucstr(dst,len,src)
+#	define hcl_find_oochar(ptr,len,c) hcl_find_uchar(ptr,len,c)
+#	define hcl_rfind_oochar(ptr,len,c) hcl_rfind_uchar(ptr,len,c)
+#	define hcl_find_oochar_in_oocstr(ptr,c) hcl_find_uchar_in_ucstr(ptr,c)
+#	define hcl_count_oocstr(str) hcl_count_ucstr(str)
 #else
-#	define hcl_equaloochars(str1,str2,len) hcl_equalbchars(str1,str2,len)
-#	define hcl_compoochars(str1,len1,str2,len2) hcl_compbchars(str1,len1,str2,len2)
-#	define hcl_compoocbcstr(str1,str2) hcl_compbcstr(str1,str2)
-#	define hcl_compoocharsbcstr(str1,len1,str2) hcl_compbcharsbcstr(str1,len1,str2)
-#	define hcl_compoocharsucstr(str1,len1,str2) hcl_compbcharsucstr(str1,len1,str2)
-#	define hcl_compoocharsoocstr(str1,len1,str2) hcl_compbcharsbcstr(str1,len1,str2)
-#	define hcl_compoocstr(str1,str2) hcl_compbcstr(str1,str2)
-#	define hcl_copyoochars(dst,src,len) hcl_copybchars(dst,src,len)
-#	define hcl_copybctooochars(dst,src,len) hcl_copybchars(dst,src,len)
-#	define hcl_copyoocstr(dst,len,src) hcl_copybcstr(dst,len,src)
-#	define hcl_findoochar(ptr,len,c) hcl_findbchar(ptr,len,c)
-#	define hcl_rfindoochar(ptr,len,c) hcl_rfindbchar(ptr,len,c)
-#	define hcl_findoocharinoocstr(ptr,c) hcl_findbcharinbcstr(ptr,c)
-#	define hcl_countoocstr(str) hcl_countbcstr(str)
+#	define hcl_equal_oochars(str1,str2,len) hcl_equal_bchars(str1,str2,len)
+#	define hcl_comp_oochars(str1,len1,str2,len2) hcl_comp_bchars(str1,len1,str2,len2)
+#	define hcl_comp_oocstr_bcstr(str1,str2) hcl_comp_bcstr(str1,str2)
+#	define hcl_comp_oochars_bcstr(str1,len1,str2) hcl_comp_bchars_bcstr(str1,len1,str2)
+#	define hcl_comp_oochars_ucstr(str1,len1,str2) hcl_comp_bchars_ucstr(str1,len1,str2)
+#	define hcl_comp_oochars_oocstr(str1,len1,str2) hcl_comp_bchars_bcstr(str1,len1,str2)
+#	define hcl_comp_oocstr(str1,str2) hcl_comp_bcstr(str1,str2)
+#	define hcl_copy_oochars(dst,src,len) hcl_copy_bchars(dst,src,len)
+#	define hcl_copy_bchars_to_oochars(dst,src,len) hcl_copy_bchars(dst,src,len)
+#	define hcl_copy_oocstr(dst,len,src) hcl_copy_bcstr(dst,len,src)
+#	define hcl_find_oochar(ptr,len,c) hcl_find_bchar(ptr,len,c)
+#	define hcl_rfind_oochar(ptr,len,c) hcl_rfind_bchar(ptr,len,c)
+#	define hcl_find_oochar_in_oocstr(ptr,c) hcl_find_bchar_in_bcstr(ptr,c)
+#	define hcl_count_oocstr(str) hcl_count_bcstr(str)
 #endif
 
 
 
-HCL_EXPORT int hcl_copyoocstrtosbuf (
-	hcl_t*            hcl,
-	const hcl_ooch_t* str,
-	int                id
-);
-
-HCL_EXPORT int hcl_concatoocstrtosbuf (
-	hcl_t*            hcl,
-	const hcl_ooch_t* str,
-	int                id
-);
-
-#if defined(HCL_OOCH_IS_UCH)
-#	define hcl_conv_oocs_to_bcs_with_cmgr(oocs,oocslen,bcs,bcslen,cmgr) hcl_conv_ucs_to_bcs_with_cmgr(oocs,oocslen,bcs,bcslen,cmgr)
-#	define hcl_conv_oocsn_to_bcsn_with_cmgr(oocs,oocslen,bcs,bcslen,cmgr) hcl_conv_ucsn_to_bcsn_with_cmgr(oocs,oocslen,bcs,bcslen,cmgr)
-#else
-#	define hcl_conv_oocs_to_ucs_with_cmgr(oocs,oocslen,ucs,ucslen,cmgr) hcl_conv_bcs_to_ucs_with_cmgr(oocs,oocslen,ucs,ucslen,cmgr,0)
-#	define hcl_conv_oocsn_to_ucsn_with_cmgr(oocs,oocslen,ucs,ucslen,cmgr) hcl_conv_bcsn_to_ucsn_with_cmgr(oocs,oocslen,ucs,ucslen,cmgr,0)
-#endif
 
 
 HCL_EXPORT int hcl_conv_bcs_to_ucs_with_cmgr (
@@ -426,7 +407,7 @@ HCL_EXPORT int hcl_conv_bcs_to_ucs_with_cmgr (
 	int              all
 );
 	
-HCL_EXPORT int hcl_conv_bcsn_to_ucsn_with_cmgr (
+HCL_EXPORT int hcl_conv_bchars_to_uchars_with_cmgr (
 	const hcl_bch_t* bcs,
 	hcl_oow_t*       bcslen,
 	hcl_uch_t*       ucs,
@@ -443,13 +424,21 @@ HCL_EXPORT int hcl_conv_ucs_to_bcs_with_cmgr (
 	hcl_cmgr_t*      cmgr
 );	
 
-HCL_EXPORT int hcl_conv_ucsn_to_bcsn_with_cmgr (
+HCL_EXPORT int hcl_conv_uchars_to_bchars_with_cmgr (
 	const hcl_uch_t* ucs,
 	hcl_oow_t*       ucslen,
 	hcl_bch_t*       bcs,
 	hcl_oow_t*       bcslen,
 	hcl_cmgr_t*      cmgr
 );
+
+#if defined(HCL_OOCH_IS_UCH)
+#	define hcl_conv_oocs_to_bcs_with_cmgr(oocs,oocslen,bcs,bcslen,cmgr) hcl_conv_ucs_to_bcs_with_cmgr(oocs,oocslen,bcs,bcslen,cmgr)
+#	define hcl_conv_oochars_to_bchars_with_cmgr(oocs,oocslen,bcs,bcslen,cmgr) hcl_conv_uchars_to_bchars_with_cmgr(oocs,oocslen,bcs,bcslen,cmgr)
+#else
+#	define hcl_conv_oocs_to_ucs_with_cmgr(oocs,oocslen,ucs,ucslen,cmgr) hcl_conv_bcs_to_ucs_with_cmgr(oocs,oocslen,ucs,ucslen,cmgr,0)
+#	define hcl_conv_oochars_to_uchars_with_cmgr(oocs,oocslen,ucs,ucslen,cmgr) hcl_conv_bchars_to_uchars_with_cmgr(oocs,oocslen,ucs,ucslen,cmgr,0)
+#endif
 
 HCL_EXPORT hcl_cmgr_t* hcl_get_utf8_cmgr (
 	void

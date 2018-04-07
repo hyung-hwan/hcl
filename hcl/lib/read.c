@@ -349,7 +349,7 @@ static int copy_string_to (hcl_t* hcl, const hcl_oocs_t* src, hcl_oocs_t* dst, h
 	}
 
 	if (append && add_delim) dst->ptr[pos++] = add_delim;
-	hcl_copyoochars (&dst->ptr[pos], src->ptr, src->len);
+	hcl_copy_oochars (&dst->ptr[pos], src->ptr, src->len);
 	dst->len = len;
 	return 0;
 }
@@ -404,7 +404,7 @@ static HCL_INLINE int add_token_str (hcl_t* hcl, const hcl_ooch_t* ptr, hcl_oow_
 static HCL_INLINE int does_token_name_match (hcl_t* hcl, voca_id_t id)
 {
 	return hcl->c->tok.name.len == vocas[id].len &&
-	       hcl_equaloochars(hcl->c->tok.name.ptr, vocas[id].str, vocas[id].len);
+	       hcl_equal_oochars(hcl->c->tok.name.ptr, vocas[id].str, vocas[id].len);
 }
 
 static HCL_INLINE int add_token_char (hcl_t* hcl, hcl_ooch_t c)
@@ -995,7 +995,7 @@ static hcl_iotok_type_t classify_ident_token (hcl_t* hcl, const hcl_oocs_t* v)
 
 	for (i = 0; i < HCL_COUNTOF(tab); i++)
 	{
-		if (hcl_compoochars(v->ptr, v->len, tab[i].name, tab[i].len) == 0) return tab[i].type;
+		if (hcl_comp_oochars(v->ptr, v->len, tab[i].name, tab[i].len) == 0) return tab[i].type;
 	}
 
 	return HCL_IOTOK_IDENT;
@@ -1300,7 +1300,7 @@ static const hcl_ooch_t* add_io_name (hcl_t* hcl, const hcl_oocs_t* name)
 
 	ptr = (hcl_ooch_t*)(link + 1);
 
-	hcl_copyoochars (ptr, name->ptr, name->len);
+	hcl_copy_oochars (ptr, name->ptr, name->len);
 	ptr[name->len] = '\0';
 
 	link->link = hcl->c->io_names;

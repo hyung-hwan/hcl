@@ -150,7 +150,7 @@ static void syserrstrb (hcl_t* hcl, int syserr, hcl_bch_t* buf, hcl_oow_t len)
 	strerror_r (syserr, buf, len);
 #else
 	/* this may not be thread safe */
-	hcl_copybcstr (buf, len, strerror(syserr));
+	hcl_copy_bcstr (buf, len, strerror(syserr));
 #endif
 }
 
@@ -211,7 +211,7 @@ static int add_to_reply_token (hcl_client_t* client, hcl_ooch_t ch)
 
 static HCL_INLINE int is_token (hcl_client_t* client, const hcl_bch_t* str)
 {
-	return hcl_compoocharsbcstr(client->rep.tok.ptr, client->rep.tok.len, str) == 0;
+	return hcl_comp_oochars_bcstr(client->rep.tok.ptr, client->rep.tok.len, str) == 0;
 } 
 
 static HCL_INLINE int is_token_integer (hcl_client_t* client, hcl_oow_t* value)
@@ -473,7 +473,7 @@ static int handle_char (hcl_client_t* client, hcl_ooci_t c, hcl_oow_t nbytes)
 					client->rep.last_attr_key.capa = client->rep.tok.capa;
 				}
 
-				hcl_copyoochars (client->rep.last_attr_key.ptr, client->rep.tok.ptr, client->rep.tok.len);
+				hcl_copy_oochars (client->rep.last_attr_key.ptr, client->rep.tok.ptr, client->rep.tok.len);
 				client->rep.last_attr_key.len = client->rep.tok.len;
 
 				client->state = HCL_CLIENT_STATE_IN_ATTR_VALUE_START;
@@ -766,7 +766,7 @@ static int feed_reply_data (hcl_client_t* client, const hcl_bch_t* data, hcl_oow
 			bcslen = end - ptr;
 			ucslen = 1;
 
-			n = hcl_conv_bcsn_to_ucsn_with_cmgr(ptr, &bcslen, &uc, &ucslen, client->cmgr, 0);
+			n = hcl_conv_bchars_to_uchars_with_cmgr(ptr, &bcslen, &uc, &ucslen, client->cmgr, 0);
 			if (n <= -1)
 			{
 				if (n == -3)
@@ -950,7 +950,7 @@ void hcl_client_seterrbfmt (hcl_client_t* client, hcl_errnum_t errnum, const hcl
 
 	HCL_ASSERT (client->dummy_hcl, HCL_COUNTOF(client->errmsg.buf) == HCL_COUNTOF(client->dummy_hcl->errmsg.buf));
 	client->errnum = errnum;
-	hcl_copyoochars (client->errmsg.buf, client->dummy_hcl->errmsg.buf, HCL_COUNTOF(client->errmsg.buf));
+	hcl_copy_oochars (client->errmsg.buf, client->dummy_hcl->errmsg.buf, HCL_COUNTOF(client->errmsg.buf));
 	client->errmsg.len = client->dummy_hcl->errmsg.len;
 }
 
@@ -964,7 +964,7 @@ void hcl_client_seterrufmt (hcl_client_t* client, hcl_errnum_t errnum, const hcl
 
 	HCL_ASSERT (client->dummy_hcl, HCL_COUNTOF(client->errmsg.buf) == HCL_COUNTOF(client->dummy_hcl->errmsg.buf));
 	client->errnum = errnum;
-	hcl_copyoochars (client->errmsg.buf, client->dummy_hcl->errmsg.buf, HCL_COUNTOF(client->errmsg.buf));
+	hcl_copy_oochars (client->errmsg.buf, client->dummy_hcl->errmsg.buf, HCL_COUNTOF(client->errmsg.buf));
 	client->errmsg.len = client->dummy_hcl->errmsg.len;
 }
 

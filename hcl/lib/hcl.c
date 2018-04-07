@@ -533,7 +533,7 @@ hcl_mod_data_t* hcl_openmod (hcl_t* hcl, const hcl_ooch_t* name, hcl_oow_t namel
 	/* copy instead of encoding conversion. MOD_PREFIX must not
 	 * include a character that requires encoding conversion.
 	 * note the terminating null isn't needed in buf here. */
-	hcl_copybctooochars (buf, MOD_PREFIX, MOD_PREFIX_LEN); 
+	hcl_copy_bchars_to_oochars (buf, MOD_PREFIX, MOD_PREFIX_LEN); 
 
 	if (namelen > HCL_COUNTOF(buf) - (MOD_PREFIX_LEN + 1 + 1))
 	{
@@ -542,7 +542,7 @@ hcl_mod_data_t* hcl_openmod (hcl_t* hcl, const hcl_ooch_t* name, hcl_oow_t namel
 		return HCL_NULL;
 	}
 
-	hcl_copyoochars (&buf[MOD_PREFIX_LEN], name, namelen);
+	hcl_copy_oochars (&buf[MOD_PREFIX_LEN], name, namelen);
 	buf[MOD_PREFIX_LEN + namelen] = '\0';
 
 #if defined(HCL_ENABLE_STATIC_MODULE)
@@ -551,7 +551,7 @@ hcl_mod_data_t* hcl_openmod (hcl_t* hcl, const hcl_ooch_t* name, hcl_oow_t namel
 	/* TODO: binary search ... */
 	for (n = 0; n < HCL_COUNTOF(static_modtab); n++)
 	{
-		if (hcl_compoocharsbcstr(name, namelen, static_modtab[n].modname) == 0) 
+		if (hcl_comp_oochars_bcstr(name, namelen, static_modtab[n].modname) == 0) 
 		{
 			load = static_modtab[n].modload;
 			break;
@@ -563,7 +563,7 @@ hcl_mod_data_t* hcl_openmod (hcl_t* hcl, const hcl_ooch_t* name, hcl_oow_t namel
 		/* found the module in the staic module table */
 
 		HCL_MEMSET (&md, 0, HCL_SIZEOF(md));
-		hcl_copyoochars ((hcl_ooch_t*)md.mod.name, name, namelen);
+		hcl_copy_oochars ((hcl_ooch_t*)md.mod.name, name, namelen);
 		/* Note md.handle is HCL_NULL for a static module */
 
 		/* i copy-insert 'md' into the table before calling 'load'.
@@ -605,7 +605,7 @@ hcl_mod_data_t* hcl_openmod (hcl_t* hcl, const hcl_ooch_t* name, hcl_oow_t namel
 
 	/* attempt to find a dynamic external module */
 	HCL_MEMSET (&md, 0, HCL_SIZEOF(md));
-	hcl_copyoochars((hcl_ooch_t*)md.mod.name, name, namelen);
+	hcl_copy_oochars((hcl_ooch_t*)md.mod.name, name, namelen);
 	if (hcl->vmprim.dl_open && hcl->vmprim.dl_getsym && hcl->vmprim.dl_close)
 	{
 		md.handle = hcl->vmprim.dl_open(hcl, &buf[MOD_PREFIX_LEN], HCL_VMPRIM_OPENDL_PFMOD);
@@ -678,7 +678,7 @@ void hcl_closemod (hcl_t* hcl, hcl_mod_data_t* mdp)
 	if (mdp->pair)
 	{
 		/*mdp->pair = HCL_NULL;*/ /* this reset isn't needed as the area will get freed by hcl_rbt_delete()) */
-		hcl_rbt_delete (&hcl->modtab, mdp->mod.name, hcl_countoocstr(mdp->mod.name));
+		hcl_rbt_delete (&hcl->modtab, mdp->mod.name, hcl_count_oocstr(mdp->mod.name));
 	}
 }
 
@@ -695,7 +695,7 @@ hcl_pfbase_t* hcl_querymod (hcl_t* hcl, const hcl_ooch_t* pfid, hcl_oow_t pfidle
 	hcl_oow_t mod_name_len;
 	hcl_pfbase_t* pfbase;
 
-	sep = hcl_rfindoochar (pfid, pfidlen, '.');
+	sep = hcl_rfind_oochar (pfid, pfidlen, '.');
 	if (!sep)
 	{
 		/* i'm writing a conservative code here. the compiler should 
@@ -756,7 +756,7 @@ hcl_pfbase_t* hcl_findpfbase (hcl_t* hcl, hcl_pfinfo_t* pfinfo, hcl_oow_t pfcoun
 		/*mid = (left + right) / 2;*/
 		mid = left + ((right - left) / 2);
 
-		n = hcl_compoocharsoocstr (name, namelen, pfinfo[mid].mthname);
+		n = hcl_comp_oochars_oocstr (name, namelen, pfinfo[mid].mthname);
 		if (n < 0) right = mid - 1; /* this substraction can make right negative. so i can't use hcl_oow_t for the variable */
 		else if (n > 0) left = mid + 1;
 		else return &pfinfo[mid].base;
@@ -768,7 +768,7 @@ hcl_pfbase_t* hcl_findpfbase (hcl_t* hcl, hcl_pfinfo_t* pfinfo, hcl_oow_t pfcoun
 	for (base = 0, lim = pfcount; lim > 0; lim >>= 1)
 	{
 		mid = base + (lim >> 1);
-		n = hcl_compoocharsoocstr (name, namelen, pfinfo[mid].mthname);
+		n = hcl_comp_oochars_oocstr (name, namelen, pfinfo[mid].mthname);
 		if (n == 0) return &pfinfo[mid].base;
 		if (n > 0) { base = mid + 1; lim--; }
 	}

@@ -106,7 +106,7 @@ static hcl_oop_t find_or_make_symbol (hcl_t* hcl, const hcl_ooch_t* ptr, hcl_oow
 		HCL_ASSERT (hcl, HCL_IS_SYMBOL(hcl, symbol));
 
 		if (len == HCL_OBJ_GET_SIZE(symbol) &&
-		    hcl_equaloochars (ptr, symbol->slot, len))
+		    hcl_equal_oochars (ptr, symbol->slot, len))
 		{
 			return (hcl_oop_t)symbol;
 		}

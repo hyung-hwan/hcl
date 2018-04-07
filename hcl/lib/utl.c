@@ -35,7 +35,7 @@
  *  utobcstr -> ucstr to bcstr
  */
 
-hcl_oow_t hcl_hashbytes (const hcl_oob_t* ptr, hcl_oow_t len)
+hcl_oow_t hcl_hash_bytes (const hcl_oob_t* ptr, hcl_oow_t len)
 {
 	hcl_oow_t h = 0;
 	const hcl_uint8_t* bp, * be;
@@ -48,7 +48,7 @@ hcl_oow_t hcl_hashbytes (const hcl_oob_t* ptr, hcl_oow_t len)
 	return h % ((hcl_oow_t)HCL_SMOOI_MAX + 1);
 }
 
-int hcl_equaluchars (const hcl_uch_t* str1, const hcl_uch_t* str2, hcl_oow_t len)
+int hcl_equal_uchars (const hcl_uch_t* str1, const hcl_uch_t* str2, hcl_oow_t len)
 {
 	hcl_oow_t i;
 
@@ -63,7 +63,7 @@ int hcl_equaluchars (const hcl_uch_t* str1, const hcl_uch_t* str2, hcl_oow_t len
 	return 1;
 }
 
-int hcl_equalbchars (const hcl_bch_t* str1, const hcl_bch_t* str2, hcl_oow_t len)
+int hcl_equal_bchars (const hcl_bch_t* str1, const hcl_bch_t* str2, hcl_oow_t len)
 {
 	hcl_oow_t i;
 
@@ -78,7 +78,7 @@ int hcl_equalbchars (const hcl_bch_t* str1, const hcl_bch_t* str2, hcl_oow_t len
 	return 1;
 }
 
-int hcl_compuchars (const hcl_uch_t* str1, hcl_oow_t len1, const hcl_uch_t* str2, hcl_oow_t len2)
+int hcl_comp_uchars (const hcl_uch_t* str1, hcl_oow_t len1, const hcl_uch_t* str2, hcl_oow_t len2)
 {
 	hcl_uchu_t c1, c2;
 	const hcl_uch_t* end1 = str1 + len1;
@@ -100,7 +100,7 @@ int hcl_compuchars (const hcl_uch_t* str1, hcl_oow_t len1, const hcl_uch_t* str2
 	return (str2 < end2)? -1: 0;
 }
 
-int hcl_compbchars (const hcl_bch_t* str1, hcl_oow_t len1, const hcl_bch_t* str2, hcl_oow_t len2)
+int hcl_comp_bchars (const hcl_bch_t* str1, hcl_oow_t len1, const hcl_bch_t* str2, hcl_oow_t len2)
 {
 	hcl_bchu_t c1, c2;
 	const hcl_bch_t* end1 = str1 + len1;
@@ -122,7 +122,7 @@ int hcl_compbchars (const hcl_bch_t* str1, hcl_oow_t len1, const hcl_bch_t* str2
 	return (str2 < end2)? -1: 0;
 }
 
-int hcl_compucstr (const hcl_uch_t* str1, const hcl_uch_t* str2)
+int hcl_comp_ucstr (const hcl_uch_t* str1, const hcl_uch_t* str2)
 {
 	while (*str1 == *str2)
 	{
@@ -133,7 +133,7 @@ int hcl_compucstr (const hcl_uch_t* str1, const hcl_uch_t* str2)
 	return ((hcl_uchu_t)*str1 > (hcl_uchu_t)*str2)? 1: -1;
 }
 
-int hcl_compbcstr (const hcl_bch_t* str1, const hcl_bch_t* str2)
+int hcl_comp_bcstr (const hcl_bch_t* str1, const hcl_bch_t* str2)
 {
 	while (*str1 == *str2)
 	{
@@ -144,7 +144,7 @@ int hcl_compbcstr (const hcl_bch_t* str1, const hcl_bch_t* str2)
 	return ((hcl_bchu_t)*str1 > (hcl_bchu_t)*str2)? 1: -1;
 }
 
-int hcl_compucbcstr (const hcl_uch_t* str1, const hcl_bch_t* str2)
+int hcl_comp_ucstr_bcstr (const hcl_uch_t* str1, const hcl_bch_t* str2)
 {
 	while (*str1 == *str2)
 	{
@@ -155,7 +155,7 @@ int hcl_compucbcstr (const hcl_uch_t* str1, const hcl_bch_t* str2)
 	return ((hcl_uchu_t)*str1 > (hcl_bchu_t)*str2)? 1: -1;
 }
 
-int hcl_compucharsucstr (const hcl_uch_t* str1, hcl_oow_t len, const hcl_uch_t* str2)
+int hcl_comp_uchars_ucstr (const hcl_uch_t* str1, hcl_oow_t len, const hcl_uch_t* str2)
 {
 	/* for "abc\0" of length 4 vs "abc", the fourth character
 	 * of the first string is equal to the terminating null of
@@ -170,7 +170,7 @@ int hcl_compucharsucstr (const hcl_uch_t* str1, hcl_oow_t len, const hcl_uch_t* 
 	return (str1 < end)? 1: (*str2 == '\0'? 0: -1);
 }
 
-int hcl_compucharsbcstr (const hcl_uch_t* str1, hcl_oow_t len, const hcl_bch_t* str2)
+int hcl_comp_uchars_bcstr (const hcl_uch_t* str1, hcl_oow_t len, const hcl_bch_t* str2)
 {
 	const hcl_uch_t* end = str1 + len;
 	while (str1 < end && *str2 != '\0') 
@@ -181,7 +181,7 @@ int hcl_compucharsbcstr (const hcl_uch_t* str1, hcl_oow_t len, const hcl_bch_t* 
 	return (str1 < end)? 1: (*str2 == '\0'? 0: -1);
 }
 
-int hcl_compbcharsbcstr (const hcl_bch_t* str1, hcl_oow_t len, const hcl_bch_t* str2)
+int hcl_comp_bchars_bcstr (const hcl_bch_t* str1, hcl_oow_t len, const hcl_bch_t* str2)
 {
 	const hcl_bch_t* end = str1 + len;
 	while (str1 < end && *str2 != '\0') 
@@ -192,7 +192,7 @@ int hcl_compbcharsbcstr (const hcl_bch_t* str1, hcl_oow_t len, const hcl_bch_t* 
 	return (str1 < end)? 1: (*str2 == '\0'? 0: -1);
 }
 
-int hcl_compbcharsucstr (const hcl_bch_t* str1, hcl_oow_t len, const hcl_uch_t* str2)
+int hcl_comp_bchars_ucstr (const hcl_bch_t* str1, hcl_oow_t len, const hcl_uch_t* str2)
 {
 	const hcl_bch_t* end = str1 + len;
 	while (str1 < end && *str2 != '\0') 
@@ -203,21 +203,21 @@ int hcl_compbcharsucstr (const hcl_bch_t* str1, hcl_oow_t len, const hcl_uch_t* 
 	return (str1 < end)? 1: (*str2 == '\0'? 0: -1);
 }
 
-void hcl_copyuchars (hcl_uch_t* dst, const hcl_uch_t* src, hcl_oow_t len)
+void hcl_copy_uchars (hcl_uch_t* dst, const hcl_uch_t* src, hcl_oow_t len)
 {
 	/* take note of no forced null termination */
 	hcl_oow_t i;
 	for (i = 0; i < len; i++) dst[i] = src[i];
 }
 
-void hcl_copybchars (hcl_bch_t* dst, const hcl_bch_t* src, hcl_oow_t len)
+void hcl_copy_bchars (hcl_bch_t* dst, const hcl_bch_t* src, hcl_oow_t len)
 {
 	/* take note of no forced null termination */
 	hcl_oow_t i;
 	for (i = 0; i < len; i++) dst[i] = src[i];
 }
 
-void hcl_copybtouchars (hcl_uch_t* dst, const hcl_bch_t* src, hcl_oow_t len)
+void hcl_copy_bchars_to_uchars (hcl_uch_t* dst, const hcl_bch_t* src, hcl_oow_t len)
 {
 	/* copy without conversions.
 	 * use hcl_bctouchars() for conversion encoding */
@@ -225,7 +225,7 @@ void hcl_copybtouchars (hcl_uch_t* dst, const hcl_bch_t* src, hcl_oow_t len)
 	for (i = 0; i < len; i++) dst[i] = src[i];
 }
 
-hcl_oow_t hcl_copyucstr (hcl_uch_t* dst, hcl_oow_t len, const hcl_uch_t* src)
+hcl_oow_t hcl_copy_ucstr (hcl_uch_t* dst, hcl_oow_t len, const hcl_uch_t* src)
 {
 	hcl_uch_t* p, * p2;
 
@@ -241,7 +241,7 @@ hcl_oow_t hcl_copyucstr (hcl_uch_t* dst, hcl_oow_t len, const hcl_uch_t* src)
 	return p - dst;
 }
 
-hcl_oow_t hcl_copybcstr (hcl_bch_t* dst, hcl_oow_t len, const hcl_bch_t* src)
+hcl_oow_t hcl_copy_bcstr (hcl_bch_t* dst, hcl_oow_t len, const hcl_bch_t* src)
 {
 	hcl_bch_t* p, * p2;
 
@@ -257,21 +257,21 @@ hcl_oow_t hcl_copybcstr (hcl_bch_t* dst, hcl_oow_t len, const hcl_bch_t* src)
 	return p - dst;
 }
 
-hcl_oow_t hcl_countucstr (const hcl_uch_t* str)
+hcl_oow_t hcl_count_ucstr (const hcl_uch_t* str)
 {
 	const hcl_uch_t* ptr = str;
 	while (*ptr != '\0') ptr++;
 	return ptr - str;
 }
 
-hcl_oow_t hcl_countbcstr (const hcl_bch_t* str)
+hcl_oow_t hcl_count_bcstr (const hcl_bch_t* str)
 {
 	const hcl_bch_t* ptr = str;
 	while (*ptr != '\0') ptr++;
 	return ptr - str;
 }
 
-hcl_uch_t* hcl_finduchar (const hcl_uch_t* ptr, hcl_oow_t len, hcl_uch_t c)
+hcl_uch_t* hcl_find_uchar (const hcl_uch_t* ptr, hcl_oow_t len, hcl_uch_t c)
 {
 	const hcl_uch_t* end;
 
@@ -285,7 +285,7 @@ hcl_uch_t* hcl_finduchar (const hcl_uch_t* ptr, hcl_oow_t len, hcl_uch_t c)
 	return HCL_NULL;
 }
 
-hcl_bch_t* hcl_findbchar (const hcl_bch_t* ptr, hcl_oow_t len, hcl_bch_t c)
+hcl_bch_t* hcl_find_bchar (const hcl_bch_t* ptr, hcl_oow_t len, hcl_bch_t c)
 {
 	const hcl_bch_t* end;
 
@@ -299,7 +299,7 @@ hcl_bch_t* hcl_findbchar (const hcl_bch_t* ptr, hcl_oow_t len, hcl_bch_t c)
 	return HCL_NULL;
 }
 
-hcl_uch_t* hcl_rfinduchar (const hcl_uch_t* ptr, hcl_oow_t len, hcl_uch_t c)
+hcl_uch_t* hcl_rfind_uchar (const hcl_uch_t* ptr, hcl_oow_t len, hcl_uch_t c)
 {
 	const hcl_uch_t* cur;
 
@@ -313,7 +313,7 @@ hcl_uch_t* hcl_rfinduchar (const hcl_uch_t* ptr, hcl_oow_t len, hcl_uch_t c)
 	return HCL_NULL;
 }
 
-hcl_bch_t* hcl_rfindbchar (const hcl_bch_t* ptr, hcl_oow_t len, hcl_bch_t c)
+hcl_bch_t* hcl_rfind_bchar (const hcl_bch_t* ptr, hcl_oow_t len, hcl_bch_t c)
 {
 	const hcl_bch_t* cur;
 
@@ -327,7 +327,7 @@ hcl_bch_t* hcl_rfindbchar (const hcl_bch_t* ptr, hcl_oow_t len, hcl_bch_t c)
 	return HCL_NULL;
 }
 
-hcl_uch_t* hcl_finducharinucstr (const hcl_uch_t* ptr, hcl_uch_t c)
+hcl_uch_t* hcl_find_uchar_in_ucstr (const hcl_uch_t* ptr, hcl_uch_t c)
 {
 	while (*ptr != '\0')
 	{
@@ -338,7 +338,7 @@ hcl_uch_t* hcl_finducharinucstr (const hcl_uch_t* ptr, hcl_uch_t c)
 	return HCL_NULL;
 }
 
-hcl_bch_t* hcl_findbcharinbcstr (const hcl_bch_t* ptr, hcl_bch_t c)
+hcl_bch_t* hcl_find_bchar_in_bcstr (const hcl_bch_t* ptr, hcl_bch_t c)
 {
 	while (*ptr != '\0')
 	{
@@ -351,45 +351,7 @@ hcl_bch_t* hcl_findbcharinbcstr (const hcl_bch_t* ptr, hcl_bch_t c)
 
 /* ----------------------------------------------------------------------- */
 
-int hcl_concatoocstrtosbuf (hcl_t* hcl, const hcl_ooch_t* str, int id)
-{
-	hcl_sbuf_t* p;
-	hcl_oow_t len;
-
-	p = &hcl->sbuf[id];
-	len = hcl_countoocstr (str);
-
-	if (len > p->capa - p->len)
-	{
-		hcl_oow_t newcapa;
-		hcl_ooch_t* tmp;
-
-		newcapa = HCL_ALIGN(p->len + len, 512); /* TODO: adjust this capacity */
-
-		/* +1 to handle line ending injection more easily */
-		tmp = (hcl_ooch_t*)hcl_reallocmem(hcl, p->ptr, (newcapa + 1) * HCL_SIZEOF(*tmp)); 
-		if (!tmp) return -1;
-
-		p->ptr = tmp;
-		p->capa = newcapa;
-	}
-
-	hcl_copyoochars (&p->ptr[p->len], str, len);
-	p->len += len;
-	p->ptr[p->len] = '\0';
-
-	return 0;
-}
-
-int hcl_copyoocstrtosbuf (hcl_t* hcl, const hcl_ooch_t* str, int id)
-{
-	hcl->sbuf[id].len = 0;;
-	return hcl_concatoocstrtosbuf (hcl, str, id);
-}
-
-/* ----------------------------------------------------------------------- */
-
-HCL_INLINE int hcl_conv_bcsn_to_ucsn_with_cmgr (
+HCL_INLINE int hcl_conv_bchars_to_uchars_with_cmgr (
 	const hcl_bch_t* bcs, hcl_oow_t* bcslen,
 	hcl_uch_t* ucs, hcl_oow_t* ucslen, hcl_cmgr_t* cmgr, int all)
 {
@@ -521,7 +483,7 @@ HCL_INLINE int hcl_conv_bcs_to_ucs_with_cmgr (
 	for (bp = bcs; *bp != '\0'; bp++) /* nothing */ ;
 
 	mlen = bp - bcs; wlen = *ucslen;
-	n = hcl_conv_bcsn_to_ucsn_with_cmgr (bcs, &mlen, ucs, &wlen, cmgr, all);
+	n = hcl_conv_bchars_to_uchars_with_cmgr (bcs, &mlen, ucs, &wlen, cmgr, all);
 	if (ucs)
 	{
 		/* null-terminate the target buffer if it has room for it. */
@@ -533,7 +495,7 @@ HCL_INLINE int hcl_conv_bcs_to_ucs_with_cmgr (
 	return n;
 }
 
-HCL_INLINE int hcl_conv_ucsn_to_bcsn_with_cmgr (
+HCL_INLINE int hcl_conv_uchars_to_bchars_with_cmgr (
 	const hcl_uch_t* ucs, hcl_oow_t* ucslen,
 	hcl_bch_t* bcs, hcl_oow_t* bcslen, hcl_cmgr_t* cmgr)
 {
@@ -699,13 +661,13 @@ hcl_cmgr_t* hcl_get_utf8_cmgr (void)
 int hcl_conv_utf8_to_uchars (const hcl_bch_t* bcs, hcl_oow_t* bcslen, hcl_uch_t* ucs, hcl_oow_t* ucslen)
 {
 	/* the source is length bound */
-	return hcl_conv_bcsn_to_ucsn_with_cmgr(bcs, bcslen, ucs, ucslen, &utf8_cmgr, 0);
+	return hcl_conv_bchars_to_uchars_with_cmgr(bcs, bcslen, ucs, ucslen, &utf8_cmgr, 0);
 }
 
 int hcl_conv_uchars_to_utf8 (const hcl_uch_t* ucs, hcl_oow_t* ucslen, hcl_bch_t* bcs, hcl_oow_t* bcslen)
 {
 	/* length bound */
-	return hcl_conv_ucsn_to_bcsn_with_cmgr(ucs, ucslen, bcs, bcslen, &utf8_cmgr);
+	return hcl_conv_uchars_to_bchars_with_cmgr(ucs, ucslen, bcs, bcslen, &utf8_cmgr);
 }
 
 int hcl_conv_utf8_to_ucstr (const hcl_bch_t* bcs, hcl_oow_t* bcslen, hcl_uch_t* ucs, hcl_oow_t* ucslen)
@@ -727,7 +689,7 @@ int hcl_convbtouchars (hcl_t* hcl, const hcl_bch_t* bcs, hcl_oow_t* bcslen, hcl_
 	/* length bound */
 	int n;
 
-	n = hcl_conv_bcsn_to_ucsn_with_cmgr(bcs, bcslen, ucs, ucslen, hcl->cmgr, 0);
+	n = hcl_conv_bchars_to_uchars_with_cmgr(bcs, bcslen, ucs, ucslen, hcl->cmgr, 0);
 
 	if (n <= -1)
 	{
@@ -743,7 +705,7 @@ int hcl_convutobchars (hcl_t* hcl, const hcl_uch_t* ucs, hcl_oow_t* ucslen, hcl_
 	/* length bound */
 	int n;
 
-	n = hcl_conv_ucsn_to_bcsn_with_cmgr(ucs, ucslen, bcs, bcslen, hcl->cmgr);
+	n = hcl_conv_uchars_to_bchars_with_cmgr(ucs, ucslen, bcs, bcslen, hcl->cmgr);
 
 	if (n <= -1)
 	{
@@ -910,7 +872,7 @@ hcl_uch_t* hcl_dupuchars (hcl_t* hcl, const hcl_uch_t* ucs, hcl_oow_t ucslen)
 	ptr = (hcl_uch_t*)hcl_allocmem (hcl, (ucslen + 1) * HCL_SIZEOF(hcl_uch_t));
 	if (!ptr) return HCL_NULL;
 
-	hcl_copyuchars (ptr, ucs, ucslen);
+	hcl_copy_uchars (ptr, ucs, ucslen);
 	ptr[ucslen] = '\0';
 	return ptr;
 }
@@ -922,7 +884,7 @@ hcl_bch_t* hcl_dupbchars (hcl_t* hcl, const hcl_bch_t* bcs, hcl_oow_t bcslen)
 	ptr = (hcl_bch_t*)hcl_allocmem (hcl, (bcslen + 1) * HCL_SIZEOF(hcl_bch_t));
 	if (!ptr) return HCL_NULL;
 
-	hcl_copybchars (ptr, bcs, bcslen);
+	hcl_copy_bchars (ptr, bcs, bcslen);
 	ptr[bcslen] = '\0';
 	return ptr;
 }

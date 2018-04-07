@@ -51,8 +51,8 @@ static hcl_bch_t EMSG_BCH[] = { '\0' };
 #define xopt_t hcl_uopt_t
 #define xopt_lng_t hcl_uopt_lng_t
 #define xgetopt hcl_getuopt
-#define xcompcharscstr hcl_compucharsucstr
-#define xfindcharincstr hcl_finducharinucstr
+#define xcompcharscstr hcl_comp_uchars_ucstr
+#define xfindcharincstr hcl_find_uchar_in_ucstr
 #define XCI_EOF HCL_BCI_EOF
 #include "opt-impl.h"
 
@@ -74,8 +74,8 @@ static hcl_bch_t EMSG_BCH[] = { '\0' };
 #define xopt_t hcl_bopt_t
 #define xopt_lng_t hcl_bopt_lng_t
 #define xgetopt hcl_getbopt
-#define xcompcharscstr hcl_compbcharsbcstr
-#define xfindcharincstr hcl_findbcharinbcstr
+#define xcompcharscstr hcl_comp_bchars_bcstr
+#define xfindcharincstr hcl_find_bchar_in_bcstr
 #define XCI_EOF HCL_UCI_EOF
 #include "opt-impl.h"
 

@@ -473,7 +473,7 @@ int hcl_hashobj (hcl_t* hcl, hcl_oop_t obj, hcl_oow_t* xhv)
 			switch (type)
 			{
 				case HCL_OBJ_TYPE_BYTE:
-					hv = hcl_hashbytes(((hcl_oop_byte_t)obj)->slot, HCL_OBJ_GET_SIZE(obj));
+					hv = hcl_hash_bytes(((hcl_oop_byte_t)obj)->slot, HCL_OBJ_GET_SIZE(obj));
 					break;
 
 				case HCL_OBJ_TYPE_CHAR:

@@ -336,7 +336,7 @@ const hcl_ooch_t* hcl_geterrmsg (hcl_t* hcl)
 
 const hcl_ooch_t* hcl_backuperrmsg (hcl_t* hcl)
 {
-	hcl_copyoocstr (hcl->errmsg.tmpbuf.ooch, HCL_COUNTOF(hcl->errmsg.tmpbuf.ooch), hcl_geterrmsg(hcl));
+	hcl_copy_oocstr (hcl->errmsg.tmpbuf.ooch, HCL_COUNTOF(hcl->errmsg.tmpbuf.ooch), hcl_geterrmsg(hcl));
 	return hcl->errmsg.tmpbuf.ooch;
 }
 

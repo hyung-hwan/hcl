@@ -1032,15 +1032,6 @@ struct hcl_mod_data_t
 };
 typedef struct hcl_mod_data_t hcl_mod_data_t;
 
-
-struct hcl_sbuf_t
-{
-	hcl_ooch_t* ptr;
-	hcl_oow_t   len;
-	hcl_oow_t   capa;
-};
-typedef struct hcl_sbuf_t hcl_sbuf_t;
-
 /* =========================================================================
  * HCL VM
  * ========================================================================= */
@@ -1205,8 +1196,6 @@ struct hcl_t
 			hcl_oow_t len;
 		} xbuf; /* buffer to support sprintf */
 	} sprintf;
-
-	hcl_sbuf_t sbuf[64];
 
 	struct
 	{

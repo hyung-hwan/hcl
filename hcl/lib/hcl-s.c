@@ -393,7 +393,7 @@ static HCL_INLINE int open_input (hcl_t* hcl, hcl_ioinarg_t* arg)
 	#if defined(HCL_OOCH_IS_UCH)
 		if (hcl_convootobcstr(hcl, arg->name, &ucslen, HCL_NULL, &bcslen) <= -1) goto oops;
 	#else
-		bcslen = hcl_countbcstr(arg->name);
+		bcslen = hcl_count_bcstr(arg->name);
 	#endif
 
 		fn = ((bb_t*)arg->includer->handle)->fn;
@@ -402,7 +402,7 @@ static HCL_INLINE int open_input (hcl_t* hcl, hcl_ioinarg_t* arg)
 		#if defined(HCL_OOCH_IS_UCH)
 			if (hcl_convootobcstr(hcl, server->cfg.script_include_path, &ucslen, HCL_NULL, &parlen) <= -1) goto oops;
 		#else
-			parlen = hcl_countbcstr(server->cfg.script_include_path);
+			parlen = hcl_count_bcstr(server->cfg.script_include_path);
 		#endif
 		}
 		else
@@ -420,19 +420,19 @@ static HCL_INLINE int open_input (hcl_t* hcl, hcl_ioinarg_t* arg)
 		#if defined(HCL_OOCH_IS_UCH)
 			hcl_convootobcstr (hcl, server->cfg.script_include_path, &ucslen, bb->fn, &parlen);
 		#else
-			hcl_copybchars (bb->fn, server->cfg.script_include_path, parlen);
+			hcl_copy_bchars (bb->fn, server->cfg.script_include_path, parlen);
 		#endif
 			if (!IS_PATH_SEP(bb->fn[parlen])) bb->fn[parlen++] = PATH_SEP_CHAR; /* +2 was used in hcl_callocmem() for this (+1 for this, +1 for '\0' */
 		}
 		else
 		{
-			hcl_copybchars (bb->fn, fn, parlen);
+			hcl_copy_bchars (bb->fn, fn, parlen);
 		}
 
 	#if defined(HCL_OOCH_IS_UCH)
 		hcl_convootobcstr (hcl, arg->name, &ucslen, &bb->fn[parlen], &bcslen);
 	#else
-		hcl_copybcstr (&bb->fn[parlen], bcslen + 1, arg->name);
+		hcl_copy_bcstr (&bb->fn[parlen], bcslen + 1, arg->name);
 	#endif
 		bb->fd = open(bb->fn, O_RDONLY, 0);
 	}
@@ -445,7 +445,7 @@ static HCL_INLINE int open_input (hcl_t* hcl, hcl_ioinarg_t* arg)
 
 		/* copy ane empty string as a main stream's name */
 		bb->fn = (hcl_bch_t*)(bb + 1);
-		hcl_copybcstr (bb->fn, pathlen + 1, "");
+		hcl_copy_bcstr (bb->fn, pathlen + 1, "");
 
 		bb->fd = xtn->proto->worker->sck;
 	}
@@ -571,7 +571,7 @@ static HCL_INLINE int read_input (hcl_t* hcl, hcl_ioinarg_t* arg)
 #else
 	bcslen = (bb->len < HCL_COUNTOF(arg->buf))? bb->len: HCL_COUNTOF(arg->buf);
 	ucslen = bcslen;
-	hcl_copybchars (arg->buf, bb->buf, bcslen);
+	hcl_copy_bchars (arg->buf, bb->buf, bcslen);
 #endif
 
 	remlen = bb->len - bcslen;
@@ -727,7 +727,7 @@ static void syserrstrb (hcl_t* hcl, int syserr, hcl_bch_t* buf, hcl_oow_t len)
 	strerror_r (syserr, buf, len);
 #else
 	/* this may not be thread safe */
-	hcl_copybcstr (buf, len, strerror(syserr));
+	hcl_copy_bcstr (buf, len, strerror(syserr));
 #endif
 }
 
@@ -746,7 +746,7 @@ static void* dl_open (hcl_t* hcl, const hcl_ooch_t* name, int flags)
 	 * and HCL_COUNTOF(HCL_DEFAULT_PFMODPOSTIFX) include the terminating nulls. Never mind about
 	 * the extra 2 characters. */
 	#else
-	bufcapa = hcl_countbcstr(name);
+	bufcapa = hcl_count_bcstr(name);
 	#endif
 	bufcapa += HCL_COUNTOF(HCL_DEFAULT_PFMODPREFIX) + HCL_COUNTOF(HCL_DEFAULT_PFMODPOSTFIX) + 1; 
 
@@ -762,13 +762,13 @@ static void* dl_open (hcl_t* hcl, const hcl_ooch_t* name, int flags)
 		hcl_oow_t len, i, xlen;
 
 		/* opening a primitive function module - mostly libhcl-xxxx */
-		len = hcl_copybcstr(bufptr, bufcapa, HCL_DEFAULT_PFMODPREFIX);
+		len = hcl_copy_bcstr(bufptr, bufcapa, HCL_DEFAULT_PFMODPREFIX);
 
 		bcslen = bufcapa - len;
 	#if defined(HCL_OOCH_IS_UCH)
 		hcl_convootobcstr(hcl, name, &ucslen, &bufptr[len], &bcslen);
 	#else
-		bcslen = hcl_copybcstr(&bufptr[len], bcslen, name);
+		bcslen = hcl_copy_bcstr(&bufptr[len], bcslen, name);
 	#endif
 
 		/* length including the prefix and the name. but excluding the postfix */
@@ -781,7 +781,7 @@ static void* dl_open (hcl_t* hcl, const hcl_ooch_t* name, int flags)
 		}
  
 	retry:
-		hcl_copybcstr (&bufptr[xlen], bufcapa - xlen, HCL_DEFAULT_PFMODPOSTFIX);
+		hcl_copy_bcstr (&bufptr[xlen], bufcapa - xlen, HCL_DEFAULT_PFMODPOSTFIX);
 
 		/* both prefix and postfix attached. for instance, libhcl-xxx */
 		handle = sys_dl_openext(bufptr);
@@ -800,7 +800,7 @@ static void* dl_open (hcl_t* hcl, const hcl_ooch_t* name, int flags)
 				HCL_DEBUG3 (hcl, "Failed to open(ext) DL %hs[%js] - %hs\n", &bufptr[len], name, dl_errstr);
 				hcl_seterrbfmt (hcl, HCL_ESYSERR, "unable to open(ext) DL %js - %hs", name, dl_errstr);
 
-				dash = hcl_rfindbchar(bufptr, hcl_countbcstr(bufptr), '-');
+				dash = hcl_rfind_bchar(bufptr, hcl_count_bcstr(bufptr), '-');
 				if (dash) 
 				{
 					/* remove a segment at the back. 
@@ -828,10 +828,10 @@ static void* dl_open (hcl_t* hcl, const hcl_ooch_t* name, int flags)
 		bcslen = bufcapa;
 		hcl_convootobcstr(hcl, name, &ucslen, bufptr, &bcslen);
 	#else
-		bcslen = hcl_copybcstr(bufptr, bufcapa, name);
+		bcslen = hcl_copy_bcstr(bufptr, bufcapa, name);
 	#endif
 
-		if (hcl_findbchar(bufptr, bcslen, '.'))
+		if (hcl_find_bchar(bufptr, bcslen, '.'))
 		{
 			handle = sys_dl_open(bufptr);
 			if (!handle) 
@@ -893,7 +893,7 @@ static void* dl_getsym (hcl_t* hcl, void* handle, const hcl_ooch_t* name)
 	#if defined(HCL_OOCH_IS_UCH)
 	if (hcl_convootobcstr(hcl, name, &ucslen, HCL_NULL, &bcslen) <= -1) return HCL_NULL;
 	#else
-	bcslen = hcl_countbcstr (name);
+	bcslen = hcl_count_bcstr (name);
 	#endif
 
 	if (bcslen >= HCL_COUNTOF(stabuf) - 2)
@@ -912,7 +912,7 @@ static void* dl_getsym (hcl_t* hcl, void* handle, const hcl_ooch_t* name)
 	#if defined(HCL_OOCH_IS_UCH)
 	hcl_convootobcstr (hcl, name, &ucslen, &bufptr[1], &bcslen);
 	#else
-	bcslen = hcl_copybcstr(&bufptr[1], bcslen, name);
+	bcslen = hcl_copy_bcstr(&bufptr[1], bcslen, name);
 	#endif
 
 	/* convert a period(.) to an underscore(_) */
@@ -1252,7 +1252,7 @@ int hcl_server_proto_end_reply (hcl_server_proto_t* proto, const hcl_ooch_t* fai
 
 		simple_error:
 			if (hcl_server_proto_feed_reply(proto, err1, 8, 0) <= -1 ||
-			    hcl_server_proto_feed_reply(proto, failmsg, hcl_countoocstr(failmsg), 1) <= -1 ||
+			    hcl_server_proto_feed_reply(proto, failmsg, hcl_count_oocstr(failmsg), 1) <= -1 ||
 			    hcl_server_proto_feed_reply(proto, err2, 2, 0) <= -1) return -1;
 
 			if (write_reply_chunk(proto) <= -1) return -1;
@@ -1394,7 +1394,7 @@ static void classify_current_ident_token (hcl_server_proto_t* proto)
 
 	for (i = 0; i < HCL_COUNTOF(tab); i++)
 	{
-		if (hcl_compoocharsoocstr(proto->tok.ptr, proto->tok.len, tab[i].name) == 0) 
+		if (hcl_comp_oochars_oocstr(proto->tok.ptr, proto->tok.len, tab[i].name) == 0) 
 		{
 			SET_TOKEN_TYPE (proto, tab[i].type);
 			break;
@@ -2264,13 +2264,13 @@ static void set_err_with_syserr (hcl_server_t* server, int syserr, const char* b
 		va_end (ap);
 
 	#if defined(HCL_OOCH_IS_UCH)
-		hcl->errmsg.len += hcl_copyucstr(&hcl->errmsg.buf[hcl->errmsg.len], HCL_COUNTOF(hcl->errmsg.buf) - hcl->errmsg.len, u_dash);
+		hcl->errmsg.len += hcl_copy_ucstr(&hcl->errmsg.buf[hcl->errmsg.len], HCL_COUNTOF(hcl->errmsg.buf) - hcl->errmsg.len, u_dash);
 		tmplen2 = HCL_COUNTOF(hcl->errmsg.buf) - hcl->errmsg.len;
 		hcl_convbtoucstr (hcl, hcl->errmsg.tmpbuf.bch, &tmplen, &hcl->errmsg.buf[hcl->errmsg.len], &tmplen2);
 		hcl->errmsg.len += tmplen2; /* ignore conversion errors */
 	#else
-		hcl->errmsg.len += hcl_copybcstr(&hcl->errmsg.buf[hcl->errmsg.len], HCL_COUNTOF(hcl->errmsg.buf) - hcl->errmsg.len, b_dash);
-		hcl->errmsg.len += hcl_copybcstr(&hcl->errmsg.buf[hcl->errmsg.len], HCL_COUNTOF(hcl->errmsg.buf) - hcl->errmsg.len, hcl->errmsg.tmpbuf.bch);
+		hcl->errmsg.len += hcl_copy_bcstr(&hcl->errmsg.buf[hcl->errmsg.len], HCL_COUNTOF(hcl->errmsg.buf) - hcl->errmsg.len, b_dash);
+		hcl->errmsg.len += hcl_copy_bcstr(&hcl->errmsg.buf[hcl->errmsg.len], HCL_COUNTOF(hcl->errmsg.buf) - hcl->errmsg.len, hcl->errmsg.tmpbuf.bch);
 
 	#endif
 	}
@@ -2285,10 +2285,10 @@ static void set_err_with_syserr (hcl_server_t* server, int syserr, const char* b
 		va_end (ap);
 
 	#if defined(HCL_OOCH_IS_UCH)
-		hcl->errmsg.len += hcl_copyucstr(&hcl->errmsg.buf[hcl->errmsg.len], HCL_COUNTOF(hcl->errmsg.buf) - hcl->errmsg.len, u_dash);
-		hcl->errmsg.len += hcl_copyucstr(&hcl->errmsg.buf[hcl->errmsg.len], HCL_COUNTOF(hcl->errmsg.buf) - hcl->errmsg.len, hcl->errmsg.tmpbuf.uch);
+		hcl->errmsg.len += hcl_copy_ucstr(&hcl->errmsg.buf[hcl->errmsg.len], HCL_COUNTOF(hcl->errmsg.buf) - hcl->errmsg.len, u_dash);
+		hcl->errmsg.len += hcl_copy_ucstr(&hcl->errmsg.buf[hcl->errmsg.len], HCL_COUNTOF(hcl->errmsg.buf) - hcl->errmsg.len, hcl->errmsg.tmpbuf.uch);
 	#else
-		hcl->errmsg.len += hcl_copybcstr(&hcl->errmsg.buf[hcl->errmsg.len], HCL_COUNTOF(hcl->errmsg.buf) - hcl->errmsg.len, b_dash);
+		hcl->errmsg.len += hcl_copy_bcstr(&hcl->errmsg.buf[hcl->errmsg.len], HCL_COUNTOF(hcl->errmsg.buf) - hcl->errmsg.len, b_dash);
 		tmplen2 = HCL_COUNTOF(hcl->errmsg.buf) - hcl->errmsg.len;
 		hcl_convutobcstr (hcl, hcl->errmsg.tmpbuf.uch, &tmplen, &hcl->errmsg.buf[hcl->errmsg.len], &tmplen2);
 		hcl->errmsg.len += tmplen2; /* ignore conversion errors */
@@ -2296,7 +2296,7 @@ static void set_err_with_syserr (hcl_server_t* server, int syserr, const char* b
 	}
 
 	server->errnum = errnum;
-	hcl_copyoochars (server->errmsg.buf, server->dummy_hcl->errmsg.buf, HCL_COUNTOF(server->errmsg.buf));
+	hcl_copy_oochars (server->errmsg.buf, server->dummy_hcl->errmsg.buf, HCL_COUNTOF(server->errmsg.buf));
 	server->errmsg.len = server->dummy_hcl->errmsg.len;
 }
 
@@ -2363,8 +2363,8 @@ static int setup_listeners (hcl_server_t* server, const hcl_bch_t* addrs)
 		hcl_oow_t addr_len;
 		hcl_server_listener_t* listener;
 
-		comma = hcl_findbcharinbcstr(addr_ptr, ',');
-		addr_len = comma? comma - addr_ptr: hcl_countbcstr(addr_ptr);
+		comma = hcl_find_bchar_in_bcstr(addr_ptr, ',');
+		addr_len = comma? comma - addr_ptr: hcl_count_bcstr(addr_ptr);
 		/* [NOTE] no whitespaces are allowed before and after a comma */
 
 		sck_fam = hcl_bchars_to_sckaddr(addr_ptr, addr_len, &srv_addr, &srv_len);
@@ -2642,7 +2642,7 @@ int hcl_server_setoption (hcl_server_t* server, hcl_server_option_t id, const vo
 			return 0;
 
 		case HCL_SERVER_SCRIPT_INCLUDE_PATH:
-			hcl_copyoocstr (server->cfg.script_include_path, HCL_COUNTOF(server->cfg.script_include_path), (const hcl_ooch_t*)value);
+			hcl_copy_oocstr (server->cfg.script_include_path, HCL_COUNTOF(server->cfg.script_include_path), (const hcl_ooch_t*)value);
 			return 0;
 	}
 
@@ -2744,7 +2744,7 @@ void hcl_server_seterrbfmt (hcl_server_t* server, hcl_errnum_t errnum, const hcl
 
 	HCL_ASSERT (server->dummy_hcl, HCL_COUNTOF(server->errmsg.buf) == HCL_COUNTOF(server->dummy_hcl->errmsg.buf));
 	server->errnum = errnum;
-	hcl_copyoochars (server->errmsg.buf, server->dummy_hcl->errmsg.buf, HCL_COUNTOF(server->errmsg.buf));
+	hcl_copy_oochars (server->errmsg.buf, server->dummy_hcl->errmsg.buf, HCL_COUNTOF(server->errmsg.buf));
 	server->errmsg.len = server->dummy_hcl->errmsg.len;
 }
 
@@ -2759,7 +2759,7 @@ void hcl_server_seterrufmt (hcl_server_t* server, hcl_errnum_t errnum, const hcl
 	HCL_ASSERT (server->dummy_hcl, HCL_COUNTOF(server->errmsg.buf) == HCL_COUNTOF(server->dummy_hcl->errmsg.buf));
 	server->errnum = errnum;
 	server->errnum = errnum;
-	hcl_copyoochars (server->errmsg.buf, server->dummy_hcl->errmsg.buf, HCL_COUNTOF(server->errmsg.buf));
+	hcl_copy_oochars (server->errmsg.buf, server->dummy_hcl->errmsg.buf, HCL_COUNTOF(server->errmsg.buf));
 	server->errmsg.len = server->dummy_hcl->errmsg.len;
 }
 

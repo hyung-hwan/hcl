@@ -264,7 +264,7 @@ static void log_write (hcl_client_t* client, unsigned int mask, const hcl_ooch_t
 		ucslen = len;
 		bcslen = HCL_COUNTOF(buf);
 
-		n = hcl_conv_oocsn_to_bcsn_with_cmgr(&msg[msgidx], &ucslen, buf, &bcslen, hcl_get_utf8_cmgr());
+		n = hcl_conv_oochars_to_bchars_with_cmgr(&msg[msgidx], &ucslen, buf, &bcslen, hcl_get_utf8_cmgr());
 		if (n == 0 || n == -2)
 		{
 			/* n = 0: 
@@ -365,7 +365,7 @@ static int handle_logopt (hcl_client_t* client, const hcl_bch_t* str)
 
 	xtn = (client_xtn_t*)hcl_client_getxtn(client);
 
-	cm = hcl_findbcharinbcstr(xstr, ',');
+	cm = hcl_find_bchar_in_bcstr(xstr, ',');
 	if (cm) 
 	{
 		/* i duplicate this string for open() below as open() doesn't 
@@ -377,7 +377,7 @@ static int handle_logopt (hcl_client_t* client, const hcl_bch_t* str)
 			return -1;
 		}
 
-		cm = hcl_findbcharinbcstr(xstr, ',');
+		cm = hcl_find_bchar_in_bcstr(xstr, ',');
 		*cm = '\0';
 
 		logmask = xtn->logmask;
@@ -385,28 +385,28 @@ static int handle_logopt (hcl_client_t* client, const hcl_bch_t* str)
 		{
 			flt = cm + 1;
 
-			cm = hcl_findbcharinbcstr(flt, ',');
+			cm = hcl_find_bchar_in_bcstr(flt, ',');
 			if (cm) *cm = '\0';
 
-			if (hcl_compbcstr(flt, "app") == 0) logmask |= HCL_LOG_APP;
-			else if (hcl_compbcstr(flt, "compiler") == 0) logmask |= HCL_LOG_COMPILER;
-			else if (hcl_compbcstr(flt, "vm") == 0) logmask |= HCL_LOG_VM;
-			else if (hcl_compbcstr(flt, "mnemonic") == 0) logmask |= HCL_LOG_MNEMONIC;
-			else if (hcl_compbcstr(flt, "gc") == 0) logmask |= HCL_LOG_GC;
-			else if (hcl_compbcstr(flt, "ic") == 0) logmask |= HCL_LOG_IC;
-			else if (hcl_compbcstr(flt, "primitive") == 0) logmask |= HCL_LOG_PRIMITIVE;
+			if (hcl_comp_bcstr(flt, "app") == 0) logmask |= HCL_LOG_APP;
+			else if (hcl_comp_bcstr(flt, "compiler") == 0) logmask |= HCL_LOG_COMPILER;
+			else if (hcl_comp_bcstr(flt, "vm") == 0) logmask |= HCL_LOG_VM;
+			else if (hcl_comp_bcstr(flt, "mnemonic") == 0) logmask |= HCL_LOG_MNEMONIC;
+			else if (hcl_comp_bcstr(flt, "gc") == 0) logmask |= HCL_LOG_GC;
+			else if (hcl_comp_bcstr(flt, "ic") == 0) logmask |= HCL_LOG_IC;
+			else if (hcl_comp_bcstr(flt, "primitive") == 0) logmask |= HCL_LOG_PRIMITIVE;
 
-			else if (hcl_compbcstr(flt, "fatal") == 0) logmask |= HCL_LOG_FATAL;
-			else if (hcl_compbcstr(flt, "error") == 0) logmask |= HCL_LOG_ERROR;
-			else if (hcl_compbcstr(flt, "warn") == 0) logmask |= HCL_LOG_WARN;
-			else if (hcl_compbcstr(flt, "info") == 0) logmask |= HCL_LOG_INFO;
-			else if (hcl_compbcstr(flt, "debug") == 0) logmask |= HCL_LOG_DEBUG;
+			else if (hcl_comp_bcstr(flt, "fatal") == 0) logmask |= HCL_LOG_FATAL;
+			else if (hcl_comp_bcstr(flt, "error") == 0) logmask |= HCL_LOG_ERROR;
+			else if (hcl_comp_bcstr(flt, "warn") == 0) logmask |= HCL_LOG_WARN;
+			else if (hcl_comp_bcstr(flt, "info") == 0) logmask |= HCL_LOG_INFO;
+			else if (hcl_comp_bcstr(flt, "debug") == 0) logmask |= HCL_LOG_DEBUG;
 
-			else if (hcl_compbcstr(flt, "fatal+") == 0) logmask |= HCL_LOG_FATAL;
-			else if (hcl_compbcstr(flt, "error+") == 0) logmask |= HCL_LOG_FATAL | HCL_LOG_ERROR;
-			else if (hcl_compbcstr(flt, "warn+") == 0) logmask |= HCL_LOG_FATAL | HCL_LOG_ERROR | HCL_LOG_WARN;
-			else if (hcl_compbcstr(flt, "info+") == 0) logmask |= HCL_LOG_FATAL | HCL_LOG_ERROR | HCL_LOG_WARN | HCL_LOG_INFO;
-			else if (hcl_compbcstr(flt, "debug+") == 0) logmask |= HCL_LOG_FATAL | HCL_LOG_ERROR | HCL_LOG_WARN | HCL_LOG_INFO | HCL_LOG_DEBUG;
+			else if (hcl_comp_bcstr(flt, "fatal+") == 0) logmask |= HCL_LOG_FATAL;
+			else if (hcl_comp_bcstr(flt, "error+") == 0) logmask |= HCL_LOG_FATAL | HCL_LOG_ERROR;
+			else if (hcl_comp_bcstr(flt, "warn+") == 0) logmask |= HCL_LOG_FATAL | HCL_LOG_ERROR | HCL_LOG_WARN;
+			else if (hcl_comp_bcstr(flt, "info+") == 0) logmask |= HCL_LOG_FATAL | HCL_LOG_ERROR | HCL_LOG_WARN | HCL_LOG_INFO;
+			else if (hcl_comp_bcstr(flt, "debug+") == 0) logmask |= HCL_LOG_FATAL | HCL_LOG_ERROR | HCL_LOG_WARN | HCL_LOG_INFO | HCL_LOG_DEBUG;
 
 			else
 			{
@@ -462,7 +462,7 @@ static int start_reply (hcl_client_t* client, hcl_client_reply_type_t type, cons
 			hcl_bch_t bcs[256];
 			hcl_oow_t bcslen;
 
-			hcl_conv_ucsn_to_bcsn_with_cmgr (dptr, &dlen, bcs, &bcslen, hcl_client_getcmgr(client));
+			hcl_conv_uchars_to_bchars_with_cmgr (dptr, &dlen, bcs, &bcslen, hcl_client_getcmgr(client));
 			printf ("\nERROR - [%.*s]\n", (int)bcslen, bcs);
 		#else
 			printf ("\nERROR - [%.*s]\n", (int)dlen, dptr);
@@ -734,11 +734,11 @@ int main (int argc, char* argv[])
 				break;
 
 			case '\0':
-				if (hcl_compbcstr(opt.lngopt, "reuseaddr") == 0)
+				if (hcl_comp_bcstr(opt.lngopt, "reuseaddr") == 0)
 				{
 					reuse_addr = 1;
 				}
-				else if (hcl_compbcstr(opt.lngopt, "shutwr") == 0)
+				else if (hcl_comp_bcstr(opt.lngopt, "shutwr") == 0)
 				{
 					shut_wr_after_req = 1;
 				}

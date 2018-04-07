@@ -127,7 +127,7 @@ static hcl_oop_cons_t find_or_upsert (hcl_t* hcl, hcl_oop_dic_t dic, hcl_oop_t k
 		HCL_ASSERT (hcl, HCL_IS_SYMBOL(hcl,ass->car));
 
 		if (HCL_OBJ_GET_SIZE(key) == HCL_OBJ_GET_SIZE(ass->car) &&
-		    hcl_equaloochars(key->slot, ((hcl_oop_char_t)ass->car)->slot, HCL_OBJ_GET_SIZE(key))) 
+		    hcl_equal_oochars(key->slot, ((hcl_oop_char_t)ass->car)->slot, HCL_OBJ_GET_SIZE(key))) 
 		{
 			/* the value of HCL_NULL indicates no insertion or update. */
 			if (value) ass->cdr = value; /* update */
@@ -300,7 +300,7 @@ int hcl_zapatdic (hcl_t* hcl, hcl_oop_dic_t dic, hcl_oop_t key)
 		HCL_ASSERT (hcl, HCL_IS_SYMBOL(hcl,ass->car));
 
 		if (HCL_OBJ_GET_SIZE(key) == HCL_OBJ_GET_SIZE(ass->car) &&
-		    hcl_equaloochars(HCL_OBJ_GET_CHAR_SLOT(key), HCL_OBJ_GET_CHAR_SLOT(ass->car), HCL_OBJ_GET_SIZE(key))) 
+		    hcl_equal_oochars(HCL_OBJ_GET_CHAR_SLOT(key), HCL_OBJ_GET_CHAR_SLOT(ass->car), HCL_OBJ_GET_SIZE(key))) 
 		{
 			/* the value of HCL_NULL indicates no insertion or update. */
 			goto found;

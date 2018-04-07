@@ -224,7 +224,7 @@ static HCL_INLINE int open_input (hcl_t* hcl, hcl_ioinarg_t* arg)
 	#if defined(HCL_OOCH_IS_UCH)
 		if (hcl_convootobcstr (hcl, arg->name, &ucslen, HCL_NULL, &bcslen) <= -1) goto oops;
 	#else
-		bcslen = hcl_countbcstr (arg->name);
+		bcslen = hcl_count_bcstr (arg->name);
 	#endif
 
 		fn = ((bb_t*)arg->includer->handle)->fn;
@@ -236,11 +236,11 @@ static HCL_INLINE int open_input (hcl_t* hcl, hcl_ioinarg_t* arg)
 		if (!bb) goto oops;
 
 		bb->fn = (hcl_bch_t*)(bb + 1);
-		hcl_copybchars (bb->fn, fn, parlen);
+		hcl_copy_bchars (bb->fn, fn, parlen);
 	#if defined(HCL_OOCH_IS_UCH)
 		hcl_convootobcstr (hcl, arg->name, &ucslen, &bb->fn[parlen], &bcslen);
 	#else
-		hcl_copybcstr (&bb->fn[parlen], bcslen + 1, arg->name);
+		hcl_copy_bcstr (&bb->fn[parlen], bcslen + 1, arg->name);
 	#endif
 	}
 	else
@@ -248,13 +248,13 @@ static HCL_INLINE int open_input (hcl_t* hcl, hcl_ioinarg_t* arg)
 		/* main stream */
 		hcl_oow_t pathlen;
 
-		pathlen = hcl_countbcstr (xtn->read_path);
+		pathlen = hcl_count_bcstr (xtn->read_path);
 
 		bb = (bb_t*)hcl_callocmem (hcl, HCL_SIZEOF(*bb) + (HCL_SIZEOF(hcl_bch_t) * (pathlen + 1)));
 		if (!bb) goto oops;
 
 		bb->fn = (hcl_bch_t*)(bb + 1);
-		hcl_copybcstr (bb->fn, pathlen + 1, xtn->read_path);
+		hcl_copy_bcstr (bb->fn, pathlen + 1, xtn->read_path);
 	}
 
 #if defined(__DOS__) || defined(_WIN32) || defined(__OS2__)
@@ -339,7 +339,7 @@ static HCL_INLINE int read_input (hcl_t* hcl, hcl_ioinarg_t* arg)
 #else
 	bcslen = (bb->len < HCL_COUNTOF(arg->buf))? bb->len: HCL_COUNTOF(arg->buf);
 	ucslen = bcslen;
-	hcl_copybchars (arg->buf, bb->buf, bcslen);
+	hcl_copy_bchars (arg->buf, bb->buf, bcslen);
 #endif
 
 	remlen = bb->len - bcslen;
@@ -427,7 +427,7 @@ static HCL_INLINE int write_output (hcl_t* hcl, hcl_iooutarg_t* arg)
 		ucslen = arg->len - donelen;
 		if (ucslen > bcslen) ucslen = bcslen;
 		else if (ucslen < bcslen) bcslen = ucslen;
-		hcl_copybchars (bcsbuf, &arg->ptr[donelen], bcslen);
+		hcl_copy_bchars (bcsbuf, &arg->ptr[donelen], bcslen);
 	#endif
 
 		if (fwrite(bcsbuf, HCL_SIZEOF(bcsbuf[0]), bcslen, (FILE*)arg->handle) < bcslen)
@@ -758,7 +758,7 @@ static void syserrstrb (hcl_t* hcl, int syserr, hcl_bch_t* buf, hcl_oow_t len)
 	strerror_r (syserr, buf, len);
 #else
 	/* this may not be thread safe */
-	hcl_copybcstr (buf, len, strerror(syserr));
+	hcl_copy_bcstr (buf, len, strerror(syserr));
 #endif
 }
 
@@ -777,7 +777,7 @@ static void* dl_open (hcl_t* hcl, const hcl_ooch_t* name, int flags)
 	 * and HCL_COUNTOF(HCL_DEFAULT_PFMODPOSTIFX) include the terminating nulls. Never mind about
 	 * the extra 2 characters. */
 	#else
-	bufcapa = hcl_countbcstr(name);
+	bufcapa = hcl_count_bcstr(name);
 	#endif
 	bufcapa += HCL_COUNTOF(HCL_DEFAULT_PFMODPREFIX) + HCL_COUNTOF(HCL_DEFAULT_PFMODPOSTFIX) + 1; 
 
@@ -793,13 +793,13 @@ static void* dl_open (hcl_t* hcl, const hcl_ooch_t* name, int flags)
 		hcl_oow_t len, i, xlen;
 
 		/* opening a primitive function module - mostly libhcl-xxxx */
-		len = hcl_copybcstr(bufptr, bufcapa, HCL_DEFAULT_PFMODPREFIX);
+		len = hcl_copy_bcstr(bufptr, bufcapa, HCL_DEFAULT_PFMODPREFIX);
 
 		bcslen = bufcapa - len;
 	#if defined(HCL_OOCH_IS_UCH)
 		hcl_convootobcstr(hcl, name, &ucslen, &bufptr[len], &bcslen);
 	#else
-		bcslen = hcl_copybcstr(&bufptr[len], bcslen, name);
+		bcslen = hcl_copy_bcstr(&bufptr[len], bcslen, name);
 	#endif
 
 		/* length including the prefix and the name. but excluding the postfix */
@@ -812,7 +812,7 @@ static void* dl_open (hcl_t* hcl, const hcl_ooch_t* name, int flags)
 		}
  
 	retry:
-		hcl_copybcstr (&bufptr[xlen], bufcapa - xlen, HCL_DEFAULT_PFMODPOSTFIX);
+		hcl_copy_bcstr (&bufptr[xlen], bufcapa - xlen, HCL_DEFAULT_PFMODPOSTFIX);
 
 		/* both prefix and postfix attached. for instance, libhcl-xxx */
 		handle = sys_dl_openext(bufptr);
@@ -831,7 +831,7 @@ static void* dl_open (hcl_t* hcl, const hcl_ooch_t* name, int flags)
 				HCL_DEBUG3 (hcl, "Failed to open(ext) DL %hs[%js] - %hs\n", &bufptr[len], name, dl_errstr);
 				hcl_seterrbfmt (hcl, HCL_ESYSERR, "unable to open(ext) DL %js - %hs", name, dl_errstr);
 
-				dash = hcl_rfindbchar(bufptr, hcl_countbcstr(bufptr), '-');
+				dash = hcl_rfind_bchar(bufptr, hcl_count_bcstr(bufptr), '-');
 				if (dash) 
 				{
 					/* remove a segment at the back. 
@@ -859,10 +859,10 @@ static void* dl_open (hcl_t* hcl, const hcl_ooch_t* name, int flags)
 		bcslen = bufcapa;
 		hcl_convootobcstr(hcl, name, &ucslen, bufptr, &bcslen);
 	#else
-		bcslen = hcl_copybcstr(bufptr, bufcapa, name);
+		bcslen = hcl_copy_bcstr(bufptr, bufcapa, name);
 	#endif
 
-		if (hcl_findbchar(bufptr, bcslen, '.'))
+		if (hcl_find_bchar(bufptr, bcslen, '.'))
 		{
 			handle = sys_dl_open(bufptr);
 			if (!handle) 
@@ -924,7 +924,7 @@ static void* dl_getsym (hcl_t* hcl, void* handle, const hcl_ooch_t* name)
 	#if defined(HCL_OOCH_IS_UCH)
 	if (hcl_convootobcstr(hcl, name, &ucslen, HCL_NULL, &bcslen) <= -1) return HCL_NULL;
 	#else
-	bcslen = hcl_countbcstr (name);
+	bcslen = hcl_count_bcstr (name);
 	#endif
 
 	if (bcslen >= HCL_COUNTOF(stabuf) - 2)
@@ -943,7 +943,7 @@ static void* dl_getsym (hcl_t* hcl, void* handle, const hcl_ooch_t* name)
 	#if defined(HCL_OOCH_IS_UCH)
 	hcl_convootobcstr (hcl, name, &ucslen, &bufptr[1], &bcslen);
 	#else
-	bcslen = hcl_copybcstr(&bufptr[1], bcslen, name);
+	bcslen = hcl_copy_bcstr(&bufptr[1], bcslen, name);
 	#endif
 
 	/* convert a period(.) to an underscore(_) */
@@ -1336,19 +1336,19 @@ static int handle_logopt (hcl_t* hcl, const hcl_bch_t* str)
 	hcl_bch_t* cm, * flt;
 	unsigned int logmask;
 
-	cm = hcl_findbcharinbcstr (xstr, ',');
+	cm = hcl_find_bchar_in_bcstr (xstr, ',');
 	if (cm) 
 	{
 		/* i duplicate this string for open() below as open() doesn't 
 		 * accept a length-bounded string */
-		xstr = hcl_dupbchars (hcl, str, hcl_countbcstr(str));
+		xstr = hcl_dupbchars (hcl, str, hcl_count_bcstr(str));
 		if (!xstr) 
 		{
 			fprintf (stderr, "ERROR: out of memory in duplicating %s\n", str);
 			return -1;
 		}
 
-		cm = hcl_findbcharinbcstr(xstr, ',');
+		cm = hcl_find_bchar_in_bcstr(xstr, ',');
 		*cm = '\0';
 
 		logmask = xtn->logmask;
@@ -1356,28 +1356,28 @@ static int handle_logopt (hcl_t* hcl, const hcl_bch_t* str)
 		{
 			flt = cm + 1;
 
-			cm = hcl_findbcharinbcstr(flt, ',');
+			cm = hcl_find_bchar_in_bcstr(flt, ',');
 			if (cm) *cm = '\0';
 
-			if (hcl_compbcstr(flt, "app") == 0) logmask |= HCL_LOG_APP;
-			else if (hcl_compbcstr(flt, "compiler") == 0) logmask |= HCL_LOG_COMPILER;
-			else if (hcl_compbcstr(flt, "vm") == 0) logmask |= HCL_LOG_VM;
-			else if (hcl_compbcstr(flt, "mnemonic") == 0) logmask |= HCL_LOG_MNEMONIC;
-			else if (hcl_compbcstr(flt, "gc") == 0) logmask |= HCL_LOG_GC;
-			else if (hcl_compbcstr(flt, "ic") == 0) logmask |= HCL_LOG_IC;
-			else if (hcl_compbcstr(flt, "primitive") == 0) logmask |= HCL_LOG_PRIMITIVE;
+			if (hcl_comp_bcstr(flt, "app") == 0) logmask |= HCL_LOG_APP;
+			else if (hcl_comp_bcstr(flt, "compiler") == 0) logmask |= HCL_LOG_COMPILER;
+			else if (hcl_comp_bcstr(flt, "vm") == 0) logmask |= HCL_LOG_VM;
+			else if (hcl_comp_bcstr(flt, "mnemonic") == 0) logmask |= HCL_LOG_MNEMONIC;
+			else if (hcl_comp_bcstr(flt, "gc") == 0) logmask |= HCL_LOG_GC;
+			else if (hcl_comp_bcstr(flt, "ic") == 0) logmask |= HCL_LOG_IC;
+			else if (hcl_comp_bcstr(flt, "primitive") == 0) logmask |= HCL_LOG_PRIMITIVE;
 
-			else if (hcl_compbcstr(flt, "fatal") == 0) logmask |= HCL_LOG_FATAL;
-			else if (hcl_compbcstr(flt, "error") == 0) logmask |= HCL_LOG_ERROR;
-			else if (hcl_compbcstr(flt, "warn") == 0) logmask |= HCL_LOG_WARN;
-			else if (hcl_compbcstr(flt, "info") == 0) logmask |= HCL_LOG_INFO;
-			else if (hcl_compbcstr(flt, "debug") == 0) logmask |= HCL_LOG_DEBUG;
+			else if (hcl_comp_bcstr(flt, "fatal") == 0) logmask |= HCL_LOG_FATAL;
+			else if (hcl_comp_bcstr(flt, "error") == 0) logmask |= HCL_LOG_ERROR;
+			else if (hcl_comp_bcstr(flt, "warn") == 0) logmask |= HCL_LOG_WARN;
+			else if (hcl_comp_bcstr(flt, "info") == 0) logmask |= HCL_LOG_INFO;
+			else if (hcl_comp_bcstr(flt, "debug") == 0) logmask |= HCL_LOG_DEBUG;
 
-			else if (hcl_compbcstr(flt, "fatal+") == 0) logmask |= HCL_LOG_FATAL;
-			else if (hcl_compbcstr(flt, "error+") == 0) logmask |= HCL_LOG_FATAL | HCL_LOG_ERROR;
-			else if (hcl_compbcstr(flt, "warn+") == 0) logmask |= HCL_LOG_FATAL | HCL_LOG_ERROR | HCL_LOG_WARN;
-			else if (hcl_compbcstr(flt, "info+") == 0) logmask |= HCL_LOG_FATAL | HCL_LOG_ERROR | HCL_LOG_WARN | HCL_LOG_INFO;
-			else if (hcl_compbcstr(flt, "debug+") == 0) logmask |= HCL_LOG_FATAL | HCL_LOG_ERROR | HCL_LOG_WARN | HCL_LOG_INFO | HCL_LOG_DEBUG;
+			else if (hcl_comp_bcstr(flt, "fatal+") == 0) logmask |= HCL_LOG_FATAL;
+			else if (hcl_comp_bcstr(flt, "error+") == 0) logmask |= HCL_LOG_FATAL | HCL_LOG_ERROR;
+			else if (hcl_comp_bcstr(flt, "warn+") == 0) logmask |= HCL_LOG_FATAL | HCL_LOG_ERROR | HCL_LOG_WARN;
+			else if (hcl_comp_bcstr(flt, "info+") == 0) logmask |= HCL_LOG_FATAL | HCL_LOG_ERROR | HCL_LOG_WARN | HCL_LOG_INFO;
+			else if (hcl_comp_bcstr(flt, "debug+") == 0) logmask |= HCL_LOG_FATAL | HCL_LOG_ERROR | HCL_LOG_WARN | HCL_LOG_INFO | HCL_LOG_DEBUG;
 
 			else
 			{
@@ -1431,10 +1431,10 @@ static int handle_dbgopt (hcl_t* hcl, const hcl_bch_t* str)
 	{
 		flt = cm + 1;
 
-		cm = hcl_findbcharinbcstr(flt, ',');
-		len = cm? (cm - flt): hcl_countbcstr(flt);
-		if (hcl_compbcharsbcstr (flt, len, "gc") == 0)  dbgopt |= HCL_DEBUG_GC;
-		else if (hcl_compbcharsbcstr (flt, len, "bigint") == 0)  dbgopt |= HCL_DEBUG_BIGINT;
+		cm = hcl_find_bchar_in_bcstr(flt, ',');
+		len = cm? (cm - flt): hcl_count_bcstr(flt);
+		if (hcl_comp_bchars_bcstr (flt, len, "gc") == 0)  dbgopt |= HCL_DEBUG_GC;
+		else if (hcl_comp_bchars_bcstr (flt, len, "bigint") == 0)  dbgopt |= HCL_DEBUG_BIGINT;
 		else
 		{
 			fprintf (stderr, "ERROR: unknown debug option value - %.*s\n", (int)len, flt);
@@ -1717,13 +1717,13 @@ int main (int argc, char* argv[])
 				break;
 
 			case '\0':
-				if (hcl_compbcstr(opt.lngopt, "large-pages") == 0)
+				if (hcl_comp_bcstr(opt.lngopt, "large-pages") == 0)
 				{
 					large_pages = 1;
 					break;
 				}
 			#if defined(HCL_BUILD_DEBUG)
-				else if (hcl_compbcstr(opt.lngopt, "debug") == 0)
+				else if (hcl_comp_bcstr(opt.lngopt, "debug") == 0)
 				{
 					dbgopt = opt.arg;
 					break;
