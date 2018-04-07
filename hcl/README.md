@@ -2,7 +2,7 @@
 
 ## Language Syntax
 
-A HCL program is composed of more expressions.
+A HCL program is composed of expressions.
 
 ## Keywords
 * nil
@@ -64,12 +64,16 @@ A HCL program is composed of more expressions.
 
 ## Defining a function
 
+```
 (defun function-name (arguments)
 	| local variables |
 	function body
 )
+```
 
+```
 (set function-name (lambda (arguments)
 	| local variables |
 	function body
 )
+```
