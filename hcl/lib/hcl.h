@@ -1437,6 +1437,7 @@ typedef enum hcl_concode_t hcl_concode_t;
 #define HCL_IS_CONS(hcl,v) (HCL_OOP_IS_POINTER(v) && HCL_OBJ_GET_FLAGS_BRAND(v) == HCL_BRAND_CONS)
 #define HCL_IS_CONS_XLIST(hcl,v) (HCL_IS_CONS(hcl,v) && HCL_OBJ_GET_FLAGS_SYNCODE(v) == HCL_CONCODE_XLIST)
 #define HCL_IS_ARRAY(hcl,v) (HCL_OOP_IS_POINTER(v) && HCL_OBJ_GET_FLAGS_BRAND(v) == HCL_BRAND_ARRAY)
+#define HCL_IS_BYTEARRAY(hcl,v) (HCL_OOP_IS_POINTER(v) && HCL_OBJ_GET_FLAGS_BRAND(v) == HCL_BRAND_BYTE_ARRAY)
 #define HCL_IS_DIC(hcl,v) (HCL_OOP_IS_POINTER(v) && HCL_OBJ_GET_FLAGS_BRAND(v) == HCL_BRAND_DIC)
 #define HCL_IS_PRIM(hcl,v) (HCL_OOP_IS_POINTER(v) && HCL_OBJ_GET_FLAGS_BRAND(v) == HCL_BRAND_PRIM)
 #define HCL_IS_PBIGINT(hcl,v) (HCL_OOP_IS_POINTER(v) && HCL_OBJ_GET_FLAGS_BRAND(v) == HCL_BRAND_PBIGINT)
@@ -1458,8 +1459,6 @@ typedef int (*hcl_dic_walker_t) (
 #if defined(__cplusplus)
 extern "C" {
 #endif
-
-#define hcl_switchprocess(hcl) ((hcl)->switch_proc = 1)
 
 HCL_EXPORT hcl_t* hcl_open (
 	hcl_mmgr_t*         mmgr,
@@ -1665,6 +1664,14 @@ HCL_EXPORT hcl_oop_t hcl_executefromip (
 HCL_EXPORT void hcl_abort (
 	hcl_t* hcl
 );
+
+
+#if defined(HCL_HAVE_INLINE)
+	static HCL_INLINE void hcl_switchprocess (hcl_t* hcl) { hcl->switch_proc = 1; }
+#else
+#	define hcl_switchprocess(hcl) ((hcl)->switch_proc = 1)
+#endif
+
 
 HCL_EXPORT int hcl_attachio (
 	hcl_t*       hcl,

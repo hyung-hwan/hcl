@@ -4048,7 +4048,12 @@ hcl_oop_t hcl_absint (hcl_t* hcl, hcl_oop_t x)
 	{
 		x = _clone_bigint(hcl, x, HCL_OBJ_GET_SIZE(x), HCL_BRAND_PBIGINT);
 	}
-	else if (!HCL_IS_PBIGINT(hcl, x))
+	else if (HCL_IS_PBIGINT(hcl, x))
+	{
+		/* do nothing. return x without change.
+		 * [THINK] but do i need to clone a positive bigint? */
+	}
+	else
 	{
 		hcl_seterrbfmt (hcl, HCL_EINVAL, "parameter not integer - %O", x);
 		return HCL_NULL;
