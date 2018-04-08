@@ -577,7 +577,7 @@ static hcl_pfrc_t pf_number_div (hcl_t* hcl, hcl_mod_t* mod, hcl_ooi_t nargs)
 	return HCL_PF_SUCCESS;
 }
 
-static hcl_pfrc_t pf_number_quo (hcl_t* hcl, hcl_mod_t* mod, hcl_ooi_t nargs)
+static hcl_pfrc_t pf_integer_quo (hcl_t* hcl, hcl_mod_t* mod, hcl_ooi_t nargs)
 {
 	hcl_ooi_t i;
 	hcl_oop_t arg, ret;
@@ -594,7 +594,7 @@ static hcl_pfrc_t pf_number_quo (hcl_t* hcl, hcl_mod_t* mod, hcl_ooi_t nargs)
 	return HCL_PF_SUCCESS;
 }
 
-static hcl_pfrc_t pf_number_rem (hcl_t* hcl, hcl_mod_t* mod, hcl_ooi_t nargs)
+static hcl_pfrc_t pf_integer_rem (hcl_t* hcl, hcl_mod_t* mod, hcl_ooi_t nargs)
 {
 	hcl_ooi_t i;
 	hcl_oop_t arg, ret, rem;
@@ -612,8 +612,24 @@ static hcl_pfrc_t pf_number_rem (hcl_t* hcl, hcl_mod_t* mod, hcl_ooi_t nargs)
 	return HCL_PF_SUCCESS;
 }
 
+static hcl_pfrc_t pf_integer_mquo (hcl_t* hcl, hcl_mod_t* mod, hcl_ooi_t nargs)
+{
+	hcl_ooi_t i;
+	hcl_oop_t arg, ret;
 
-static hcl_pfrc_t pf_number_mod (hcl_t* hcl, hcl_mod_t* mod, hcl_ooi_t nargs)
+	ret = HCL_STACK_GETARG(hcl, nargs, 0);
+	for (i = 1; i < nargs; i++)
+	{
+		arg = HCL_STACK_GETARG(hcl, nargs, i);
+		ret = hcl_divints(hcl, ret, arg, 1, HCL_NULL);
+		if (!ret) return HCL_PF_FAILURE;
+	}
+
+	HCL_STACK_SETRET (hcl, nargs, ret);
+	return HCL_PF_SUCCESS;
+}
+
+static hcl_pfrc_t pf_integer_mod (hcl_t* hcl, hcl_mod_t* mod, hcl_ooi_t nargs)
 {
 	hcl_ooi_t i;
 	hcl_oop_t arg, ret, rem;
@@ -801,9 +817,6 @@ static pf_t builtin_prims[] =
 	{ 1, HCL_TYPE_MAX(hcl_oow_t), pf_number_mul,      1,  { '*' } },
 	{ 1, HCL_TYPE_MAX(hcl_oow_t), pf_number_mlt,      3,  { 'm','l','t' } },
 	{ 1, HCL_TYPE_MAX(hcl_oow_t), pf_number_div,      1,  { '/' } },
-	{ 1, HCL_TYPE_MAX(hcl_oow_t), pf_number_quo,      3,  { 'q','u','o' } },
-	{ 2, HCL_TYPE_MAX(hcl_oow_t), pf_number_rem,      3,  { 'r','e','m' } },
-	{ 2, HCL_TYPE_MAX(hcl_oow_t), pf_number_mod,      3,  { 'm','o','d' } },
 	{ 1, 1,                       pf_number_sqrt,     4,  { 's','q','r','t' } },
 	{ 1, 1,                       pf_number_abs,      3,  { 'a','b','s' } },
 
@@ -820,6 +833,11 @@ static pf_t builtin_prims[] =
 	{ 2, 2,                       pf_integer_bxor,    7,  { 'b','i','t','-','x','o','r' } },
 	{ 1, 1,                       pf_integer_bnot,    7,  { 'b','i','t','-','n','o','t' } },
 	{ 2, 2,                       pf_integer_bshift,  9,  { 'b','i','t','-','s','h','i','f','t'  } },
+	
+	{ 1, HCL_TYPE_MAX(hcl_oow_t), pf_integer_quo,      3,  { 'd','i','v' } },
+	{ 2, HCL_TYPE_MAX(hcl_oow_t), pf_integer_rem,      3,  { 'r','e','m' } },
+	{ 1, HCL_TYPE_MAX(hcl_oow_t), pf_integer_mquo,     4,  { 'm','d','i','v' } },
+	{ 2, HCL_TYPE_MAX(hcl_oow_t), pf_integer_mod,      3,  { 'm','o','d' } },
 };
 
 
