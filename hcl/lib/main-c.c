@@ -462,6 +462,8 @@ static int start_reply (hcl_client_t* client, hcl_client_reply_type_t type, cons
 			hcl_bch_t bcs[256];
 			hcl_oow_t bcslen;
 
+			/* NOTE: the error may get truncated without looping */
+			bcslen = HCL_COUNTOF(bcs); 
 			hcl_conv_uchars_to_bchars_with_cmgr (dptr, &dlen, bcs, &bcslen, hcl_client_getcmgr(client));
 			printf ("\nERROR - [%.*s]\n", (int)bcslen, bcs);
 		#else
@@ -470,8 +472,36 @@ static int start_reply (hcl_client_t* client, hcl_client_reply_type_t type, cons
 		}
 		else
 		{
-			printf ("\nTOTAL DATA %lu bytes\n", (unsigned long int)client_xtn->data_length);
+		#if defined(HCL_OOCH_IS_UCH)
+			hcl_oow_t drem = dlen;
+			while (drem > 0)
+			{
+				hcl_bch_t bcs[256];
+				hcl_oow_t ucslen, bcslen;
+
+				ucslen = drem;
+				bcslen = HCL_COUNTOF(bcs);
+				hcl_conv_uchars_to_bchars_with_cmgr(dptr, &ucslen, bcs, &bcslen, hcl_client_getcmgr(client));
+				client_xtn->data_length += bcslen;
+				if (write_all(0, bcs, bcslen) <= -1)
+				{
+					hcl_client_seterrbfmt (client, HCL_EIOERR, "unable to write data");
+					return -1;
+				}
+
+				drem -= ucslen;
+				dptr += ucslen;
+			}
+		#else
+			client_xtn->data_length += dlen;
+			if (write_all(0, dptr, dlen) <= -1)
+			{
+				hcl_client_seterrbfmt (client, HCL_EIOERR, "unable to write data");
+				return -1;
+			}
+		#endif
 		}
+		printf ("\nTOTAL DATA %lu bytes\n", (unsigned long int)client_xtn->data_length);
 
 		/*fflush (stdout);*/
 		client_xtn->reply_count++;

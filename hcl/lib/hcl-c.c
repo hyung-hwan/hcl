@@ -233,6 +233,7 @@ static HCL_INLINE int is_token_integer (hcl_client_t* client, hcl_oow_t* value)
 
 static HCL_INLINE hcl_ooch_t unescape (hcl_ooch_t c)
 {
+#if 0
 	/* as of this writing, the server side only escapes \ and ".
 	 * i don't know if n, r, f, t, v should be supported here */
 	switch (c)
@@ -244,6 +245,9 @@ static HCL_INLINE hcl_ooch_t unescape (hcl_ooch_t c)
 		case 'v': return '\v';
 		default: return c;
 	}
+#else
+	return c;
+#endif
 }
 
 static int handle_char (hcl_client_t* client, hcl_ooci_t c, hcl_oow_t nbytes)
