@@ -253,8 +253,8 @@ am__can_run_installinfo = \
     n|no|NO) false;; \
     *) (install-info --version) >/dev/null 2>&1;; \
   esac
-am__pkginclude_HEADERS_DIST = hcl-cfg.h hcl-cmn.h hcl-rbt.h hcl-tmr.h \
-	hcl-utl.h hcl.h hcl-s.h hcl-c.h
+am__pkginclude_HEADERS_DIST = hcl.h hcl-cmn.h hcl-opt.h hcl-rbt.h \
+	hcl-tmr.h hcl-utl.h hcl-s.h hcl-c.h
 HEADERS = $(pkginclude_HEADERS)
 am__tagged_files = $(HEADERS) $(SOURCES) $(TAGS_FILES) \
 	$(LISP)hcl-cfg.h.in
@@ -448,13 +448,17 @@ CPPFLAGS_ALL_COMMON = \
 CPPFLAGS_LIB_COMMON = $(CPPFLAGS_ALL_COMMON)
 LDFLAGS_LIB_COMMON = $(LDFLAGS_ALL_COMMON) -version-info 1:0:0 -no-undefined
 LIBADD_LIB_COMMON = $(LIBM) $(am__append_1) $(am__append_2)
-pkginclude_HEADERS = hcl-cfg.h hcl-cmn.h hcl-rbt.h hcl-tmr.h hcl-utl.h \
-	hcl.h $(am__append_4) $(am__append_6)
+pkginclude_HEADERS = hcl.h hcl-cmn.h hcl-opt.h hcl-rbt.h hcl-tmr.h \
+	hcl-utl.h $(am__append_4) $(am__append_6)
 pkglib_LTLIBRARIES = libhcl.la $(am__append_3) $(am__append_5)
 libhcl_la_SOURCES = \
+	hcl.h \
+	hcl-cmn.h \
+	hcl-opt.h \
+	hcl-rbt.h \
+	hcl-tmr.h \
+	hcl-utl.h \
 	hcl-prv.h \
-	logfmtv.h \
-	sa-utl.h \
 	bigint.c \
 	comp.c \
 	debug.c \
@@ -465,6 +469,7 @@ libhcl_la_SOURCES = \
 	gc.c \
 	hcl.c \
 	heap.c \
+	logfmtv.h \
 	logfmt.c \
 	number.c \
 	obj.c \
@@ -477,6 +482,7 @@ libhcl_la_SOURCES = \
 	sym.c \
 	tmr.c \
 	utf8.c \
+	sa-utl.h \
 	utl.c 
 
 libhcl_la_CPPFLAGS = $(CPPFLAGS_LIB_COMMON)
@@ -496,7 +502,7 @@ libhcl_la_DEPENDENCIES = $(am__append_8)
 hcl_SOURCES = main.c 
 hcl_CPPFLAGS = $(CPPFLAGS_LIB_COMMON)
 hcl_LDFLAGS = $(LDFLAGS_LIB_COMMON)
-hcl_LDADD = $(LIBADD_LIB_COMMON) -lhcl #-ldyncall_s
+hcl_LDADD = $(LIBADD_LIB_COMMON) -lhcl
 @ENABLE_STATIC_MODULE_TRUE@hcl_DEPENDENCIES = libhcl.la
 @ENABLE_HCLS_TRUE@hcls_SOURCES = main-s.c
 @ENABLE_HCLS_TRUE@hcls_CPPFLAGS = $(CPPFLAGS_LIB_COMMON)

@@ -21063,7 +21063,10 @@ else
 
 fi
 
-test "${enable_shared}" = "no" && enable_dynamic_module_is="no"
+if test "${enable_shared}" = "no"
+then
+	enable_dynamic_module_is="no"
+fi
 
 if test "${enable_dynamic_module_is}" = "yes"
 then
@@ -21088,7 +21091,11 @@ else
 
 fi
 
-test "${enable_shared}" = "no" -a "${enable_static}" = "yes" && enable_static_module_is="yes"
+
+if test "${enable_shared}" = "no" -a "${enable_static}" = "yes"
+then
+	enable_static_module_is="yes"
+fi
 
 if test "${enable_static_module_is}" = "yes"
 then

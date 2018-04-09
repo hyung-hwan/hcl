@@ -33,18 +33,22 @@ pkgincludedir = $(includedir)
 pkglibdir = $(libdir)
 
 pkginclude_HEADERS = \
-	hcl-cfg.h \
+	hcl.h \
 	hcl-cmn.h \
+	hcl-opt.h \
 	hcl-rbt.h \
 	hcl-tmr.h \
-	hcl-utl.h \
-	hcl.h
+	hcl-utl.h
 
 pkglib_LTLIBRARIES = libhcl.la
 libhcl_la_SOURCES = \
+	hcl.h \
+	hcl-cmn.h \
+	hcl-opt.h \
+	hcl-rbt.h \
+	hcl-tmr.h \
+	hcl-utl.h \
 	hcl-prv.h \
-	logfmtv.h \
-	sa-utl.h \
 	bigint.c \
 	comp.c \
 	debug.c \
@@ -55,6 +59,7 @@ libhcl_la_SOURCES = \
 	gc.c \
 	hcl.c \
 	heap.c \
+	logfmtv.h \
 	logfmt.c \
 	number.c \
 	obj.c \
@@ -67,6 +72,7 @@ libhcl_la_SOURCES = \
 	sym.c \
 	tmr.c \
 	utf8.c \
+	sa-utl.h \
 	utl.c 
 libhcl_la_CPPFLAGS = $(CPPFLAGS_LIB_COMMON)
 libhcl_la_LDFLAGS = $(LDFLAGS_LIB_COMMON)
@@ -106,7 +112,7 @@ bin_PROGRAMS = hcl
 hcl_SOURCES = main.c 
 hcl_CPPFLAGS = $(CPPFLAGS_LIB_COMMON)
 hcl_LDFLAGS = $(LDFLAGS_LIB_COMMON)
-hcl_LDADD = $(LIBADD_LIB_COMMON) -lhcl #-ldyncall_s
+hcl_LDADD = $(LIBADD_LIB_COMMON) -lhcl
 if ENABLE_STATIC_MODULE
 hcl_DEPENDENCIES = libhcl.la
 endif

@@ -597,7 +597,10 @@ AC_ARG_ENABLE([dynamic-module],
 	enable_dynamic_module_is=$enableval,
 	enable_dynamic_module_is=yes
 )
-test "${enable_shared}" = "no" && enable_dynamic_module_is="no"
+if test "${enable_shared}" = "no"
+then
+	enable_dynamic_module_is="no"
+fi
 
 if test "${enable_dynamic_module_is}" = "yes"
 then
@@ -611,7 +614,11 @@ AC_ARG_ENABLE([static-module],
 	enable_static_module_is=$enableval,
 	enable_static_module_is=no
 )
-test "${enable_shared}" = "no" -a "${enable_static}" = "yes" && enable_static_module_is="yes"
+
+if test "${enable_shared}" = "no" -a "${enable_static}" = "yes"
+then
+	enable_static_module_is="yes"
+fi
 
 if test "${enable_static_module_is}" = "yes"
 then
