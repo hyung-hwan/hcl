@@ -560,7 +560,7 @@ static int logfmtv (hcl_t* hcl, const fmtchar_t* fmt, hcl_fmtout_t* data, va_lis
 
 					/* this must not fail since the dry-run above was successful */
 					/*hcl_convutooochars (hcl, &usp[tot_len], &src_len, conv_buf, &conv_len);*/
-					hcl_conv_uchars_to_bchars_with_cmgr (hcl, &usp[tot_len], &src_len, conv_buf, &conv_len, hcl->cmgr);
+					hcl_conv_uchars_to_bchars_with_cmgr (&usp[tot_len], &src_len, conv_buf, &conv_len, hcl->cmgr);
 					tot_len += src_len;
 
 					if (conv_len > n) conv_len = n;
