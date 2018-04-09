@@ -316,6 +316,7 @@ struct hcl_server_t
 		hcl_oow_t actor_heap_size;
 		hcl_ntime_t actor_max_runtime;
 		hcl_ooch_t script_include_path[HCL_PATH_MAX + 1];
+		void* module_inctx;
 	} cfg;
 
 	struct
@@ -1067,6 +1068,7 @@ hcl_server_proto_t* hcl_server_proto_open (hcl_oow_t xtnsize, hcl_server_worker_
 	xtn = (worker_hcl_xtn_t*)hcl_getxtn(proto->hcl);
 	xtn->proto = proto;
 
+	hcl_setoption (proto->hcl, HCL_MOD_INCTX, &proto->worker->server->cfg.module_inctx);
 	hcl_setoption (proto->hcl, HCL_LOG_MASK, &proto->worker->server->cfg.logmask);
 	hcl_setcmgr (proto->hcl, proto->worker->server->cmgr);
 
@@ -2644,6 +2646,10 @@ int hcl_server_setoption (hcl_server_t* server, hcl_server_option_t id, const vo
 		case HCL_SERVER_SCRIPT_INCLUDE_PATH:
 			hcl_copy_oocstr (server->cfg.script_include_path, HCL_COUNTOF(server->cfg.script_include_path), (const hcl_ooch_t*)value);
 			return 0;
+
+		case HCL_SERVER_MODULE_INCTX:
+			server->cfg.module_inctx = *(void**)value;
+			return 0;
 	}
 
 	hcl_server_seterrnum (server, HCL_EINVAL);
@@ -2684,6 +2690,10 @@ int hcl_server_getoption (hcl_server_t* server, hcl_server_option_t id, void* va
 
 		case HCL_SERVER_SCRIPT_INCLUDE_PATH:
 			*(hcl_ooch_t**)value = server->cfg.script_include_path;
+			return 0;
+
+		case HCL_SERVER_MODULE_INCTX:
+			*(void**)value = server->cfg.module_inctx;
 			return 0;
 	};
 

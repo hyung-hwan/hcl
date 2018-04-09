@@ -374,6 +374,10 @@ int hcl_setoption (hcl_t* hcl, hcl_option_t id, const void* value)
 			hcl->option.dfl_procstk_size = *(hcl_oow_t*)value;
 			return 0;
 		}
+		
+		case HCL_MOD_INCTX:
+			hcl->option.mod_inctx = *(void**)value;
+			return 0;
 	}
 
 einval:
@@ -407,6 +411,10 @@ int hcl_getoption (hcl_t* hcl, hcl_option_t id, void* value)
 
 		case HCL_PROCSTK_SIZE:
 			*(hcl_oow_t*)value = hcl->option.dfl_procstk_size;
+			return 0;
+
+		case HCL_MOD_INCTX:
+			*(void**)value = hcl->option.mod_inctx;
 			return 0;
 	};
 
@@ -563,6 +571,7 @@ hcl_mod_data_t* hcl_openmod (hcl_t* hcl, const hcl_ooch_t* name, hcl_oow_t namel
 		/* found the module in the staic module table */
 
 		HCL_MEMSET (&md, 0, HCL_SIZEOF(md));
+		md.mod.inctx = hcl->option.mod_inctx;
 		hcl_copy_oochars ((hcl_ooch_t*)md.mod.name, name, namelen);
 		/* Note md.handle is HCL_NULL for a static module */
 
@@ -605,6 +614,7 @@ hcl_mod_data_t* hcl_openmod (hcl_t* hcl, const hcl_ooch_t* name, hcl_oow_t namel
 
 	/* attempt to find a dynamic external module */
 	HCL_MEMSET (&md, 0, HCL_SIZEOF(md));
+	md.mod.inctx = hcl->option.mod_inctx;
 	hcl_copy_oochars((hcl_ooch_t*)md.mod.name, name, namelen);
 	if (hcl->vmprim.dl_open && hcl->vmprim.dl_getsym && hcl->vmprim.dl_close)
 	{
@@ -695,7 +705,7 @@ hcl_pfbase_t* hcl_querymod (hcl_t* hcl, const hcl_ooch_t* pfid, hcl_oow_t pfidle
 	hcl_oow_t mod_name_len;
 	hcl_pfbase_t* pfbase;
 
-	sep = hcl_rfind_oochar (pfid, pfidlen, '.');
+	sep = hcl_rfind_oochar(pfid, pfidlen, '.');
 	if (!sep)
 	{
 		/* i'm writing a conservative code here. the compiler should 

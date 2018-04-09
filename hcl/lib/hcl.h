@@ -163,7 +163,8 @@ enum hcl_option_t
 	HCL_LOG_MAXCAPA,
 	HCL_SYMTAB_SIZE,  /* default system table size */
 	HCL_SYSDIC_SIZE,  /* default system dictionary size */
-	HCL_PROCSTK_SIZE  /* default process stack size */
+	HCL_PROCSTK_SIZE, /* default process stack size */
+	HCL_MOD_INCTX
 };
 typedef enum hcl_option_t hcl_option_t;
 
@@ -1015,9 +1016,10 @@ typedef void (*hcl_mod_gc_t) (
 struct hcl_mod_t
 {
 	/* input */
-	/*const*/ hcl_ooch_t name[HCL_MOD_NAME_LEN_MAX + 1];
+	hcl_ooch_t       name[HCL_MOD_NAME_LEN_MAX + 1];
+	void*            inctx;
 
-	/* user-defined data */
+	/* user-defined data - the module intializer shoudl fill in the following fields. */
 	hcl_mod_query_t  query;
 	hcl_mod_unload_t unload;
 	hcl_mod_gc_t     gc;
@@ -1076,6 +1078,7 @@ struct hcl_t
 		hcl_oow_t dfl_symtab_size;
 		hcl_oow_t dfl_sysdic_size;
 		hcl_oow_t dfl_procstk_size; 
+		void* mod_inctx;
 
 	#if defined(HCL_BUILD_DEBUG)
 		/* set automatically when trait is set */
