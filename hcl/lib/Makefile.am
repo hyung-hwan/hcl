@@ -58,7 +58,7 @@ libhcl_la_SOURCES = \
 	logfmt.c \
 	number.c \
 	obj.c \
-	opt-imp.h \
+	opt-impl.h \
 	opt.c \
 	prim.c \
 	print.c \
@@ -75,6 +75,7 @@ libhcl_la_DEPENDENCIES =
 
 if ENABLE_HCLS
 pkglib_LTLIBRARIES += libhcls.la
+pkginclude_HEADERS += hcl-s.h
 libhcls_la_SOURCES = hcl-s.c hcl-s.h
 libhcls_la_CPPFLAGS = $(CPPFLAGS_LIB_COMMON)
 libhcls_la_LDFLAGS = $(LDFLAGS_LIB_COMMON)
@@ -84,6 +85,7 @@ endif
 
 if ENABLE_HCLC
 pkglib_LTLIBRARIES += libhclc.la
+pkginclude_HEADERS += hcl-c.h
 libhclc_la_SOURCES = hcl-c.c hcl-c.h
 libhclc_la_CPPFLAGS = $(CPPFLAGS_LIB_COMMON)
 libhclc_la_LDFLAGS = $(LDFLAGS_LIB_COMMON)
