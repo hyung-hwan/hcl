@@ -597,16 +597,16 @@ AC_ARG_ENABLE([dynamic-module],
 	enable_dynamic_module_is=$enableval,
 	enable_dynamic_module_is=yes
 )
-if test "${enable_shared}" = "no"
+if test "x${enable_shared}" = "xno"
 then
 	enable_dynamic_module_is="no"
 fi
 
-if test "${enable_dynamic_module_is}" = "yes"
+if test "x${enable_dynamic_module_is}" = "xyes"
 then
 	AC_DEFINE([HCL_ENABLE_DYNAMIC_MODULE],[1],[enable dynamic module capability])
 fi
-AM_CONDITIONAL(ENABLE_DYNAMIC_MODULE, test "${enable_dynamic_module_is}" = "yes")
+AM_CONDITIONAL(ENABLE_DYNAMIC_MODULE, test "x${enable_dynamic_module_is}" = "xyes")
 
 dnl ===== enable-static-module =====
 AC_ARG_ENABLE([static-module],
@@ -615,16 +615,16 @@ AC_ARG_ENABLE([static-module],
 	enable_static_module_is=no
 )
 
-if test "${enable_shared}" = "no" -a "${enable_static}" = "yes"
+if test "x${enable_shared}" = "xno" -a "x${enable_static}" = "xyes"
 then
-	enable_static_module_is="yes"
+	enable_static_module_is="xyes"
 fi
 
-if test "${enable_static_module_is}" = "yes"
+if test "x${enable_static_module_is}" = "xyes"
 then
 	AC_DEFINE([HCL_ENABLE_STATIC_MODULE],[1],[link modules statically into the main library])
 fi
-AM_CONDITIONAL(ENABLE_STATIC_MODULE, test "${enable_static_module_is}" = "yes")
+AM_CONDITIONAL(ENABLE_STATIC_MODULE, test "x${enable_static_module_is}" = "xyes")
 
 dnl ===== enable-libltdl =====
 AC_ARG_ENABLE([libltdl],
@@ -632,16 +632,16 @@ AC_ARG_ENABLE([libltdl],
 	enable_libltdl_is=$enableval,
 	enable_libltdl_is=no
 )
-if test "${enable_libltdl_is}" = "yes"
+if test "x${enable_libltdl_is}" = "xyes"
 then
-	if test "${ac_cv_header_ltdl_h}" = "yes"  -a "${LTDL_LIBS}" != ""
+	if test "x${ac_cv_header_ltdl_h}" = "xyes"  -a "${LTDL_LIBS}" != ""
 	then
 		AC_DEFINE([HCL_ENABLE_LIBLTDL],[],[use libltdl when loading a dynamic module])
 	else
 		enable_libltdl_is="no"
 	fi
 fi
-AM_CONDITIONAL(ENABLE_LIBLTDL, test "${enable_libltdl_is}" = "yes")
+AM_CONDITIONAL(ENABLE_LIBLTDL, test "x${enable_libltdl_is}" = "xyes")
 
 dnl ===== enable-hcls =====
 AC_ARG_ENABLE([hcls],
@@ -649,7 +649,7 @@ AC_ARG_ENABLE([hcls],
 	enable_hcls_is=$enableval,
 	enable_hcls_is=no
 )
-AM_CONDITIONAL(ENABLE_HCLS, test "${enable_hcls_is}" = "yes")
+AM_CONDITIONAL(ENABLE_HCLS, test "x${enable_hcls_is}" = "xyes")
 
 dnl ===== enable-hclc =====
 AC_ARG_ENABLE([hclc],
@@ -657,7 +657,7 @@ AC_ARG_ENABLE([hclc],
 	enable_hclc_is=$enableval,
 	enable_hclc_is=no
 )
-AM_CONDITIONAL(ENABLE_HCLC, test "${enable_hclc_is}" = "yes")
+AM_CONDITIONAL(ENABLE_HCLC, test "x${enable_hclc_is}" = "xyes")
 
 AC_SUBST(HCL_SIZEOF_WCHAR_T, $ac_cv_sizeof_wchar_t)
 AC_SUBST(HCL_SIZEOF_CHAR16_T, $ac_cv_sizeof_char16_t)
