@@ -947,7 +947,8 @@ static int get_sharp_token (hcl_t* hcl)
 			if (is_delimiter(c)) 
 			{
 				/* EOF, whitespace, etc */
-				hcl_setsynerr (hcl, HCL_SYNERR_HASHLIT, TOKEN_LOC(hcl), TOKEN_NAME(hcl));
+				hcl_setsynerrbfmt (hcl, HCL_SYNERR_HASHLIT, TOKEN_LOC(hcl), TOKEN_NAME(hcl),
+					"invalid hashed literal #%jc", c);
 				return -1;
 			}
 
@@ -967,7 +968,7 @@ static int get_sharp_token (hcl_t* hcl)
 			else
 			{
 				hcl_setsynerrbfmt (hcl, HCL_SYNERR_HASHLIT, TOKEN_LOC(hcl), TOKEN_NAME(hcl),
-					"invalid hashed literal name %.*js", hcl->c->tok.name.len, hcl->c->tok.name.ptr);
+					"invalid hashed literal %.*js", hcl->c->tok.name.len, hcl->c->tok.name.ptr);
 				return -1;
 			}
 
