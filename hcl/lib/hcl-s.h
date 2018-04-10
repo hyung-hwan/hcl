@@ -198,6 +198,13 @@ HCL_EXPORT void hcl_server_freemem (
 	void*         ptr
 );
 
+HCL_EXPORT int hcl_server_proto_feed_reply (
+	hcl_server_proto_t* proto,
+	const hcl_ooch_t*   ptr,
+	hcl_oow_t           len,
+	int                 escape
+);
+
 #if defined(__cplusplus)
 }
 #endif

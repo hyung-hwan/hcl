@@ -936,7 +936,7 @@ struct hcl_cb_t
 {
 	hcl_cb_gc_t gc;
 	hcl_cb_fini_t fini;
-	
+
 	hcl_cb_vm_startup_t vm_startup;
 	hcl_cb_vm_cleanup_t vm_cleanup;
 	hcl_cb_vm_checkbc_t vm_checkbc;

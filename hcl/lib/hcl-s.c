@@ -349,8 +349,6 @@ struct hcl_server_t
 	pthread_mutex_t log_mutex;
 };
 
-int hcl_server_proto_feed_reply (hcl_server_proto_t* proto, const hcl_ooch_t* ptr, hcl_oow_t len, int escape);
-
 /* ========================================================================= */
 
 #if defined(_WIN32) || defined(__OS2__) || defined(__DOS__)
