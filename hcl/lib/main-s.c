@@ -27,6 +27,7 @@
 #include "hcl-s.h"
 #include "hcl-opt.h"
 #include "hcl-utl.h"
+#include "hcl-xutl.h"
 
 #include <stdio.h>
 #include <stdlib.h>

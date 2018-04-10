@@ -643,21 +643,13 @@ then
 fi
 AM_CONDITIONAL(ENABLE_LIBLTDL, test "x${enable_libltdl_is}" = "xyes")
 
-dnl ===== enable-hcls =====
-AC_ARG_ENABLE([hcls],
-	[AS_HELP_STRING([--enable-hcls],[build libhcls and hcls(default. no)])],
-	enable_hcls_is=$enableval,
-	enable_hcls_is=no
+dnl ===== enable-hclex =====
+AC_ARG_ENABLE([hclex],
+	[AS_HELP_STRING([--enable-hclex],[build libhclex(default. no)])],
+	enable_hclex_is=$enableval,
+	enable_hclex_is=no
 )
-AM_CONDITIONAL(ENABLE_HCLS, test "x${enable_hcls_is}" = "xyes")
-
-dnl ===== enable-hclc =====
-AC_ARG_ENABLE([hclc],
-	[AS_HELP_STRING([--enable-hclc],[build libhclc and hclc(default. no)])],
-	enable_hclc_is=$enableval,
-	enable_hclc_is=no
-)
-AM_CONDITIONAL(ENABLE_HCLC, test "x${enable_hclc_is}" = "xyes")
+AM_CONDITIONAL(ENABLE_HCLEX, test "x${enable_hclex_is}" = "xyes")
 
 AC_SUBST(HCL_SIZEOF_WCHAR_T, $ac_cv_sizeof_wchar_t)
 AC_SUBST(HCL_SIZEOF_CHAR16_T, $ac_cv_sizeof_char16_t)

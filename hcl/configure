@@ -651,10 +651,8 @@ HCL_SIZEOF_LONG_LONG
 HCL_SIZEOF_CHAR32_T
 HCL_SIZEOF_CHAR16_T
 HCL_SIZEOF_WCHAR_T
-ENABLE_HCLC_FALSE
-ENABLE_HCLC_TRUE
-ENABLE_HCLS_FALSE
-ENABLE_HCLS_TRUE
+ENABLE_HCLEX_FALSE
+ENABLE_HCLEX_TRUE
 ENABLE_LIBLTDL_FALSE
 ENABLE_LIBLTDL_TRUE
 ENABLE_STATIC_MODULE_FALSE
@@ -820,8 +818,7 @@ enable_cxx
 enable_dynamic_module
 enable_static_module
 enable_libltdl
-enable_hcls
-enable_hclc
+enable_hclex
 '
       ac_precious_vars='build_alias
 host_alias
@@ -1487,8 +1484,7 @@ Optional Features:
   --enable-static-module  build modules statically into the main
                           library(default. no)
   --enable-libltdl        use libltdl(default. no)
-  --enable-hcls           build libhcls and hcls(default. no)
-  --enable-hclc           build libhclc and hclc(default. no)
+  --enable-hclex          build libhclex(default. no)
 
 Optional Packages:
   --with-PACKAGE[=ARG]    use PACKAGE [ARG=yes]
@@ -21152,37 +21148,20 @@ else
 fi
 
 
-# Check whether --enable-hcls was given.
-if test "${enable_hcls+set}" = set; then :
-  enableval=$enable_hcls; enable_hcls_is=$enableval
+# Check whether --enable-hclex was given.
+if test "${enable_hclex+set}" = set; then :
+  enableval=$enable_hclex; enable_hclex_is=$enableval
 else
-  enable_hcls_is=no
+  enable_hclex_is=no
 
 fi
 
- if test "x${enable_hcls_is}" = "xyes"; then
-  ENABLE_HCLS_TRUE=
-  ENABLE_HCLS_FALSE='#'
+ if test "x${enable_hclex_is}" = "xyes"; then
+  ENABLE_HCLEX_TRUE=
+  ENABLE_HCLEX_FALSE='#'
 else
-  ENABLE_HCLS_TRUE='#'
-  ENABLE_HCLS_FALSE=
-fi
-
-
-# Check whether --enable-hclc was given.
-if test "${enable_hclc+set}" = set; then :
-  enableval=$enable_hclc; enable_hclc_is=$enableval
-else
-  enable_hclc_is=no
-
-fi
-
- if test "x${enable_hclc_is}" = "xyes"; then
-  ENABLE_HCLC_TRUE=
-  ENABLE_HCLC_FALSE='#'
-else
-  ENABLE_HCLC_TRUE='#'
-  ENABLE_HCLC_FALSE=
+  ENABLE_HCLEX_TRUE='#'
+  ENABLE_HCLEX_FALSE=
 fi
 
 
@@ -21384,12 +21363,8 @@ if test -z "${ENABLE_LIBLTDL_TRUE}" && test -z "${ENABLE_LIBLTDL_FALSE}"; then
   as_fn_error $? "conditional \"ENABLE_LIBLTDL\" was never defined.
 Usually this means the macro was only invoked conditionally." "$LINENO" 5
 fi
-if test -z "${ENABLE_HCLS_TRUE}" && test -z "${ENABLE_HCLS_FALSE}"; then
-  as_fn_error $? "conditional \"ENABLE_HCLS\" was never defined.
-Usually this means the macro was only invoked conditionally." "$LINENO" 5
-fi
-if test -z "${ENABLE_HCLC_TRUE}" && test -z "${ENABLE_HCLC_FALSE}"; then
-  as_fn_error $? "conditional \"ENABLE_HCLC\" was never defined.
+if test -z "${ENABLE_HCLEX_TRUE}" && test -z "${ENABLE_HCLEX_FALSE}"; then
+  as_fn_error $? "conditional \"ENABLE_HCLEX\" was never defined.
 Usually this means the macro was only invoked conditionally." "$LINENO" 5
 fi
 

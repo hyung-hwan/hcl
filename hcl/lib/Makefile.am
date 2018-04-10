@@ -37,7 +37,6 @@ pkginclude_HEADERS = \
 	hcl-cmn.h \
 	hcl-opt.h \
 	hcl-rbt.h \
-	hcl-tmr.h \
 	hcl-utl.h
 
 pkglib_LTLIBRARIES = libhcl.la
@@ -46,7 +45,6 @@ libhcl_la_SOURCES = \
 	hcl-cmn.h \
 	hcl-opt.h \
 	hcl-rbt.h \
-	hcl-tmr.h \
 	hcl-utl.h \
 	hcl-prv.h \
 	bigint.c \
@@ -70,34 +68,12 @@ libhcl_la_SOURCES = \
 	rbt.c \
 	read.c \
 	sym.c \
-	tmr.c \
 	utf8.c \
-	sa-utl.h \
 	utl.c 
 libhcl_la_CPPFLAGS = $(CPPFLAGS_LIB_COMMON)
 libhcl_la_LDFLAGS = $(LDFLAGS_LIB_COMMON)
 libhcl_la_LIBADD = $(LIBADD_LIB_COMMON)
 libhcl_la_DEPENDENCIES =
-
-if ENABLE_HCLS
-pkglib_LTLIBRARIES += libhcls.la
-pkginclude_HEADERS += hcl-s.h
-libhcls_la_SOURCES = hcl-s.c hcl-s.h
-libhcls_la_CPPFLAGS = $(CPPFLAGS_LIB_COMMON)
-libhcls_la_LDFLAGS = $(LDFLAGS_LIB_COMMON)
-libhcls_la_LIBADD = $(LIBADD_LIB_COMMON) $(PTHREAD_LIBS)
-libhcls_la_DEPENDENCIES =
-endif
-
-if ENABLE_HCLC
-pkglib_LTLIBRARIES += libhclc.la
-pkginclude_HEADERS += hcl-c.h
-libhclc_la_SOURCES = hcl-c.c hcl-c.h
-libhclc_la_CPPFLAGS = $(CPPFLAGS_LIB_COMMON)
-libhclc_la_LDFLAGS = $(LDFLAGS_LIB_COMMON)
-libhclc_la_LIBADD = $(LIBADD_LIB_COMMON) $(PTHREAD_LIBS)
-libhclc_la_DEPENDENCIES =
-endif
 
 if ENABLE_STATIC_MODULE
 libhcl_la_LIBADD += -lhcl-arr
@@ -113,31 +89,36 @@ hcl_SOURCES = main.c
 hcl_CPPFLAGS = $(CPPFLAGS_LIB_COMMON)
 hcl_LDFLAGS = $(LDFLAGS_LIB_COMMON)
 hcl_LDADD = $(LIBADD_LIB_COMMON) -lhcl
-if ENABLE_STATIC_MODULE
 hcl_DEPENDENCIES = libhcl.la
-endif
 
-if ENABLE_HCLS
+if ENABLE_HCLEX
+pkglib_LTLIBRARIES += libhclex.la
+pkginclude_HEADERS += hcl-c.h hcl-s.h hcl-tmr.h hcl-xutl.h
+libhclex_la_SOURCES = \
+	tmr.c hcl-tmr.h \
+	xutl.c xutl-sa.h hcl-xutl.h \
+	hcl-s.c hcl-s.h \
+	hcl-c.c hcl-c.h
+libhclex_la_CPPFLAGS = $(CPPFLAGS_LIB_COMMON)
+libhclex_la_LDFLAGS = $(LDFLAGS_LIB_COMMON)
+libhclex_la_LIBADD = $(LIBADD_LIB_COMMON) $(PTHREAD_LIBS) -lhcl
+libhclex_la_DEPENDENCIES = libhcl.la
+
 bin_PROGRAMS += hcls
 hcls_SOURCES = main-s.c
 hcls_CPPFLAGS = $(CPPFLAGS_LIB_COMMON)
 hcls_LDFLAGS = $(LDFLAGS_LIB_COMMON)
-hcls_LDADD = $(LIBADD_LIB_COMMON) $(PTHREAD_LIBS) -lhcl -lhcls
-if ENABLE_STATIC_MODULE
-hcls_DEPENDENCIES = libhcl.la libhcls.la
-endif
-endif
+hcls_LDADD = $(LIBADD_LIB_COMMON) $(PTHREAD_LIBS) -lhcl -lhclex
+hcls_DEPENDENCIES = libhclex.la
 
-if ENABLE_HCLC
 bin_PROGRAMS += hclc
 hclc_SOURCES = main-c.c
 hclc_CPPFLAGS = $(CPPFLAGS_LIB_COMMON)
 hclc_LDFLAGS = $(LDFLAGS_LIB_COMMON)
-hclc_LDADD = $(LIBADD_LIB_COMMON) $(PTHREAD_LIBS) -lhcl -lhclc
-if ENABLE_STATIC_MODULE
-hclc_DEPENDENCIES = libhcl.la libhclc.la
+hclc_LDADD = $(LIBADD_LIB_COMMON) $(PTHREAD_LIBS) -lhcl -lhclex
+hclc_DEPENDENCIES = libhclex.la
 endif
-endif
+
 
 install-data-hook:
 	@echo "#ifndef _HCL_CFG_H_" > "$(DESTDIR)$(pkgincludedir)/hcl-cfg.h"

@@ -29,7 +29,6 @@
 
 #include <hcl.h>
 
-
 typedef struct hcl_client_t hcl_client_t;
 
 enum hcl_client_option_t
