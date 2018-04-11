@@ -1591,6 +1591,15 @@ static int execute_script (hcl_server_proto_t* proto, const hcl_bch_t* trigger)
 }
 
 
+static void send_error_message (hcl_server_proto_t* proto, const hcl_bch_t* errmsg)
+{
+	hcl_server_proto_start_reply (proto);
+	if (hcl_server_proto_end_reply(proto, errmsg) <= -1)
+	{
+		HCL_LOG1 (proto->hcl, SERVER_LOGMASK_ERROR, "Unable to send error message - %s\n", errmsg);
+	}
+}
+
 static void show_server_workers (hcl_server_proto_t* proto)
 {
 	hcl_server_t* server;
@@ -1746,6 +1755,7 @@ int hcl_server_proto_handle_request (hcl_server_proto_t* proto)
 			obj = hcl_read(proto->hcl);
 			if (!obj)
 			{
+				send_error_message (proto, hcl_geterrmsg(proto->hcl));
 				HCL_LOG1 (proto->hcl, SERVER_LOGMASK_ERROR, "Unable to read .SCRIPT contents - %js\n", hcl_geterrmsg(proto->hcl));
 				return -1;
 			}
@@ -1753,6 +1763,7 @@ int hcl_server_proto_handle_request (hcl_server_proto_t* proto)
 			if (get_token(proto) <= -1) return -1;
 			if (proto->tok.type != HCL_SERVER_PROTO_TOKEN_NL)
 			{
+				send_error_message (proto, "No new line after .SCRIPT contents");
 				HCL_LOG0 (proto->hcl, SERVER_LOGMASK_ERROR, "No new line after .SCRIPT contents\n");
 				return -1;
 			}
@@ -1760,6 +1771,7 @@ int hcl_server_proto_handle_request (hcl_server_proto_t* proto)
 			proto->worker->opstate = HCL_SERVER_WORKER_OPSTATE_COMPILE;
 			if (hcl_compile(proto->hcl, obj) <= -1)
 			{
+				send_error_message (proto, hcl_geterrmsg(proto->hcl));
 				HCL_LOG1 (proto->hcl, SERVER_LOGMASK_ERROR, "Unable to compile .SCRIPT contents - %js\n", hcl_geterrmsg(proto->hcl));
 				return -1;
 			}
