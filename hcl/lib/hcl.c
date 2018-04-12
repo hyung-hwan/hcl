@@ -286,21 +286,10 @@ void hcl_fini (hcl_t* hcl)
 	}
 }
 
-void hcl_reset (hcl_t* hcl/*, int flags*/)
+void hcl_reset (hcl_t* hcl)
 {
 	hcl_oop_t v;
 	hcl_oow_t i;
-
-#if 0
-	if (flags & HCL_RESET_LXC)
-	{
-		hcl->c->nungots = 0;
-
-		hcl->c->inarg.line = 1;
-		hcl->c->inarg.colm = 1;
-		/* reset on curinp???? hwo to reset the input stream?  or crate a separate function? */
-	}
-#endif
 
 	/* delete all literals shown in the literal frame from the system dictionary 
 	 * excluding special kernel symbols. */
@@ -321,6 +310,12 @@ void hcl_reset (hcl_t* hcl/*, int flags*/)
 
 	/* clean up object memory */
 	hcl_gc (hcl);
+}
+
+void hcl_setinloc (hcl_t* hcl, hcl_oow_t line, hcl_oow_t colm)
+{
+	hcl->c->inarg.line = line;
+	hcl->c->inarg.colm = colm;
 }
 
 int hcl_setoption (hcl_t* hcl, hcl_option_t id, const void* value)
@@ -618,7 +613,7 @@ hcl_mod_data_t* hcl_openmod (hcl_t* hcl, const hcl_ooch_t* name, hcl_oow_t namel
 	hcl_copy_oochars((hcl_ooch_t*)md.mod.name, name, namelen);
 	if (hcl->vmprim.dl_open && hcl->vmprim.dl_getsym && hcl->vmprim.dl_close)
 	{
-		md.handle = hcl->vmprim.dl_open(hcl, &buf[MOD_PREFIX_LEN], HCL_VMPRIM_OPENDL_PFMOD);
+		md.handle = hcl->vmprim.dl_open(hcl, &buf[MOD_PREFIX_LEN], HCL_VMPRIM_DLOPEN_PFMOD);
 	}
 
 	if (md.handle == HCL_NULL) 

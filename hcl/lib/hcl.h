@@ -743,11 +743,11 @@ typedef void (*hcl_syserrstru_t) (
 	hcl_oow_t          len
 );
 
-enum hcl_vmprim_opendl_flag_t
+enum hcl_vmprim_dlopen_flag_t
 {
-	HCL_VMPRIM_OPENDL_PFMOD = (1 << 0)
+	HCL_VMPRIM_DLOPEN_PFMOD = (1 << 0)
 };
-typedef enum hcl_vmprim_opendl_flag_t hcl_vmprim_opendl_flag_t;
+typedef enum hcl_vmprim_dlopen_flag_t hcl_vmprim_dlopen_flag_t;
 
 typedef void* (*hcl_vmprim_dlopen_t) (
 	hcl_t*             hcl,
@@ -818,8 +818,8 @@ typedef enum hcl_iocmd_t hcl_iocmd_t;
 
 struct hcl_ioloc_t
 {
-	unsigned long int  line; /**< line */
-	unsigned long int  colm; /**< column */
+	hcl_oow_t line; /**< line */
+	hcl_oow_t colm; /**< column */
 	const hcl_ooch_t*  file; /**< file specified in #include */
 };
 typedef struct hcl_ioloc_t hcl_ioloc_t;
@@ -874,8 +874,8 @@ struct hcl_ioinarg_t
 		int state;
 	} b;
 
-	unsigned long int line;
-	unsigned long int colm;
+	hcl_oow_t line;
+	hcl_oow_t colm;
 	hcl_ooci_t nl;
 
 	hcl_iolxc_t lxc;
@@ -1484,7 +1484,13 @@ HCL_EXPORT void hcl_fini (
  * the variable symbol.
  */
 HCL_EXPORT void hcl_reset (
-	hcl_t*              hcl
+	hcl_t*   hcl
+);
+
+HCL_EXPORT void hcl_setinloc (
+	hcl_t*    hcl,
+	hcl_oow_t line,
+	hcl_oow_t colm
 );
 
 #if defined(HCL_HAVE_INLINE)

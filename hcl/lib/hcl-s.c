@@ -757,7 +757,7 @@ static void* dl_open (hcl_t* hcl, const hcl_ooch_t* name, int flags)
 		if (!bufptr) return HCL_NULL;
 	}
 
-	if (flags & HCL_VMPRIM_OPENDL_PFMOD)
+	if (flags & HCL_VMPRIM_DLOPEN_PFMOD)
 	{
 		hcl_oow_t len, i, xlen;
 
@@ -1671,11 +1671,11 @@ static void reformat_synerr (hcl_t* hcl)
 	orgmsg = hcl_backuperrmsg(hcl);
 	hcl_seterrbfmt (
 		hcl, HCL_ESYNERR,
-		"%js%s%.*js at line %lu", 
+		"%js%s%.*js at line %zu column %zu", 
 		orgmsg,
 		(synerr.tgt.len > 0? " near ": ""),
 		synerr.tgt.len, synerr.tgt.ptr,
-		(unsigned long int)synerr.loc.line
+		synerr.loc.line, synerr.loc.colm
 	);
 }
 
@@ -1764,6 +1764,8 @@ int hcl_server_proto_handle_request (hcl_server_proto_t* proto)
 		{
 			hcl_oop_t obj;
 			hcl_ooci_t c;
+
+			hcl_setinloc (proto->hcl, 1, 1);
 
 			/* do a special check bypassing get_token(). it checks if the script contents
 			 * come on the same line as .SCRIPT */

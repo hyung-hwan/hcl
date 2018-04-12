@@ -788,7 +788,7 @@ static void* dl_open (hcl_t* hcl, const hcl_ooch_t* name, int flags)
 		if (!bufptr) return HCL_NULL;
 	}
 
-	if (flags & HCL_VMPRIM_OPENDL_PFMOD)
+	if (flags & HCL_VMPRIM_DLOPEN_PFMOD)
 	{
 		hcl_oow_t len, i, xlen;
 
