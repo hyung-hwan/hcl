@@ -1341,6 +1341,12 @@ static HCL_INLINE int unread_last_char (hcl_server_proto_t* proto)
 		c = (proto)->lxc->c; \
 	} while(0)
 
+#define GET_CHAR_TO_WITH_GOTO(proto,c,oops) \
+	do { \
+		if (read_char(proto) <= -1) goto oops; \
+		c = (proto)->lxc->c; \
+	} while(0)
+
 #define UNGET_LAST_CHAR(proto) \
 	do { \
 		if (unread_last_char(proto) <= -1) return -1; \
@@ -1362,7 +1368,7 @@ static HCL_INLINE int add_token_char (hcl_server_proto_t* proto, hcl_ooch_t c)
 		tmp = (hcl_ooch_t*)hcl_server_reallocmem(proto->worker->server, proto->tok.ptr, capa * HCL_SIZEOF(*tmp));
 		if (!tmp) 
 		{
-			HCL_LOG0 (proto->hcl, SERVER_LOGMASK_ERROR, "Out of memory in allocating a token buffer\n");
+			hcl_seterrbfmt (proto->hcl, HCL_ESYSMEM, "Out of memory in allocating token buffer");
 			return -1;
 		}
 
@@ -1433,7 +1439,7 @@ static int get_token (hcl_server_proto_t* proto)
 			GET_CHAR_TO(proto, c);
 			if (!is_alphachar(c))
 			{
-				HCL_LOG0 (proto->hcl, SERVER_LOGMASK_ERROR, "Alphabetic character expected after a period\n");
+				hcl_seterrbfmt (proto->hcl, HCL_EINVAL, "Alphabetic character expected after a period");
 				return -1;
 			}
 
@@ -1465,7 +1471,7 @@ static int get_token (hcl_server_proto_t* proto)
 				break;
 			}
 
-			HCL_LOG1 (proto->hcl, SERVER_LOGMASK_ERROR, "Unrecognized character - [%jc]\n", c);
+			hcl_seterrbfmt (proto->hcl, HCL_EINVAL, "Unrecognized character - [%jc]", c);
 			return -1;
 	}
 	return 0;
@@ -1591,7 +1597,7 @@ static int execute_script (hcl_server_proto_t* proto, const hcl_bch_t* trigger)
 }
 
 
-static void send_error_message (hcl_server_proto_t* proto, const hcl_bch_t* errmsg)
+static void send_error_message (hcl_server_proto_t* proto, const hcl_ooch_t* errmsg)
 {
 	hcl_server_proto_start_reply (proto);
 	if (hcl_server_proto_end_reply(proto, errmsg) <= -1)
@@ -1655,9 +1661,27 @@ static int kill_server_worker (hcl_server_proto_t* proto, hcl_oow_t wid)
 	return xret;
 }
 
+static void reformat_synerr (hcl_t* hcl)
+{
+	hcl_synerr_t synerr;
+	const hcl_ooch_t* orgmsg;
+
+	hcl_getsynerr (hcl, &synerr);
+
+	orgmsg = hcl_backuperrmsg(hcl);
+	hcl_seterrbfmt (
+		hcl, HCL_ESYNERR,
+		"%js%s%.*js at line %lu", 
+		orgmsg,
+		(synerr.tgt.len > 0? " near ": ""),
+		synerr.tgt.len, synerr.tgt.ptr,
+		(unsigned long int)synerr.loc.line
+	);
+}
+
 int hcl_server_proto_handle_request (hcl_server_proto_t* proto)
 {
-	if (get_token(proto) <= -1) return -1;
+	if (get_token(proto) <= -1) goto fail_with_errmsg;
 
 	switch (proto->tok.type)
 	{
@@ -1668,8 +1692,8 @@ int hcl_server_proto_handle_request (hcl_server_proto_t* proto)
 		case HCL_SERVER_PROTO_TOKEN_EOF:
 			if (proto->req.state != HCL_SERVER_PROTO_REQ_IN_TOP_LEVEL)
 			{
-				HCL_LOG0 (proto->hcl, SERVER_LOGMASK_ERROR, "Unexpected EOF without .END\n");
-				return -1;
+				hcl_seterrbfmt (proto->hcl, HCL_EINVAL, "Unexpected EOF without .END");
+				goto fail_with_errmsg;
 			}
 			/* drop connection silently */
 			return 0;
@@ -1677,15 +1701,15 @@ int hcl_server_proto_handle_request (hcl_server_proto_t* proto)
 		case HCL_SERVER_PROTO_TOKEN_EXIT:
 			if (proto->req.state != HCL_SERVER_PROTO_REQ_IN_TOP_LEVEL)
 			{
-				HCL_LOG0 (proto->hcl, SERVER_LOGMASK_ERROR, ".EXIT allowed in the top level only\n");
-				return -1;
+				hcl_seterrbfmt (proto->hcl, HCL_EINVAL, ".EXIT allowed in the top level only");
+				goto fail_with_errmsg;
 			}
 
-			if (get_token(proto) <= -1) return -1;
+			if (get_token(proto) <= -1) goto fail_with_errmsg;
 			if (proto->tok.type != HCL_SERVER_PROTO_TOKEN_NL)
 			{
-				HCL_LOG0 (proto->hcl, SERVER_LOGMASK_ERROR, "No new line after .EXIT\n");
-				return -1;
+				hcl_seterrbfmt (proto->hcl, HCL_EINVAL, "No new line after .EXIT");
+				goto fail_with_errmsg;
 			}
 			
 			hcl_server_proto_start_reply (proto);
@@ -1699,15 +1723,15 @@ int hcl_server_proto_handle_request (hcl_server_proto_t* proto)
 		case HCL_SERVER_PROTO_TOKEN_BEGIN:
 			if (proto->req.state != HCL_SERVER_PROTO_REQ_IN_TOP_LEVEL)
 			{
-				HCL_LOG0 (proto->hcl, SERVER_LOGMASK_ERROR, ".BEGIN not allowed to be nested\n");
-				return -1;
+				hcl_seterrbfmt (proto->hcl, HCL_EINVAL, ".BEGIN not allowed to be nested");
+				goto fail_with_errmsg;
 			}
 
-			if (get_token(proto) <= -1) return -1;
+			if (get_token(proto) <= -1) goto fail_with_errmsg;
 			if (proto->tok.type != HCL_SERVER_PROTO_TOKEN_NL)
 			{
-				HCL_LOG0 (proto->hcl, SERVER_LOGMASK_ERROR, "No new line after .BEGIN\n");
-				return -1;
+				hcl_seterrbfmt (proto->hcl, HCL_EINVAL, "No new line after .BEGIN");
+				goto fail_with_errmsg;
 			}
 
 			proto->req.state = HCL_SERVER_PROTO_REQ_IN_BLOCK_LEVEL;
@@ -1717,19 +1741,22 @@ int hcl_server_proto_handle_request (hcl_server_proto_t* proto)
 		case HCL_SERVER_PROTO_TOKEN_END:
 			if (proto->req.state != HCL_SERVER_PROTO_REQ_IN_BLOCK_LEVEL)
 			{
-				HCL_LOG0 (proto->hcl, SERVER_LOGMASK_ERROR, ".END without opening .BEGIN\n");
-				return -1;
+				hcl_seterrbfmt (proto->hcl, HCL_EINVAL, ".END without opening .BEGIN");
+				goto fail_with_errmsg;
 			}
 
-			if (get_token(proto) <= -1) return -1;
+			if (get_token(proto) <= -1) goto fail_with_errmsg;
 			if (proto->tok.type != HCL_SERVER_PROTO_TOKEN_NL)
 			{
-				HCL_LOG0 (proto->hcl, SERVER_LOGMASK_ERROR, "No new line after .BEGIN\n");
-				return -1;
+				hcl_seterrbfmt (proto->hcl, HCL_EINVAL, "No new line after .END");
+				goto fail_with_errmsg;
 			}
 
 			proto->worker->opstate = HCL_SERVER_WORKER_OPSTATE_EXECUTE;
-			if (execute_script(proto, ".END") <= -1) return -1;
+			/* i must not jump to fail_with_errmsg when execute_script() fails.
+			 * it may have produced some normal output already. so the function
+			 * is supposed to handle an error in itself */
+			if (execute_script(proto, ".END") <= -1) return -1; 
 			proto->req.state = HCL_SERVER_PROTO_REQ_IN_TOP_LEVEL;
 			break;
 
@@ -1740,12 +1767,12 @@ int hcl_server_proto_handle_request (hcl_server_proto_t* proto)
 
 			/* do a special check bypassing get_token(). it checks if the script contents
 			 * come on the same line as .SCRIPT */
-			GET_CHAR_TO (proto, c);
+			GET_CHAR_TO_WITH_GOTO (proto, c, fail_with_errmsg);
 			while (is_spacechar(c)) GET_CHAR_TO (proto, c);
 			if (c == HCL_OOCI_EOF || c == '\n')
 			{
-				HCL_LOG0 (proto->hcl, SERVER_LOGMASK_ERROR, "No contents on the .SCRIPT line\n");
-				return -1;
+				hcl_seterrbfmt (proto->hcl, HCL_EINVAL, "No contents on the .SCRIPT line");
+				goto fail_with_errmsg;
 			}
 			UNGET_LAST_CHAR (proto);
 
@@ -1755,25 +1782,22 @@ int hcl_server_proto_handle_request (hcl_server_proto_t* proto)
 			obj = hcl_read(proto->hcl);
 			if (!obj)
 			{
-				send_error_message (proto, hcl_geterrmsg(proto->hcl));
-				HCL_LOG1 (proto->hcl, SERVER_LOGMASK_ERROR, "Unable to read .SCRIPT contents - %js\n", hcl_geterrmsg(proto->hcl));
-				return -1;
+				if (hcl_geterrnum(proto->hcl) == HCL_ESYNERR) reformat_synerr (proto->hcl);
+				goto fail_with_errmsg;
 			}
 
-			if (get_token(proto) <= -1) return -1;
+			if (get_token(proto) <= -1) goto fail_with_errmsg;
 			if (proto->tok.type != HCL_SERVER_PROTO_TOKEN_NL)
 			{
-				send_error_message (proto, "No new line after .SCRIPT contents");
-				HCL_LOG0 (proto->hcl, SERVER_LOGMASK_ERROR, "No new line after .SCRIPT contents\n");
-				return -1;
+				hcl_seterrbfmt (proto->hcl, HCL_EINVAL, "No new line after .SCRIPT contents");
+				goto fail_with_errmsg;
 			}
 
 			proto->worker->opstate = HCL_SERVER_WORKER_OPSTATE_COMPILE;
 			if (hcl_compile(proto->hcl, obj) <= -1)
 			{
-				send_error_message (proto, hcl_geterrmsg(proto->hcl));
-				HCL_LOG1 (proto->hcl, SERVER_LOGMASK_ERROR, "Unable to compile .SCRIPT contents - %js\n", hcl_geterrmsg(proto->hcl));
-				return -1;
+				if (hcl_geterrnum(proto->hcl) == HCL_ESYNERR) reformat_synerr (proto->hcl);
+				goto fail_with_errmsg;
 			}
 
 			if (proto->req.state == HCL_SERVER_PROTO_REQ_IN_TOP_LEVEL)
@@ -1787,15 +1811,15 @@ int hcl_server_proto_handle_request (hcl_server_proto_t* proto)
 		case HCL_SERVER_PROTO_TOKEN_SHOW_WORKERS:
 			if (proto->req.state != HCL_SERVER_PROTO_REQ_IN_TOP_LEVEL)
 			{
-				HCL_LOG0 (proto->hcl, SERVER_LOGMASK_ERROR, ".SHOW-WORKERS not allowed to be nested\n");
-				return -1;
+				hcl_seterrbfmt (proto->hcl, HCL_EINVAL, ".SHOW-WORKERS not allowed to be nested");
+				goto fail_with_errmsg;
 			}
 
-			if (get_token(proto) <= -1) return -1;
+			if (get_token(proto) <= -1) goto fail_with_errmsg;
 			if (proto->tok.type != HCL_SERVER_PROTO_TOKEN_NL)
 			{
-				HCL_LOG0 (proto->hcl, SERVER_LOGMASK_ERROR, "No new line after .SHOW-WORKERS\n");
-				return -1;
+				hcl_seterrbfmt (proto->hcl, HCL_EINVAL, "No new line after .SHOW-WORKERS");
+				goto fail_with_errmsg;
 			}
 			
 			hcl_server_proto_start_reply (proto);
@@ -1818,24 +1842,24 @@ int hcl_server_proto_handle_request (hcl_server_proto_t* proto)
 
 			if (proto->req.state != HCL_SERVER_PROTO_REQ_IN_TOP_LEVEL)
 			{
-				HCL_LOG0 (proto->hcl, SERVER_LOGMASK_ERROR, ".KILL-WORKER not allowed to be nested\n");
-				return -1;
+				hcl_seterrbfmt (proto->hcl, HCL_EINVAL, ".KILL-WORKER not allowed to be nested");
+				goto fail_with_errmsg;
 			}
 
-			if (get_token(proto) <= -1) return -1;
+			if (get_token(proto) <= -1) goto fail_with_errmsg;
 			if (proto->tok.type != HCL_SERVER_PROTO_TOKEN_NUMBER)
 			{
-				HCL_LOG0 (proto->hcl, SERVER_LOGMASK_ERROR, "No worker ID after .KILL-WORKER\n");
-				return -1;
+				hcl_seterrbfmt (proto->hcl, HCL_EINVAL, "No worker ID after .KILL-WORKER");
+				goto fail_with_errmsg;
 			}
 
 			for (wid = 0, wp = 0; wp < proto->tok.len; wp++) wid = wid * 10 + (proto->tok.ptr[wp] - '0');
 
-			if (get_token(proto) <= -1) return -1;
+			if (get_token(proto) <= -1) goto fail_with_errmsg;
 			if (proto->tok.type != HCL_SERVER_PROTO_TOKEN_NL)
 			{
-				HCL_LOG0 (proto->hcl, SERVER_LOGMASK_ERROR, "No new line after worker ID of .KILL-WORKER\n");
-				return -1;
+				hcl_seterrbfmt (proto->hcl, HCL_EINVAL, "No new line after worker ID of .KILL-WORKER");
+				goto fail_with_errmsg;
 			}
 
 			hcl_server_proto_start_reply (proto);
@@ -1850,11 +1874,16 @@ int hcl_server_proto_handle_request (hcl_server_proto_t* proto)
 		}
 
 		default:
-			HCL_LOG3 (proto->hcl, SERVER_LOGMASK_ERROR, "Unknown token - %d - %.*js\n", (int)proto->tok.type, proto->tok.len, proto->tok.ptr);
-			return -1;
+			hcl_seterrbfmt (proto->hcl, HCL_EINVAL, "Unknown token %.*js of type %d", proto->tok.len, proto->tok.ptr, (int)proto->tok.type);
+			goto fail_with_errmsg;
 	}
 
 	return 1;
+
+fail_with_errmsg:
+	send_error_message (proto, hcl_geterrmsg(proto->hcl));
+	HCL_LOG1 (proto->hcl, SERVER_LOGMASK_ERROR, "Unable to compile .SCRIPT contents - %js\n", hcl_geterrmsg(proto->hcl));
+	return -1;
 }
 
 /* ========================================================================= */
