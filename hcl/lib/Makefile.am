@@ -93,10 +93,11 @@ hcl_DEPENDENCIES = libhcl.la
 
 if ENABLE_HCLEX
 pkglib_LTLIBRARIES += libhclex.la
-pkginclude_HEADERS += hcl-c.h hcl-s.h hcl-tmr.h hcl-xutl.h
+pkginclude_HEADERS += hcl-c.h hcl-s.h hcl-tmr.h hcl-xutl.h hcl-json.h
 libhclex_la_SOURCES = \
 	tmr.c hcl-tmr.h \
 	xutl.c xutl-sa.h hcl-xutl.h \
+	json.c hcl-json.h \
 	hcl-s.c hcl-s.h \
 	hcl-c.c hcl-c.h
 libhclex_la_CPPFLAGS = $(CPPFLAGS_LIB_COMMON)

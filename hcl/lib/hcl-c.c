@@ -796,7 +796,7 @@ static int feed_reply_data (hcl_client_t* client, const hcl_bch_t* data, hcl_oow
 	return 1;
 
 oops:
-	/* TODO: compute the number of processes bytes so far and return it via a parameter??? */
+	/* TODO: compute the number of processed bytes so far and return it via a parameter??? */
 /*printf ("feed oops....\n");*/
 	return -1;
 }
@@ -810,7 +810,6 @@ hcl_client_t* hcl_client_open (hcl_mmgr_t* mmgr, hcl_oow_t xtnsize, hcl_client_p
 	hcl_t* hcl;
 	hcl_vmprim_t vmprim;
 	dummy_hcl_xtn_t* xtn;
-/*	unsigned int trait;*/
 
 	client = (hcl_client_t*)HCL_MMGR_ALLOC(mmgr, HCL_SIZEOF(*client) + xtnsize);
 	if (!client) 
@@ -852,7 +851,7 @@ hcl_client_t* hcl_client_open (hcl_mmgr_t* mmgr, hcl_oow_t xtnsize, hcl_client_p
 
 void hcl_client_close (hcl_client_t* client)
 {
-	if (client->rep.tok.ptr)	hcl_client_freemem (client, client->rep.tok.ptr);
+	if (client->rep.tok.ptr) hcl_client_freemem (client, client->rep.tok.ptr);
 	if (client->rep.last_attr_key.ptr) hcl_client_freemem (client, client->rep.last_attr_key.ptr);
 	hcl_close (client->dummy_hcl);
 	HCL_MMGR_FREE (client->mmgr, client);

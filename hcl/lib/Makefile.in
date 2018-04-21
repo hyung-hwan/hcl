@@ -97,7 +97,7 @@ host_triplet = @host@
 @ENABLE_STATIC_MODULE_TRUE@	$(abs_builddir)/../mod/libhcl-str.la
 bin_PROGRAMS = hcl$(EXEEXT) $(am__EXEEXT_1)
 @ENABLE_HCLEX_TRUE@am__append_5 = libhclex.la
-@ENABLE_HCLEX_TRUE@am__append_6 = hcl-c.h hcl-s.h hcl-tmr.h hcl-xutl.h
+@ENABLE_HCLEX_TRUE@am__append_6 = hcl-c.h hcl-s.h hcl-tmr.h hcl-xutl.h hcl-json.h
 @ENABLE_HCLEX_TRUE@am__append_7 = hcls hclc
 subdir = lib
 ACLOCAL_M4 = $(top_srcdir)/aclocal.m4
@@ -167,10 +167,10 @@ libhcl_la_LINK = $(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) \
 	$(LIBTOOLFLAGS) --mode=link $(CCLD) $(AM_CFLAGS) $(CFLAGS) \
 	$(libhcl_la_LDFLAGS) $(LDFLAGS) -o $@
 am__libhclex_la_SOURCES_DIST = tmr.c hcl-tmr.h xutl.c xutl-sa.h \
-	hcl-xutl.h hcl-s.c hcl-s.h hcl-c.c hcl-c.h
+	hcl-xutl.h json.c hcl-json.h hcl-s.c hcl-s.h hcl-c.c hcl-c.h
 @ENABLE_HCLEX_TRUE@am_libhclex_la_OBJECTS = libhclex_la-tmr.lo \
-@ENABLE_HCLEX_TRUE@	libhclex_la-xutl.lo libhclex_la-hcl-s.lo \
-@ENABLE_HCLEX_TRUE@	libhclex_la-hcl-c.lo
+@ENABLE_HCLEX_TRUE@	libhclex_la-xutl.lo libhclex_la-json.lo \
+@ENABLE_HCLEX_TRUE@	libhclex_la-hcl-s.lo libhclex_la-hcl-c.lo
 libhclex_la_OBJECTS = $(am_libhclex_la_OBJECTS)
 libhclex_la_LINK = $(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) \
 	$(LIBTOOLFLAGS) --mode=link $(CCLD) $(AM_CFLAGS) $(CFLAGS) \
@@ -240,7 +240,7 @@ am__can_run_installinfo = \
     *) (install-info --version) >/dev/null 2>&1;; \
   esac
 am__pkginclude_HEADERS_DIST = hcl.h hcl-cmn.h hcl-opt.h hcl-rbt.h \
-	hcl-utl.h hcl-c.h hcl-s.h hcl-tmr.h hcl-xutl.h
+	hcl-utl.h hcl-c.h hcl-s.h hcl-tmr.h hcl-xutl.h hcl-json.h
 HEADERS = $(pkginclude_HEADERS)
 am__tagged_files = $(HEADERS) $(SOURCES) $(TAGS_FILES) \
 	$(LISP)hcl-cfg.h.in
@@ -410,7 +410,6 @@ pdfdir = @pdfdir@
 prefix = @prefix@
 program_transform_name = @program_transform_name@
 psdir = @psdir@
-runstatedir = @runstatedir@
 sbindir = @sbindir@
 sharedstatedir = @sharedstatedir@
 srcdir = @srcdir@
@@ -481,6 +480,7 @@ hcl_DEPENDENCIES = libhcl.la
 @ENABLE_HCLEX_TRUE@libhclex_la_SOURCES = \
 @ENABLE_HCLEX_TRUE@	tmr.c hcl-tmr.h \
 @ENABLE_HCLEX_TRUE@	xutl.c xutl-sa.h hcl-xutl.h \
+@ENABLE_HCLEX_TRUE@	json.c hcl-json.h \
 @ENABLE_HCLEX_TRUE@	hcl-s.c hcl-s.h \
 @ENABLE_HCLEX_TRUE@	hcl-c.c hcl-c.h
 
@@ -682,6 +682,7 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libhcl_la-utl.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libhclex_la-hcl-c.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libhclex_la-hcl-s.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libhclex_la-json.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libhclex_la-tmr.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libhclex_la-xutl.Plo@am__quote@
 
@@ -869,6 +870,13 @@ libhclex_la-xutl.lo: xutl.c
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='xutl.c' object='libhclex_la-xutl.lo' libtool=yes @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libhclex_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o libhclex_la-xutl.lo `test -f 'xutl.c' || echo '$(srcdir)/'`xutl.c
+
+libhclex_la-json.lo: json.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libhclex_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT libhclex_la-json.lo -MD -MP -MF $(DEPDIR)/libhclex_la-json.Tpo -c -o libhclex_la-json.lo `test -f 'json.c' || echo '$(srcdir)/'`json.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/libhclex_la-json.Tpo $(DEPDIR)/libhclex_la-json.Plo
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='json.c' object='libhclex_la-json.lo' libtool=yes @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libhclex_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o libhclex_la-json.lo `test -f 'json.c' || echo '$(srcdir)/'`json.c
 
 libhclex_la-hcl-s.lo: hcl-s.c
 @am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libhclex_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT libhclex_la-hcl-s.lo -MD -MP -MF $(DEPDIR)/libhclex_la-hcl-s.Tpo -c -o libhclex_la-hcl-s.lo `test -f 'hcl-s.c' || echo '$(srcdir)/'`hcl-s.c
