@@ -34,22 +34,22 @@
 
 struct dummy_hcl_xtn_t
 {
-	hcl_json_t* json;
+	hcl_jsoner_t* json;
 };
 typedef struct dummy_hcl_xtn_t dummy_hcl_xtn_t;
 
-enum hcl_json_reply_attr_type_t
+enum hcl_jsoner_reply_attr_type_t
 {
 	HCL_JSON_REPLY_ATTR_TYPE_UNKNOWN,
 	HCL_JSON_REPLY_ATTR_TYPE_DATA
 };
-typedef enum hcl_json_reply_attr_type_t hcl_json_reply_attr_type_t;
+typedef enum hcl_jsoner_reply_attr_type_t hcl_jsoner_reply_attr_type_t;
 
-struct hcl_json_t
+struct hcl_jsoner_t
 {
 	hcl_mmgr_t* mmgr;
 	hcl_cmgr_t* cmgr;
-	hcl_json_prim_t prim;
+	hcl_jsoner_prim_t prim;
 	hcl_t* dummy_hcl;
 
 	hcl_errnum_t errnum;
@@ -72,7 +72,7 @@ struct hcl_json_t
 		hcl_oow_t capa;
 	} req;
 
-	hcl_json_state_t state;
+	hcl_jsoner_state_t state;
 	struct
 	{
 		struct
@@ -82,8 +82,8 @@ struct hcl_json_t
 			hcl_oow_t capa;
 		} tok;
 
-		hcl_json_reply_type_t type;
-		hcl_json_reply_attr_type_t last_attr_type;
+		hcl_jsoner_reply_type_t type;
+		hcl_jsoner_reply_attr_type_t last_attr_type;
 		struct
 		{
 			hcl_ooch_t* ptr;
@@ -138,7 +138,7 @@ struct hcl_json_t
 static void log_write_for_dummy (hcl_t* hcl, unsigned int mask, const hcl_ooch_t* msg, hcl_oow_t len)
 {
 	dummy_hcl_xtn_t* xtn = (dummy_hcl_xtn_t*)hcl_getxtn(hcl);
-	hcl_json_t* json;
+	hcl_jsoner_t* json;
 
 	json = xtn->json;
 	json->prim.log_write (json, mask, msg, len);
@@ -185,12 +185,12 @@ static HCL_INLINE int is_digitchar (hcl_ooci_t c)
 	return (c >= '0' && c <= '9');
 }
 
-static void clear_reply_token (hcl_json_t* json)
+static void clear_reply_token (hcl_jsoner_t* json)
 {
 	json->rep.tok.len = 0;
 }
 
-static int add_to_reply_token (hcl_json_t* json, hcl_ooch_t ch)
+static int add_to_reply_token (hcl_jsoner_t* json, hcl_ooch_t ch)
 {
 	if (json->rep.tok.len >= json->rep.tok.capa)
 	{
@@ -198,7 +198,7 @@ static int add_to_reply_token (hcl_json_t* json, hcl_ooch_t ch)
 		hcl_oow_t newcapa;
 
 		newcapa = HCL_ALIGN_POW2(json->rep.tok.len + 1, HCL_JSON_TOKEN_NAME_ALIGN);
-		tmp = hcl_json_reallocmem(json, json->rep.tok.ptr, newcapa * HCL_SIZEOF(*tmp));
+		tmp = hcl_jsoner_reallocmem(json, json->rep.tok.ptr, newcapa * HCL_SIZEOF(*tmp));
 		if (!tmp) return -1;
 
 		json->rep.tok.capa = newcapa;
@@ -209,12 +209,12 @@ static int add_to_reply_token (hcl_json_t* json, hcl_ooch_t ch)
 	return 0;
 }
 
-static HCL_INLINE int is_token (hcl_json_t* json, const hcl_bch_t* str)
+static HCL_INLINE int is_token (hcl_jsoner_t* json, const hcl_bch_t* str)
 {
 	return hcl_comp_oochars_bcstr(json->rep.tok.ptr, json->rep.tok.len, str) == 0;
 } 
 
-static HCL_INLINE int is_token_integer (hcl_json_t* json, hcl_oow_t* value)
+static HCL_INLINE int is_token_integer (hcl_jsoner_t* json, hcl_oow_t* value)
 {
 	hcl_oow_t i;
 	hcl_oow_t v = 0;
@@ -250,14 +250,14 @@ static HCL_INLINE hcl_ooch_t unescape (hcl_ooch_t c)
 #endif
 }
 
-static int handle_char (hcl_json_t* json, hcl_ooci_t c, hcl_oow_t nbytes)
+static int handle_char (hcl_jsoner_t* json, hcl_ooci_t c, hcl_oow_t nbytes)
 {
 	switch (json->state)
 	{
 		case HCL_JSON_STATE_START:
 			if (c == HCL_OOCI_EOF)
 			{
-				hcl_json_seterrbfmt (json, HCL_EFINIS, "unexpected end before reply name");
+				hcl_jsoner_seterrbfmt (json, HCL_EFINIS, "unexpected end before reply name");
 				goto oops;
 			}
 			else if (c == '[')
@@ -277,7 +277,7 @@ static int handle_char (hcl_json_t* json, hcl_ooci_t c, hcl_oow_t nbytes)
 			}
 			else
 			{
-				hcl_json_seterrbfmt (json, HCL_EINVAL, "not starting with [ or { - %jc", (hcl_ooch_t)c);
+				hcl_jsoner_seterrbfmt (json, HCL_EINVAL, "not starting with [ or { - %jc", (hcl_ooch_t)c);
 				goto oops;
 			}
 			break;
@@ -306,7 +306,7 @@ static int handle_char (hcl_json_t* json, hcl_ooci_t c, hcl_oow_t nbytes)
 			}
 			else
 			{
-				hcl_json_seterrbfmt (json, HCL_EINVAL, "not starting with [ or { - %jc", (hcl_ooch_t)c);
+				hcl_jsoner_seterrbfmt (json, HCL_EINVAL, "not starting with [ or { - %jc", (hcl_ooch_t)c);
 				goto oops;
 			}
 			break;
@@ -334,7 +334,7 @@ static int handle_char (hcl_json_t* json, hcl_ooci_t c, hcl_oow_t nbytes)
 			}
 			else
 			{
-				hcl_json_seterrbfmt (json, HCL_EINVAL, "not starting with [ or { - %jc", (hcl_ooch_t)c);
+				hcl_jsoner_seterrbfmt (json, HCL_EINVAL, "not starting with [ or { - %jc", (hcl_ooch_t)c);
 				goto oops;
 			}
 			break;
@@ -358,7 +358,7 @@ static int handle_char (hcl_json_t* json, hcl_ooci_t c, hcl_oow_t nbytes)
 			break;
 
 		default:
-			hcl_json_seterrbfmt (json, HCL_EINTERN, "internal error - must not be called for state %d", (int)json->state);
+			hcl_jsoner_seterrbfmt (json, HCL_EINTERN, "internal error - must not be called for state %d", (int)json->state);
 			goto oops;
 	}
 
@@ -368,7 +368,7 @@ oops:
 	return -1;
 }
 
-static int feed_json_data (hcl_json_t* json, const hcl_bch_t* data, hcl_oow_t len, hcl_oow_t* xlen)
+static int feed_json_data (hcl_jsoner_t* json, const hcl_bch_t* data, hcl_oow_t len, hcl_oow_t* xlen)
 {
 	const hcl_bch_t* ptr;
 	const hcl_bch_t* end;
@@ -422,14 +422,14 @@ oops:
 
 /* ========================================================================= */
 
-hcl_json_t* hcl_json_open (hcl_mmgr_t* mmgr, hcl_oow_t xtnsize, hcl_json_prim_t* prim, hcl_errnum_t* errnum)
+hcl_jsoner_t* hcl_jsoner_open (hcl_mmgr_t* mmgr, hcl_oow_t xtnsize, hcl_jsoner_prim_t* prim, hcl_errnum_t* errnum)
 {
-	hcl_json_t* json;
+	hcl_jsoner_t* json;
 	hcl_t* hcl;
 	hcl_vmprim_t vmprim;
 	dummy_hcl_xtn_t* xtn;
 
-	json = (hcl_json_t*)HCL_MMGR_ALLOC(mmgr, HCL_SIZEOF(*json) + xtnsize);
+	json = (hcl_jsoner_t*)HCL_MMGR_ALLOC(mmgr, HCL_SIZEOF(*json) + xtnsize);
 	if (!json) 
 	{
 		if (errnum) *errnum = HCL_ESYSMEM;
@@ -467,15 +467,15 @@ hcl_json_t* hcl_json_open (hcl_mmgr_t* mmgr, hcl_oow_t xtnsize, hcl_json_prim_t*
 	return json;
 }
 
-void hcl_json_close (hcl_json_t* json)
+void hcl_jsoner_close (hcl_jsoner_t* json)
 {
-	if (json->rep.tok.ptr) hcl_json_freemem (json, json->rep.tok.ptr);
-	if (json->rep.last_attr_key.ptr) hcl_json_freemem (json, json->rep.last_attr_key.ptr);
+	if (json->rep.tok.ptr) hcl_jsoner_freemem (json, json->rep.tok.ptr);
+	if (json->rep.last_attr_key.ptr) hcl_jsoner_freemem (json, json->rep.last_attr_key.ptr);
 	hcl_close (json->dummy_hcl);
 	HCL_MMGR_FREE (json->mmgr, json);
 }
 
-int hcl_json_setoption (hcl_json_t* json, hcl_json_option_t id, const void* value)
+int hcl_jsoner_setoption (hcl_jsoner_t* json, hcl_jsoner_option_t id, const void* value)
 {
 	switch (id)
 	{
@@ -496,11 +496,11 @@ int hcl_json_setoption (hcl_json_t* json, hcl_json_option_t id, const void* valu
 			return 0;
 	}
 
-	hcl_json_seterrnum (json, HCL_EINVAL);
+	hcl_jsoner_seterrnum (json, HCL_EINVAL);
 	return -1;
 }
 
-int hcl_json_getoption (hcl_json_t* json, hcl_json_option_t id, void* value)
+int hcl_jsoner_getoption (hcl_jsoner_t* json, hcl_jsoner_option_t id, void* value)
 {
 	switch (id)
 	{
@@ -513,55 +513,55 @@ int hcl_json_getoption (hcl_json_t* json, hcl_json_option_t id, void* value)
 			return 0;
 	};
 
-	hcl_json_seterrnum (json, HCL_EINVAL);
+	hcl_jsoner_seterrnum (json, HCL_EINVAL);
 	return -1;
 }
 
 
-void* hcl_json_getxtn (hcl_json_t* json)
+void* hcl_jsoner_getxtn (hcl_jsoner_t* json)
 {
 	return (void*)(json + 1);
 }
 
-hcl_mmgr_t* hcl_json_getmmgr (hcl_json_t* json)
+hcl_mmgr_t* hcl_jsoner_getmmgr (hcl_jsoner_t* json)
 {
 	return json->mmgr;
 }
 
-hcl_cmgr_t* hcl_json_getcmgr (hcl_json_t* json)
+hcl_cmgr_t* hcl_jsoner_getcmgr (hcl_jsoner_t* json)
 {
 	return json->cmgr;
 }
 
-void hcl_json_setcmgr (hcl_json_t* json, hcl_cmgr_t* cmgr)
+void hcl_jsoner_setcmgr (hcl_jsoner_t* json, hcl_cmgr_t* cmgr)
 {
 	json->cmgr = cmgr;
 }
 
-hcl_errnum_t hcl_json_geterrnum (hcl_json_t* json)
+hcl_errnum_t hcl_jsoner_geterrnum (hcl_jsoner_t* json)
 {
 	return json->errnum;
 }
 
-const hcl_ooch_t* hcl_json_geterrstr (hcl_json_t* json)
+const hcl_ooch_t* hcl_jsoner_geterrstr (hcl_jsoner_t* json)
 {
 	return hcl_errnum_to_errstr(json->errnum);
 }
 
-const hcl_ooch_t* hcl_json_geterrmsg (hcl_json_t* json)
+const hcl_ooch_t* hcl_jsoner_geterrmsg (hcl_jsoner_t* json)
 {
 	if (json->errmsg.len <= 0) return hcl_errnum_to_errstr(json->errnum);
 	return json->errmsg.buf;
 }
 
-void hcl_json_seterrnum (hcl_json_t* json, hcl_errnum_t errnum)
+void hcl_jsoner_seterrnum (hcl_jsoner_t* json, hcl_errnum_t errnum)
 {
 	/*if (json->shuterr) return; */
 	json->errnum = errnum;
 	json->errmsg.len = 0;
 }
 
-void hcl_json_seterrbfmt (hcl_json_t* json, hcl_errnum_t errnum, const hcl_bch_t* fmt, ...)
+void hcl_jsoner_seterrbfmt (hcl_jsoner_t* json, hcl_errnum_t errnum, const hcl_bch_t* fmt, ...)
 {
 	va_list ap;
 
@@ -575,7 +575,7 @@ void hcl_json_seterrbfmt (hcl_json_t* json, hcl_errnum_t errnum, const hcl_bch_t
 	json->errmsg.len = json->dummy_hcl->errmsg.len;
 }
 
-void hcl_json_seterrufmt (hcl_json_t* json, hcl_errnum_t errnum, const hcl_uch_t* fmt, ...)
+void hcl_jsoner_seterrufmt (hcl_jsoner_t* json, hcl_errnum_t errnum, const hcl_uch_t* fmt, ...)
 {
 	va_list ap;
 
@@ -591,7 +591,7 @@ void hcl_json_seterrufmt (hcl_json_t* json, hcl_errnum_t errnum, const hcl_uch_t
 
 /* ========================================================================= */
 
-void hcl_json_logbfmt (hcl_json_t* json, unsigned int mask, const hcl_bch_t* fmt, ...)
+void hcl_jsoner_logbfmt (hcl_jsoner_t* json, unsigned int mask, const hcl_bch_t* fmt, ...)
 {
 	va_list ap;
 	va_start (ap, fmt);
@@ -599,7 +599,7 @@ void hcl_json_logbfmt (hcl_json_t* json, unsigned int mask, const hcl_bch_t* fmt
 	va_end (ap);
 }
 
-void hcl_json_logufmt (hcl_json_t* json, unsigned int mask, const hcl_uch_t* fmt, ...)
+void hcl_jsoner_logufmt (hcl_jsoner_t* json, unsigned int mask, const hcl_uch_t* fmt, ...)
 {
 	va_list ap;
 	va_start (ap, fmt);
@@ -609,51 +609,51 @@ void hcl_json_logufmt (hcl_json_t* json, unsigned int mask, const hcl_uch_t* fmt
 
 /* ========================================================================= */
 
-void* hcl_json_allocmem (hcl_json_t* json, hcl_oow_t size)
+void* hcl_jsoner_allocmem (hcl_jsoner_t* json, hcl_oow_t size)
 {
 	void* ptr;
 
 	ptr = HCL_MMGR_ALLOC(json->mmgr, size);
-	if (!ptr) hcl_json_seterrnum (json, HCL_ESYSMEM);
+	if (!ptr) hcl_jsoner_seterrnum (json, HCL_ESYSMEM);
 	return ptr;
 }
 
-void* hcl_json_callocmem (hcl_json_t* json, hcl_oow_t size)
+void* hcl_jsoner_callocmem (hcl_jsoner_t* json, hcl_oow_t size)
 {
 	void* ptr;
 
 	ptr = HCL_MMGR_ALLOC(json->mmgr, size);
-	if (!ptr) hcl_json_seterrnum (json, HCL_ESYSMEM);
+	if (!ptr) hcl_jsoner_seterrnum (json, HCL_ESYSMEM);
 	else HCL_MEMSET (ptr, 0, size);
 	return ptr;
 }
 
-void* hcl_json_reallocmem (hcl_json_t* json, void* ptr, hcl_oow_t size)
+void* hcl_jsoner_reallocmem (hcl_jsoner_t* json, void* ptr, hcl_oow_t size)
 {
 	ptr = HCL_MMGR_REALLOC(json->mmgr, ptr, size);
-	if (!ptr) hcl_json_seterrnum (json, HCL_ESYSMEM);
+	if (!ptr) hcl_jsoner_seterrnum (json, HCL_ESYSMEM);
 	return ptr;
 }
 
-void hcl_json_freemem (hcl_json_t* json, void* ptr)
+void hcl_jsoner_freemem (hcl_jsoner_t* json, void* ptr)
 {
 	HCL_MMGR_FREE (json->mmgr, ptr);
 }
 
 /* ========================================================================= */
 
-hcl_json_state_t hcl_json_getstate (hcl_json_t* json)
+hcl_jsoner_state_t hcl_jsoner_getstate (hcl_jsoner_t* json)
 {
 	return json->state;
 }
 
-void hcl_json_reset (hcl_json_t* json)
+void hcl_jsoner_reset (hcl_jsoner_t* json)
 {
 	/* TODO: reset XXXXXXXXXXXXXXXXXXXXXXXXXXXxxxxx */
 	json->state = HCL_JSON_STATE_START;
 }
 
-int hcl_json_feed (hcl_json_t* json, const void* ptr, hcl_oow_t len, hcl_oow_t* xlen)
+int hcl_jsoner_feed (hcl_jsoner_t* json, const void* ptr, hcl_oow_t len, hcl_oow_t* xlen)
 {
 	int x;
 	hcl_oow_t total, ylen;

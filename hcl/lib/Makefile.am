@@ -118,6 +118,13 @@ hclc_CPPFLAGS = $(CPPFLAGS_LIB_COMMON)
 hclc_LDFLAGS = $(LDFLAGS_LIB_COMMON)
 hclc_LDADD = $(LIBADD_LIB_COMMON) $(PTHREAD_LIBS) -lhcl -lhclex
 hclc_DEPENDENCIES = libhclex.la
+
+bin_PROGRAMS += hclj
+hclj_SOURCES = main-j.c
+hclj_CPPFLAGS = $(CPPFLAGS_LIB_COMMON)
+hclj_LDFLAGS = $(LDFLAGS_LIB_COMMON)
+hclj_LDADD = $(LIBADD_LIB_COMMON) $(PTHREAD_LIBS) -lhcl -lhclex
+hclj_DEPENDENCIES = libhclex.la
 endif
 
 

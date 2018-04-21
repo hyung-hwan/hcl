@@ -29,25 +29,25 @@
 
 #include <hcl.h>
 
-typedef struct hcl_json_t hcl_json_t;
+typedef struct hcl_jsoner_t hcl_jsoner_t;
 
-enum hcl_json_option_t
+enum hcl_jsoner_option_t
 {
 	HCL_JSON_TRAIT,
 	HCL_JSON_LOG_MASK,
 };
-typedef enum hcl_json_option_t hcl_json_option_t;
+typedef enum hcl_jsoner_option_t hcl_jsoner_option_t;
 
-enum hcl_json_trait_t
+enum hcl_jsoner_trait_t
 {
 	/* no trait defined at this moment. XXXX is just a placeholder */
 	HCL_JSON_XXXX  = (1 << 0)
 };
-typedef enum hcl_json_trait_t hcl_json_trait_t;
+typedef enum hcl_jsoner_trait_t hcl_jsoner_trait_t;
 
 /* ========================================================================= */
 
-enum hcl_json_state_t
+enum hcl_jsoner_state_t
 {
 	HCL_JSON_STATE_START,
 	HCL_JSON_STATE_ARRAY_STARTED,
@@ -57,109 +57,109 @@ enum hcl_json_state_t
 	HCL_JSON_STATE_IN_NUMERIC_VALUE,
 	HCL_JSON_STATE_IN_QUOTED_VALUE
 };
-typedef enum hcl_json_state_t hcl_json_state_t;
+typedef enum hcl_jsoner_state_t hcl_jsoner_state_t;
 
 /* ========================================================================= */
 
 #if 0
-struct hcl_json_root_t
+struct hcl_jsoner_root_t
 {
 	int type;
-	hcl_json_value_t* value;
+	hcl_jsoner_value_t* value;
 };
 
-struct hcl_json_list_t
+struct hcl_jsoner_list_t
 {
 	int type; /* array or table */
-	hcl_json_pair_t* cell;
+	hcl_jsoner_pair_t* cell;
 };
 
-struct hcl_json_value_t
+struct hcl_jsoner_value_t
 {
 	int type; /* atom or pair */
 	union
 	{
-		hcl_json_value_t* value;
-		hcl_json_pair_t* cell;
+		hcl_jsoner_value_t* value;
+		hcl_jsoner_pair_t* cell;
 	} u;
 };
 
-struct hcl_json_atom_t
+struct hcl_jsoner_atom_t
 {
 	int type; /* string, word, number */
 };
 
-struct hcl_json_pair_t
+struct hcl_jsoner_pair_t
 {
-	hcl_json_atom_t* key;
-	hcl_json_value_t* value;
-	hcl_json_pair_t* next;
+	hcl_jsoner_atom_t* key;
+	hcl_jsoner_value_t* value;
+	hcl_jsoner_pair_t* next;
 };
 #endif
 /* ========================================================================= */
-enum hcl_json_reply_type_t
+enum hcl_jsoner_reply_type_t
 {
 	HCL_JSON_REPLY_TYPE_OK = 0,
 	HCL_JSON_REPLY_TYPE_ERROR = 1
 };
-typedef enum hcl_json_reply_type_t hcl_json_reply_type_t;
+typedef enum hcl_jsoner_reply_type_t hcl_jsoner_reply_type_t;
 
-typedef void (*hcl_json_log_write_t) (
-	hcl_json_t*     json,
+typedef void (*hcl_jsoner_log_write_t) (
+	hcl_jsoner_t*     json,
 	unsigned int      mask,
 	const hcl_ooch_t* msg,
 	hcl_oow_t         len
 );
 
-typedef int (*hcl_json_start_reply_t) (
-	hcl_json_t*           json,
-	hcl_json_reply_type_t type,
+typedef int (*hcl_jsoner_start_reply_t) (
+	hcl_jsoner_t*           json,
+	hcl_jsoner_reply_type_t type,
 	const hcl_ooch_t*       dptr,
 	hcl_oow_t               dlen
 );
 
-typedef int (*hcl_json_feed_attr_t) (
-	hcl_json_t*     json,
+typedef int (*hcl_jsoner_feed_attr_t) (
+	hcl_jsoner_t*     json,
 	const hcl_oocs_t* key,
 	const hcl_oocs_t* val
 );
 
-typedef int (*hcl_json_start_data_t) (
-	hcl_json_t*     json
+typedef int (*hcl_jsoner_start_data_t) (
+	hcl_jsoner_t*     json
 );
 
-typedef int (*hcl_json_feed_data_t) (
-	hcl_json_t*     json,
+typedef int (*hcl_jsoner_feed_data_t) (
+	hcl_jsoner_t*     json,
 	const void*       ptr,
 	hcl_oow_t         len
 );
 
-typedef int (*hcl_json_end_data_t) (
-	hcl_json_t*     json
+typedef int (*hcl_jsoner_end_data_t) (
+	hcl_jsoner_t*     json
 );
 
-enum hcl_json_end_reply_state_t
+enum hcl_jsoner_end_reply_state_t
 {
 	HCL_JSON_END_REPLY_STATE_OK,
 	HCL_JSON_END_REPLY_STATE_REVOKED
 };
-typedef enum hcl_json_end_reply_state_t hcl_json_end_reply_state_t;
+typedef enum hcl_jsoner_end_reply_state_t hcl_jsoner_end_reply_state_t;
 
-typedef int (*hcl_json_end_reply_t) (
-	hcl_json_t*                json,
-	hcl_json_end_reply_state_t state
+typedef int (*hcl_jsoner_end_reply_t) (
+	hcl_jsoner_t*                json,
+	hcl_jsoner_end_reply_state_t state
 );
 
-struct hcl_json_prim_t
+struct hcl_jsoner_prim_t
 {
-	hcl_json_log_write_t     log_write;
+	hcl_jsoner_log_write_t     log_write;
 
-	hcl_json_start_reply_t   start_reply;   /* mandatory */
-	hcl_json_feed_attr_t     feed_attr; /* optional */
-	hcl_json_feed_data_t     feed_data;     /* optional */
-	hcl_json_end_reply_t     end_reply;     /* mandatory */
+	hcl_jsoner_start_reply_t   start_reply;   /* mandatory */
+	hcl_jsoner_feed_attr_t     feed_attr; /* optional */
+	hcl_jsoner_feed_data_t     feed_data;     /* optional */
+	hcl_jsoner_end_reply_t     end_reply;     /* mandatory */
 };
-typedef struct hcl_json_prim_t hcl_json_prim_t;
+typedef struct hcl_jsoner_prim_t hcl_jsoner_prim_t;
 
 /* ========================================================================= */
 
@@ -167,127 +167,127 @@ typedef struct hcl_json_prim_t hcl_json_prim_t;
 extern "C" {
 #endif
 
-HCL_EXPORT hcl_json_t* hcl_json_open (
+HCL_EXPORT hcl_jsoner_t* hcl_jsoner_open (
 	hcl_mmgr_t*        mmgr,
 	hcl_oow_t          xtnsize,
-	hcl_json_prim_t* prim,
+	hcl_jsoner_prim_t* prim,
 	hcl_errnum_t*      errnum
 );
 
-HCL_EXPORT void hcl_json_close (
-	hcl_json_t* json
+HCL_EXPORT void hcl_jsoner_close (
+	hcl_jsoner_t* json
 );
 
-HCL_EXPORT void hcl_json_reset (
-	hcl_json_t* json
+HCL_EXPORT void hcl_jsoner_reset (
+	hcl_jsoner_t* json
 );
 
-HCL_EXPORT int hcl_json_feed (
-	hcl_json_t* json,
+HCL_EXPORT int hcl_jsoner_feed (
+	hcl_jsoner_t* json,
 	const void*   ptr,
 	hcl_oow_t     len,
 	hcl_oow_t*    xlen
 );
 
-HCL_EXPORT hcl_json_state_t hcl_json_getstate (
-	hcl_json_t* json
+HCL_EXPORT hcl_jsoner_state_t hcl_jsoner_getstate (
+	hcl_jsoner_t* json
 );
 
-HCL_EXPORT int hcl_json_setoption (
-	hcl_json_t*       json,
-	hcl_json_option_t id,
+HCL_EXPORT int hcl_jsoner_setoption (
+	hcl_jsoner_t*       json,
+	hcl_jsoner_option_t id,
 	const void*         value
 );
 
-HCL_EXPORT int hcl_json_getoption (
-	hcl_json_t*       json,
-	hcl_json_option_t id,
+HCL_EXPORT int hcl_jsoner_getoption (
+	hcl_jsoner_t*       json,
+	hcl_jsoner_option_t id,
 	void*               value
 );
 
 
-HCL_EXPORT void* hcl_json_getxtn (
-	hcl_json_t* json
+HCL_EXPORT void* hcl_jsoner_getxtn (
+	hcl_jsoner_t* json
 );
 
-HCL_EXPORT hcl_mmgr_t* hcl_json_getmmgr (
-	hcl_json_t* json
+HCL_EXPORT hcl_mmgr_t* hcl_jsoner_getmmgr (
+	hcl_jsoner_t* json
 );
 
-HCL_EXPORT hcl_cmgr_t* hcl_json_getcmgr (
-	hcl_json_t* json
+HCL_EXPORT hcl_cmgr_t* hcl_jsoner_getcmgr (
+	hcl_jsoner_t* json
 );
 
-HCL_EXPORT void hcl_json_setcmgr (
-	hcl_json_t* json,
+HCL_EXPORT void hcl_jsoner_setcmgr (
+	hcl_jsoner_t* json,
 	hcl_cmgr_t*   cmgr
 );
 
 
-HCL_EXPORT hcl_errnum_t hcl_json_geterrnum (
-	hcl_json_t* json
+HCL_EXPORT hcl_errnum_t hcl_jsoner_geterrnum (
+	hcl_jsoner_t* json
 );
 
-HCL_EXPORT const hcl_ooch_t* hcl_json_geterrstr (
-	hcl_json_t* json
+HCL_EXPORT const hcl_ooch_t* hcl_jsoner_geterrstr (
+	hcl_jsoner_t* json
 );
 
-HCL_EXPORT const hcl_ooch_t* hcl_json_geterrmsg (
-	hcl_json_t* json
+HCL_EXPORT const hcl_ooch_t* hcl_jsoner_geterrmsg (
+	hcl_jsoner_t* json
 );
 
-HCL_EXPORT void hcl_json_seterrnum (
-	hcl_json_t* json,
+HCL_EXPORT void hcl_jsoner_seterrnum (
+	hcl_jsoner_t* json,
 	hcl_errnum_t  errnum
 );
 
-HCL_EXPORT void hcl_json_seterrbfmt (
-	hcl_json_t*    json,
+HCL_EXPORT void hcl_jsoner_seterrbfmt (
+	hcl_jsoner_t*    json,
 	hcl_errnum_t     errnum,
 	const hcl_bch_t* fmt,
 	...
 );
 
-HCL_EXPORT void hcl_json_seterrufmt (
-	hcl_json_t*    json,
+HCL_EXPORT void hcl_jsoner_seterrufmt (
+	hcl_jsoner_t*    json,
 	hcl_errnum_t     errnum,
 	const hcl_uch_t* fmt,
 	...
 );
 
-HCL_EXPORT void hcl_json_logbfmt (
-	hcl_json_t*    json,
+HCL_EXPORT void hcl_jsoner_logbfmt (
+	hcl_jsoner_t*    json,
 	unsigned int     mask,
 	const hcl_bch_t* fmt,
 	...
 );
 
-HCL_EXPORT void hcl_json_logufmt (
-	hcl_json_t*    json,
+HCL_EXPORT void hcl_jsoner_logufmt (
+	hcl_jsoner_t*    json,
 	unsigned int     mask,
 	const hcl_uch_t* fmt,
 	...
 );
 
-HCL_EXPORT void* hcl_json_allocmem (
-	hcl_json_t* json,
+HCL_EXPORT void* hcl_jsoner_allocmem (
+	hcl_jsoner_t* json,
 	hcl_oow_t     size
 );
 
-HCL_EXPORT void* hcl_json_callocmem (
-	hcl_json_t* json,
+HCL_EXPORT void* hcl_jsoner_callocmem (
+	hcl_jsoner_t* json,
 	hcl_oow_t     size
 );
 
-HCL_EXPORT void* hcl_json_reallocmem (
-	hcl_json_t* json,
+HCL_EXPORT void* hcl_jsoner_reallocmem (
+	hcl_jsoner_t* json,
 	void*         ptr,
 	hcl_oow_t     size
 );
 
 
-HCL_EXPORT void hcl_json_freemem (
-	hcl_json_t* json,
+HCL_EXPORT void hcl_jsoner_freemem (
+	hcl_jsoner_t* json,
 	void*         ptr
 );
 
