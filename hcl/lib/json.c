@@ -45,6 +45,24 @@ enum hcl_jsoner_reply_attr_type_t
 };
 typedef enum hcl_jsoner_reply_attr_type_t hcl_jsoner_reply_attr_type_t;
 
+
+
+typedef struct hcl_jsoner_state_node_t hcl_jsoner_state_node_t;
+struct hcl_jsoner_state_node_t
+{
+	hcl_jsoner_state_t state;
+	union
+	{
+		struct
+		{
+			int escaped;
+			int digit_count;
+			hcl_ooch_t acc;
+		} qv;
+	} u;
+	hcl_jsoner_state_node_t* next;
+};
+
 struct hcl_jsoner_t
 {
 	hcl_mmgr_t* mmgr;
@@ -65,71 +83,15 @@ struct hcl_jsoner_t
 		unsigned int logmask;
 	} cfg;
 
+	hcl_jsoner_state_node_t state_top;
+	hcl_jsoner_state_node_t* state_stack;
+
 	struct
 	{
-		hcl_bch_t* ptr;
+		hcl_ooch_t* ptr;
 		hcl_oow_t len;
 		hcl_oow_t capa;
-	} req;
-
-	hcl_jsoner_state_t state;
-	struct
-	{
-		struct
-		{
-			hcl_ooch_t* ptr;
-			hcl_oow_t len;
-			hcl_oow_t capa;
-		} tok;
-
-		hcl_jsoner_reply_type_t type;
-		hcl_jsoner_reply_attr_type_t last_attr_type;
-		struct
-		{
-			hcl_ooch_t* ptr;
-			hcl_oow_t   len;
-			hcl_oow_t   capa;
-		} last_attr_key; /* the last attr key shown */
-
-		union
-		{
-			struct
-			{
-				hcl_oow_t nsplen; /* length remembered when the white space was shown */
-			} reply_value_unquoted;
-
-			struct
-			{
-				int escaped;
-			} reply_value_quoted;
-
-			struct
-			{
-				hcl_oow_t nsplen; /* length remembered when the white space was shown */
-			} attr_value_unquoted;
-
-			struct
-			{
-				int escaped;
-			} attr_value_quoted;
-
-			struct
-			{
-				hcl_oow_t max;
-				hcl_oow_t tally;
-			} length_bounded_data;
-
-			struct
-			{
-				int in_data_part;
-				int negated;
-				hcl_oow_t max; /* chunk length */
-				hcl_oow_t tally; 
-				hcl_oow_t total;
-				hcl_oow_t clcount; 
-			} chunked_data;
-		} u;
-	} rep;
+	} tok;
 };
 
 
@@ -185,33 +147,33 @@ static HCL_INLINE int is_digitchar (hcl_ooci_t c)
 	return (c >= '0' && c <= '9');
 }
 
-static void clear_reply_token (hcl_jsoner_t* json)
+static void clear_token (hcl_jsoner_t* json)
 {
-	json->rep.tok.len = 0;
+	json->tok.len = 0;
 }
 
-static int add_to_reply_token (hcl_jsoner_t* json, hcl_ooch_t ch)
+static int add_char_to_token (hcl_jsoner_t* json, hcl_ooch_t ch)
 {
-	if (json->rep.tok.len >= json->rep.tok.capa)
+	if (json->tok.len >= json->tok.capa)
 	{
 		hcl_ooch_t* tmp;
 		hcl_oow_t newcapa;
 
-		newcapa = HCL_ALIGN_POW2(json->rep.tok.len + 1, HCL_JSON_TOKEN_NAME_ALIGN);
-		tmp = hcl_jsoner_reallocmem(json, json->rep.tok.ptr, newcapa * HCL_SIZEOF(*tmp));
+		newcapa = HCL_ALIGN_POW2(json->tok.len + 1, HCL_JSON_TOKEN_NAME_ALIGN);
+		tmp = hcl_jsoner_reallocmem(json, json->tok.ptr, newcapa * HCL_SIZEOF(*tmp));
 		if (!tmp) return -1;
 
-		json->rep.tok.capa = newcapa;
-		json->rep.tok.ptr = tmp;
+		json->tok.capa = newcapa;
+		json->tok.ptr = tmp;
 	}
 
-	json->rep.tok.ptr[json->rep.tok.len++] = ch;
+	json->tok.ptr[json->tok.len++] = ch;
 	return 0;
 }
 
 static HCL_INLINE int is_token (hcl_jsoner_t* json, const hcl_bch_t* str)
 {
-	return hcl_comp_oochars_bcstr(json->rep.tok.ptr, json->rep.tok.len, str) == 0;
+	return hcl_comp_oochars_bcstr(json->tok.ptr, json->tok.len, str) == 0;
 } 
 
 static HCL_INLINE int is_token_integer (hcl_jsoner_t* json, hcl_oow_t* value)
@@ -219,12 +181,12 @@ static HCL_INLINE int is_token_integer (hcl_jsoner_t* json, hcl_oow_t* value)
 	hcl_oow_t i;
 	hcl_oow_t v = 0;
 
-	if (json->rep.tok.len <= 0) return 0;
+	if (json->tok.len <= 0) return 0;
 
-	for (i = 0; i < json->rep.tok.len; i++)
+	for (i = 0; i < json->tok.len; i++)
 	{
-		if (!is_digitchar(json->rep.tok.ptr[i])) return 0;
-		v = v * 10 + (json->rep.tok.ptr[i] - '0');
+		if (!is_digitchar(json->tok.ptr[i])) return 0;
+		v = v * 10 + (json->tok.ptr[i] - '0');
 	}
 
 	*value = v;
@@ -233,41 +195,158 @@ static HCL_INLINE int is_token_integer (hcl_jsoner_t* json, hcl_oow_t* value)
 
 static HCL_INLINE hcl_ooch_t unescape (hcl_ooch_t c)
 {
-#if 0
-	/* as of this writing, the server side only escapes \ and ".
-	 * i don't know if n, r, f, t, v should be supported here */
 	switch (c)
 	{
+		case 'a': return '\a';
+		case 'b': return '\b';
+		case 'f': return '\f';
 		case 'n': return '\n';
 		case 'r': return '\r';
-		case 'f': return '\f';
 		case 't': return '\t';
 		case 'v': return '\v';
 		default: return c;
 	}
-#else
-	return c;
-#endif
+}
+
+static int push_state (hcl_jsoner_t* json, hcl_jsoner_state_t state)
+{
+	hcl_jsoner_state_node_t* ss;
+
+	ss = hcl_jsoner_callocmem(json, HCL_SIZEOF(*ss));
+	if (!ss) return -1;
+
+	ss->state = state;
+	ss->next = json->state_stack;
+	
+	json->state_stack = ss;
+	return 0;
+}
+
+static void pop_state (hcl_jsoner_t* json)
+{
+	hcl_jsoner_state_node_t* ss;
+
+	ss = json->state_stack;
+	HCL_ASSERT (json->dummy_hcl, ss != HCL_NULL && ss != &json->state_top);
+	json->state_stack = ss->next;
+
+/* TODO: don't free this. move it to the free list? */
+	hcl_jsoner_freemem (json, ss);
+}
+
+static void pop_all_states (hcl_jsoner_t* json)
+{
+	while (json->state_stack != &json->state_top) pop_state (json);
+}
+
+static int handle_quoted_value_char (hcl_jsoner_t* json, hcl_ooci_t c)
+{
+	if (json->state_stack->u.qv.escaped >= 2)
+	{
+		if (c >= '0' && c <= '9')
+		{
+			json->state_stack->u.qv.acc = json->state_stack->u.qv.acc * 16 + c - '0';
+			json->state_stack->u.qv.digit_count++;
+			if (json->state_stack->u.qv.digit_count >= json->state_stack->u.qv.escaped) goto add_qv_acc;
+		}
+		else if (c >= 'a' && c <= 'f')
+		{
+			json->state_stack->u.qv.acc = json->state_stack->u.qv.acc * 16 + c - 'a' + 10;
+			json->state_stack->u.qv.digit_count++;
+			if (json->state_stack->u.qv.digit_count >= json->state_stack->u.qv.escaped) goto add_qv_acc;
+		}
+		else if (c >= 'A' && c <= 'F')
+		{
+			json->state_stack->u.qv.acc = json->state_stack->u.qv.acc * 16 + c - 'A' + 10;
+			json->state_stack->u.qv.digit_count++;
+			if (json->state_stack->u.qv.digit_count >= json->state_stack->u.qv.escaped) goto add_qv_acc;
+		}
+		else
+		{
+		add_qv_acc:
+			if (add_char_to_token(json, json->state_stack->u.qv.acc) <= -1) return -1;
+			json->state_stack->u.qv.escaped = 0;
+		}
+	}
+	else if (json->state_stack->u.qv.escaped == 1)
+	{
+		if (c == 'x')
+		{
+			json->state_stack->u.qv.escaped = 2;
+			json->state_stack->u.qv.digit_count = 0;
+			json->state_stack->u.qv.acc = 0;
+		}
+		else if (c == 'u')
+		{
+			json->state_stack->u.qv.escaped = 4;
+			json->state_stack->u.qv.digit_count = 0;
+			json->state_stack->u.qv.acc = 0;
+		}
+		else if (c == 'U')
+		{
+			json->state_stack->u.qv.escaped = 8;
+			json->state_stack->u.qv.digit_count = 0;
+			json->state_stack->u.qv.acc = 0;
+		}
+		else
+		{
+			json->state_stack->u.qv.escaped = 0;
+			if (add_char_to_token(json, unescape(c)) <= -1) return -1;
+		}
+	}
+	else if (c == '\\')
+	{
+		json->state_stack->u.qv.escaped = 1;
+	}
+	else if (c == '\"')
+	{
+		pop_state (json);
+HCL_LOG2 (json->dummy_hcl, HCL_LOG_APP | HCL_LOG_FATAL, "[%.*js]\n", json->tok.len, json->tok.ptr);
+		/* TODO: call callback ARRAY_VALUE*/
+	}
+	else
+	{
+		if (add_char_to_token(json, c) <= -1) return -1;
+	}
+	
+	
+	return 0;
+}
+
+static int handle_numeric_value_char (hcl_jsoner_t* json, hcl_ooci_t c)
+{
+	/* TODO: */
+	return -1;
 }
 
 static int handle_char (hcl_jsoner_t* json, hcl_ooci_t c, hcl_oow_t nbytes)
 {
-	switch (json->state)
+	if (c == HCL_OOCI_EOF)
+	{
+		if (json->state_stack->state == HCL_JSON_STATE_START)
+		{
+			/* no input data */
+			return 0;
+		}
+		else
+		{
+			hcl_jsoner_seterrbfmt (json, HCL_EFINIS, "unexpected end of data");
+			return -1;
+		}
+	}
+
+printf ("handling [%c] %d\n", c, (int)nbytes);
+	switch (json->state_stack->state)
 	{
 		case HCL_JSON_STATE_START:
-			if (c == HCL_OOCI_EOF)
+			if (c == '[')
 			{
-				hcl_jsoner_seterrbfmt (json, HCL_EFINIS, "unexpected end before reply name");
-				goto oops;
-			}
-			else if (c == '[')
-			{
-				json->state = HCL_JSON_STATE_ARRAY_STARTED;
+				if (push_state(json, HCL_JSON_STATE_IN_ARRAY) <= -1) return -1;
 				break;
 			}
 			else if (c == '{')
 			{
-				json->state = HCL_JSON_STATE_OBJECT_STARTED;
+				if (push_state(json, HCL_JSON_STATE_IN_DIC) <= -1) return -1;
 				break;
 			}
 			else if (is_spacechar(c)) 
@@ -282,14 +361,15 @@ static int handle_char (hcl_jsoner_t* json, hcl_ooci_t c, hcl_oow_t nbytes)
 			}
 			break;
 
-		case HCL_JSON_STATE_ARRAY_STARTED:
-			if (c == HCL_OOCI_EOF)
+		case HCL_JSON_STATE_IN_ARRAY:
+			if (c == ']')
 			{
+				pop_state (json);
 				break;
 			}
-			else if (c == ']')
+			else if (c == ',')
 			{
-				break;
+				/* TODO: handle this */
 			}
 			else if (is_spacechar(c))
 			{
@@ -297,7 +377,9 @@ static int handle_char (hcl_jsoner_t* json, hcl_ooci_t c, hcl_oow_t nbytes)
 			}
 			else if (c == '\"')
 			{
-				json->state = HCL_JSON_STATE_IN_QUOTED_VALUE;
+		
+				if (push_state(json, HCL_JSON_STATE_IN_QUOTED_VALUE) <= -1) return -1;
+				clear_token (json);
 				break;
 			}
 			else if (is_alphachar(c) || is_digitchar(c))
@@ -306,18 +388,15 @@ static int handle_char (hcl_jsoner_t* json, hcl_ooci_t c, hcl_oow_t nbytes)
 			}
 			else
 			{
-				hcl_jsoner_seterrbfmt (json, HCL_EINVAL, "not starting with [ or { - %jc", (hcl_ooch_t)c);
+				hcl_jsoner_seterrbfmt (json, HCL_EINVAL, "wrong character inside array - %jc", (hcl_ooch_t)c);
 				goto oops;
 			}
 			break;
 
-		case HCL_JSON_STATE_OBJECT_STARTED:
-			if (c == HCL_OOCI_EOF)
+		case HCL_JSON_STATE_IN_DIC:
+			if (c == '}')
 			{
-				break;
-			}
-			else if (c == '}')
-			{
+				pop_state (json);
 				break;
 			}
 			else if (is_spacechar(c))
@@ -334,31 +413,24 @@ static int handle_char (hcl_jsoner_t* json, hcl_ooci_t c, hcl_oow_t nbytes)
 			}
 			else
 			{
-				hcl_jsoner_seterrbfmt (json, HCL_EINVAL, "not starting with [ or { - %jc", (hcl_ooch_t)c);
+				hcl_jsoner_seterrbfmt (json, HCL_EINVAL, "wrong character inside dictionary - %jc", (hcl_ooch_t)c);
 				goto oops;
 			}
 			break;
 
 		case HCL_JSON_STATE_IN_WORD_VALUE:
-			if (c == HCL_OOCI_EOF)
-			{
-				break;
-			}
-			else
-			{
-				break;
-			}
 			break;
 
 		case HCL_JSON_STATE_IN_QUOTED_VALUE:
-			
+			if (handle_quoted_value_char(json, c) <= -1) goto oops;
 			break;
 
 		case HCL_JSON_STATE_IN_NUMERIC_VALUE:
+			if (handle_numeric_value_char(json, c) <= -1) goto oops;
 			break;
 
 		default:
-			hcl_jsoner_seterrbfmt (json, HCL_EINTERN, "internal error - must not be called for state %d", (int)json->state);
+			hcl_jsoner_seterrbfmt (json, HCL_EINTERN, "internal error - must not be called for state %d", (int)json->state_stack->state);
 			goto oops;
 	}
 
@@ -398,6 +470,10 @@ static int feed_json_data (hcl_jsoner_t* json, const hcl_bch_t* data, hcl_oow_t 
 				*xlen = ptr - data;
 				return 0; /* feed more for incomplete sequence */
 			}
+
+			/* advance 1 byte without proper conversion */
+			uc = *ptr;
+			bcslen = 1;
 		}
 
 		ptr += bcslen;
@@ -407,6 +483,8 @@ static int feed_json_data (hcl_jsoner_t* json, const hcl_bch_t* data, hcl_oow_t 
 		c = *ptr++;
 	#endif
 
+
+		/* handle a signle character */
 		if (handle_char(json, c, bcslen) <= -1) goto oops;
 	}
 
@@ -464,13 +542,18 @@ hcl_jsoner_t* hcl_jsoner_open (hcl_mmgr_t* mmgr, hcl_oow_t xtnsize, hcl_jsoner_p
 	hcl_setoption (json->dummy_hcl, HCL_LOG_MASK, &json->cfg.logmask);
 	hcl_setcmgr (json->dummy_hcl, json->cmgr);
 
+
+	json->state_top.state = HCL_JSON_STATE_START;
+	json->state_top.next = HCL_NULL;
+	json->state_stack = &json->state_top;
+
 	return json;
 }
 
 void hcl_jsoner_close (hcl_jsoner_t* json)
 {
-	if (json->rep.tok.ptr) hcl_jsoner_freemem (json, json->rep.tok.ptr);
-	if (json->rep.last_attr_key.ptr) hcl_jsoner_freemem (json, json->rep.last_attr_key.ptr);
+	pop_all_states (json);
+	if (json->tok.ptr) hcl_jsoner_freemem (json, json->tok.ptr);
 	hcl_close (json->dummy_hcl);
 	HCL_MMGR_FREE (json->mmgr, json);
 }
@@ -644,13 +727,15 @@ void hcl_jsoner_freemem (hcl_jsoner_t* json, void* ptr)
 
 hcl_jsoner_state_t hcl_jsoner_getstate (hcl_jsoner_t* json)
 {
-	return json->state;
+	return json->state_stack->state;
 }
 
 void hcl_jsoner_reset (hcl_jsoner_t* json)
 {
 	/* TODO: reset XXXXXXXXXXXXXXXXXXXXXXXXXXXxxxxx */
-	json->state = HCL_JSON_STATE_START;
+	pop_all_states (json);
+	HCL_ASSERT (json->dummy_hcl, json->state_stack == &json->state_top);
+	json->state_stack->state = HCL_JSON_STATE_START;
 }
 
 int hcl_jsoner_feed (hcl_jsoner_t* json, const void* ptr, hcl_oow_t len, hcl_oow_t* xlen)

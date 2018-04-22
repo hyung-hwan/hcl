@@ -65,13 +65,6 @@ struct hcl_client_t
 		unsigned int logmask;
 	} cfg;
 
-	struct
-	{
-		hcl_bch_t* ptr;
-		hcl_oow_t len;
-		hcl_oow_t capa;
-	} req;
-
 	hcl_client_state_t state;
 	struct
 	{
@@ -238,9 +231,11 @@ static HCL_INLINE hcl_ooch_t unescape (hcl_ooch_t c)
 	 * i don't know if n, r, f, t, v should be supported here */
 	switch (c)
 	{
+		case 'a': return '\a';
+		case 'b': return '\b';
+		case 'f': return '\f';
 		case 'n': return '\n';
 		case 'r': return '\r';
-		case 'f': return '\f';
 		case 't': return '\t';
 		case 'v': return '\v';
 		default: return c;
@@ -779,6 +774,9 @@ static int feed_reply_data (hcl_client_t* client, const hcl_bch_t* data, hcl_oow
 					*xlen = ptr - data;
 					return 0; /* feed more for incomplete sequence */
 				}
+
+				uc = *ptr;
+				bcslen = 1;
 			}
 
 			ptr += bcslen;

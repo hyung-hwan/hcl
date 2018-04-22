@@ -649,13 +649,13 @@ static int get_string (hcl_t* hcl, hcl_ooch_t end_char, hcl_ooch_t esc_char, int
 
 		if (escaped == 1)
 		{
-			if (c == 'n') c = '\n';
+			if (c == 'a') c = '\a';
+			else if (c == 'b') c = '\b';
+			else if (c == 'f') c = '\f';
+			else if (c == 'n') c = '\n';
 			else if (c == 'r') c = '\r';
 			else if (c == 't') c = '\t';
-			else if (c == 'f') c = '\f';
-			else if (c == 'b') c = '\b';
 			else if (c == 'v') c = '\v';
-			else if (c == 'a') c = '\a';
 			else if (c >= '0' && c <= '7' && !regex) 
 			{
 				/* i don't support the octal notation for a regular expression.
