@@ -290,7 +290,10 @@ static void log_write (hcl_client_t* client, unsigned int mask, const hcl_ooch_t
 		else if (n <= -1)
 		{
 			/* conversion error */
-			break;
+			if (bcslen <= 0) break;
+			if (write_log(client, logfd, buf, bcslen) <= -1) break;
+			msgidx += ucslen;
+			len -= ucslen;
 		}
 	}
 #else

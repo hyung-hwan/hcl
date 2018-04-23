@@ -291,7 +291,10 @@ static void log_write (hcl_server_t* server, hcl_oow_t wid, unsigned int mask, c
 		else if (n <= -1)
 		{
 			/* conversion error */
-			break;
+			if (bcslen <= 0) break;
+			if (write_log(server, logfd, buf, bcslen) <= -1) break;
+			msgidx += ucslen;
+			len -= ucslen;
 		}
 	}
 #else

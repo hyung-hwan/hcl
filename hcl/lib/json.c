@@ -61,7 +61,13 @@ struct hcl_json_state_node_t
 			int escaped;
 			int digit_count;
 			hcl_ooch_t acc;
-		} qv;
+		} sv;
+		struct
+		{
+			int escaped;
+			int digit_count;
+			hcl_ooch_t acc;
+		} cv;
 		struct
 		{
 			int dotted;
@@ -272,64 +278,88 @@ static int invoke_data_inst (hcl_json_t* json, hcl_json_inst_t inst)
 	return 0;
 }
 
-static int handle_quoted_value_char (hcl_json_t* json, hcl_ooci_t c)
+static int handle_string_value_char (hcl_json_t* json, hcl_ooci_t c)
 {
-	if (json->state_stack->u.qv.escaped >= 2)
+	int ret = 1;
+	
+	
+	if (json->state_stack->u.sv.escaped == 3)
+	{
+		if (c >= '0' && c <= '7')
+		{
+			json->state_stack->u.sv.acc = json->state_stack->u.sv.acc * 8 + c - '0';
+			json->state_stack->u.sv.digit_count++;
+			if (json->state_stack->u.sv.digit_count >= json->state_stack->u.sv.escaped) goto add_sv_acc;
+		}
+		else
+		{
+			ret = 0;
+			goto add_sv_acc;
+		}
+	}
+	else if (json->state_stack->u.sv.escaped >= 2)
 	{
 		if (c >= '0' && c <= '9')
 		{
-			json->state_stack->u.qv.acc = json->state_stack->u.qv.acc * 16 + c - '0';
-			json->state_stack->u.qv.digit_count++;
-			if (json->state_stack->u.qv.digit_count >= json->state_stack->u.qv.escaped) goto add_qv_acc;
+			json->state_stack->u.sv.acc = json->state_stack->u.sv.acc * 16 + c - '0';
+			json->state_stack->u.sv.digit_count++;
+			if (json->state_stack->u.sv.digit_count >= json->state_stack->u.sv.escaped) goto add_sv_acc;
 		}
 		else if (c >= 'a' && c <= 'f')
 		{
-			json->state_stack->u.qv.acc = json->state_stack->u.qv.acc * 16 + c - 'a' + 10;
-			json->state_stack->u.qv.digit_count++;
-			if (json->state_stack->u.qv.digit_count >= json->state_stack->u.qv.escaped) goto add_qv_acc;
+			json->state_stack->u.sv.acc = json->state_stack->u.sv.acc * 16 + c - 'a' + 10;
+			json->state_stack->u.sv.digit_count++;
+			if (json->state_stack->u.sv.digit_count >= json->state_stack->u.sv.escaped) goto add_sv_acc;
 		}
 		else if (c >= 'A' && c <= 'F')
 		{
-			json->state_stack->u.qv.acc = json->state_stack->u.qv.acc * 16 + c - 'A' + 10;
-			json->state_stack->u.qv.digit_count++;
-			if (json->state_stack->u.qv.digit_count >= json->state_stack->u.qv.escaped) goto add_qv_acc;
+			json->state_stack->u.sv.acc = json->state_stack->u.sv.acc * 16 + c - 'A' + 10;
+			json->state_stack->u.sv.digit_count++;
+			if (json->state_stack->u.sv.digit_count >= json->state_stack->u.sv.escaped) goto add_sv_acc;
 		}
 		else
 		{
-		add_qv_acc:
-			if (add_char_to_token(json, json->state_stack->u.qv.acc) <= -1) return -1;
-			json->state_stack->u.qv.escaped = 0;
+			ret = 0;
+		add_sv_acc:
+			if (add_char_to_token(json, json->state_stack->u.sv.acc) <= -1) return -1;
+			json->state_stack->u.sv.escaped = 0;
 		}
 	}
-	else if (json->state_stack->u.qv.escaped == 1)
+	else if (json->state_stack->u.sv.escaped == 1)
 	{
-		if (c == 'x')
+		if (c >= '0' && c <= '8') 
 		{
-			json->state_stack->u.qv.escaped = 2;
-			json->state_stack->u.qv.digit_count = 0;
-			json->state_stack->u.qv.acc = 0;
+			json->state_stack->u.sv.escaped = 3;
+			json->state_stack->u.sv.digit_count = 0;
+			json->state_stack->u.sv.acc = c - '0';
+		}
+		else if (c == 'x')
+		{
+			json->state_stack->u.sv.escaped = 2;
+			json->state_stack->u.sv.digit_count = 0;
+			json->state_stack->u.sv.acc = 0;
 		}
 		else if (c == 'u')
 		{
-			json->state_stack->u.qv.escaped = 4;
-			json->state_stack->u.qv.digit_count = 0;
-			json->state_stack->u.qv.acc = 0;
+			json->state_stack->u.sv.escaped = 4;
+			json->state_stack->u.sv.digit_count = 0;
+			json->state_stack->u.sv.acc = 0;
 		}
 		else if (c == 'U')
 		{
-			json->state_stack->u.qv.escaped = 8;
-			json->state_stack->u.qv.digit_count = 0;
-			json->state_stack->u.qv.acc = 0;
+			json->state_stack->u.sv.escaped = 8;
+			json->state_stack->u.sv.digit_count = 0;
+			json->state_stack->u.sv.acc = 0;
 		}
 		else
 		{
-			json->state_stack->u.qv.escaped = 0;
+			json->state_stack->u.sv.escaped = 0;
 			if (add_char_to_token(json, unescape(c)) <= -1) return -1;
 		}
 	}
 	else if (c == '\\')
 	{
-		json->state_stack->u.qv.escaped = 1;
+		json->state_stack->u.sv.escaped = 1;
 	}
 	else if (c == '\"')
 	{
@@ -341,7 +371,114 @@ static int handle_quoted_value_char (hcl_json_t* json, hcl_ooci_t c)
 		if (add_char_to_token(json, c) <= -1) return -1;
 	}
 
-	return 1;
+	return ret;
+}
+
+static int handle_character_value_char (hcl_json_t* json, hcl_ooci_t c)
+{
+	/* The real JSON dones't support character literal. this is HCL's own extension. */
+	int ret = 1;
+
+	if (json->state_stack->u.cv.escaped == 3)
+	{
+		if (c >= '0' && c <= '7')
+		{
+			json->state_stack->u.cv.acc = json->state_stack->u.cv.acc * 8 + c - '0';
+			json->state_stack->u.cv.digit_count++;
+			if (json->state_stack->u.cv.digit_count >= json->state_stack->u.cv.escaped) goto add_cv_acc;
+		}
+		else
+		{
+			ret = 0;
+			goto add_cv_acc;
+		}
+	}
+	if (json->state_stack->u.cv.escaped >= 2)
+	{
+		if (c >= '0' && c <= '9')
+		{
+			json->state_stack->u.cv.acc = json->state_stack->u.cv.acc * 16 + c - '0';
+			json->state_stack->u.cv.digit_count++;
+			if (json->state_stack->u.cv.digit_count >= json->state_stack->u.cv.escaped) goto add_cv_acc;
+		}
+		else if (c >= 'a' && c <= 'f')
+		{
+			json->state_stack->u.cv.acc = json->state_stack->u.cv.acc * 16 + c - 'a' + 10;
+			json->state_stack->u.cv.digit_count++;
+			if (json->state_stack->u.cv.digit_count >= json->state_stack->u.cv.escaped) goto add_cv_acc;
+		}
+		else if (c >= 'A' && c <= 'F')
+		{
+			json->state_stack->u.cv.acc = json->state_stack->u.cv.acc * 16 + c - 'A' + 10;
+			json->state_stack->u.cv.digit_count++;
+			if (json->state_stack->u.cv.digit_count >= json->state_stack->u.cv.escaped) goto add_cv_acc;
+		}
+		else
+		{
+			ret = 0;
+		add_cv_acc:
+			if (add_char_to_token(json, json->state_stack->u.cv.acc) <= -1) return -1;
+			json->state_stack->u.cv.escaped = 0;
+		}
+	}
+	else if (json->state_stack->u.cv.escaped == 1)
+	{
+		if (c >= '0' && c <= '8') 
+		{
+			json->state_stack->u.cv.escaped = 3;
+			json->state_stack->u.cv.digit_count = 0;
+			json->state_stack->u.cv.acc = c - '0';
+		}
+		else if (c == 'x')
+		{
+			json->state_stack->u.cv.escaped = 2;
+			json->state_stack->u.cv.digit_count = 0;
+			json->state_stack->u.cv.acc = 0;
+		}
+		else if (c == 'u')
+		{
+			json->state_stack->u.cv.escaped = 4;
+			json->state_stack->u.cv.digit_count = 0;
+			json->state_stack->u.cv.acc = 0;
+		}
+		else if (c == 'U')
+		{
+			json->state_stack->u.cv.escaped = 8;
+			json->state_stack->u.cv.digit_count = 0;
+			json->state_stack->u.cv.acc = 0;
+		}
+		else
+		{
+			json->state_stack->u.cv.escaped = 0;
+			if (add_char_to_token(json, unescape(c)) <= -1) return -1;
+		}
+	}
+	else if (c == '\\')
+	{
+		json->state_stack->u.cv.escaped = 1;
+	}
+	else if (c == '\'')
+	{
+		pop_state (json);
+		
+		if (json->tok.len < 1)
+		{
+			hcl_json_seterrbfmt (json, HCL_EINVAL, "no character in a character literal");
+			return -1;
+		}
+		if (invoke_data_inst(json, HCL_JSON_INST_CHARACTER) <= -1) return -1;
+	}
+	else
+	{
+		if (add_char_to_token(json, c) <= -1) return -1;
+	}
+
+	if (json->tok.len >= 1) 
+	{
+		hcl_json_seterrbfmt (json, HCL_EINVAL, "too many characters in a character literal - %.*js", json->tok.len, json->tok.ptr);
+		return -1;
+	}
+	return ret;
 }
 
 static int handle_numeric_value_char (hcl_json_t* json, hcl_ooci_t c)
@@ -388,7 +525,7 @@ static int handle_word_value_char (hcl_json_t* json, hcl_ooci_t c)
 	else if (hcl_comp_oochars_bcstr(json->tok.ptr, json->tok.len, "false") == 0) inst = HCL_JSON_INST_FALSE;
 	else
 	{
-		hcl_json_seterrbfmt (json, HCL_EINVAL, "invalue word value - %.*js", json->tok.len, json->tok.ptr);
+		hcl_json_seterrbfmt (json, HCL_EINVAL, "invalid word value - %.*js", json->tok.len, json->tok.ptr);
 		return -1;
 	}
 
@@ -459,12 +596,17 @@ static int handle_char_in_array (hcl_json_t* json, hcl_ooci_t c)
 
 		if (c == '\"')
 		{
-			if (push_state(json, HCL_JSON_STATE_IN_QUOTED_VALUE) <= -1) return -1;
+			if (push_state(json, HCL_JSON_STATE_IN_STRING_VALUE) <= -1) return -1;
 			clear_token (json);
 			return 1;
 		}
-		/* TOOD: else if (c == '\'') HCL character
-		 *       else if (c == '#') HCL radixed number
+		else if (c == '\'')
+		{
+			if (push_state(json, HCL_JSON_STATE_IN_CHARACTER_VALUE) <= -1) return -1;
+			clear_token (json);
+			return 1;
+		}
+		/* TOOD: else if (c == '#') HCL radixed number
 		 */
 		else if (is_digitchar(c) || c == '+' || c == '-')
 		{
@@ -549,12 +691,17 @@ static int handle_char_in_dic (hcl_json_t* json, hcl_ooci_t c)
 
 		if (c == '\"')
 		{
-			if (push_state(json, HCL_JSON_STATE_IN_QUOTED_VALUE) <= -1) return -1;
+			if (push_state(json, HCL_JSON_STATE_IN_STRING_VALUE) <= -1) return -1;
 			clear_token (json);
 			return 1;
 		}
-		/* TOOD: else if (c == '\'') HCL character
-		 *       else if (c == '#') HCL radixed number
+		else if (c == '\'')
+		{
+			if (push_state(json, HCL_JSON_STATE_IN_CHARACTER_VALUE) <= -1) return -1;
+			clear_token (json);
+			return 1;
+		}
+		/* TOOD: else if (c == '#') HCL radixed number
 		 */
 		else if (is_digitchar(c) || c == '+' || c == '-')
 		{
@@ -630,8 +777,12 @@ start_over:
 			x = handle_word_value_char(json, c);
 			break;
 
-		case HCL_JSON_STATE_IN_QUOTED_VALUE:
-			x = handle_quoted_value_char(json, c);
+		case HCL_JSON_STATE_IN_STRING_VALUE:
+			x = handle_string_value_char(json, c);
+			break;
+			
+		case HCL_JSON_STATE_IN_CHARACTER_VALUE:
+			x = handle_character_value_char(json, c);
 			break;
 
 		case HCL_JSON_STATE_IN_NUMERIC_VALUE:

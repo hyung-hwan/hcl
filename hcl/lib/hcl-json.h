@@ -58,7 +58,8 @@ enum hcl_json_state_t
 
 	HCL_JSON_STATE_IN_WORD_VALUE,
 	HCL_JSON_STATE_IN_NUMERIC_VALUE,
-	HCL_JSON_STATE_IN_QUOTED_VALUE
+	HCL_JSON_STATE_IN_STRING_VALUE,
+	HCL_JSON_STATE_IN_CHARACTER_VALUE
 };
 typedef enum hcl_json_state_t hcl_json_state_t;
 
@@ -73,6 +74,7 @@ enum hcl_json_inst_t
 
 	HCL_JSON_INST_KEY,
 
+	HCL_JSON_INST_CHARACTER, /* there is no such element as character in real JSON */
 	HCL_JSON_INST_STRING,
 	HCL_JSON_INST_NUMBER,
 	HCL_JSON_INST_NIL,

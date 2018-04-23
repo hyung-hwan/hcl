@@ -21,6 +21,8 @@ struct json_xtn_t
 		hcl_bch_t buf[4096];
 		hcl_oow_t len;
 	} logbuf;
+
+	int depth;
 };
 /* ========================================================================= */
 
@@ -87,7 +89,6 @@ static int write_all (int fd, const hcl_bch_t* ptr, hcl_oow_t len)
 static int write_log (hcl_json_t* json, int fd, const hcl_bch_t* ptr, hcl_oow_t len)
 {
 	json_xtn_t* xtn;
-
 
 	xtn = hcl_json_getxtn(json);
 
@@ -240,7 +241,10 @@ static void log_write (hcl_json_t* json, unsigned int mask, const hcl_ooch_t* ms
 		else if (n <= -1)
 		{
 			/* conversion error */
-			break;
+			if (bcslen <= 0) break;
+			if (write_log(json, logfd, buf, bcslen) <= -1) break;
+			msgidx += ucslen;
+			len -= ucslen;
 		}
 	}
 #else
@@ -257,18 +261,26 @@ static void log_write (hcl_json_t* json, unsigned int mask, const hcl_ooch_t* ms
 
 static int instcb (hcl_json_t* json, hcl_json_inst_t it, const hcl_oocs_t* str)
 {
+	json_xtn_t* json_xtn;
+
+	json_xtn = hcl_json_getxtn(json);
+
 	switch (it)
 	{
 		case HCL_JSON_INST_START_ARRAY:
+			json_xtn->depth++;
 			hcl_json_logbfmt (json, HCL_LOG_INFO | HCL_LOG_APP,  "[\n");
 			break;
 		case HCL_JSON_INST_END_ARRAY:
+			json_xtn->depth--;
 			hcl_json_logbfmt (json, HCL_LOG_INFO | HCL_LOG_APP,  "]\n");
 			break;
 		case HCL_JSON_INST_START_DIC:
+			json_xtn->depth++;
 			hcl_json_logbfmt (json, HCL_LOG_INFO | HCL_LOG_APP,  "{\n");
 			break;
 		case HCL_JSON_INST_END_DIC:
+			json_xtn->depth--;
 			hcl_json_logbfmt (json, HCL_LOG_INFO | HCL_LOG_APP,  "}\n");
 			break;
 
@@ -276,6 +288,7 @@ static int instcb (hcl_json_t* json, hcl_json_inst_t it, const hcl_oocs_t* str)
 			hcl_json_logbfmt (json, HCL_LOG_INFO | HCL_LOG_APP,  "%.*js: ", str->len, str->ptr);
 			break;
 
+		case HCL_JSON_INST_CHARACTER:
 		case HCL_JSON_INST_STRING:
 		case HCL_JSON_INST_NUMBER:
 		case HCL_JSON_INST_TRUE:
@@ -307,11 +320,15 @@ int main (int argc, char* argv[])
 	json_xtn = hcl_json_getxtn(json);
 	json_xtn->logmask = HCL_LOG_ALL_LEVELS | HCL_LOG_ALL_TYPES;
 
-	p = "[ \"ab\\xab\\uC88B\\uC544\\uC6A9c\", \"kaden\", \"iron\", true, { \"null\": \"abc\", \"123\": \"AA20AA\", \"10\": -0.123 } ]";
+	p = "[ \"ab\\xab\\uC88B\\uC544\\uC6A9c\", \"kaden\", \"iron\", true, { \"null\": \"a\\1bc\", \"123\": \"AA20AA\", \"10\": -0.123, \"way\": '\\uC88B' } ]";
 
 	if (hcl_json_feed(json, p, strlen(p), &xlen) <= -1)
+	{	
+		hcl_json_logbfmt (json, HCL_LOG_FATAL | HCL_LOG_APP, "ERROR: unable to process - %js\n", hcl_json_geterrmsg(json));
+	}
+	else if (json_xtn->depth != 0)
 	{
-		hcl_json_logbfmt (json, HCL_LOG_FATAL | HCL_LOG_APP, "ERROR: %js\n", hcl_json_geterrmsg(json));
+		hcl_json_logbfmt (json, HCL_LOG_FATAL | HCL_LOG_APP, "ERROR: incomplete input\n");
 	}
 
 	hcl_json_close (json);
