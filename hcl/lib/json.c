@@ -34,40 +34,47 @@
 
 struct dummy_hcl_xtn_t
 {
-	hcl_jsoner_t* json;
+	hcl_json_t* json;
 };
 typedef struct dummy_hcl_xtn_t dummy_hcl_xtn_t;
 
-enum hcl_jsoner_reply_attr_type_t
+
+typedef struct hcl_json_state_node_t hcl_json_state_node_t;
+struct hcl_json_state_node_t
 {
-	HCL_JSON_REPLY_ATTR_TYPE_UNKNOWN,
-	HCL_JSON_REPLY_ATTR_TYPE_DATA
-};
-typedef enum hcl_jsoner_reply_attr_type_t hcl_jsoner_reply_attr_type_t;
-
-
-
-typedef struct hcl_jsoner_state_node_t hcl_jsoner_state_node_t;
-struct hcl_jsoner_state_node_t
-{
-	hcl_jsoner_state_t state;
+	hcl_json_state_t state;
 	union
 	{
+		struct
+		{
+			int got_value;
+		} ia; /* in array */
+
+		struct
+		{
+			/* 0: ready to get key (at the beginning or got comma), 
+			 * 1: got key, 2: got colon, 3: got value */
+			int state; 
+		} id; /* in dictionary */
 		struct
 		{
 			int escaped;
 			int digit_count;
 			hcl_ooch_t acc;
 		} qv;
+		struct
+		{
+			int dotted;
+		} nv;
 	} u;
-	hcl_jsoner_state_node_t* next;
+	hcl_json_state_node_t* next;
 };
 
-struct hcl_jsoner_t
+struct hcl_json_t
 {
 	hcl_mmgr_t* mmgr;
 	hcl_cmgr_t* cmgr;
-	hcl_jsoner_prim_t prim;
+	hcl_json_prim_t prim;
 	hcl_t* dummy_hcl;
 
 	hcl_errnum_t errnum;
@@ -83,15 +90,11 @@ struct hcl_jsoner_t
 		unsigned int logmask;
 	} cfg;
 
-	hcl_jsoner_state_node_t state_top;
-	hcl_jsoner_state_node_t* state_stack;
+	hcl_json_state_node_t state_top;
+	hcl_json_state_node_t* state_stack;
 
-	struct
-	{
-		hcl_ooch_t* ptr;
-		hcl_oow_t len;
-		hcl_oow_t capa;
-	} tok;
+	hcl_oocs_t tok;
+	hcl_oow_t tok_capa;
 };
 
 
@@ -100,7 +103,7 @@ struct hcl_jsoner_t
 static void log_write_for_dummy (hcl_t* hcl, unsigned int mask, const hcl_ooch_t* msg, hcl_oow_t len)
 {
 	dummy_hcl_xtn_t* xtn = (dummy_hcl_xtn_t*)hcl_getxtn(hcl);
-	hcl_jsoner_t* json;
+	hcl_json_t* json;
 
 	json = xtn->json;
 	json->prim.log_write (json, mask, msg, len);
@@ -147,23 +150,23 @@ static HCL_INLINE int is_digitchar (hcl_ooci_t c)
 	return (c >= '0' && c <= '9');
 }
 
-static void clear_token (hcl_jsoner_t* json)
+static void clear_token (hcl_json_t* json)
 {
 	json->tok.len = 0;
 }
 
-static int add_char_to_token (hcl_jsoner_t* json, hcl_ooch_t ch)
+static int add_char_to_token (hcl_json_t* json, hcl_ooch_t ch)
 {
-	if (json->tok.len >= json->tok.capa)
+	if (json->tok.len >= json->tok_capa)
 	{
 		hcl_ooch_t* tmp;
 		hcl_oow_t newcapa;
 
 		newcapa = HCL_ALIGN_POW2(json->tok.len + 1, HCL_JSON_TOKEN_NAME_ALIGN);
-		tmp = hcl_jsoner_reallocmem(json, json->tok.ptr, newcapa * HCL_SIZEOF(*tmp));
+		tmp = hcl_json_reallocmem(json, json->tok.ptr, newcapa * HCL_SIZEOF(*tmp));
 		if (!tmp) return -1;
 
-		json->tok.capa = newcapa;
+		json->tok_capa = newcapa;
 		json->tok.ptr = tmp;
 	}
 
@@ -171,12 +174,12 @@ static int add_char_to_token (hcl_jsoner_t* json, hcl_ooch_t ch)
 	return 0;
 }
 
-static HCL_INLINE int is_token (hcl_jsoner_t* json, const hcl_bch_t* str)
+static HCL_INLINE int is_token (hcl_json_t* json, const hcl_bch_t* str)
 {
 	return hcl_comp_oochars_bcstr(json->tok.ptr, json->tok.len, str) == 0;
 } 
 
-static HCL_INLINE int is_token_integer (hcl_jsoner_t* json, hcl_oow_t* value)
+static HCL_INLINE int is_token_integer (hcl_json_t* json, hcl_oow_t* value)
 {
 	hcl_oow_t i;
 	hcl_oow_t v = 0;
@@ -208,11 +211,13 @@ static HCL_INLINE hcl_ooch_t unescape (hcl_ooch_t c)
 	}
 }
 
-static int push_state (hcl_jsoner_t* json, hcl_jsoner_state_t state)
-{
-	hcl_jsoner_state_node_t* ss;
+/* ========================================================================= */
 
-	ss = hcl_jsoner_callocmem(json, HCL_SIZEOF(*ss));
+static int push_state (hcl_json_t* json, hcl_json_state_t state)
+{
+	hcl_json_state_node_t* ss;
+
+	ss = hcl_json_callocmem(json, HCL_SIZEOF(*ss));
 	if (!ss) return -1;
 
 	ss->state = state;
@@ -222,24 +227,52 @@ static int push_state (hcl_jsoner_t* json, hcl_jsoner_state_t state)
 	return 0;
 }
 
-static void pop_state (hcl_jsoner_t* json)
+static void pop_state (hcl_json_t* json)
 {
-	hcl_jsoner_state_node_t* ss;
+	hcl_json_state_node_t* ss;
 
 	ss = json->state_stack;
 	HCL_ASSERT (json->dummy_hcl, ss != HCL_NULL && ss != &json->state_top);
 	json->state_stack = ss->next;
 
+	if (json->state_stack->state == HCL_JSON_STATE_IN_ARRAY)
+	{
+		json->state_stack->u.ia.got_value = 1;
+	}
+	else if (json->state_stack->state == HCL_JSON_STATE_IN_DIC)
+	{
+		json->state_stack->u.id.state++;
+	}
+
 /* TODO: don't free this. move it to the free list? */
-	hcl_jsoner_freemem (json, ss);
+	hcl_json_freemem (json, ss);
 }
 
-static void pop_all_states (hcl_jsoner_t* json)
+static void pop_all_states (hcl_json_t* json)
 {
 	while (json->state_stack != &json->state_top) pop_state (json);
 }
 
-static int handle_quoted_value_char (hcl_jsoner_t* json, hcl_ooci_t c)
+/* ========================================================================= */
+
+static int invoke_data_inst (hcl_json_t* json, hcl_json_inst_t inst)
+{
+	if (json->state_stack->state == HCL_JSON_STATE_IN_DIC && json->state_stack->u.id.state == 1) 
+	{
+		if (inst != HCL_JSON_INST_STRING)
+		{
+			hcl_json_seterrbfmt (json, HCL_EINVAL, "dictionary key not a string - %.*js", json->tok.len, json->tok.ptr);
+			return -1;
+		}
+
+		inst = HCL_JSON_INST_KEY;
+	}
+
+	json->prim.instcb (json, inst, &json->tok);
+	return 0;
+}
+
+static int handle_quoted_value_char (hcl_json_t* json, hcl_ooci_t c)
 {
 	if (json->state_stack->u.qv.escaped >= 2)
 	{
@@ -301,26 +334,270 @@ static int handle_quoted_value_char (hcl_jsoner_t* json, hcl_ooci_t c)
 	else if (c == '\"')
 	{
 		pop_state (json);
-HCL_LOG2 (json->dummy_hcl, HCL_LOG_APP | HCL_LOG_FATAL, "[%.*js]\n", json->tok.len, json->tok.ptr);
-		/* TODO: call callback ARRAY_VALUE*/
+		if (invoke_data_inst(json, HCL_JSON_INST_STRING) <= -1) return -1;
 	}
 	else
 	{
 		if (add_char_to_token(json, c) <= -1) return -1;
 	}
-	
-	
-	return 0;
+
+	return 1;
 }
 
-static int handle_numeric_value_char (hcl_jsoner_t* json, hcl_ooci_t c)
+static int handle_numeric_value_char (hcl_json_t* json, hcl_ooci_t c)
 {
-	/* TODO: */
-	return -1;
+	if (is_digitchar(c) || (json->tok.len == 0 && (c == '+' || c == '-')))
+	{
+		if (add_char_to_token(json, c) <= -1) return -1;
+		return 1;
+	}
+	else if (!json->state_stack->u.nv.dotted && c == '.' &&
+	         json->tok.len > 0 && is_digitchar(json->tok.ptr[json->tok.len - 1]))
+	{
+		if (add_char_to_token(json, c) <= -1) return -1;
+		json->state_stack->u.nv.dotted = 1;
+		return 1;
+	}
+
+	pop_state (json);
+
+	HCL_ASSERT (json->dummy_hcl, json->tok.len > 0);
+	if (!is_digitchar(json->tok.ptr[json->tok.len - 1]))
+	{
+		hcl_json_seterrbfmt (json, HCL_EINVAL, "invalid numeric value - %.*js", json->tok.len, json->tok.ptr);
+		return -1;
+	}
+	if (invoke_data_inst(json, HCL_JSON_INST_NUMBER) <= -1) return -1;
+	return 0; /* start over */
 }
 
-static int handle_char (hcl_jsoner_t* json, hcl_ooci_t c, hcl_oow_t nbytes)
+static int handle_word_value_char (hcl_json_t* json, hcl_ooci_t c)
 {
+	hcl_json_inst_t inst;
+
+	if (is_alphachar(c))
+	{
+		if (add_char_to_token(json, c) <= -1) return -1;
+		return 1;
+	}
+
+	pop_state (json);
+
+	if (hcl_comp_oochars_bcstr(json->tok.ptr, json->tok.len, "null") == 0) inst = HCL_JSON_INST_NIL;
+	else if (hcl_comp_oochars_bcstr(json->tok.ptr, json->tok.len, "true") == 0) inst = HCL_JSON_INST_TRUE;
+	else if (hcl_comp_oochars_bcstr(json->tok.ptr, json->tok.len, "false") == 0) inst = HCL_JSON_INST_FALSE;
+	else
+	{
+		hcl_json_seterrbfmt (json, HCL_EINVAL, "invalue word value - %.*js", json->tok.len, json->tok.ptr);
+		return -1;
+	}
+
+	if (invoke_data_inst(json, inst) <= -1) return -1;
+	return 0; /* start over */
+}
+
+/* ========================================================================= */
+
+static int handle_start_char (hcl_json_t* json, hcl_ooci_t c)
+{
+	if (c == '[')
+	{
+		if (push_state(json, HCL_JSON_STATE_IN_ARRAY) <= -1) return -1;
+		json->state_stack->u.ia.got_value = 0;
+		json->prim.instcb (json, HCL_JSON_INST_START_ARRAY, HCL_NULL);
+		return 1;
+	}
+	else if (c == '{')
+	{
+		if (push_state(json, HCL_JSON_STATE_IN_DIC) <= -1) return -1;
+		json->state_stack->u.id.state = 0;
+		json->prim.instcb (json, HCL_JSON_INST_START_DIC, HCL_NULL);
+		return 1;
+	}
+	else if (is_spacechar(c)) 
+	{
+		/* do nothing */
+		return 1;
+	}
+	else
+	{
+		hcl_json_seterrbfmt (json, HCL_EINVAL, "not starting with [ or { - %jc", (hcl_ooch_t)c);
+		return -1;
+	}
+}
+
+static int handle_char_in_array (hcl_json_t* json, hcl_ooci_t c)
+{
+	if (c == ']')
+	{
+		json->prim.instcb (json, HCL_JSON_INST_END_ARRAY, HCL_NULL);
+		pop_state (json);
+		return 1;
+	}
+	else if (c == ',')
+	{
+		if (!json->state_stack->u.ia.got_value)
+		{
+			hcl_json_seterrbfmt (json, HCL_EINVAL, "redundant comma in array - %jc", (hcl_ooch_t)c);
+			return -1;
+		}
+		json->state_stack->u.ia.got_value = 0;
+		return 1;
+	}
+	else if (is_spacechar(c))
+	{
+		/* do nothing */
+		return 1;
+	}
+	else
+	{
+		if (json->state_stack->u.ia.got_value)
+		{
+			hcl_json_seterrbfmt (json, HCL_EINVAL, "comma required in array - %jc", (hcl_ooch_t)c);
+			return -1;
+		}
+
+		if (c == '\"')
+		{
+			if (push_state(json, HCL_JSON_STATE_IN_QUOTED_VALUE) <= -1) return -1;
+			clear_token (json);
+			return 1;
+		}
+		/* TOOD: else if (c == '\'') HCL character
+		 *       else if (c == '#') HCL radixed number
+		 */
+		else if (is_digitchar(c) || c == '+' || c == '-')
+		{
+			if (push_state(json, HCL_JSON_STATE_IN_NUMERIC_VALUE) <= -1) return -1;
+			clear_token (json);
+			json->state_stack->u.nv.dotted = 0;
+			return 0; /* start over */
+		}
+		else if (is_alphachar(c))
+		{
+			if (push_state(json, HCL_JSON_STATE_IN_WORD_VALUE) <= -1) return -1;
+			clear_token (json);
+			return 0; /* start over */
+		}
+		else if (c == '[')
+		{
+			if (push_state(json, HCL_JSON_STATE_IN_ARRAY) <= -1) return -1;
+			json->state_stack->u.ia.got_value = 0;
+			json->prim.instcb (json, HCL_JSON_INST_START_ARRAY, HCL_NULL);
+			return 1;
+		}
+		else if (c == '{')
+		{
+			if (push_state(json, HCL_JSON_STATE_IN_DIC) <= -1) return -1;
+			json->state_stack->u.id.state = 0;
+			json->prim.instcb (json, HCL_JSON_INST_START_DIC, HCL_NULL);
+			return 1;
+		}
+		else
+		{
+			hcl_json_seterrbfmt (json, HCL_EINVAL, "wrong character inside array - %jc", (hcl_ooch_t)c);
+			return -1;
+		}
+	}
+}
+
+static int handle_char_in_dic (hcl_json_t* json, hcl_ooci_t c)
+{
+	if (c == '}')
+	{
+		json->prim.instcb (json, HCL_JSON_INST_END_DIC, HCL_NULL);
+		pop_state (json);
+		return 1;
+	}
+	else if (c == ':')
+	{
+		if (json->state_stack->u.id.state != 1)
+		{
+			hcl_json_seterrbfmt (json, HCL_EINVAL, "redundant colon in dictionary - %jc", (hcl_ooch_t)c);
+			return -1;
+		}
+		json->state_stack->u.id.state++;
+		return 1;
+	}
+	else if (c == ',')
+	{
+		if (json->state_stack->u.id.state != 3)
+		{
+			hcl_json_seterrbfmt (json, HCL_EINVAL, "redundant comma in dicitonary - %jc", (hcl_ooch_t)c);
+			return -1;
+		}
+		json->state_stack->u.id.state = 0;
+		return 1;
+	}
+	else if (is_spacechar(c))
+	{
+		/* do nothing */
+		return 1;
+	}
+	else
+	{
+		if (json->state_stack->u.id.state == 1)
+		{
+			hcl_json_seterrbfmt (json, HCL_EINVAL, "colon required in dicitonary - %jc", (hcl_ooch_t)c);
+			return -1;
+		}
+		else if (json->state_stack->u.id.state == 3)
+		{
+			hcl_json_seterrbfmt (json, HCL_EINVAL, "comma required in dicitonary - %jc", (hcl_ooch_t)c);
+			return -1;
+		}
+
+		if (c == '\"')
+		{
+			if (push_state(json, HCL_JSON_STATE_IN_QUOTED_VALUE) <= -1) return -1;
+			clear_token (json);
+			return 1;
+		}
+		/* TOOD: else if (c == '\'') HCL character
+		 *       else if (c == '#') HCL radixed number
+		 */
+		else if (is_digitchar(c) || c == '+' || c == '-')
+		{
+			if (push_state(json, HCL_JSON_STATE_IN_NUMERIC_VALUE) <= -1) return -1;
+			clear_token (json);
+			json->state_stack->u.nv.dotted = 0;
+			return 0; /* start over */
+		}
+		else if (is_alphachar(c))
+		{
+			if (push_state(json, HCL_JSON_STATE_IN_WORD_VALUE) <= -1) return -1;
+			clear_token (json);
+			return 0; /* start over */
+		}
+		else if (c == '[')
+		{
+			if (push_state(json, HCL_JSON_STATE_IN_ARRAY) <= -1) return -1;
+			json->state_stack->u.ia.got_value = 0;
+			json->prim.instcb (json, HCL_JSON_INST_START_ARRAY, HCL_NULL);
+			return 1;
+		}
+		else if (c == '{')
+		{
+			if (push_state(json, HCL_JSON_STATE_IN_DIC) <= -1) return -1;
+			json->state_stack->u.id.state = 0;
+			json->prim.instcb (json, HCL_JSON_INST_START_DIC, HCL_NULL);
+			return 1;
+		}
+		else
+		{
+			hcl_json_seterrbfmt (json, HCL_EINVAL, "wrong character inside array - %jc", (hcl_ooch_t)c);
+			return -1;
+		}
+	}
+}
+
+/* ========================================================================= */
+
+static int handle_char (hcl_json_t* json, hcl_ooci_t c, hcl_oow_t nbytes)
+{
+	int x;
+
+start_over:
 	if (c == HCL_OOCI_EOF)
 	{
 		if (json->state_stack->state == HCL_JSON_STATE_START)
@@ -330,117 +607,51 @@ static int handle_char (hcl_jsoner_t* json, hcl_ooci_t c, hcl_oow_t nbytes)
 		}
 		else
 		{
-			hcl_jsoner_seterrbfmt (json, HCL_EFINIS, "unexpected end of data");
+			hcl_json_seterrbfmt (json, HCL_EFINIS, "unexpected end of data");
 			return -1;
 		}
 	}
 
-printf ("handling [%c] %d\n", c, (int)nbytes);
 	switch (json->state_stack->state)
 	{
 		case HCL_JSON_STATE_START:
-			if (c == '[')
-			{
-				if (push_state(json, HCL_JSON_STATE_IN_ARRAY) <= -1) return -1;
-				break;
-			}
-			else if (c == '{')
-			{
-				if (push_state(json, HCL_JSON_STATE_IN_DIC) <= -1) return -1;
-				break;
-			}
-			else if (is_spacechar(c)) 
-			{
-				/* skip whitespaces at the beginning of the start line before the reply name */
-				break;
-			}
-			else
-			{
-				hcl_jsoner_seterrbfmt (json, HCL_EINVAL, "not starting with [ or { - %jc", (hcl_ooch_t)c);
-				goto oops;
-			}
+			x = handle_start_char(json, c);
 			break;
 
 		case HCL_JSON_STATE_IN_ARRAY:
-			if (c == ']')
-			{
-				pop_state (json);
-				break;
-			}
-			else if (c == ',')
-			{
-				/* TODO: handle this */
-			}
-			else if (is_spacechar(c))
-			{
-				break;
-			}
-			else if (c == '\"')
-			{
-		
-				if (push_state(json, HCL_JSON_STATE_IN_QUOTED_VALUE) <= -1) return -1;
-				clear_token (json);
-				break;
-			}
-			else if (is_alphachar(c) || is_digitchar(c))
-			{
-				break;
-			}
-			else
-			{
-				hcl_jsoner_seterrbfmt (json, HCL_EINVAL, "wrong character inside array - %jc", (hcl_ooch_t)c);
-				goto oops;
-			}
+			x = handle_char_in_array(json, c);
 			break;
 
 		case HCL_JSON_STATE_IN_DIC:
-			if (c == '}')
-			{
-				pop_state (json);
-				break;
-			}
-			else if (is_spacechar(c))
-			{
-				break;
-			}
-			else if (c == '\"')
-			{
-				break;
-			}
-			else if (is_alphachar(c) || is_digitchar(c))
-			{
-				break;
-			}
-			else
-			{
-				hcl_jsoner_seterrbfmt (json, HCL_EINVAL, "wrong character inside dictionary - %jc", (hcl_ooch_t)c);
-				goto oops;
-			}
+			x = handle_char_in_dic(json, c);
 			break;
 
 		case HCL_JSON_STATE_IN_WORD_VALUE:
+			x = handle_word_value_char(json, c);
 			break;
 
 		case HCL_JSON_STATE_IN_QUOTED_VALUE:
-			if (handle_quoted_value_char(json, c) <= -1) goto oops;
+			x = handle_quoted_value_char(json, c);
 			break;
 
 		case HCL_JSON_STATE_IN_NUMERIC_VALUE:
-			if (handle_numeric_value_char(json, c) <= -1) goto oops;
+			x = handle_numeric_value_char(json, c);
 			break;
 
 		default:
-			hcl_jsoner_seterrbfmt (json, HCL_EINTERN, "internal error - must not be called for state %d", (int)json->state_stack->state);
-			goto oops;
+			hcl_json_seterrbfmt (json, HCL_EINTERN, "internal error - must not be called for state %d", (int)json->state_stack->state);
+			return -1;
 	}
 
+	if (x <= -1) return -1;
+	if (x == 0) goto start_over;
+
 	return 0;
-	
-oops: 
-	return -1;
 }
 
-static int feed_json_data (hcl_jsoner_t* json, const hcl_bch_t* data, hcl_oow_t len, hcl_oow_t* xlen)
+/* ========================================================================= */
+
+static int feed_json_data (hcl_json_t* json, const hcl_bch_t* data, hcl_oow_t len, hcl_oow_t* xlen)
 {
 	const hcl_bch_t* ptr;
 	const hcl_bch_t* end;
@@ -500,14 +711,14 @@ oops:
 
 /* ========================================================================= */
 
-hcl_jsoner_t* hcl_jsoner_open (hcl_mmgr_t* mmgr, hcl_oow_t xtnsize, hcl_jsoner_prim_t* prim, hcl_errnum_t* errnum)
+hcl_json_t* hcl_json_open (hcl_mmgr_t* mmgr, hcl_oow_t xtnsize, hcl_json_prim_t* prim, hcl_errnum_t* errnum)
 {
-	hcl_jsoner_t* json;
+	hcl_json_t* json;
 	hcl_t* hcl;
 	hcl_vmprim_t vmprim;
 	dummy_hcl_xtn_t* xtn;
 
-	json = (hcl_jsoner_t*)HCL_MMGR_ALLOC(mmgr, HCL_SIZEOF(*json) + xtnsize);
+	json = (hcl_json_t*)HCL_MMGR_ALLOC(mmgr, HCL_SIZEOF(*json) + xtnsize);
 	if (!json) 
 	{
 		if (errnum) *errnum = HCL_ESYSMEM;
@@ -550,15 +761,15 @@ hcl_jsoner_t* hcl_jsoner_open (hcl_mmgr_t* mmgr, hcl_oow_t xtnsize, hcl_jsoner_p
 	return json;
 }
 
-void hcl_jsoner_close (hcl_jsoner_t* json)
+void hcl_json_close (hcl_json_t* json)
 {
 	pop_all_states (json);
-	if (json->tok.ptr) hcl_jsoner_freemem (json, json->tok.ptr);
+	if (json->tok.ptr) hcl_json_freemem (json, json->tok.ptr);
 	hcl_close (json->dummy_hcl);
 	HCL_MMGR_FREE (json->mmgr, json);
 }
 
-int hcl_jsoner_setoption (hcl_jsoner_t* json, hcl_jsoner_option_t id, const void* value)
+int hcl_json_setoption (hcl_json_t* json, hcl_json_option_t id, const void* value)
 {
 	switch (id)
 	{
@@ -579,11 +790,11 @@ int hcl_jsoner_setoption (hcl_jsoner_t* json, hcl_jsoner_option_t id, const void
 			return 0;
 	}
 
-	hcl_jsoner_seterrnum (json, HCL_EINVAL);
+	hcl_json_seterrnum (json, HCL_EINVAL);
 	return -1;
 }
 
-int hcl_jsoner_getoption (hcl_jsoner_t* json, hcl_jsoner_option_t id, void* value)
+int hcl_json_getoption (hcl_json_t* json, hcl_json_option_t id, void* value)
 {
 	switch (id)
 	{
@@ -596,55 +807,55 @@ int hcl_jsoner_getoption (hcl_jsoner_t* json, hcl_jsoner_option_t id, void* valu
 			return 0;
 	};
 
-	hcl_jsoner_seterrnum (json, HCL_EINVAL);
+	hcl_json_seterrnum (json, HCL_EINVAL);
 	return -1;
 }
 
 
-void* hcl_jsoner_getxtn (hcl_jsoner_t* json)
+void* hcl_json_getxtn (hcl_json_t* json)
 {
 	return (void*)(json + 1);
 }
 
-hcl_mmgr_t* hcl_jsoner_getmmgr (hcl_jsoner_t* json)
+hcl_mmgr_t* hcl_json_getmmgr (hcl_json_t* json)
 {
 	return json->mmgr;
 }
 
-hcl_cmgr_t* hcl_jsoner_getcmgr (hcl_jsoner_t* json)
+hcl_cmgr_t* hcl_json_getcmgr (hcl_json_t* json)
 {
 	return json->cmgr;
 }
 
-void hcl_jsoner_setcmgr (hcl_jsoner_t* json, hcl_cmgr_t* cmgr)
+void hcl_json_setcmgr (hcl_json_t* json, hcl_cmgr_t* cmgr)
 {
 	json->cmgr = cmgr;
 }
 
-hcl_errnum_t hcl_jsoner_geterrnum (hcl_jsoner_t* json)
+hcl_errnum_t hcl_json_geterrnum (hcl_json_t* json)
 {
 	return json->errnum;
 }
 
-const hcl_ooch_t* hcl_jsoner_geterrstr (hcl_jsoner_t* json)
+const hcl_ooch_t* hcl_json_geterrstr (hcl_json_t* json)
 {
 	return hcl_errnum_to_errstr(json->errnum);
 }
 
-const hcl_ooch_t* hcl_jsoner_geterrmsg (hcl_jsoner_t* json)
+const hcl_ooch_t* hcl_json_geterrmsg (hcl_json_t* json)
 {
 	if (json->errmsg.len <= 0) return hcl_errnum_to_errstr(json->errnum);
 	return json->errmsg.buf;
 }
 
-void hcl_jsoner_seterrnum (hcl_jsoner_t* json, hcl_errnum_t errnum)
+void hcl_json_seterrnum (hcl_json_t* json, hcl_errnum_t errnum)
 {
 	/*if (json->shuterr) return; */
 	json->errnum = errnum;
 	json->errmsg.len = 0;
 }
 
-void hcl_jsoner_seterrbfmt (hcl_jsoner_t* json, hcl_errnum_t errnum, const hcl_bch_t* fmt, ...)
+void hcl_json_seterrbfmt (hcl_json_t* json, hcl_errnum_t errnum, const hcl_bch_t* fmt, ...)
 {
 	va_list ap;
 
@@ -658,7 +869,7 @@ void hcl_jsoner_seterrbfmt (hcl_jsoner_t* json, hcl_errnum_t errnum, const hcl_b
 	json->errmsg.len = json->dummy_hcl->errmsg.len;
 }
 
-void hcl_jsoner_seterrufmt (hcl_jsoner_t* json, hcl_errnum_t errnum, const hcl_uch_t* fmt, ...)
+void hcl_json_seterrufmt (hcl_json_t* json, hcl_errnum_t errnum, const hcl_uch_t* fmt, ...)
 {
 	va_list ap;
 
@@ -674,7 +885,7 @@ void hcl_jsoner_seterrufmt (hcl_jsoner_t* json, hcl_errnum_t errnum, const hcl_u
 
 /* ========================================================================= */
 
-void hcl_jsoner_logbfmt (hcl_jsoner_t* json, unsigned int mask, const hcl_bch_t* fmt, ...)
+void hcl_json_logbfmt (hcl_json_t* json, unsigned int mask, const hcl_bch_t* fmt, ...)
 {
 	va_list ap;
 	va_start (ap, fmt);
@@ -682,7 +893,7 @@ void hcl_jsoner_logbfmt (hcl_jsoner_t* json, unsigned int mask, const hcl_bch_t*
 	va_end (ap);
 }
 
-void hcl_jsoner_logufmt (hcl_jsoner_t* json, unsigned int mask, const hcl_uch_t* fmt, ...)
+void hcl_json_logufmt (hcl_json_t* json, unsigned int mask, const hcl_uch_t* fmt, ...)
 {
 	va_list ap;
 	va_start (ap, fmt);
@@ -692,45 +903,45 @@ void hcl_jsoner_logufmt (hcl_jsoner_t* json, unsigned int mask, const hcl_uch_t*
 
 /* ========================================================================= */
 
-void* hcl_jsoner_allocmem (hcl_jsoner_t* json, hcl_oow_t size)
+void* hcl_json_allocmem (hcl_json_t* json, hcl_oow_t size)
 {
 	void* ptr;
 
 	ptr = HCL_MMGR_ALLOC(json->mmgr, size);
-	if (!ptr) hcl_jsoner_seterrnum (json, HCL_ESYSMEM);
+	if (!ptr) hcl_json_seterrnum (json, HCL_ESYSMEM);
 	return ptr;
 }
 
-void* hcl_jsoner_callocmem (hcl_jsoner_t* json, hcl_oow_t size)
+void* hcl_json_callocmem (hcl_json_t* json, hcl_oow_t size)
 {
 	void* ptr;
 
 	ptr = HCL_MMGR_ALLOC(json->mmgr, size);
-	if (!ptr) hcl_jsoner_seterrnum (json, HCL_ESYSMEM);
+	if (!ptr) hcl_json_seterrnum (json, HCL_ESYSMEM);
 	else HCL_MEMSET (ptr, 0, size);
 	return ptr;
 }
 
-void* hcl_jsoner_reallocmem (hcl_jsoner_t* json, void* ptr, hcl_oow_t size)
+void* hcl_json_reallocmem (hcl_json_t* json, void* ptr, hcl_oow_t size)
 {
 	ptr = HCL_MMGR_REALLOC(json->mmgr, ptr, size);
-	if (!ptr) hcl_jsoner_seterrnum (json, HCL_ESYSMEM);
+	if (!ptr) hcl_json_seterrnum (json, HCL_ESYSMEM);
 	return ptr;
 }
 
-void hcl_jsoner_freemem (hcl_jsoner_t* json, void* ptr)
+void hcl_json_freemem (hcl_json_t* json, void* ptr)
 {
 	HCL_MMGR_FREE (json->mmgr, ptr);
 }
 
 /* ========================================================================= */
 
-hcl_jsoner_state_t hcl_jsoner_getstate (hcl_jsoner_t* json)
+hcl_json_state_t hcl_json_getstate (hcl_json_t* json)
 {
 	return json->state_stack->state;
 }
 
-void hcl_jsoner_reset (hcl_jsoner_t* json)
+void hcl_json_reset (hcl_json_t* json)
 {
 	/* TODO: reset XXXXXXXXXXXXXXXXXXXXXXXXXXXxxxxx */
 	pop_all_states (json);
@@ -738,7 +949,7 @@ void hcl_jsoner_reset (hcl_jsoner_t* json)
 	json->state_stack->state = HCL_JSON_STATE_START;
 }
 
-int hcl_jsoner_feed (hcl_jsoner_t* json, const void* ptr, hcl_oow_t len, hcl_oow_t* xlen)
+int hcl_json_feed (hcl_json_t* json, const void* ptr, hcl_oow_t len, hcl_oow_t* xlen)
 {
 	int x;
 	hcl_oow_t total, ylen;

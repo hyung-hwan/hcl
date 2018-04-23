@@ -9,8 +9,8 @@
 
 /* ========================================================================= */
 
-typedef struct jsoner_xtn_t jsoner_xtn_t;
-struct jsoner_xtn_t
+typedef struct json_xtn_t json_xtn_t;
+struct json_xtn_t
 {
 	int logfd;
 	unsigned int logmask;
@@ -84,12 +84,12 @@ static int write_all (int fd, const hcl_bch_t* ptr, hcl_oow_t len)
 }
 
 
-static int write_log (hcl_jsoner_t* jsoner, int fd, const hcl_bch_t* ptr, hcl_oow_t len)
+static int write_log (hcl_json_t* json, int fd, const hcl_bch_t* ptr, hcl_oow_t len)
 {
-	jsoner_xtn_t* xtn;
+	json_xtn_t* xtn;
 
 
-	xtn = hcl_jsoner_getxtn(jsoner);
+	xtn = hcl_json_getxtn(json);
 
 	while (len > 0)
 	{
@@ -136,10 +136,10 @@ static int write_log (hcl_jsoner_t* jsoner, int fd, const hcl_bch_t* ptr, hcl_oo
 	return 0;
 }
 
-static void flush_log (hcl_jsoner_t* jsoner, int fd)
+static void flush_log (hcl_json_t* json, int fd)
 {
-	jsoner_xtn_t* xtn;
-	xtn = hcl_jsoner_getxtn(jsoner);
+	json_xtn_t* xtn;
+	xtn = hcl_json_getxtn(json);
 	if (xtn->logbuf.len > 0)
 	{
 		write_all (fd, xtn->logbuf.buf, xtn->logbuf.len);
@@ -147,15 +147,15 @@ static void flush_log (hcl_jsoner_t* jsoner, int fd)
 	}
 }
 
-static void log_write (hcl_jsoner_t* jsoner, unsigned int mask, const hcl_ooch_t* msg, hcl_oow_t len)
+static void log_write (hcl_json_t* json, unsigned int mask, const hcl_ooch_t* msg, hcl_oow_t len)
 {
 	hcl_bch_t buf[256];
 	hcl_oow_t ucslen, bcslen;
-	jsoner_xtn_t* xtn;
+	json_xtn_t* xtn;
 	hcl_oow_t msgidx;
 	int n, logfd;
 
-	xtn = hcl_jsoner_getxtn(jsoner);
+	xtn = hcl_json_getxtn(json);
 
 	if (mask & HCL_LOG_STDERR)
 	{
@@ -198,14 +198,14 @@ static void log_write (hcl_jsoner_t* jsoner, unsigned int mask, const hcl_ooch_t
 			tslen = 25; 
 		}
 
-		write_log (jsoner, logfd, ts, tslen);
+		write_log (json, logfd, ts, tslen);
 	}
 
 	if (logfd == xtn->logfd && xtn->logfd_istty)
 	{
-		if (mask & HCL_LOG_FATAL) write_log (jsoner, logfd, "\x1B[1;31m", 7);
-		else if (mask & HCL_LOG_ERROR) write_log (jsoner, logfd, "\x1B[1;32m", 7);
-		else if (mask & HCL_LOG_WARN) write_log (jsoner, logfd, "\x1B[1;33m", 7);
+		if (mask & HCL_LOG_FATAL) write_log (json, logfd, "\x1B[1;31m", 7);
+		else if (mask & HCL_LOG_ERROR) write_log (json, logfd, "\x1B[1;32m", 7);
+		else if (mask & HCL_LOG_WARN) write_log (json, logfd, "\x1B[1;33m", 7);
 	}
 
 #if defined(HCL_OOCH_IS_UCH)
@@ -228,7 +228,7 @@ static void log_write (hcl_jsoner_t* jsoner, unsigned int mask, const hcl_ooch_t
 			/*assert (ucslen > 0);*/
 
 			/* attempt to write all converted characters */
-			if (write_log(jsoner, logfd, buf, bcslen) <= -1) break;
+			if (write_log(json, logfd, buf, bcslen) <= -1) break;
 
 			if (n == 0) break;
 			else
@@ -244,41 +244,76 @@ static void log_write (hcl_jsoner_t* jsoner, unsigned int mask, const hcl_ooch_t
 		}
 	}
 #else
-	write_log (jsoner, logfd, msg, len);
+	write_log (json, logfd, msg, len);
 #endif
 
 	if (logfd == xtn->logfd && xtn->logfd_istty)
 	{
-		if (mask & (HCL_LOG_FATAL | HCL_LOG_ERROR | HCL_LOG_WARN)) write_log (jsoner, logfd, "\x1B[0m", 4);
+		if (mask & (HCL_LOG_FATAL | HCL_LOG_ERROR | HCL_LOG_WARN)) write_log (json, logfd, "\x1B[0m", 4);
 	}
 
-	flush_log (jsoner, logfd);
+	flush_log (json, logfd);
 }
 
+static int instcb (hcl_json_t* json, hcl_json_inst_t it, const hcl_oocs_t* str)
+{
+	switch (it)
+	{
+		case HCL_JSON_INST_START_ARRAY:
+			hcl_json_logbfmt (json, HCL_LOG_INFO | HCL_LOG_APP,  "[\n");
+			break;
+		case HCL_JSON_INST_END_ARRAY:
+			hcl_json_logbfmt (json, HCL_LOG_INFO | HCL_LOG_APP,  "]\n");
+			break;
+		case HCL_JSON_INST_START_DIC:
+			hcl_json_logbfmt (json, HCL_LOG_INFO | HCL_LOG_APP,  "{\n");
+			break;
+		case HCL_JSON_INST_END_DIC:
+			hcl_json_logbfmt (json, HCL_LOG_INFO | HCL_LOG_APP,  "}\n");
+			break;
+
+		case HCL_JSON_INST_KEY:
+			hcl_json_logbfmt (json, HCL_LOG_INFO | HCL_LOG_APP,  "%.*js: ", str->len, str->ptr);
+			break;
+
+		case HCL_JSON_INST_STRING:
+		case HCL_JSON_INST_NUMBER:
+		case HCL_JSON_INST_TRUE:
+		case HCL_JSON_INST_FALSE:
+		case HCL_JSON_INST_NIL:
+			hcl_json_logbfmt (json, HCL_LOG_INFO | HCL_LOG_APP,  "%.*js\n", str->len, str->ptr);
+			break;
+	}
+
+	return 0;
+}
 /* ========================================================================= */
 
 int main (int argc, char* argv[])
 {
 
-	hcl_jsoner_t* jsoner;
-	hcl_jsoner_prim_t json_prim;
-	jsoner_xtn_t* jsoner_xtn;
+	hcl_json_t* json;
+	hcl_json_prim_t json_prim;
+	json_xtn_t* json_xtn;
 	hcl_oow_t xlen;
 	const char* p;
-	
+
 	memset (&json_prim, 0, HCL_SIZEOF(json_prim));
 	json_prim.log_write = log_write;
-	
-	jsoner = hcl_jsoner_open (&sys_mmgr, HCL_SIZEOF(jsoner_xtn_t), &json_prim, NULL);
+	json_prim.instcb = instcb;
 
+	json = hcl_json_open (&sys_mmgr, HCL_SIZEOF(json_xtn_t), &json_prim, NULL);
 
-	jsoner_xtn = hcl_jsoner_getxtn(jsoner);
-	jsoner_xtn->logmask = HCL_LOG_ALL_LEVELS | HCL_LOG_ALL_TYPES;
+	json_xtn = hcl_json_getxtn(json);
+	json_xtn->logmask = HCL_LOG_ALL_LEVELS | HCL_LOG_ALL_TYPES;
 
-	p = "[ \"ab\\xab\\uC88B\\uC544\\uC6A9c\", \"kaden\", \"iron\" ]";
-	
+	p = "[ \"ab\\xab\\uC88B\\uC544\\uC6A9c\", \"kaden\", \"iron\", true, { \"null\": \"abc\", \"123\": \"AA20AA\", \"10\": -0.123 } ]";
 
-	hcl_jsoner_feed (jsoner, p, strlen(p), &xlen);
-	hcl_jsoner_close (jsoner);
+	if (hcl_json_feed(json, p, strlen(p), &xlen) <= -1)
+	{
+		hcl_json_logbfmt (json, HCL_LOG_FATAL | HCL_LOG_APP, "ERROR: %js\n", hcl_json_geterrmsg(json));
+	}
+
+	hcl_json_close (json);
 	return 0;
 }
