@@ -154,6 +154,8 @@ static HCL_INLINE int is_spacechar (hcl_bch_t c)
 	/* TODO: handle other space unicode characters */
 	switch (c)
 	{
+		/* [NOTE]: '\n' is special and used as delimiter. so it's not treated
+		 *         as a space character */
 		case ' ':
 		case '\f': /* formfeed */
 		case '\r': /* carriage return */

@@ -134,6 +134,7 @@ static HCL_INLINE int is_spacechar (hcl_bch_t c)
 	{
 		case ' ':
 		case '\f': /* formfeed */
+		case '\n': /* new line */
 		case '\r': /* carriage return */
 		case '\t': /* horizon tab */
 		case '\v': /* vertical tab */
@@ -637,7 +638,7 @@ static int handle_char_in_array (hcl_json_t* json, hcl_ooci_t c)
 		}
 		else
 		{
-			hcl_json_seterrbfmt (json, HCL_EINVAL, "wrong character inside array - %jc", (hcl_ooch_t)c);
+			hcl_json_seterrbfmt (json, HCL_EINVAL, "wrong character inside array - %jc[%d]", (hcl_ooch_t)c, (int)c);
 			return -1;
 		}
 	}
@@ -732,7 +733,7 @@ static int handle_char_in_dic (hcl_json_t* json, hcl_ooci_t c)
 		}
 		else
 		{
-			hcl_json_seterrbfmt (json, HCL_EINVAL, "wrong character inside array - %jc", (hcl_ooch_t)c);
+			hcl_json_seterrbfmt (json, HCL_EINVAL, "wrong character inside dictionary - %jc[%d]", (hcl_ooch_t)c, (int)c);
 			return -1;
 		}
 	}
