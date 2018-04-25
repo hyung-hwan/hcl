@@ -1916,6 +1916,10 @@ hcl_server_t* hcl_server_open (hcl_mmgr_t* mmgr, hcl_oow_t xtnsize, hcl_server_p
 	vmprim.vm_gettime = vm_gettime;
 	vmprim.vm_sleep = vm_sleep;
 
+#if defined(USE_LTDL)
+	lt_dlinit ();
+#endif
+
 	hcl = hcl_open(mmgr, HCL_SIZEOF(*xtn), 2048, &vmprim, errnum);
 	if (!hcl) goto oops;
 
@@ -1992,7 +1996,11 @@ oops:
 	/* NOTE: pipe should be closed if jump to here is made after pipe() above */
 	if (tmr) hcl_tmr_close (tmr);
 	if (hcl) hcl_close (hcl);
+#if defined(USE_LTDL)
+	lt_dlexit ();
+#endif
 	if (server) HCL_MMGR_FREE (mmgr, server);
+
 	return HCL_NULL;
 }
 
@@ -2019,6 +2027,11 @@ void hcl_server_close (hcl_server_t* server)
 
 	hcl_tmr_close (server->tmr);
 	hcl_close (server->dummy_hcl);
+
+#if defined(USE_LTDL)
+	lt_dlexit ();
+#endif
+
 	HCL_MMGR_FREE (server->mmgr, server);
 }
 

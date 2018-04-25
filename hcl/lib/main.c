@@ -1663,7 +1663,7 @@ static void print_synerr (hcl_t* hcl)
  
 int main (int argc, char* argv[])
 {
-	hcl_t* hcl;
+	hcl_t* hcl = HCL_NULL;
 	xtn_t* xtn;
 	hcl_vmprim_t vmprim;
 	hcl_cb_t hclcb;
@@ -1762,11 +1762,15 @@ int main (int argc, char* argv[])
 	vmprim.vm_gettime = vm_gettime;
 	vmprim.vm_sleep = vm_sleep;
 
+#if defined(USE_LTDL)
+	lt_dlinit ();
+#endif
+
 	hcl = hcl_open (&sys_mmgr, HCL_SIZEOF(xtn_t), memsize, &vmprim, HCL_NULL);
 	if (!hcl)
 	{
-		printf ("cannot open hcl\n");
-		return -1;
+		printf ("ERROR: cannot open hcl\n");
+		goto oops;
 	}
 
 	{
@@ -1805,11 +1809,7 @@ int main (int argc, char* argv[])
 
 	if (logopt)
 	{
-		if (handle_logopt (hcl, logopt) <= -1) 
-		{
-			hcl_close (hcl);
-			return -1;
-		}
+		if (handle_logopt (hcl, logopt) <= -1) goto oops;
 	}
 	else
 	{
@@ -1820,26 +1820,20 @@ int main (int argc, char* argv[])
 #if defined(HCL_BUILD_DEBUG)
 	if (dbgopt)
 	{
-		if (handle_dbgopt (hcl, dbgopt) <= -1)
-		{
-			hcl_close (hcl);
-			return -1;
-		}
+		if (handle_dbgopt (hcl, dbgopt) <= -1) goto oops;
 	}
 #endif
 
 	if (hcl_ignite(hcl) <= -1)
 	{
 		hcl_logbfmt (hcl, HCL_LOG_STDERR, "cannot ignite hcl - [%d] %js\n", hcl_geterrnum(hcl), hcl_geterrmsg(hcl));
-		hcl_close (hcl);
-		return -1;
+		goto oops;
 	}
 
 	if (hcl_addbuiltinprims(hcl) <= -1)
 	{
 		hcl_logbfmt (hcl, HCL_LOG_STDERR, "cannot add builtin primitives - [%d] %js\n", hcl_geterrnum(hcl), hcl_geterrmsg(hcl));
-		hcl_close (hcl);
-		return -1;
+		goto oops;
 	}
 
 	xtn->read_path = argv[opt.ind++];
@@ -1848,8 +1842,7 @@ int main (int argc, char* argv[])
 	if (hcl_attachio(hcl, read_handler, print_handler) <= -1)
 	{
 		hcl_logbfmt (hcl, HCL_LOG_STDERR, "ERROR: cannot attach input stream - [%d] %js\n", hcl_geterrnum(hcl), hcl_geterrmsg(hcl));
-		hcl_close (hcl);
-		return -1;
+		goto oops;
 	}
 
 	{
@@ -1858,8 +1851,7 @@ int main (int argc, char* argv[])
 		if (!xtn->sym_errstr)
 		{
 			hcl_logbfmt (hcl, HCL_LOG_STDERR, "ERROR: cannot create the ERRSTR symbol - [%d] %js\n", hcl_geterrnum(hcl), hcl_geterrmsg(hcl));
-			hcl_close (hcl);
-			return -1;
+			goto oops;
 		}
 		HCL_OBJ_SET_FLAGS_KERNEL (xtn->sym_errstr, 1);
 	}
@@ -1982,10 +1974,17 @@ count++;
 	
 	set_signal_to_default (SIGINT);
 	hcl_close (hcl);
+
+#if defined(USE_LTDL)
+	lt_dlexit ();
+#endif
 	return 0;
 
 oops:
-	set_signal_to_default (SIGINT);
-	hcl_close (hcl);
+	set_signal_to_default (SIGINT); /* harmless to call multiple times without set_signal() */
+	if (hcl) hcl_close (hcl);
+#if defined(USE_LTDL)
+	lt_dlexit ();
+#endif
 	return -1;
 }
