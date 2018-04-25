@@ -160,6 +160,7 @@ static HCL_INLINE int is_digitchar (hcl_ooci_t c)
 static void clear_token (hcl_json_t* json)
 {
 	json->tok.len = 0;
+	if (json->tok_capa > 0) json->tok.ptr[json->tok.len] = '\0';
 }
 
 static int add_char_to_token (hcl_json_t* json, hcl_ooch_t ch)
@@ -178,6 +179,7 @@ static int add_char_to_token (hcl_json_t* json, hcl_ooch_t ch)
 	}
 
 	json->tok.ptr[json->tok.len++] = ch;
+	json->tok.ptr[json->tok.len] = '\0';
 	return 0;
 }
 
@@ -275,7 +277,7 @@ static int invoke_data_inst (hcl_json_t* json, hcl_json_inst_t inst)
 		inst = HCL_JSON_INST_KEY;
 	}
 
-	if (json->prim.instcb (json, inst, &json->tok) <= -1) return -1;
+	if (json->prim.instcb(json, inst, &json->tok) <= -1) return -1;
 	return 0;
 }
 
@@ -542,14 +544,14 @@ static int handle_start_char (hcl_json_t* json, hcl_ooci_t c)
 	{
 		if (push_state(json, HCL_JSON_STATE_IN_ARRAY) <= -1) return -1;
 		json->state_stack->u.ia.got_value = 0;
-		if (json->prim.instcb (json, HCL_JSON_INST_START_ARRAY, HCL_NULL) <= -1) return -1;
+		if (json->prim.instcb(json, HCL_JSON_INST_START_ARRAY, HCL_NULL) <= -1) return -1;
 		return 1;
 	}
 	else if (c == '{')
 	{
 		if (push_state(json, HCL_JSON_STATE_IN_DIC) <= -1) return -1;
 		json->state_stack->u.id.state = 0;
-		if (json->prim.instcb (json, HCL_JSON_INST_START_DIC, HCL_NULL) <= -1) return -1;
+		if (json->prim.instcb(json, HCL_JSON_INST_START_DIC, HCL_NULL) <= -1) return -1;
 		return 1;
 	}
 	else if (is_spacechar(c)) 
@@ -568,7 +570,7 @@ static int handle_char_in_array (hcl_json_t* json, hcl_ooci_t c)
 {
 	if (c == ']')
 	{
-		if (json->prim.instcb (json, HCL_JSON_INST_END_ARRAY, HCL_NULL) <= -1) return -1;
+		if (json->prim.instcb(json, HCL_JSON_INST_END_ARRAY, HCL_NULL) <= -1) return -1;
 		pop_state (json);
 		return 1;
 	}
@@ -626,14 +628,14 @@ static int handle_char_in_array (hcl_json_t* json, hcl_ooci_t c)
 		{
 			if (push_state(json, HCL_JSON_STATE_IN_ARRAY) <= -1) return -1;
 			json->state_stack->u.ia.got_value = 0;
-			if (json->prim.instcb (json, HCL_JSON_INST_START_ARRAY, HCL_NULL) <= -1) return -1;
+			if (json->prim.instcb(json, HCL_JSON_INST_START_ARRAY, HCL_NULL) <= -1) return -1;
 			return 1;
 		}
 		else if (c == '{')
 		{
 			if (push_state(json, HCL_JSON_STATE_IN_DIC) <= -1) return -1;
 			json->state_stack->u.id.state = 0;
-			if (json->prim.instcb (json, HCL_JSON_INST_START_DIC, HCL_NULL) <= -1) return -1;
+			if (json->prim.instcb(json, HCL_JSON_INST_START_DIC, HCL_NULL) <= -1) return -1;
 			return 1;
 		}
 		else
@@ -648,7 +650,7 @@ static int handle_char_in_dic (hcl_json_t* json, hcl_ooci_t c)
 {
 	if (c == '}')
 	{
-		if (json->prim.instcb (json, HCL_JSON_INST_END_DIC, HCL_NULL) <= -1) return -1;
+		if (json->prim.instcb(json, HCL_JSON_INST_END_DIC, HCL_NULL) <= -1) return -1;
 		pop_state (json);
 		return 1;
 	}
@@ -721,14 +723,14 @@ static int handle_char_in_dic (hcl_json_t* json, hcl_ooci_t c)
 		{
 			if (push_state(json, HCL_JSON_STATE_IN_ARRAY) <= -1) return -1;
 			json->state_stack->u.ia.got_value = 0;
-			if (json->prim.instcb (json, HCL_JSON_INST_START_ARRAY, HCL_NULL) <= -1) return -1;
+			if (json->prim.instcb(json, HCL_JSON_INST_START_ARRAY, HCL_NULL) <= -1) return -1;
 			return 1;
 		}
 		else if (c == '{')
 		{
 			if (push_state(json, HCL_JSON_STATE_IN_DIC) <= -1) return -1;
 			json->state_stack->u.id.state = 0;
-			if (json->prim.instcb (json, HCL_JSON_INST_START_DIC, HCL_NULL) <= -1) return -1;
+			if (json->prim.instcb(json, HCL_JSON_INST_START_DIC, HCL_NULL) <= -1) return -1;
 			return 1;
 		}
 		else
