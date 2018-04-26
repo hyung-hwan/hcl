@@ -490,6 +490,7 @@ static void backtrace_stack_frames (hcl_t* hcl)
 	unw_getcontext(&context);
 	unw_init_local(&cursor, &context);
 
+	hcl_logbfmt (hcl, HCL_LOG_UNTYPED | HCL_LOG_DEBUG, "[BACKTRACE]\n");
 	for (n = 0; unw_step(&cursor) > 0; n++) 
 	{
 		unw_word_t ip, sp, off;
