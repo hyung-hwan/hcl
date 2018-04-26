@@ -60,13 +60,17 @@ struct hcl_json_state_node_t
 		{
 			int escaped;
 			int digit_count;
-			hcl_ooch_t acc;
+			/* acc is always of unicode type to handle \u and \U. 
+			 * in the bch mode, it will get converted to a utf8 stream. */
+			hcl_uch_t acc;
 		} sv;
 		struct
 		{
 			int escaped;
 			int digit_count;
-			hcl_ooch_t acc;
+			/* for a character, no way to support the unicode character
+			 * in the bch mode */
+			hcl_ooch_t acc; 
 		} cv;
 		struct
 		{
@@ -284,8 +288,7 @@ static int invoke_data_inst (hcl_json_t* json, hcl_json_inst_t inst)
 static int handle_string_value_char (hcl_json_t* json, hcl_ooci_t c)
 {
 	int ret = 1;
-	
-	
+
 	if (json->state_stack->u.sv.escaped == 3)
 	{
 		if (c >= '0' && c <= '7')
@@ -324,7 +327,29 @@ static int handle_string_value_char (hcl_json_t* json, hcl_ooci_t c)
 		{
 			ret = 0;
 		add_sv_acc:
+		#if defined(HCL_OOCH_IS_BCH)
+			/* convert the character to utf8 */
+			{
+				hcl_bch_t bcsbuf[HCL_BCSIZE_MAX];
+				hcl_oow_t ucslen = 1, bcslen;
+
+				if (hcl_conv_uchars_to_bchars_with_cmgr(&json->state_stack->u.sv.acc, &ucslen, bcsbuf, &bcslen, hcl_json_getcmgr(json)) <= -1)
+				{
+					hcl_json_seterrbfmt (json, HCL_EECERR, "unable to convert %jc", acc);
+					return -1;
+				}
+				else
+				{
+					hcl_oow_t i;
+					for (i = 0; i < bcslen; i++)
+					{
+						if (add_char_to_token(json, bcsbuf[i]) <= -1) return -1;
+					}
+				}
+			}
+		#else
 			if (add_char_to_token(json, json->state_stack->u.sv.acc) <= -1) return -1;
+		#endif
 			json->state_stack->u.sv.escaped = 0;
 		}
 	}
