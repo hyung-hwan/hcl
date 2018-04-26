@@ -122,6 +122,7 @@ AC_CHECK_HEADERS([stddef.h wchar.h wctype.h errno.h signal.h fcntl.h dirent.h])
 AC_CHECK_HEADERS([time.h sys/time.h utime.h spawn.h execinfo.h ucontext.h])
 AC_CHECK_HEADERS([dlfcn.h ltdl.h sys/mman.h sys/uio.h])
 AC_CHECK_HEADERS([sys/devpoll.h sys/epoll.h poll.h])
+AC_CHECK_HEADERS([libunwind.h])
 
 dnl check data types
 dnl AC_CHECK_TYPE([wchar_t], 
@@ -160,6 +161,17 @@ AC_SEARCH_LIBS([lt_dlopen], [ltdl], [
 ])
 LIBS="$save_LIBS"
 AC_SUBST(LTDL_LIBS)
+
+if test "x${ac_cv_header_libunwind_h}" = "xyes" 
+then
+	AC_CHECK_LIB([unwind], [unw_backtrace], 
+		[
+			UNWIND_LIBS="-lunwind"
+			AC_DEFINE([HAVE_UNWIND_LIB], [1], [libunwind is available])
+		]
+	)
+	AC_SUBST(UNWIND_LIBS)
+fi
 
 dnl check is the import library for unicows.dll exists
 dnl this check doesn't look for a particular symbol
@@ -642,6 +654,23 @@ then
 	fi
 fi
 AM_CONDITIONAL(ENABLE_LIBLTDL, test "x${enable_libltdl_is}" = "xyes")
+
+dnl ===== enable-libunwind =====
+AC_ARG_ENABLE([libunwind],
+	[AS_HELP_STRING([--enable-libunwind],[use libunwind(default. no)])],
+	enable_libunwind_is=$enableval,
+	enable_libunwind_is=no
+)
+if test "x${enable_libunwind_is}" = "xyes"
+then
+	if test "x${ac_cv_header_unwind_h}" = "xyes"  -a "${UNWIND_LIBS}" != ""
+	then
+		AC_DEFINE([HCL_ENABLE_LIBUNWIND],[],[use libunwind for backtracing stack frames])
+	else
+		enable_libunwind_is="no"
+	fi
+fi
+AM_CONDITIONAL(ENABLE_LIBUNWIND, test "x${enable_libunwind_is}" = "xyes")
 
 dnl ===== enable-hclex =====
 AC_ARG_ENABLE([hclex],

@@ -28,6 +28,9 @@ else
 LIBADD_LIB_COMMON += $(DL_LIBS)
 endif
 
+if ENABLE_LIBUNWIND
+LIBADD_LIB_COMMON += $(UNWIND_LIBS)
+endif
 
 pkgincludedir = $(includedir)
 pkglibdir = $(libdir)

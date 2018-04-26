@@ -81,6 +81,9 @@
 /* Define to 1 if you have the `isatty' function. */
 #undef HAVE_ISATTY
 
+/* Define to 1 if you have the <libunwind.h> header file. */
+#undef HAVE_LIBUNWIND_H
+
 /* Define to 1 if you have the `log10q' function. */
 #undef HAVE_LOG10Q
 
@@ -213,6 +216,9 @@
 /* Define to 1 if you have the <unistd.h> header file. */
 #undef HAVE_UNISTD_H
 
+/* libunwind is available */
+#undef HAVE_UNWIND_LIB
+
 /* Define to 1 if you have the `usleep' function. */
 #undef HAVE_USLEEP
 
@@ -263,6 +269,9 @@
 
 /* use libltdl when loading a dynamic module */
 #undef HCL_ENABLE_LIBLTDL
+
+/* use libunwind for backtracing stack frames */
+#undef HCL_ENABLE_LIBUNWIND
 
 /* link modules statically into the main library */
 #undef HCL_ENABLE_STATIC_MODULE

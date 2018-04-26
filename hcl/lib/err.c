@@ -26,6 +26,10 @@
 
 #include "hcl-prv.h"
 
+#if defined(HCL_ENABLE_LIBUNWIND)
+#	include <libunwind.h>
+#endif
+
 static hcl_ooch_t errstr_0[] = {'n','o',' ','e','r','r','o','r','\0'};
 static hcl_ooch_t errstr_1[] = {'g','e','n','e','r','i','c',' ','e','r','r','o','r','\0'};
 static hcl_ooch_t errstr_2[] = {'n','o','t',' ','i','m','p','l','e','m','e','n','t','e','d','\0'};
@@ -472,22 +476,45 @@ void hcl_setsynerrufmt (hcl_t* hcl, hcl_synerrnum_t num, const hcl_ioloc_t* loc,
 	}
 }
 
-
 /* -------------------------------------------------------------------------- 
- * ASSERTION FAILURE HANDLERsemaphore heap full
+ * STACK FRAME BACKTRACE
  * -------------------------------------------------------------------------- */
-
-void hcl_assertfailed (hcl_t* hcl, const hcl_bch_t* expr, const hcl_bch_t* file, hcl_oow_t line)
+#if defined(HCL_ENABLE_LIBUNWIND)
+static void backtrace_stack_frames (hcl_t* hcl)
 {
-#if defined(HAVE_BACKTRACE)
+	unw_cursor_t cursor;
+	unw_context_t context;
+
+	unw_getcontext(&context);
+	unw_init_local(&cursor, &context);
+
+	int n=0;
+	while (unw_step(&cursor)) 
+	{
+		unw_word_t ip, sp, off;
+
+		unw_get_reg (&cursor, UNW_REG_IP, &ip);
+		unw_get_reg (&cursor, UNW_REG_SP, &sp);
+
+		char symbol[256];
+
+		if (!unw_get_proc_name(&cursor, symbol, HCL_COUNTOF(symbol), &off)) 
+		{
+			hcl_copy_bcstr (symbol, "<unknown>");
+		}
+
+		hcl_logbfmt (hcl, HCL_LOG_UNTYPED | HCL_LOG_DEBUG, 
+			"#%-2d 0x%016p p=0x%016p %s + 0x%zu\n", 
+			++n, (void*)ip, (void*)sp, symbol, (hcl_oow_t)off);
+	}
+}
+#elif defined(HAVE_BACKTRACE)
+static void backtrace_stack_frames (hcl_t* hcl)
+{
 	void* btarray[128];
 	hcl_oow_t btsize;
 	char** btsyms;
-#endif
 
-	hcl_logbfmt (hcl, HCL_LOG_UNTYPED | HCL_LOG_FATAL, "ASSERTION FAILURE: %s at %s:%zu\n", expr, file, line);
-
-#if defined(HAVE_BACKTRACE)
 	btsize = backtrace (btarray, HCL_COUNTOF(btarray));
 	btsyms = backtrace_symbols (btarray, btsize);
 	if (btsyms)
@@ -501,8 +528,22 @@ void hcl_assertfailed (hcl_t* hcl, const hcl_bch_t* expr, const hcl_bch_t* file,
 		}
 		free (btsyms);
 	}
+}
+#else
+static void backtrace_stack_frames (hcl_t* hcl)
+{
+	/* do nothing. not supported */
+}
 #endif
 
+/* -------------------------------------------------------------------------- 
+ * ASSERTION FAILURE HANDLERsemaphore heap full
+ * -------------------------------------------------------------------------- */
+
+void hcl_assertfailed (hcl_t* hcl, const hcl_bch_t* expr, const hcl_bch_t* file, hcl_oow_t line)
+{
+	hcl_logbfmt (hcl, HCL_LOG_UNTYPED | HCL_LOG_FATAL, "ASSERTION FAILURE: %s at %s:%zu\n", expr, file, line);
+	backtrace_stack_frames (hcl);
 
 #if defined(_WIN32)
 	ExitProcess (249);

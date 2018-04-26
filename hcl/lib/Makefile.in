@@ -90,15 +90,16 @@ build_triplet = @build@
 host_triplet = @host@
 @ENABLE_LIBLTDL_TRUE@am__append_1 = $(LTDL_LIBS)
 @ENABLE_LIBLTDL_FALSE@am__append_2 = $(DL_LIBS)
-@ENABLE_STATIC_MODULE_TRUE@am__append_3 = -lhcl-arr -lhcl-dic \
+@ENABLE_LIBUNWIND_TRUE@am__append_3 = $(UNWIND_LIBS)
+@ENABLE_STATIC_MODULE_TRUE@am__append_4 = -lhcl-arr -lhcl-dic \
 @ENABLE_STATIC_MODULE_TRUE@	-lhcl-str
-@ENABLE_STATIC_MODULE_TRUE@am__append_4 = $(abs_builddir)/../mod/libhcl-arr.la \
+@ENABLE_STATIC_MODULE_TRUE@am__append_5 = $(abs_builddir)/../mod/libhcl-arr.la \
 @ENABLE_STATIC_MODULE_TRUE@	$(abs_builddir)/../mod/libhcl-dic.la \
 @ENABLE_STATIC_MODULE_TRUE@	$(abs_builddir)/../mod/libhcl-str.la
 bin_PROGRAMS = hcl$(EXEEXT) $(am__EXEEXT_1)
-@ENABLE_HCLEX_TRUE@am__append_5 = libhclex.la
-@ENABLE_HCLEX_TRUE@am__append_6 = hcl-c.h hcl-s.h hcl-tmr.h hcl-xutl.h hcl-json.h
-@ENABLE_HCLEX_TRUE@am__append_7 = hcls hclc hclj
+@ENABLE_HCLEX_TRUE@am__append_6 = libhclex.la
+@ENABLE_HCLEX_TRUE@am__append_7 = hcl-c.h hcl-s.h hcl-tmr.h hcl-xutl.h hcl-json.h
+@ENABLE_HCLEX_TRUE@am__append_8 = hcls hclc hclj
 subdir = lib
 ACLOCAL_M4 = $(top_srcdir)/aclocal.m4
 am__aclocal_m4_deps = $(top_srcdir)/m4/ax_check_sign.m4 \
@@ -148,8 +149,9 @@ LTLIBRARIES = $(pkglib_LTLIBRARIES)
 am__DEPENDENCIES_1 =
 @ENABLE_LIBLTDL_TRUE@am__DEPENDENCIES_2 = $(am__DEPENDENCIES_1)
 @ENABLE_LIBLTDL_FALSE@am__DEPENDENCIES_3 = $(am__DEPENDENCIES_1)
-am__DEPENDENCIES_4 = $(am__DEPENDENCIES_1) $(am__DEPENDENCIES_2) \
-	$(am__DEPENDENCIES_3)
+@ENABLE_LIBUNWIND_TRUE@am__DEPENDENCIES_4 = $(am__DEPENDENCIES_1)
+am__DEPENDENCIES_5 = $(am__DEPENDENCIES_1) $(am__DEPENDENCIES_2) \
+	$(am__DEPENDENCIES_3) $(am__DEPENDENCIES_4)
 am_libhcl_la_OBJECTS = libhcl_la-bigint.lo libhcl_la-comp.lo \
 	libhcl_la-debug.lo libhcl_la-decode.lo libhcl_la-dic.lo \
 	libhcl_la-err.lo libhcl_la-exec.lo libhcl_la-gc.lo \
@@ -370,6 +372,7 @@ SET_MAKE = @SET_MAKE@
 SHELL = @SHELL@
 STRIP = @STRIP@
 UNICOWS_LIBS = @UNICOWS_LIBS@
+UNWIND_LIBS = @UNWIND_LIBS@
 VERSION = @VERSION@
 abs_builddir = @abs_builddir@
 abs_srcdir = @abs_srcdir@
@@ -417,7 +420,6 @@ pdfdir = @pdfdir@
 prefix = @prefix@
 program_transform_name = @program_transform_name@
 psdir = @psdir@
-runstatedir = @runstatedir@
 sbindir = @sbindir@
 sharedstatedir = @sharedstatedir@
 srcdir = @srcdir@
@@ -441,10 +443,11 @@ CPPFLAGS_ALL_COMMON = \
 ##################################################
 CPPFLAGS_LIB_COMMON = $(CPPFLAGS_ALL_COMMON)
 LDFLAGS_LIB_COMMON = $(LDFLAGS_ALL_COMMON) -version-info 1:0:0 -no-undefined
-LIBADD_LIB_COMMON = $(LIBM) $(am__append_1) $(am__append_2)
+LIBADD_LIB_COMMON = $(LIBM) $(am__append_1) $(am__append_2) \
+	$(am__append_3)
 pkginclude_HEADERS = hcl.h hcl-cmn.h hcl-opt.h hcl-rbt.h hcl-utl.h \
-	$(am__append_6)
-pkglib_LTLIBRARIES = libhcl.la $(am__append_5)
+	$(am__append_7)
+pkglib_LTLIBRARIES = libhcl.la $(am__append_6)
 libhcl_la_SOURCES = \
 	hcl.h \
 	hcl-cmn.h \
@@ -478,8 +481,8 @@ libhcl_la_SOURCES = \
 
 libhcl_la_CPPFLAGS = $(CPPFLAGS_LIB_COMMON)
 libhcl_la_LDFLAGS = $(LDFLAGS_LIB_COMMON)
-libhcl_la_LIBADD = $(LIBADD_LIB_COMMON) $(am__append_3)
-libhcl_la_DEPENDENCIES = $(am__append_4)
+libhcl_la_LIBADD = $(LIBADD_LIB_COMMON) $(am__append_4)
+libhcl_la_DEPENDENCIES = $(am__append_5)
 hcl_SOURCES = main.c 
 hcl_CPPFLAGS = $(CPPFLAGS_LIB_COMMON)
 hcl_LDFLAGS = $(LDFLAGS_LIB_COMMON)
