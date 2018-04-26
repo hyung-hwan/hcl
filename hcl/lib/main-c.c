@@ -60,7 +60,7 @@ typedef struct client_xtn_t client_xtn_t;
 struct client_xtn_t
 {
 	int logfd;
-	unsigned int logmask;
+	hcl_bitmask_t logmask;
 	int logfd_istty;
 	
 	struct
@@ -197,7 +197,7 @@ static void flush_log (hcl_client_t* client, int fd)
 	}
 }
 
-static void log_write (hcl_client_t* client, unsigned int mask, const hcl_ooch_t* msg, hcl_oow_t len)
+static void log_write (hcl_client_t* client, hcl_bitmask_t mask, const hcl_ooch_t* msg, hcl_oow_t len)
 {
 	hcl_bch_t buf[256];
 	hcl_oow_t ucslen, bcslen;
@@ -364,7 +364,7 @@ static int handle_logopt (hcl_client_t* client, const hcl_bch_t* str)
 {
 	hcl_bch_t* xstr = (hcl_bch_t*)str;
 	hcl_bch_t* cm, * flt;
-	unsigned int logmask;
+	hcl_bitmask_t logmask;
 	client_xtn_t* xtn;
 
 	xtn = (client_xtn_t*)hcl_client_getxtn(client);

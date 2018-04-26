@@ -309,8 +309,8 @@ struct hcl_server_t
 
 	struct
 	{
-		unsigned int trait;
-		unsigned int logmask;
+		hcl_bitmask_t trait;
+		hcl_bitmask_t logmask;
 		hcl_oow_t worker_stack_size;
 		hcl_oow_t worker_max_count;
 		hcl_ntime_t worker_idle_timeout;
@@ -699,7 +699,7 @@ static void free_heap (hcl_t* hcl, void* ptr)
 #endif
 }
 
-static void log_write (hcl_t* hcl, unsigned int mask, const hcl_ooch_t* msg, hcl_oow_t len)
+static void log_write (hcl_t* hcl, hcl_bitmask_t mask, const hcl_ooch_t* msg, hcl_oow_t len)
 {
 	worker_hcl_xtn_t* xtn = (worker_hcl_xtn_t*)hcl_getxtn(hcl);
 	hcl_server_t* server;
@@ -710,7 +710,7 @@ static void log_write (hcl_t* hcl, unsigned int mask, const hcl_ooch_t* msg, hcl
 	pthread_mutex_unlock (&server->log_mutex);
 }
 
-static void log_write_for_dummy (hcl_t* hcl, unsigned int mask, const hcl_ooch_t* msg, hcl_oow_t len)
+static void log_write_for_dummy (hcl_t* hcl, hcl_bitmask_t mask, const hcl_ooch_t* msg, hcl_oow_t len)
 {
 	dummy_hcl_xtn_t* xtn = (dummy_hcl_xtn_t*)hcl_getxtn(hcl);
 	hcl_server_t* server;
@@ -1038,7 +1038,7 @@ hcl_server_proto_t* hcl_server_proto_open (hcl_oow_t xtnsize, hcl_server_worker_
 	hcl_vmprim_t vmprim;
 	hcl_cb_t hclcb;
 	worker_hcl_xtn_t* xtn;
-	unsigned int trait;
+	hcl_bitmask_t trait;
 
 	HCL_MEMSET (&vmprim, 0, HCL_SIZEOF(vmprim));
 	if (worker->server->cfg.trait & HCL_SERVER_TRAIT_USE_LARGE_PAGES)
@@ -1898,7 +1898,7 @@ hcl_server_t* hcl_server_open (hcl_mmgr_t* mmgr, hcl_oow_t xtnsize, hcl_server_p
 	hcl_tmr_t* tmr = HCL_NULL;
 	dummy_hcl_xtn_t* xtn;
 	int pfd[2], fcv;
-	unsigned int trait;
+	hcl_bitmask_t trait;
 
 	server = (hcl_server_t*)HCL_MMGR_ALLOC(mmgr, HCL_SIZEOF(*server) + xtnsize);
 	if (!server) 
@@ -1959,7 +1959,7 @@ hcl_server_t* hcl_server_open (hcl_mmgr_t* mmgr, hcl_oow_t xtnsize, hcl_server_p
 	server->dummy_hcl = hcl;
 	server->tmr = tmr;
 
-	server->cfg.logmask = ~0u;
+	server->cfg.logmask = ~(hcl_bitmask_t)0;
 	server->cfg.worker_stack_size = 512000UL; 
 	server->cfg.actor_heap_size = 512000UL;
 
@@ -2283,7 +2283,7 @@ static void purge_all_workers (hcl_server_t* server, hcl_server_worker_state_t w
 	}
 }
 
-void hcl_server_logbfmt (hcl_server_t* server, unsigned int mask, const hcl_bch_t* fmt, ...)
+void hcl_server_logbfmt (hcl_server_t* server, hcl_bitmask_t mask, const hcl_bch_t* fmt, ...)
 {
 	va_list ap;
 	va_start (ap, fmt);
@@ -2291,7 +2291,7 @@ void hcl_server_logbfmt (hcl_server_t* server, unsigned int mask, const hcl_bch_
 	va_end (ap);
 }
 
-void hcl_server_logufmt (hcl_server_t* server, unsigned int mask, const hcl_uch_t* fmt, ...)
+void hcl_server_logufmt (hcl_server_t* server, hcl_bitmask_t mask, const hcl_uch_t* fmt, ...)
 {
 	va_list ap;
 	va_start (ap, fmt);
@@ -2648,14 +2648,14 @@ int hcl_server_setoption (hcl_server_t* server, hcl_server_option_t id, const vo
 	switch (id)
 	{
 		case HCL_SERVER_TRAIT:
-			server->cfg.trait = *(const unsigned int*)value;
+			server->cfg.trait = *(const hcl_bitmask_t*)value;
 			if (server->dummy_hcl)
 			{
 				/* setting this affects the dummy hcl immediately.
 				 * existing hcl instances inside worker threads won't get 
 				 * affected. new hcl instances to be created later 
 				 * is supposed to use the new value */
-				unsigned int trait;
+				hcl_bitmask_t trait;
 
 				hcl_getoption (server->dummy_hcl, HCL_TRAIT, &trait);
 			#if defined(HCL_BUILD_DEBUG)
@@ -2667,7 +2667,7 @@ int hcl_server_setoption (hcl_server_t* server, hcl_server_option_t id, const vo
 			return 0;
 
 		case HCL_SERVER_LOG_MASK:
-			server->cfg.logmask = *(const unsigned int*)value;
+			server->cfg.logmask = *(const hcl_bitmask_t*)value;
 			if (server->dummy_hcl) 
 			{
 				/* setting this affects the dummy hcl immediately.
@@ -2716,11 +2716,11 @@ int hcl_server_getoption (hcl_server_t* server, hcl_server_option_t id, void* va
 	switch (id)
 	{
 		case HCL_SERVER_TRAIT:
-			*(unsigned int*)value = server->cfg.trait;
+			*(hcl_bitmask_t*)value = server->cfg.trait;
 			return 0;
 
 		case HCL_SERVER_LOG_MASK:
-			*(unsigned int*)value = server->cfg.logmask;
+			*(hcl_bitmask_t*)value = server->cfg.logmask;
 			return 0;
 
 		case HCL_SERVER_WORKER_MAX_COUNT:

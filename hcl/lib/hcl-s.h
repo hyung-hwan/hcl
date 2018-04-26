@@ -64,7 +64,7 @@ typedef enum hcl_server_trait_t hcl_server_trait_t;
 typedef void (*hcl_server_log_write_t) (
 	hcl_server_t*     server,
 	hcl_oow_t         wid,
-	unsigned int      mask,
+	hcl_bitmask_t   mask,
 	const hcl_ooch_t* msg,
 	hcl_oow_t         len
 );
@@ -163,14 +163,14 @@ HCL_EXPORT void hcl_server_seterrufmt (
 
 HCL_EXPORT void hcl_server_logbfmt (
 	hcl_server_t*    server,
-	unsigned int     mask,
+	hcl_bitmask_t  mask,
 	const hcl_bch_t* fmt,
 	...
 );
 
 HCL_EXPORT void hcl_server_logufmt (
 	hcl_server_t*    server,
-	unsigned int     mask,
+	hcl_bitmask_t  mask,
 	const hcl_uch_t* fmt,
 	...
 );

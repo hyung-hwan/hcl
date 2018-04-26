@@ -644,7 +644,7 @@ enum hcl_bcode_t
 
 typedef hcl_ooi_t (*hcl_outbfmt_t) (
 	hcl_t*           hcl,
-	int              mask,
+	hcl_bitmask_t  mask,
 	const hcl_bch_t* fmt,
 	...
 );
@@ -1090,10 +1090,10 @@ hcl_pfbase_t* hcl_querymod (
 /* logfmt.c                                                                  */
 /* ========================================================================= */
 int hcl_outfmtobj (
-	hcl_t*        hcl,
-	int           mask,
-	hcl_oop_t     obj,
-	hcl_outbfmt_t outbfmt
+	hcl_t*           hcl,
+	hcl_bitmask_t  mask,
+	hcl_oop_t        obj,
+	hcl_outbfmt_t    outbfmt
 );
 
 int hcl_printfmtst (

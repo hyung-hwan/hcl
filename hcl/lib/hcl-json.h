@@ -85,7 +85,7 @@ typedef enum hcl_json_inst_t hcl_json_inst_t;
 
 typedef void (*hcl_json_log_write_t) (
 	hcl_json_t*       json,
-	unsigned int      mask,
+	hcl_bitmask_t   mask,
 	const hcl_ooch_t* msg,
 	hcl_oow_t         len
 );
@@ -198,15 +198,15 @@ HCL_EXPORT void hcl_json_seterrufmt (
 );
 
 HCL_EXPORT void hcl_json_logbfmt (
-	hcl_json_t*    json,
-	unsigned int     mask,
+	hcl_json_t*      json,
+	hcl_bitmask_t  mask,
 	const hcl_bch_t* fmt,
 	...
 );
 
 HCL_EXPORT void hcl_json_logufmt (
-	hcl_json_t*    json,
-	unsigned int     mask,
+	hcl_json_t*      json,
+	hcl_bitmask_t  mask,
 	const hcl_uch_t* fmt,
 	...
 );

@@ -57,7 +57,7 @@ typedef struct server_xtn_t server_xtn_t;
 struct server_xtn_t
 {
 	int logfd;
-	unsigned int logmask;
+	hcl_bitmask_t logmask;
 	int logfd_istty;
 	
 	struct
@@ -191,7 +191,7 @@ static void flush_log (hcl_server_t* server, int fd)
 	}
 }
 
-static void log_write (hcl_server_t* server, hcl_oow_t wid, unsigned int mask, const hcl_ooch_t* msg, hcl_oow_t len)
+static void log_write (hcl_server_t* server, hcl_oow_t wid, hcl_bitmask_t mask, const hcl_ooch_t* msg, hcl_oow_t len)
 {
 	hcl_bch_t buf[256];
 	hcl_oow_t ucslen, bcslen;
@@ -365,7 +365,7 @@ static int handle_logopt (hcl_server_t* server, const hcl_bch_t* str)
 {
 	hcl_bch_t* xstr = (hcl_bch_t*)str;
 	hcl_bch_t* cm, * flt;
-	unsigned int logmask;
+	hcl_bitmask_t logmask;
 	server_xtn_t* xtn;
 
 	xtn = (server_xtn_t*)hcl_server_getxtn(server);
@@ -452,7 +452,7 @@ static int handle_dbgopt (hcl_server_t* server, const char* str)
 {
 	const hcl_bch_t* cm, * flt;
 	hcl_oow_t len;
-	unsigned int trait;
+	hcl_bitmask_t trait;
 
 	hcl_server_getoption (server, HCL_SERVER_TRAIT, &trait);
 
@@ -535,7 +535,7 @@ int main (int argc, char* argv[])
 	hcl_oow_t actor_heap_size = MIN_ACTOR_HEAP_SIZE;
 	hcl_ntime_t actor_max_runtime = { 0, 0 };
 	int large_pages = 0;
-	unsigned int trait;
+	hcl_bitmask_t trait;
 
 	setlocale (LC_ALL, "");
 

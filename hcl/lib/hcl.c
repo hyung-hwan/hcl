@@ -110,7 +110,7 @@ int hcl_init (hcl_t* hcl, hcl_mmgr_t* mmgr, hcl_oow_t heapsz, const hcl_vmprim_t
 	if (!hcl->vmprim.alloc_heap) hcl->vmprim.alloc_heap = alloc_heap;
 	if (!hcl->vmprim.free_heap) hcl->vmprim.free_heap = free_heap;
 
-	hcl->option.log_mask = ~0u;
+	hcl->option.log_mask = ~(hcl_bitmask_t)0;
 	hcl->option.log_maxcapa = HCL_DFL_LOG_MAXCAPA;
 	hcl->option.dfl_symtab_size = HCL_DFL_SYMTAB_SIZE;
 	hcl->option.dfl_sysdic_size = HCL_DFL_SYSDIC_SIZE;
@@ -323,14 +323,14 @@ int hcl_setoption (hcl_t* hcl, hcl_option_t id, const void* value)
 	switch (id)
 	{
 		case HCL_TRAIT:
-			hcl->option.trait = *(const unsigned int*)value;
+			hcl->option.trait = *(const hcl_bitmask_t*)value;
 		#if defined(HCL_BUILD_DEBUG)
 			hcl->option.karatsuba_cutoff = ((hcl->option.trait & HCL_DEBUG_BIGINT)? HCL_KARATSUBA_CUTOFF_DEBUG: HCL_KARATSUBA_CUTOFF);
 		#endif
 			return 0;
 
 		case HCL_LOG_MASK:
-			hcl->option.log_mask = *(const unsigned int*)value;
+			hcl->option.log_mask = *(const hcl_bitmask_t*)value;
 			return 0;
 
 		case HCL_LOG_MAXCAPA:
@@ -385,11 +385,11 @@ int hcl_getoption (hcl_t* hcl, hcl_option_t id, void* value)
 	switch  (id)
 	{
 		case HCL_TRAIT:
-			*(unsigned int*)value = hcl->option.trait;
+			*(hcl_bitmask_t*)value = hcl->option.trait;
 			return 0;
 
 		case HCL_LOG_MASK:
-			*(unsigned int*)value = hcl->option.log_mask;
+			*(hcl_bitmask_t*)value = hcl->option.log_mask;
 			return 0;
 
 		case HCL_LOG_MAXCAPA:

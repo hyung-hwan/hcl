@@ -61,8 +61,8 @@ struct hcl_client_t
 
 	struct
 	{
-		unsigned int trait;
-		unsigned int logmask;
+		hcl_bitmask_t trait;
+		hcl_bitmask_t logmask;
 	} cfg;
 
 	hcl_client_state_t state;
@@ -128,7 +128,7 @@ struct hcl_client_t
 
 /* ========================================================================= */
 
-static void log_write_for_dummy (hcl_t* hcl, unsigned int mask, const hcl_ooch_t* msg, hcl_oow_t len)
+static void log_write_for_dummy (hcl_t* hcl, hcl_bitmask_t mask, const hcl_ooch_t* msg, hcl_oow_t len)
 {
 	dummy_hcl_xtn_t* xtn = (dummy_hcl_xtn_t*)hcl_getxtn(hcl);
 	hcl_client_t* client;
@@ -838,7 +838,7 @@ hcl_client_t* hcl_client_open (hcl_mmgr_t* mmgr, hcl_oow_t xtnsize, hcl_client_p
 	client->prim = *prim;
 	client->dummy_hcl = hcl;
 
-	client->cfg.logmask = ~0u;
+	client->cfg.logmask = ~(hcl_bitmask_t)0;
 
 	/* the dummy hcl is used for this client to perform primitive operations
 	 * such as getting system time or logging. so the heap size doesn't 
@@ -862,11 +862,11 @@ int hcl_client_setoption (hcl_client_t* client, hcl_client_option_t id, const vo
 	switch (id)
 	{
 		case HCL_CLIENT_TRAIT:
-			client->cfg.trait = *(const unsigned int*)value;
+			client->cfg.trait = *(const hcl_bitmask_t*)value;
 			return 0;
 
 		case HCL_CLIENT_LOG_MASK:
-			client->cfg.logmask = *(const unsigned int*)value;
+			client->cfg.logmask = *(const hcl_bitmask_t*)value;
 			if (client->dummy_hcl) 
 			{
 				/* setting this affects the dummy hcl immediately.
@@ -887,11 +887,11 @@ int hcl_client_getoption (hcl_client_t* client, hcl_client_option_t id, void* va
 	switch (id)
 	{
 		case HCL_CLIENT_TRAIT:
-			*(unsigned int*)value = client->cfg.trait;
+			*(hcl_bitmask_t*)value = client->cfg.trait;
 			return 0;
 
 		case HCL_CLIENT_LOG_MASK:
-			*(unsigned int*)value = client->cfg.logmask;
+			*(hcl_bitmask_t*)value = client->cfg.logmask;
 			return 0;
 	};
 
@@ -973,7 +973,7 @@ void hcl_client_seterrufmt (hcl_client_t* client, hcl_errnum_t errnum, const hcl
 
 /* ========================================================================= */
 
-void hcl_client_logbfmt (hcl_client_t* client, unsigned int mask, const hcl_bch_t* fmt, ...)
+void hcl_client_logbfmt (hcl_client_t* client, hcl_bitmask_t mask, const hcl_bch_t* fmt, ...)
 {
 	va_list ap;
 	va_start (ap, fmt);
@@ -981,7 +981,7 @@ void hcl_client_logbfmt (hcl_client_t* client, unsigned int mask, const hcl_bch_
 	va_end (ap);
 }
 
-void hcl_client_logufmt (hcl_client_t* client, unsigned int mask, const hcl_uch_t* fmt, ...)
+void hcl_client_logufmt (hcl_client_t* client, hcl_bitmask_t mask, const hcl_uch_t* fmt, ...)
 {
 	va_list ap;
 	va_start (ap, fmt);

@@ -57,7 +57,7 @@ hcl_oop_t hcl_makeprim (hcl_t* hcl, hcl_pfimpl_t primimpl, hcl_oow_t minargs, hc
 
 /* ------------------------------------------------------------------------- */
 
-static void log_char_object (hcl_t* hcl, int mask, hcl_oop_char_t msg)
+static void log_char_object (hcl_t* hcl, hcl_bitmask_t mask, hcl_oop_char_t msg)
 {
 	hcl_ooi_t n;
 	hcl_oow_t rem;
@@ -99,7 +99,7 @@ static hcl_pfrc_t pf_log (hcl_t* hcl, hcl_mod_t* mod, hcl_ooi_t nargs)
 {
 /* TODO: accept log level */
 	hcl_oop_t msg;
-	int mask;
+	hcl_bitmask_t mask;
 	hcl_ooi_t k;
 
 	/*level = HCL_STACK_GET(hcl, hcl->sp - nargs + 1);

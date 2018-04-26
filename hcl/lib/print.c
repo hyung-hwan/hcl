@@ -113,7 +113,7 @@ static struct
 	{  12, { '#','<','S','E','M','A','P','H','O','R','E','>' } }
 };
 
-static HCL_INLINE int print_single_char (hcl_t* hcl, int mask, hcl_ooch_t ch, hcl_outbfmt_t outbfmt)
+static HCL_INLINE int print_single_char (hcl_t* hcl, hcl_bitmask_t mask, hcl_ooch_t ch, hcl_outbfmt_t outbfmt)
 {
 	hcl_oochu_t chu = (hcl_oochu_t)ch;
 	if (chu == '\\' || chu == '\"')
@@ -194,7 +194,7 @@ static HCL_INLINE int print_single_char (hcl_t* hcl, int mask, hcl_ooch_t ch, hc
 	return 0;
 }
 
-static HCL_INLINE int outfmt_obj (hcl_t* hcl, int mask, hcl_oop_t obj, hcl_outbfmt_t outbfmt)
+static HCL_INLINE int outfmt_obj (hcl_t* hcl, hcl_bitmask_t mask, hcl_oop_t obj, hcl_outbfmt_t outbfmt)
 {
 	hcl_oop_t cur;
 	print_stack_t ps;
@@ -716,7 +716,7 @@ done:
 	return 0;
 }
 
-int hcl_outfmtobj (hcl_t* hcl, int mask, hcl_oop_t obj, hcl_outbfmt_t outbfmt)
+int hcl_outfmtobj (hcl_t* hcl, hcl_bitmask_t mask, hcl_oop_t obj, hcl_outbfmt_t outbfmt)
 {
 	int n;
 

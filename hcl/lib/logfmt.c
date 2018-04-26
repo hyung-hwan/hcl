@@ -128,15 +128,15 @@ static hcl_uch_t uch_nullstr[] = { '(','n','u','l','l', ')','\0' };
 static hcl_bch_t bch_nullstr[] = { '(','n','u','l','l', ')','\0' };
 
 typedef int (*hcl_fmtout_putch_t) (
-	hcl_t*      hcl,
-	int         mask,
-	hcl_ooch_t  c,
-	hcl_oow_t   len
+	hcl_t*            hcl,
+	hcl_bitmask_t   mask,
+	hcl_ooch_t        c,
+	hcl_oow_t         len
 );
 
 typedef int (*hcl_fmtout_putcs_t) (
 	hcl_t*            hcl,
-	int               mask,
+	hcl_bitmask_t   mask,
 	const hcl_ooch_t* ptr,
 	hcl_oow_t         len
 );
@@ -145,7 +145,7 @@ typedef struct hcl_fmtout_t hcl_fmtout_t;
 struct hcl_fmtout_t
 {
 	hcl_oow_t            count; /* out */
-	int                  mask;  /* in */
+	hcl_bitmask_t      mask;  /* in */
 	hcl_fmtout_putch_t   putch; /* in */
 	hcl_fmtout_putcs_t   putcs; /* in */
 };
@@ -182,7 +182,7 @@ static hcl_bch_t* sprintn_upper (hcl_bch_t* nbuf, hcl_uintmax_t num, int base, h
 }
 
 /* ------------------------------------------------------------------------- */
-static int put_logch (hcl_t* hcl, int mask, hcl_ooch_t ch, hcl_oow_t len)
+static int put_logch (hcl_t* hcl, hcl_bitmask_t mask, hcl_ooch_t ch, hcl_oow_t len)
 {
 	/* this is not equivalent to put_logcs(hcl,mask,&ch,1);
 	 * this function is to emit a single character multiple times */
@@ -276,7 +276,7 @@ redo:
 	return 1; /* success */
 }
 
-static int put_logcs (hcl_t* hcl, int mask, const hcl_ooch_t* ptr, hcl_oow_t len)
+static int put_logcs (hcl_t* hcl, hcl_bitmask_t mask, const hcl_ooch_t* ptr, hcl_oow_t len)
 {
 	hcl_oow_t rem;
 
@@ -406,7 +406,7 @@ static int _logufmtv (hcl_t* hcl, const hcl_uch_t* fmt, hcl_fmtout_t* data, va_l
 	return __logufmtv (hcl, fmt, data, ap, hcl_logbfmt);
 }
 
-hcl_ooi_t hcl_logbfmtv (hcl_t* hcl, int mask, const hcl_bch_t* fmt, va_list ap)
+hcl_ooi_t hcl_logbfmtv (hcl_t* hcl, hcl_bitmask_t mask, const hcl_bch_t* fmt, va_list ap)
 {
 	int x;
 	hcl_fmtout_t fo;
@@ -436,7 +436,7 @@ hcl_ooi_t hcl_logbfmtv (hcl_t* hcl, int mask, const hcl_bch_t* fmt, va_list ap)
 	return (x <= -1)? -1: fo.count;
 }
 
-hcl_ooi_t hcl_logbfmt (hcl_t* hcl, int mask, const hcl_bch_t* fmt, ...)
+hcl_ooi_t hcl_logbfmt (hcl_t* hcl, hcl_bitmask_t mask, const hcl_bch_t* fmt, ...)
 {
 	va_list ap;
 	hcl_ooi_t x;
@@ -448,7 +448,7 @@ hcl_ooi_t hcl_logbfmt (hcl_t* hcl, int mask, const hcl_bch_t* fmt, ...)
 	return x;
 }
 
-hcl_ooi_t hcl_logufmtv (hcl_t* hcl, int mask, const hcl_uch_t* fmt, va_list ap)
+hcl_ooi_t hcl_logufmtv (hcl_t* hcl, hcl_bitmask_t mask, const hcl_uch_t* fmt, va_list ap)
 {
 	int x;
 	hcl_fmtout_t fo;
@@ -474,7 +474,7 @@ hcl_ooi_t hcl_logufmtv (hcl_t* hcl, int mask, const hcl_uch_t* fmt, va_list ap)
 	return (x <= -1)? -1: fo.count;
 }
 
-hcl_ooi_t hcl_logufmt (hcl_t* hcl, int mask, const hcl_uch_t* fmt, ...)
+hcl_ooi_t hcl_logufmt (hcl_t* hcl, hcl_bitmask_t mask, const hcl_uch_t* fmt, ...)
 {
 	va_list ap;
 	hcl_ooi_t x;
@@ -491,7 +491,7 @@ hcl_ooi_t hcl_logufmt (hcl_t* hcl, int mask, const hcl_uch_t* fmt, ...)
  * HELPER FOR PRINTING
  * -------------------------------------------------------------------------- */
 
-static int put_prcs (hcl_t* hcl, int mask, const hcl_ooch_t* ptr, hcl_oow_t len)
+static int put_prcs (hcl_t* hcl, hcl_bitmask_t mask, const hcl_ooch_t* ptr, hcl_oow_t len)
 {
 	hcl_ooch_t* optr;
 
@@ -512,7 +512,7 @@ static int put_prcs (hcl_t* hcl, int mask, const hcl_ooch_t* ptr, hcl_oow_t len)
 	return 1; /* success */
 }
 
-static int put_prch (hcl_t* hcl, int mask, hcl_ooch_t ch, hcl_oow_t len)
+static int put_prch (hcl_t* hcl, hcl_bitmask_t mask, hcl_ooch_t ch, hcl_oow_t len)
 {
 	hcl_ooch_t str[256];
 	hcl_oow_t seglen, i;
@@ -532,7 +532,7 @@ static int put_prch (hcl_t* hcl, int mask, hcl_ooch_t ch, hcl_oow_t len)
 	return 1; /* success */
 }
 
-static hcl_ooi_t __prbfmtv (hcl_t* hcl, int mask, const hcl_bch_t* fmt, ...);
+static hcl_ooi_t __prbfmtv (hcl_t* hcl, hcl_bitmask_t mask, const hcl_bch_t* fmt, ...);
 
 static int _prbfmtv (hcl_t* hcl, const hcl_bch_t* fmt, hcl_fmtout_t* data, va_list ap)
 {
@@ -544,7 +544,7 @@ static int _prufmtv (hcl_t* hcl, const hcl_uch_t* fmt, hcl_fmtout_t* data, va_li
 	return __logufmtv (hcl, fmt, data, ap, __prbfmtv);
 }
 
-static hcl_ooi_t __prbfmtv (hcl_t* hcl, int mask, const hcl_bch_t* fmt, ...)
+static hcl_ooi_t __prbfmtv (hcl_t* hcl, hcl_bitmask_t mask, const hcl_bch_t* fmt, ...)
 {
 	va_list ap;
 	hcl_fmtout_t fo;
@@ -560,7 +560,7 @@ static hcl_ooi_t __prbfmtv (hcl_t* hcl, int mask, const hcl_bch_t* fmt, ...)
 	return fo.count;
 }
 
-hcl_ooi_t hcl_proutbfmt (hcl_t* hcl, int mask, const hcl_bch_t* fmt, ...)
+hcl_ooi_t hcl_proutbfmt (hcl_t* hcl, hcl_bitmask_t mask, const hcl_bch_t* fmt, ...)
 {
 	int x;
 	va_list ap;
@@ -571,13 +571,13 @@ hcl_ooi_t hcl_proutbfmt (hcl_t* hcl, int mask, const hcl_bch_t* fmt, ...)
 	fo.putcs = put_prcs;
 
 	va_start (ap, fmt);
-	x = _prbfmtv (hcl, fmt, &fo, ap);
+	x = _prbfmtv(hcl, fmt, &fo, ap);
 	va_end (ap);
 
 	return (x <= -1)? -1: fo.count;
 }
 
-hcl_ooi_t hcl_proutufmt (hcl_t* hcl, int mask, const hcl_uch_t* fmt, ...)
+hcl_ooi_t hcl_proutufmt (hcl_t* hcl, hcl_bitmask_t mask, const hcl_uch_t* fmt, ...)
 {
 	int x;
 	va_list ap;
@@ -598,7 +598,7 @@ hcl_ooi_t hcl_proutufmt (hcl_t* hcl, int mask, const hcl_uch_t* fmt, ...)
  * ERROR MESSAGE FORMATTING
  * -------------------------------------------------------------------------- */
 
-static int put_errcs (hcl_t* hcl, int mask, const hcl_ooch_t* ptr, hcl_oow_t len)
+static int put_errcs (hcl_t* hcl, hcl_bitmask_t mask, const hcl_ooch_t* ptr, hcl_oow_t len)
 {
 	hcl_oow_t max;
 
@@ -614,7 +614,7 @@ static int put_errcs (hcl_t* hcl, int mask, const hcl_ooch_t* ptr, hcl_oow_t len
 	return 1; /* success */
 }
 
-static int put_errch (hcl_t* hcl, int mask, hcl_ooch_t ch, hcl_oow_t len)
+static int put_errch (hcl_t* hcl, hcl_bitmask_t mask, hcl_ooch_t ch, hcl_oow_t len)
 {
 	hcl_oow_t max;
 
@@ -633,7 +633,7 @@ static int put_errch (hcl_t* hcl, int mask, hcl_ooch_t ch, hcl_oow_t len)
 	return 1; /* success */
 }
 
-static hcl_ooi_t __errbfmtv (hcl_t* hcl, int mask, const hcl_bch_t* fmt, ...);
+static hcl_ooi_t __errbfmtv (hcl_t* hcl, hcl_bitmask_t mask, const hcl_bch_t* fmt, ...);
 
 static int _errbfmtv (hcl_t* hcl, const hcl_bch_t* fmt, hcl_fmtout_t* data, va_list ap)
 {
@@ -645,7 +645,7 @@ static int _errufmtv (hcl_t* hcl, const hcl_uch_t* fmt, hcl_fmtout_t* data, va_l
 	return __logufmtv (hcl, fmt, data, ap, __errbfmtv);
 }
 
-static hcl_ooi_t __errbfmtv (hcl_t* hcl, int mask, const hcl_bch_t* fmt, ...)
+static hcl_ooi_t __errbfmtv (hcl_t* hcl, hcl_bitmask_t mask, const hcl_bch_t* fmt, ...)
 {
 	va_list ap;
 	hcl_fmtout_t fo;
@@ -1327,7 +1327,7 @@ int hcl_logfmtst (hcl_t* hcl, hcl_ooi_t nargs)
 /* -------------------------------------------------------------------------- 
  * SUPPORT FOR THE BUILTIN SPRINTF PRIMITIVE FUNCTION
  * -------------------------------------------------------------------------- */
-static int put_sprcs (hcl_t* hcl, int mask, const hcl_ooch_t* ptr, hcl_oow_t len)
+static int put_sprcs (hcl_t* hcl, hcl_bitmask_t mask, const hcl_ooch_t* ptr, hcl_oow_t len)
 {
 	if (len > hcl->sprintf.xbuf.capa - hcl->sprintf.xbuf.len)
 	{
@@ -1349,7 +1349,7 @@ static int put_sprcs (hcl_t* hcl, int mask, const hcl_ooch_t* ptr, hcl_oow_t len
 	return 1; /* success */
 }
 
-static int put_sprch (hcl_t* hcl, int mask, hcl_ooch_t ch, hcl_oow_t len)
+static int put_sprch (hcl_t* hcl, hcl_bitmask_t mask, hcl_ooch_t ch, hcl_oow_t len)
 {
 	if (len > hcl->sprintf.xbuf.capa - hcl->sprintf.xbuf.len)
 	{
@@ -1375,7 +1375,7 @@ static int put_sprch (hcl_t* hcl, int mask, hcl_ooch_t ch, hcl_oow_t len)
 	return 1; /* success */
 }
 
-static hcl_ooi_t __sprbfmtv (hcl_t* hcl, int mask, const hcl_bch_t* fmt, ...);
+static hcl_ooi_t __sprbfmtv (hcl_t* hcl, hcl_bitmask_t mask, const hcl_bch_t* fmt, ...);
 
 static int _sprbfmtv (hcl_t* hcl, const hcl_bch_t* fmt, hcl_fmtout_t* data, va_list ap)
 {
@@ -1388,7 +1388,7 @@ static int _sprufmtv (hcl_t* hcl, const hcl_uch_t* fmt, hcl_fmtout_t* data, va_l
 	return __logufmtv (hcl, fmt, data, ap, __sprbfmtv);
 }*/
 
-static hcl_ooi_t __sprbfmtv (hcl_t* hcl, int mask, const hcl_bch_t* fmt, ...)
+static hcl_ooi_t __sprbfmtv (hcl_t* hcl, hcl_bitmask_t mask, const hcl_bch_t* fmt, ...)
 {
 	va_list ap;
 	hcl_fmtout_t fo;
@@ -1404,7 +1404,7 @@ static hcl_ooi_t __sprbfmtv (hcl_t* hcl, int mask, const hcl_bch_t* fmt, ...)
 	return fo.count;
 }
 
-hcl_ooi_t hcl_sproutbfmt (hcl_t* hcl, int mask, const hcl_bch_t* fmt, ...)
+hcl_ooi_t hcl_sproutbfmt (hcl_t* hcl, hcl_bitmask_t mask, const hcl_bch_t* fmt, ...)
 {
 	int x;
 	va_list ap;
@@ -1415,14 +1415,14 @@ hcl_ooi_t hcl_sproutbfmt (hcl_t* hcl, int mask, const hcl_bch_t* fmt, ...)
 	fo.putcs = put_sprcs;
 
 	va_start (ap, fmt);
-	x = _sprbfmtv (hcl, fmt, &fo, ap);
+	x = _sprbfmtv(hcl, fmt, &fo, ap);
 	va_end (ap);
 
 	return (x <= -1)? -1: fo.count;
 }
 
 /*
-hcl_ooi_t hcl_sproutufmt (hcl_t* hcl, int mask, const hcl_uch_t* fmt, ...)
+hcl_ooi_t hcl_sproutufmt (hcl_t* hcl, hcl_bitmask_t mask, const hcl_uch_t* fmt, ...)
 {
 	int x;
 	va_list ap;

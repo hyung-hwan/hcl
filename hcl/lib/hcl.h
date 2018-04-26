@@ -37,7 +37,7 @@
 /* ========================================================================== */
 
 typedef struct hcl_mod_t hcl_mod_t;
-
+typedef unsigned int hcl_bitmask_t;
 /* ========================================================================== */
 
 /**
@@ -183,16 +183,16 @@ typedef enum hcl_option_dflval_t hcl_option_dflval_t;
 enum hcl_trait_t
 {
 #if defined(HCL_BUILD_DEBUG)
-	HCL_DEBUG_GC     = (1 << 0),
-	HCL_DEBUG_BIGINT = (1 << 1),
+	HCL_DEBUG_GC     = (1u << 0),
+	HCL_DEBUG_BIGINT = (1u << 1),
 #endif
 
 	/* perform no garbage collection when the heap is full. 
 	 * you still can use hcl_gc() explicitly. */
-	HCL_NOGC = (1 << 8),
+	HCL_NOGC = (1u << 8),
 
 	/* wait for running process when exiting from the main method */
-	HCL_AWAIT_PROCS = (1 << 9)
+	HCL_AWAIT_PROCS = (1u << 9)
 };
 typedef enum hcl_trait_t hcl_trait_t;
 
@@ -709,6 +709,84 @@ struct hcl_heap_t
 };
 
 /* =========================================================================
+ * HCL VM LOGGING
+ * ========================================================================= */
+
+enum hcl_log_mask_t
+{
+	HCL_LOG_DEBUG       = (1u << 0),
+	HCL_LOG_INFO        = (1u << 1),
+	HCL_LOG_WARN        = (1u << 2),
+	HCL_LOG_ERROR       = (1u << 3),
+	HCL_LOG_FATAL       = (1u << 4),
+
+	HCL_LOG_UNTYPED     = (1u << 6), /* only to be used by HCL_DEBUGx() and HCL_INFOx() */
+	HCL_LOG_COMPILER    = (1u << 7),
+	HCL_LOG_VM          = (1u << 8),
+	HCL_LOG_MNEMONIC    = (1u << 9), /* bytecode mnemonic */
+	HCL_LOG_GC          = (1u << 10),
+	HCL_LOG_IC          = (1u << 11), /* instruction cycle, fetch-decode-execute */
+	HCL_LOG_PRIMITIVE   = (1u << 12),
+
+	HCL_LOG_APP         = (1u << 13), /* hcl applications, set by hcl logging primitive */
+	HCL_LOG_APP_X1      = (1u << 14), /* more hcl applications, you can choose to use one of APP_X? randomly */
+	HCL_LOG_APP_X2      = (1u << 15),
+	HCL_LOG_APP_X3      = (1u << 16),
+
+	HCL_LOG_ALL_LEVELS  = (HCL_LOG_DEBUG  | HCL_LOG_INFO | HCL_LOG_WARN | HCL_LOG_ERROR | HCL_LOG_FATAL),
+	HCL_LOG_ALL_TYPES   = (HCL_LOG_UNTYPED | HCL_LOG_COMPILER | HCL_LOG_VM | HCL_LOG_MNEMONIC | HCL_LOG_GC | HCL_LOG_IC | HCL_LOG_PRIMITIVE | HCL_LOG_APP | HCL_LOG_APP_X1 | HCL_LOG_APP_X2 | HCL_LOG_APP_X3),
+
+
+	HCL_LOG_STDOUT      = (1u << 20),  /* write log messages to stdout without timestamp. HCL_LOG_STDOUT wins over HCL_LOG_STDERR. */
+	HCL_LOG_STDERR      = (1u << 21),  /* write log messages to stderr without timestamp. */
+
+	HCL_LOG_PREFER_JSON = (1u << 30)   /* write a object in the json format. don't set this explicitly. use %J instead */
+};
+typedef enum hcl_log_mask_t hcl_log_mask_t;
+
+/* all bits must be set to get enabled */
+#define HCL_LOG_ENABLED(hcl,mask) (((hcl)->option.log_mask & (mask)) == (mask))
+
+#define HCL_LOG0(hcl,mask,fmt) do { if (HCL_LOG_ENABLED(hcl,mask)) hcl_logbfmt(hcl, mask, fmt); } while(0)
+#define HCL_LOG1(hcl,mask,fmt,a1) do { if (HCL_LOG_ENABLED(hcl,mask)) hcl_logbfmt(hcl, mask, fmt, a1); } while(0)
+#define HCL_LOG2(hcl,mask,fmt,a1,a2) do { if (HCL_LOG_ENABLED(hcl,mask)) hcl_logbfmt(hcl, mask, fmt, a1, a2); } while(0)
+#define HCL_LOG3(hcl,mask,fmt,a1,a2,a3) do { if (HCL_LOG_ENABLED(hcl,mask)) hcl_logbfmt(hcl, mask, fmt, a1, a2, a3); } while(0)
+#define HCL_LOG4(hcl,mask,fmt,a1,a2,a3,a4) do { if (HCL_LOG_ENABLED(hcl,mask)) hcl_logbfmt(hcl, mask, fmt, a1, a2, a3, a4); } while(0)
+#define HCL_LOG5(hcl,mask,fmt,a1,a2,a3,a4,a5) do { if (HCL_LOG_ENABLED(hcl,mask)) hcl_logbfmt(hcl, mask, fmt, a1, a2, a3, a4, a5); } while(0)
+#define HCL_LOG6(hcl,mask,fmt,a1,a2,a3,a4,a5,a6) do { if (HCL_LOG_ENABLED(hcl,mask)) hcl_logbfmt(hcl, mask, fmt, a1, a2, a3, a4, a5, a6); } while(0)
+
+#if defined(HCL_BUILD_RELEASE)
+	/* [NOTE]
+	 *  get rid of debugging message totally regardless of
+	 *  the log mask in the release build.
+	 */
+#	define HCL_DEBUG0(hcl,fmt)
+#	define HCL_DEBUG1(hcl,fmt,a1)
+#	define HCL_DEBUG2(hcl,fmt,a1,a2)
+#	define HCL_DEBUG3(hcl,fmt,a1,a2,a3)
+#	define HCL_DEBUG4(hcl,fmt,a1,a2,a3,a4)
+#	define HCL_DEBUG5(hcl,fmt,a1,a2,a3,a4,a5)
+#	define HCL_DEBUG6(hcl,fmt,a1,a2,a3,a4,a5,a6)
+#else
+#	define HCL_DEBUG0(hcl,fmt) HCL_LOG0(hcl, HCL_LOG_DEBUG | HCL_LOG_UNTYPED, fmt)
+#	define HCL_DEBUG1(hcl,fmt,a1) HCL_LOG1(hcl, HCL_LOG_DEBUG | HCL_LOG_UNTYPED, fmt, a1)
+#	define HCL_DEBUG2(hcl,fmt,a1,a2) HCL_LOG2(hcl, HCL_LOG_DEBUG | HCL_LOG_UNTYPED, fmt, a1, a2)
+#	define HCL_DEBUG3(hcl,fmt,a1,a2,a3) HCL_LOG3(hcl, HCL_LOG_DEBUG | HCL_LOG_UNTYPED, fmt, a1, a2, a3)
+#	define HCL_DEBUG4(hcl,fmt,a1,a2,a3,a4) HCL_LOG4(hcl, HCL_LOG_DEBUG | HCL_LOG_UNTYPED, fmt, a1, a2, a3, a4)
+#	define HCL_DEBUG5(hcl,fmt,a1,a2,a3,a4,a5) HCL_LOG5(hcl, HCL_LOG_DEBUG | HCL_LOG_UNTYPED, fmt, a1, a2, a3, a4, a5)
+#	define HCL_DEBUG6(hcl,fmt,a1,a2,a3,a4,a5,a6) HCL_LOG6(hcl, HCL_LOG_DEBUG | HCL_LOG_UNTYPED, fmt, a1, a2, a3, a4, a5, a6)
+#endif
+
+#define HCL_INFO0(hcl,fmt) HCL_LOG0(hcl, HCL_LOG_INFO | HCL_LOG_UNTYPED, fmt)
+#define HCL_INFO1(hcl,fmt,a1) HCL_LOG1(hcl, HCL_LOG_INFO | HCL_LOG_UNTYPED, fmt, a1)
+#define HCL_INFO2(hcl,fmt,a1,a2) HCL_LOG2(hcl, HCL_LOG_INFO | HCL_LOG_UNTYPED, fmt, a1, a2)
+#define HCL_INFO3(hcl,fmt,a1,a2,a3) HCL_LOG3(hcl, HCL_LOG_INFO | HCL_LOG_UNTYPED, fmt, a1, a2, a3)
+#define HCL_INFO4(hcl,fmt,a1,a2,a3,a4) HCL_LOG4(hcl, HCL_LOG_INFO | HCL_LOG_UNTYPED, fmt, a1, a2, a3, a4)
+#define HCL_INFO5(hcl,fmt,a1,a2,a3,a4,a5) HCL_LOG5(hcl, HCL_LOG_INFO | HCL_LOG_UNTYPED, fmt, a1, a2, a3, a4, a5)
+#define HCL_INFO6(hcl,fmt,a1,a2,a3,a4,a5,a6) HCL_LOG6(hcl, HCL_LOG_INFO | HCL_LOG_UNTYPED, fmt, a1, a2, a3, a4, a5, a6)
+
+
+/* =========================================================================
  * VIRTUAL MACHINE PRIMITIVES
  * ========================================================================= */
 
@@ -724,7 +802,7 @@ typedef void (*hcl_free_heap_t) (
 
 typedef void (*hcl_log_write_t) (
 	hcl_t*             hcl,
-	unsigned int       mask,
+	hcl_bitmask_t    mask,
 	const hcl_ooch_t*  msg,
 	hcl_oow_t          len
 );
@@ -1072,8 +1150,8 @@ struct hcl_t
 
 	struct
 	{
-		unsigned int trait;
-		unsigned int log_mask;
+		hcl_bitmask_t trait;
+		hcl_bitmask_t log_mask;
 		hcl_oow_t log_maxcapa;
 		hcl_oow_t dfl_symtab_size;
 		hcl_oow_t dfl_sysdic_size;
@@ -1097,8 +1175,8 @@ struct hcl_t
 		hcl_ooch_t* ptr;
 		hcl_oow_t len;
 		hcl_oow_t capa;
-		unsigned int last_mask;
-		unsigned int default_type_mask;
+		hcl_bitmask_t last_mask;
+		hcl_bitmask_t default_type_mask;
 	} log;
 	/* ========================= */
 
@@ -1265,85 +1343,6 @@ struct hcl_t
 
 #define HCL_STACK_SETRETTOERRNUM(hcl,nargs) HCL_STACK_SETRET(hcl, nargs, HCL_ERROR_TO_OOP(hcl->errnum))
 #define HCL_STACK_SETRETTOERROR(hcl,nargs,ec) HCL_STACK_SETRET(hcl, nargs, HCL_ERROR_TO_OOP(ec))
-
-
-/* =========================================================================
- * HCL VM LOGGING
- * ========================================================================= */
-
-enum hcl_log_mask_t
-{
-	HCL_LOG_DEBUG       = (1u << 0),
-	HCL_LOG_INFO        = (1u << 1),
-	HCL_LOG_WARN        = (1u << 2),
-	HCL_LOG_ERROR       = (1u << 3),
-	HCL_LOG_FATAL       = (1u << 4),
-
-	HCL_LOG_UNTYPED     = (1u << 6), /* only to be used by HCL_DEBUGx() and HCL_INFOx() */
-	HCL_LOG_COMPILER    = (1u << 7),
-	HCL_LOG_VM          = (1u << 8),
-	HCL_LOG_MNEMONIC    = (1u << 9), /* bytecode mnemonic */
-	HCL_LOG_GC          = (1u << 10),
-	HCL_LOG_IC          = (1u << 11), /* instruction cycle, fetch-decode-execute */
-	HCL_LOG_PRIMITIVE   = (1u << 12),
-
-	HCL_LOG_APP         = (1u << 13), /* hcl applications, set by hcl logging primitive */
-	HCL_LOG_APP_X1      = (1u << 14), /* more hcl applications, you can choose to use one of APP_X? randomly */
-	HCL_LOG_APP_X2      = (1u << 15),
-	HCL_LOG_APP_X3      = (1u << 16),
-
-	HCL_LOG_ALL_LEVELS  = (HCL_LOG_DEBUG  | HCL_LOG_INFO | HCL_LOG_WARN | HCL_LOG_ERROR | HCL_LOG_FATAL),
-	HCL_LOG_ALL_TYPES   = (HCL_LOG_UNTYPED | HCL_LOG_COMPILER | HCL_LOG_VM | HCL_LOG_MNEMONIC | HCL_LOG_GC | HCL_LOG_IC | HCL_LOG_PRIMITIVE | HCL_LOG_APP | HCL_LOG_APP_X1 | HCL_LOG_APP_X2 | HCL_LOG_APP_X3),
-
-
-	HCL_LOG_STDOUT      = (1u << 20),  /* write log messages to stdout without timestamp. HCL_LOG_STDOUT wins over HCL_LOG_STDERR. */
-	HCL_LOG_STDERR      = (1u << 21),  /* write log messages to stderr without timestamp. */
-
-	HCL_LOG_PREFER_JSON = (1u << 30)   /* write a object in the json format. don't set this explicitly. use %J instead */
-};
-typedef enum hcl_log_mask_t hcl_log_mask_t;
-
-/* all bits must be set to get enabled */
-#define HCL_LOG_ENABLED(hcl,mask) (((hcl)->option.log_mask & (mask)) == (mask))
-
-#define HCL_LOG0(hcl,mask,fmt) do { if (HCL_LOG_ENABLED(hcl,mask)) hcl_logbfmt(hcl, mask, fmt); } while(0)
-#define HCL_LOG1(hcl,mask,fmt,a1) do { if (HCL_LOG_ENABLED(hcl,mask)) hcl_logbfmt(hcl, mask, fmt, a1); } while(0)
-#define HCL_LOG2(hcl,mask,fmt,a1,a2) do { if (HCL_LOG_ENABLED(hcl,mask)) hcl_logbfmt(hcl, mask, fmt, a1, a2); } while(0)
-#define HCL_LOG3(hcl,mask,fmt,a1,a2,a3) do { if (HCL_LOG_ENABLED(hcl,mask)) hcl_logbfmt(hcl, mask, fmt, a1, a2, a3); } while(0)
-#define HCL_LOG4(hcl,mask,fmt,a1,a2,a3,a4) do { if (HCL_LOG_ENABLED(hcl,mask)) hcl_logbfmt(hcl, mask, fmt, a1, a2, a3, a4); } while(0)
-#define HCL_LOG5(hcl,mask,fmt,a1,a2,a3,a4,a5) do { if (HCL_LOG_ENABLED(hcl,mask)) hcl_logbfmt(hcl, mask, fmt, a1, a2, a3, a4, a5); } while(0)
-#define HCL_LOG6(hcl,mask,fmt,a1,a2,a3,a4,a5,a6) do { if (HCL_LOG_ENABLED(hcl,mask)) hcl_logbfmt(hcl, mask, fmt, a1, a2, a3, a4, a5, a6); } while(0)
-
-#if defined(HCL_BUILD_RELEASE)
-	/* [NOTE]
-	 *  get rid of debugging message totally regardless of
-	 *  the log mask in the release build.
-	 */
-#	define HCL_DEBUG0(hcl,fmt)
-#	define HCL_DEBUG1(hcl,fmt,a1)
-#	define HCL_DEBUG2(hcl,fmt,a1,a2)
-#	define HCL_DEBUG3(hcl,fmt,a1,a2,a3)
-#	define HCL_DEBUG4(hcl,fmt,a1,a2,a3,a4)
-#	define HCL_DEBUG5(hcl,fmt,a1,a2,a3,a4,a5)
-#	define HCL_DEBUG6(hcl,fmt,a1,a2,a3,a4,a5,a6)
-#else
-#	define HCL_DEBUG0(hcl,fmt) HCL_LOG0(hcl, HCL_LOG_DEBUG | HCL_LOG_UNTYPED, fmt)
-#	define HCL_DEBUG1(hcl,fmt,a1) HCL_LOG1(hcl, HCL_LOG_DEBUG | HCL_LOG_UNTYPED, fmt, a1)
-#	define HCL_DEBUG2(hcl,fmt,a1,a2) HCL_LOG2(hcl, HCL_LOG_DEBUG | HCL_LOG_UNTYPED, fmt, a1, a2)
-#	define HCL_DEBUG3(hcl,fmt,a1,a2,a3) HCL_LOG3(hcl, HCL_LOG_DEBUG | HCL_LOG_UNTYPED, fmt, a1, a2, a3)
-#	define HCL_DEBUG4(hcl,fmt,a1,a2,a3,a4) HCL_LOG4(hcl, HCL_LOG_DEBUG | HCL_LOG_UNTYPED, fmt, a1, a2, a3, a4)
-#	define HCL_DEBUG5(hcl,fmt,a1,a2,a3,a4,a5) HCL_LOG5(hcl, HCL_LOG_DEBUG | HCL_LOG_UNTYPED, fmt, a1, a2, a3, a4, a5)
-#	define HCL_DEBUG6(hcl,fmt,a1,a2,a3,a4,a5,a6) HCL_LOG6(hcl, HCL_LOG_DEBUG | HCL_LOG_UNTYPED, fmt, a1, a2, a3, a4, a5, a6)
-#endif
-
-#define HCL_INFO0(hcl,fmt) HCL_LOG0(hcl, HCL_LOG_INFO | HCL_LOG_UNTYPED, fmt)
-#define HCL_INFO1(hcl,fmt,a1) HCL_LOG1(hcl, HCL_LOG_INFO | HCL_LOG_UNTYPED, fmt, a1)
-#define HCL_INFO2(hcl,fmt,a1,a2) HCL_LOG2(hcl, HCL_LOG_INFO | HCL_LOG_UNTYPED, fmt, a1, a2)
-#define HCL_INFO3(hcl,fmt,a1,a2,a3) HCL_LOG3(hcl, HCL_LOG_INFO | HCL_LOG_UNTYPED, fmt, a1, a2, a3)
-#define HCL_INFO4(hcl,fmt,a1,a2,a3,a4) HCL_LOG4(hcl, HCL_LOG_INFO | HCL_LOG_UNTYPED, fmt, a1, a2, a3, a4)
-#define HCL_INFO5(hcl,fmt,a1,a2,a3,a4,a5) HCL_LOG5(hcl, HCL_LOG_INFO | HCL_LOG_UNTYPED, fmt, a1, a2, a3, a4, a5)
-#define HCL_INFO6(hcl,fmt,a1,a2,a3,a4,a5,a6) HCL_LOG6(hcl, HCL_LOG_INFO | HCL_LOG_UNTYPED, fmt, a1, a2, a3, a4, a5, a6)
-
 
 /* =========================================================================
  * HCL ASSERTION
@@ -1694,14 +1693,14 @@ HCL_EXPORT int hcl_print (
 
 HCL_EXPORT hcl_ooi_t hcl_proutbfmt (
 	hcl_t*           hcl,
-	int              mask,
+	hcl_bitmask_t  mask,
 	const hcl_bch_t* fmt,
 	...
 );
 
 HCL_EXPORT hcl_ooi_t hcl_proutufmt (
 	hcl_t*           hcl,
-	int              mask,
+	hcl_bitmask_t  mask,
 	const hcl_uch_t* fmt,
 	...
 );
@@ -1843,28 +1842,28 @@ HCL_EXPORT hcl_pfbase_t* hcl_findpfbase (
 
 HCL_EXPORT hcl_ooi_t hcl_logbfmt (
 	hcl_t*           hcl,
-	int              mask,
+	hcl_bitmask_t    mask,
 	const hcl_bch_t* fmt,
 	...
 );
 
 HCL_EXPORT hcl_ooi_t hcl_logbfmtv (
 	hcl_t*           hcl,
-	int              mask,
+	hcl_bitmask_t    mask,
 	const hcl_bch_t* fmt,
 	va_list          ap
 );
 
 HCL_EXPORT hcl_ooi_t hcl_logufmt (
 	hcl_t*           hcl,
-	int              mask,
+	hcl_bitmask_t    mask,
 	const hcl_uch_t* fmt,
 	...
 );
 
 HCL_EXPORT hcl_ooi_t hcl_logufmtv (
 	hcl_t*           hcl,
-	int              mask,
+	hcl_bitmask_t    mask,
 	const hcl_uch_t* fmt,
 	va_list          ap
 );

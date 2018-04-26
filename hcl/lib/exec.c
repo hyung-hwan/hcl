@@ -2243,7 +2243,8 @@ oops:
 
 hcl_oop_t hcl_executefromip (hcl_t* hcl, hcl_oow_t initial_ip)
 {
-	int n, log_default_type_mask;
+	int n;
+	hcl_bitmask_t log_default_type_mask;
 
 	HCL_ASSERT (hcl, hcl->code.bc.len < HCL_SMOOI_MAX); /* asserted by the compiler */
 	if (initial_ip >= hcl->code.bc.len)

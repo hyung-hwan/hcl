@@ -92,8 +92,8 @@ struct hcl_json_t
 
 	struct
 	{
-		unsigned int trait;
-		unsigned int logmask;
+		hcl_bitmask_t trait;
+		hcl_bitmask_t logmask;
 	} cfg;
 
 	hcl_json_state_node_t state_top;
@@ -106,7 +106,7 @@ struct hcl_json_t
 
 /* ========================================================================= */
 
-static void log_write_for_dummy (hcl_t* hcl, unsigned int mask, const hcl_ooch_t* msg, hcl_oow_t len)
+static void log_write_for_dummy (hcl_t* hcl, hcl_bitmask_t mask, const hcl_ooch_t* msg, hcl_oow_t len)
 {
 	dummy_hcl_xtn_t* xtn = (dummy_hcl_xtn_t*)hcl_getxtn(hcl);
 	hcl_json_t* json;
@@ -899,7 +899,7 @@ hcl_json_t* hcl_json_open (hcl_mmgr_t* mmgr, hcl_oow_t xtnsize, hcl_json_prim_t*
 	json->prim = *prim;
 	json->dummy_hcl = hcl;
 
-	json->cfg.logmask = ~0u;
+	json->cfg.logmask = ~(hcl_bitmask_t)0;
 
 	/* the dummy hcl is used for this json to perform primitive operations
 	 * such as getting system time or logging. so the heap size doesn't 
@@ -928,11 +928,11 @@ int hcl_json_setoption (hcl_json_t* json, hcl_json_option_t id, const void* valu
 	switch (id)
 	{
 		case HCL_JSON_TRAIT:
-			json->cfg.trait = *(const unsigned int*)value;
+			json->cfg.trait = *(const hcl_bitmask_t*)value;
 			return 0;
 
 		case HCL_JSON_LOG_MASK:
-			json->cfg.logmask = *(const unsigned int*)value;
+			json->cfg.logmask = *(const hcl_bitmask_t*)value;
 			if (json->dummy_hcl) 
 			{
 				/* setting this affects the dummy hcl immediately.
@@ -953,11 +953,11 @@ int hcl_json_getoption (hcl_json_t* json, hcl_json_option_t id, void* value)
 	switch (id)
 	{
 		case HCL_JSON_TRAIT:
-			*(unsigned int*)value = json->cfg.trait;
+			*(hcl_bitmask_t*)value = json->cfg.trait;
 			return 0;
 
 		case HCL_JSON_LOG_MASK:
-			*(unsigned int*)value = json->cfg.logmask;
+			*(hcl_bitmask_t*)value = json->cfg.logmask;
 			return 0;
 	};
 
@@ -1039,7 +1039,7 @@ void hcl_json_seterrufmt (hcl_json_t* json, hcl_errnum_t errnum, const hcl_uch_t
 
 /* ========================================================================= */
 
-void hcl_json_logbfmt (hcl_json_t* json, unsigned int mask, const hcl_bch_t* fmt, ...)
+void hcl_json_logbfmt (hcl_json_t* json, hcl_bitmask_t mask, const hcl_bch_t* fmt, ...)
 {
 	va_list ap;
 	va_start (ap, fmt);
@@ -1047,7 +1047,7 @@ void hcl_json_logbfmt (hcl_json_t* json, unsigned int mask, const hcl_bch_t* fmt
 	va_end (ap);
 }
 
-void hcl_json_logufmt (hcl_json_t* json, unsigned int mask, const hcl_uch_t* fmt, ...)
+void hcl_json_logufmt (hcl_json_t* json, hcl_bitmask_t mask, const hcl_uch_t* fmt, ...)
 {
 	va_list ap;
 	va_start (ap, fmt);

@@ -13,7 +13,7 @@ typedef struct json_xtn_t json_xtn_t;
 struct json_xtn_t
 {
 	int logfd;
-	unsigned int logmask;
+	hcl_bitmask_t logmask;
 	int logfd_istty;
 	
 	struct
@@ -148,7 +148,7 @@ static void flush_log (hcl_json_t* json, int fd)
 	}
 }
 
-static void log_write (hcl_json_t* json, unsigned int mask, const hcl_ooch_t* msg, hcl_oow_t len)
+static void log_write (hcl_json_t* json, hcl_bitmask_t mask, const hcl_ooch_t* msg, hcl_oow_t len)
 {
 	hcl_bch_t buf[256];
 	hcl_oow_t ucslen, bcslen;

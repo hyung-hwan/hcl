@@ -148,7 +148,7 @@ struct xtn_t
 	int vm_running;
 
 	int logfd;
-	unsigned int logmask;
+	hcl_bitmask_t logmask;
 	int logfd_istty;
 	
 	struct 
@@ -624,7 +624,7 @@ static void flush_log (hcl_t* hcl, int fd)
 	}
 }
 
-static void log_write (hcl_t* hcl, unsigned int mask, const hcl_ooch_t* msg, hcl_oow_t len)
+static void log_write (hcl_t* hcl, hcl_bitmask_t mask, const hcl_ooch_t* msg, hcl_oow_t len)
 {
 	hcl_bch_t buf[256];
 	hcl_oow_t ucslen, bcslen, msgidx;
@@ -1334,7 +1334,7 @@ static int handle_logopt (hcl_t* hcl, const hcl_bch_t* str)
 	xtn_t* xtn = (xtn_t*)hcl_getxtn (hcl);
 	hcl_bch_t* xstr = (hcl_bch_t*)str;
 	hcl_bch_t* cm, * flt;
-	unsigned int logmask;
+	hcl_bitmask_t logmask;
 
 	cm = hcl_find_bchar_in_bcstr (xstr, ',');
 	if (cm) 
@@ -1424,7 +1424,7 @@ static int handle_dbgopt (hcl_t* hcl, const hcl_bch_t* str)
 	xtn_t* xtn = (xtn_t*)hcl_getxtn(hcl);
 	const hcl_bch_t* cm, * flt;
 	hcl_oow_t len;
-	unsigned int trait, dbgopt = 0;
+	hcl_bitmask_t trait, dbgopt = 0;
 
 	cm = str - 1;
 	do
@@ -1784,7 +1784,7 @@ int main (int argc, char* argv[])
 	}
 
 	{
-		unsigned int trait = 0;
+		hcl_bitmask_t trait = 0;
 
 		/*trait |= HCL_NOGC;*/
 		trait |= HCL_AWAIT_PROCS;

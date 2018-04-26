@@ -2564,7 +2564,7 @@ static HCL_INLINE int emit_set (hcl_t* hcl)
 int hcl_compile (hcl_t* hcl, hcl_oop_t obj)
 {
 	hcl_oow_t saved_bc_len, saved_lit_len;
-	int log_default_type_mask;
+	hcl_bitmask_t log_default_type_mask;
 
 	HCL_ASSERT (hcl, GET_TOP_CFRAME_INDEX(hcl) < 0);
 

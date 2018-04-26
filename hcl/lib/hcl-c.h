@@ -77,7 +77,7 @@ typedef enum hcl_client_reply_type_t hcl_client_reply_type_t;
 
 typedef void (*hcl_client_log_write_t) (
 	hcl_client_t*     client,
-	unsigned int      mask,
+	hcl_bitmask_t   mask,
 	const hcl_ooch_t* msg,
 	hcl_oow_t         len
 );
@@ -228,14 +228,14 @@ HCL_EXPORT void hcl_client_seterrufmt (
 
 HCL_EXPORT void hcl_client_logbfmt (
 	hcl_client_t*    client,
-	unsigned int     mask,
+	hcl_bitmask_t  mask,
 	const hcl_bch_t* fmt,
 	...
 );
 
 HCL_EXPORT void hcl_client_logufmt (
 	hcl_client_t*    client,
-	unsigned int     mask,
+	hcl_bitmask_t  mask,
 	const hcl_uch_t* fmt,
 	...
 );
