@@ -331,11 +331,13 @@ static int handle_string_value_char (hcl_json_t* json, hcl_ooci_t c)
 			/* convert the character to utf8 */
 			{
 				hcl_bch_t bcsbuf[HCL_BCSIZE_MAX];
-				hcl_oow_t ucslen = 1, bcslen;
+				hcl_oow_t ucslen, bcslen;
 
+				ucslen = 1;
+				bcslen = HCL_COUNTOF(bcsbuf);
 				if (hcl_conv_uchars_to_bchars_with_cmgr(&json->state_stack->u.sv.acc, &ucslen, bcsbuf, &bcslen, hcl_json_getcmgr(json)) <= -1)
 				{
-					hcl_json_seterrbfmt (json, HCL_EECERR, "unable to convert %jc", acc);
+					hcl_json_seterrbfmt (json, HCL_EECERR, "unable to convert %jc", json->state_stack->u.sv.acc);
 					return -1;
 				}
 				else
@@ -501,11 +503,12 @@ static int handle_character_value_char (hcl_json_t* json, hcl_ooci_t c)
 		if (add_char_to_token(json, c) <= -1) return -1;
 	}
 
-	if (json->tok.len >= 1) 
+	if (json->tok.len > 1) 
 	{
 		hcl_json_seterrbfmt (json, HCL_EINVAL, "too many characters in a character literal - %.*js", json->tok.len, json->tok.ptr);
 		return -1;
 	}
+
 	return ret;
 }
 

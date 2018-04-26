@@ -320,8 +320,8 @@ int main (int argc, char* argv[])
 	json_xtn = hcl_json_getxtn(json);
 	json_xtn->logmask = HCL_LOG_ALL_LEVELS | HCL_LOG_ALL_TYPES;
 
-	//p = "[ \"ab\\xab\\uC88B\\uC544\\uC6A9c\", \"kaden\", \"iron\", true, { \"null\": \"a\\1bc\", \"123\": \"AA20AA\", \"10\": -0.123, \"way\": '\\uC88B' } ]";
-	p = "{ \"result\": \"SUCCESS\", \"message\": \"1 clients\", \"sessions\": [] }";
+	p = "[ \"ab\\xab\\uC88B\\uC544\\uC6A9c\", \"kaden\", \"iron\", true, { \"null\": \"a\\1bc\", \"123\": \"AA20AA\", \"10\": -0.123, \"way\": '\\uC88A' } ]";
+	/*p = "{ \"result\": \"SUCCESS\", \"message\": \"1 clients\", \"sessions\": [] }";*/
 
 	if (hcl_json_feed(json, p, strlen(p), &xlen) <= -1)
 	{	
