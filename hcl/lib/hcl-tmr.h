@@ -57,9 +57,6 @@ struct hcl_tmr_t
 struct hcl_tmr_event_t
 {
 	void*              ctx;    /* primary context pointer */
-	void*              ctx2;   /* secondary context pointer */
-	void*              ctx3;   /* tertiary context pointer */
-
 	hcl_ntime_t        when;
 	hcl_tmr_handler_t  handler;
 	hcl_tmr_updater_t  updater;
