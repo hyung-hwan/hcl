@@ -297,10 +297,10 @@ typedef struct hcl_obj_word_t*     hcl_oop_word_t;
 #define HCL_OOP_IS_SMOOI(oop) (HCL_OOP_GET_TAG_LO(oop) == HCL_OOP_TAG_SMOOI)
 #define HCL_OOP_IS_SMPTR(oop) (HCL_OOP_GET_TAG_LO(oop) == HCL_OOP_TAG_SMPTR)
 
-#define HCL_SMOOI_TO_OOP(num) ((hcl_oop_t)((((hcl_ooi_t)(num)) << HCL_OOP_TAG_BITS_LO) | HCL_OOP_TAG_SMOOI))
+#define HCL_SMOOI_TO_OOP(num) ((hcl_oop_t)((((hcl_oow_t)(hcl_ooi_t)(num)) << HCL_OOP_TAG_BITS_LO) | HCL_OOP_TAG_SMOOI))
 #define HCL_OOP_TO_SMOOI(oop) (((hcl_ooi_t)oop) >> HCL_OOP_TAG_BITS_LO)
 /*
-#define HCL_SMPTR_TO_OOP(num) ((hcl_oop_t)((((hcl_ooi_t)(num)) << HCL_OOP_TAG_BITS_LO) | HCL_OOP_TAG_SMPTR))
+#define HCL_SMPTR_TO_OOP(ptr) ((hcl_oop_t)((((hcl_oow_t)(ptr)) << HCL_OOP_TAG_BITS_LO) | HCL_OOP_TAG_SMPTR))
 #define HCL_OOP_TO_SMPTR(oop) (((hcl_ooi_t)oop) >> HCL_OOP_TAG_BITS_LO)
 */
 #define HCL_SMPTR_TO_OOP(ptr) ((hcl_oop_t)(((hcl_oow_t)ptr) | HCL_OOP_TAG_SMPTR))
