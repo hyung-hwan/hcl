@@ -1936,17 +1936,30 @@ hcl_server_t* hcl_server_open (hcl_mmgr_t* mmgr, hcl_oow_t xtnsize, hcl_server_p
 		goto oops;
 	}
 
-#if defined(O_CLOEXEC)
+#if defined(O_NONBLOCK) || defined(O_CLOEXEC)
 	fcv = fcntl(pfd[0], F_GETFD, 0);
-	if (fcv >= 0) fcntl(pfd[0], F_SETFD, fcv | O_CLOEXEC);
+	if (fcv >= 0) 
+	{
+	#if defined(O_NONBLOCK)
+		fcv |= O_NONBLOCK;
+	#endif
+	#if defined(O_CLOEXEC)
+		fcv |= O_CLOEXEC;
+	#endif
+		fcntl(pfd[0], F_SETFD, fcv);
+	}
+
 	fcv = fcntl(pfd[1], F_GETFD, 0);
-	if (fcv >= 0) fcntl(pfd[1], F_SETFD, fcv | O_CLOEXEC);
-#endif
-#if defined(O_NONBLOCK)
-	fcv = fcntl(pfd[0], F_GETFL, 0);
-	if (fcv >= 0) fcntl(pfd[0], F_SETFL, fcv | O_NONBLOCK);
-	fcv = fcntl(pfd[1], F_GETFL, 0);
-	if (fcv >= 0) fcntl(pfd[1], F_SETFL, fcv | O_NONBLOCK);
+	if (fcv >= 0) 
+	{
+	#if defined(O_NONBLOCK)
+		fcv |= O_NONBLOCK;
+	#endif
+	#if defined(O_CLOEXEC)
+		fcv |= O_CLOEXEC;
+	#endif
+		fcntl(pfd[1], F_SETFD, fcv);
+	}
 #endif
 	
 	xtn = (dummy_hcl_xtn_t*)hcl_getxtn(hcl);
@@ -2443,13 +2456,19 @@ static int setup_listeners (hcl_server_t* server, const hcl_bch_t* addrs)
 		optval = 1;
 		setsockopt (srv_fd, SOL_SOCKET, SO_REUSEADDR, &optval, HCL_SIZEOF(int));
 
-	#if defined(O_CLOEXEC)
+	#if defined(O_NONBLOCK) || defined(O_CLOEXEC)
 		fcv = fcntl(srv_fd, F_GETFD, 0);
-		if (fcv >= 0) fcntl(srv_fd, F_SETFD, fcv | O_CLOEXEC);
-	#endif
-	#if defined(O_NONBLOCK)
-		fcv = fcntl(srv_fd, F_GETFL, 0);
-		if (fcv >= 0) fcntl(srv_fd, F_SETFL, fcv | O_NONBLOCK);
+		if (fcv >= 0) 
+		{
+		#if defined(O_NONBLOCK)
+			fcv |= O_NONBLOCK;
+		#endif
+		#if defined(O_CLOEXEC)
+			fcv |= O_CLOEXEC;
+		#endif
+
+			fcntl(srv_fd, F_SETFL, fcv);
+		}
 	#endif
 
 		if (bind(srv_fd, (struct sockaddr*)&srv_addr, srv_len) == -1)
@@ -2590,9 +2609,18 @@ int hcl_server_start (hcl_server_t* server, const hcl_bch_t* addrs)
 					break;
 				}
 
-			#if defined(O_CLOEXEC)
+			#if defined(O_NONBLOCK) || defined(O_CLOEXEC)
 				fcv = fcntl(cli_fd, F_GETFD, 0);
-				if (fcv >= 0) fcntl(cli_fd, F_SETFD, fcv | O_CLOEXEC);
+				if (fcv >= 0) 
+				{
+				#if defined(O_NONBLOCK)
+					fcv &= ~O_NONBLOCK; // force the accepted socket to be blocking
+				#endif
+				#if defined(O_CLOEXEC)
+					fcv |= O_CLOEXEC;
+				#endif
+					fcntl(cli_fd, F_SETFD, fcv);
+				}
 			#endif
 
 				if (server->cfg.worker_max_count > 0)
