@@ -2051,7 +2051,7 @@ void hcl_server_close (hcl_server_t* server)
 static HCL_INLINE int prepare_to_acquire_wid (hcl_server_t* server)
 {
 	hcl_oow_t new_capa;
-	hcl_ooi_t i, j;
+	hcl_oow_t i, j;
 	hcl_server_wid_map_data_t* tmp;
 
 	HCL_ASSERT (server->dummy_hcl, server->wid_map.free_first == HCL_SERVER_WID_INVALID);

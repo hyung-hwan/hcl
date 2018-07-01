@@ -564,7 +564,7 @@ static int write_log (hcl_t* hcl, int fd, const hcl_bch_t* ptr, hcl_oow_t len)
 {
 	xtn_t* xtn;
 
-	xtn = hcl_getxtn(hcl);
+	xtn = (xtn_t*)hcl_getxtn(hcl);
 
 	while (len > 0)
 	{
@@ -616,7 +616,7 @@ static int write_log (hcl_t* hcl, int fd, const hcl_bch_t* ptr, hcl_oow_t len)
 static void flush_log (hcl_t* hcl, int fd)
 {
 	xtn_t* xtn;
-	xtn = hcl_getxtn(hcl);
+	xtn = (xtn_t*)hcl_getxtn(hcl);
 	if (xtn->logbuf.len > 0)
 	{
 		write_all (fd, xtn->logbuf.buf, xtn->logbuf.len);
