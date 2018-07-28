@@ -375,6 +375,12 @@ void hcl_getsynerr (hcl_t* hcl, hcl_synerr_t* synerr)
 	if (synerr) *synerr = hcl->c->synerr;
 }
 
+hcl_synerrnum_t hcl_getsynerrnum (hcl_t* hcl)
+{
+	HCL_ASSERT (hcl, hcl->c != HCL_NULL);
+	return hcl->c->synerr.num;
+}
+
 void hcl_setsynerrbfmt (hcl_t* hcl, hcl_synerrnum_t num, const hcl_ioloc_t* loc, const hcl_oocs_t* tgt, const hcl_bch_t* msgfmt, ...)
 {
 	static hcl_bch_t syntax_error[] = "syntax error - ";

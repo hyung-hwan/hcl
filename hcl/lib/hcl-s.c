@@ -2651,7 +2651,6 @@ int hcl_server_start (hcl_server_t* server, const hcl_bch_t* addrs)
 						free_worker (worker);
 					}
 				}
-				
 			}
 		}
 	}

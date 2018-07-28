@@ -58,6 +58,7 @@ static struct voca_t
 	{  7, { '#','\\','s','p','a','c','e'                                  } },
 	{  5, { '#','\\','t','a','b'                                          } },
 	{  6, { '#','\\','v','t','a','b'                                      } },
+	{  5, { '<','E','O','L','>'                                           } },
 	{  5, { '<','E','O','F','>'                                           } }
 };
 
@@ -75,6 +76,7 @@ enum voca_id_t
 	VOCA_TAB,
 	VOCA_VTAB,
 
+	VOCA_EOL,
 	VOCA_EOF
 };
 typedef enum voca_id_t voca_id_t;
@@ -1013,7 +1015,17 @@ retry:
 	do 
 	{
 		/* skip spaces */
-		while (is_spacechar(hcl->c->lxc.c)) GET_CHAR (hcl);
+		while (is_spacechar(hcl->c->lxc.c)) 
+		{
+			if ((hcl->option.trait & HCL_CLI_MODE) && hcl->c->lxc.c == '\n')
+			{
+				SET_TOKEN_TYPE (hcl, HCL_IOTOK_EOL);
+				CLEAR_TOKEN_NAME (hcl);
+				ADD_TOKEN_STR(hcl, vocas[VOCA_EOL].str, vocas[VOCA_EOL].len);
+				hcl->c->tok.loc = hcl->c->lxc.l; /* set token location */
+			}
+			GET_CHAR (hcl);
+		}
 		/* the first character after the last space is in hcl->c->lxc */
 		if ((n = skip_comment(hcl)) <= -1) return -1;
 	} 

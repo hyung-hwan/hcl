@@ -187,6 +187,9 @@ enum hcl_trait_t
 	HCL_DEBUG_BIGINT = (1u << 1),
 #endif
 
+	/* command line mode */
+	HCL_CLI_MODE = (1u << 7),
+
 	/* perform no garbage collection when the heap is full. 
 	 * you still can use hcl_gc() explicitly. */
 	HCL_NOGC = (1u << 8),
@@ -1754,6 +1757,9 @@ HCL_EXPORT void hcl_getsynerr (
 	hcl_synerr_t*      synerr
 );
 
+HCL_EXPORT hcl_synerrnum_t hcl_getsynerrnum (
+	hcl_t*             hcl
+);
 
 HCL_EXPORT void hcl_setsynerrbfmt (
 	hcl_t*              hcl,

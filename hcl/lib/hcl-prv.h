@@ -169,6 +169,7 @@ enum hcl_iotok_type_t
 	HCL_IOTOK_LBRACE,   /* { */
 	HCL_IOTOK_RBRACE,   /* } */
 	HCL_IOTOK_VBAR,
+	HCL_IOTOK_EOL,      /* end of line */
 
 	HCL_IOTOK_INCLUDE
 };
