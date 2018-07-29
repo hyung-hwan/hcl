@@ -1023,6 +1023,7 @@ retry:
 				CLEAR_TOKEN_NAME (hcl);
 				ADD_TOKEN_STR(hcl, vocas[VOCA_EOL].str, vocas[VOCA_EOL].len);
 				hcl->c->tok.loc = hcl->c->lxc.l; /* set token location */
+				goto done;
 			}
 			GET_CHAR (hcl);
 		}
@@ -1282,6 +1283,7 @@ retry:
 			break;
 	}
 
+done:
 #if defined(HCL_DEBUG_LEXER)
 	HCL_DEBUG2 (hcl, "TOKEN: [%.*js]\n", (hcl_ooi_t)TOKEN_NAME_LEN(hcl), TOKEN_NAME_PTR(hcl));
 #endif
@@ -1608,7 +1610,7 @@ static HCL_INLINE int can_colon_list (hcl_t* hcl)
 
 	HCL_ASSERT (hcl, !HCL_IS_NIL(hcl,hcl->c->r.s));
 
-	/* mark the state that a dot has appeared in the list */
+	/* mark the state that a colon has appeared in the list */
 	rsa = (hcl_oop_oop_t)hcl->c->r.s;
 	HCL_ASSERT (hcl, HCL_OOP_IS_SMOOI(rsa->slot[2]));
 	flagv = HCL_OOP_TO_SMOOI(rsa->slot[2]);
@@ -1625,7 +1627,7 @@ static HCL_INLINE int can_colon_list (hcl_t* hcl)
 	count = HCL_OOP_TO_SMOOI(rsa->slot[4]);
 	if (!(count & 1)) return 0;
 
-	flagv |= COMMAED;
+	flagv |= COLONED;
 	rsa->slot[2] = HCL_SMOOI_TO_OOP(flagv);
 	return 1;
 }
@@ -2100,7 +2102,7 @@ static int read_object (hcl_t* hcl)
 						/* TODO switch to syntax error */
 						return -1;
 					}
-				
+
 					hcl_pushtmp (hcl, &obj);
 					switch (pfbase->type)
 					{
@@ -2185,6 +2187,89 @@ static int read_object (hcl_t* hcl)
 	return 0;
 }
 
+static int read_object_in_cli_mode (hcl_t* hcl)
+{
+	int level = 0, array_level = 0, flagv = 0; 
+	hcl_oop_t obj;
+
+	flagv = 0;
+	LIST_FLAG_SET_CONCODE (flagv, HCL_CONCODE_XLIST);
+
+	/* push some data to simulate recursion into 
+	 * a list literal or an array literal */
+	if (enter_list(hcl, flagv) == HCL_NULL) return -1;
+	level++;
+	//if (LIST_FLAG_GET_CONCODE(flagv) == HCL_CONCODE_ARRAY) array_level++;
+
+	while (1)
+	{
+	redo:
+		switch (TOKEN_TYPE(hcl))
+		{
+			default:
+				hcl_setsynerr (hcl, HCL_SYNERR_ILTOK, TOKEN_LOC(hcl), TOKEN_NAME(hcl));
+				return -1;
+
+			case HCL_IOTOK_EOF:
+				hcl_setsynerr (hcl, HCL_SYNERR_EOF, TOKEN_LOC(hcl), TOKEN_NAME(hcl));
+				return -1;
+
+			case HCL_IOTOK_INCLUDE:
+				/* TODO: should i limit where #include can be specified?
+				 *       disallow it inside a list literal or an array literal? */
+				GET_TOKEN (hcl);
+				if (TOKEN_TYPE(hcl) != HCL_IOTOK_STRLIT)
+				{
+					hcl_setsynerr (hcl, HCL_SYNERR_STRING, TOKEN_LOC(hcl), TOKEN_NAME(hcl));
+					return -1;
+				}
+				if (begin_include(hcl) <= -1) return -1;
+				goto redo;
+
+			case HCL_IOTOK_EOL:
+			{
+				int oldflagv;
+				//int concode;
+
+				if (level <= 0)
+				{
+					hcl_setsynerr (hcl, HCL_SYNERR_UNBALPBB, TOKEN_LOC(hcl), HCL_NULL); 
+					return -1;
+				}
+
+				//concode = LIST_FLAG_GET_CONCODE(flagv);
+				obj = leave_list (hcl, &flagv, &oldflagv);
+
+				level--;
+				//if (LIST_FLAG_GET_CONCODE(oldflagv) == HCL_CONCODE_ARRAY) array_level--;
+				goto done;
+			}
+
+			case HCL_IOTOK_STRLIT:
+			case HCL_IOTOK_IDENT:
+				obj = hcl_makestring(hcl, TOKEN_NAME_PTR(hcl), TOKEN_NAME_LEN(hcl), 0);
+				break;
+		}
+
+		if (!obj) return -1;
+
+		/* check if we are at the top level */
+		//if (level <= 0) break; /* yes */
+
+		/* if not, append the element read into the current list.
+		 * if we are not at the top level, we must be in a list */
+		//if (chain_to_list(hcl, obj) == HCL_NULL) return -1;
+		clear_comma_colon_flag (hcl);
+
+		/* read the next token */
+		GET_TOKEN (hcl);
+	}
+
+done:
+	hcl->c->r.e = obj;
+	return 0;
+}
+
 static HCL_INLINE int __read (hcl_t* hcl)
 {
 	if (get_token(hcl) <= -1) return -1;
@@ -2193,7 +2278,7 @@ static HCL_INLINE int __read (hcl_t* hcl)
 		hcl_seterrnum (hcl, HCL_EFINIS);
 		return -1;
 	}
-	return read_object (hcl);
+	return (hcl->option.trait & HCL_CLI_MODE)? read_object_in_cli_mode(hcl): read_object(hcl);
 }
 
 hcl_oop_t hcl_read (hcl_t* hcl)
