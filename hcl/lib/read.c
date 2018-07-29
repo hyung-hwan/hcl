@@ -2226,24 +2226,54 @@ static int read_object_in_cli_mode (hcl_t* hcl)
 				if (begin_include(hcl) <= -1) return -1;
 				goto redo;
 
+			case HCL_IOTOK_LPAREN: /* () */
+				flagv = 0;
+				LIST_FLAG_SET_CONCODE (flagv, HCL_CONCODE_XLIST);
+			start_list:
+				if (level >= HCL_TYPE_MAX(int))
+				{
+					/* the nesting level has become too deep */
+					hcl_setsynerr (hcl, HCL_SYNERR_NESTING, TOKEN_LOC(hcl), TOKEN_NAME(hcl));
+					return -1;
+				}
+
+				/* push some data to simulate recursion into 
+				 * a list literal or an array literal */
+				if (enter_list(hcl, flagv) == HCL_NULL) return -1;
+				level++;
+				if (LIST_FLAG_GET_CONCODE(flagv) == HCL_CONCODE_ARRAY) array_level++;
+
+				/* read the next token */
+				GET_TOKEN (hcl);
+				goto redo;
+
 			case HCL_IOTOK_EOL:
+			case HCL_IOTOK_RPAREN:
 			{
 				int oldflagv;
 				//int concode;
 
 				if (level <= 0)
 				{
+				unbalpbb:
 					hcl_setsynerr (hcl, HCL_SYNERR_UNBALPBB, TOKEN_LOC(hcl), HCL_NULL); 
 					return -1;
 				}
 
+				if (level == 1 && TOKEN_TYPE(hcl) != HCL_IOTOK_EOL) goto unbalpbb;
+				
 				//concode = LIST_FLAG_GET_CONCODE(flagv);
 				obj = leave_list (hcl, &flagv, &oldflagv);
 
 				level--;
 				//if (LIST_FLAG_GET_CONCODE(oldflagv) == HCL_CONCODE_ARRAY) array_level--;
-				goto done;
+				goto done	;
 			}
+
+			case HCL_IOTOK_NUMLIT:
+			case HCL_IOTOK_RADNUMLIT:
+				obj = string_to_num(hcl, TOKEN_NAME(hcl), TOKEN_TYPE(hcl) == HCL_IOTOK_RADNUMLIT);
+				break;
 
 			case HCL_IOTOK_STRLIT:
 			case HCL_IOTOK_IDENT:
@@ -2254,11 +2284,11 @@ static int read_object_in_cli_mode (hcl_t* hcl)
 		if (!obj) return -1;
 
 		/* check if we are at the top level */
-		//if (level <= 0) break; /* yes */
+		if (level <= 0) break; /* yes */
 
 		/* if not, append the element read into the current list.
 		 * if we are not at the top level, we must be in a list */
-		//if (chain_to_list(hcl, obj) == HCL_NULL) return -1;
+		if (chain_to_list(hcl, obj) == HCL_NULL) return -1;
 		clear_comma_colon_flag (hcl);
 
 		/* read the next token */
