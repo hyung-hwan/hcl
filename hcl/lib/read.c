@@ -1017,7 +1017,7 @@ retry:
 		/* skip spaces */
 		while (is_spacechar(hcl->c->lxc.c)) 
 		{
-			if ((hcl->option.trait & HCL_CLI_MODE) && hcl->c->lxc.c == '\n')
+			if ((hcl->option.trait & HCL_CLI_MODE) && hcl->c->lxc.c == '\n' && TOKEN_TYPE(hcl) != HCL_IOTOK_EOL)
 			{
 				SET_TOKEN_TYPE (hcl, HCL_IOTOK_EOL);
 				CLEAR_TOKEN_NAME (hcl);
@@ -1925,9 +1925,9 @@ static int read_object (hcl_t* hcl)
 				GET_TOKEN (hcl);
 				goto redo;
 
-			case HCL_IOTOK_RPAREN: /* xlist (), byte array #() */
-			case HCL_IOTOK_RBRACK: /* array #[], qlist[] */
-			case HCL_IOTOK_RBRACE: /* dictionary #{} */
+			case HCL_IOTOK_RPAREN: /* xlist (), qlist #() */
+			case HCL_IOTOK_RBRACK: /* bytearray #[], array[] */
+			case HCL_IOTOK_RBRACE: /* dictionary {} */
 			{
 				static struct 
 				{
@@ -1939,7 +1939,7 @@ static int read_object (hcl_t* hcl)
 					{ HCL_IOTOK_RBRACK, HCL_SYNERR_RBRACK }, /* ARRAY     [] */
 					{ HCL_IOTOK_RBRACK, HCL_SYNERR_RBRACK }, /* BYTEARRAY #[] */
 					{ HCL_IOTOK_RBRACE, HCL_SYNERR_RBRACE }, /* DIC       {} */
-					{ HCL_IOTOK_RPAREN, HCL_SYNERR_RPAREN }  /* QLIST     $()  */
+					{ HCL_IOTOK_RPAREN, HCL_SYNERR_RPAREN }  /* QLIST     #()  */
 				};
 
 				int oldflagv;
@@ -2229,6 +2229,7 @@ static int read_object_in_cli_mode (hcl_t* hcl)
 			case HCL_IOTOK_LPAREN: /* () */
 				flagv = 0;
 				LIST_FLAG_SET_CONCODE (flagv, HCL_CONCODE_XLIST);
+				SET_TOKEN_TYPE (hcl, HCL_IOTOK_EOL); /* to have get_token() to ignore immediate <EOL> after ( */
 			start_list:
 				if (level >= HCL_TYPE_MAX(int))
 				{
@@ -2269,6 +2270,12 @@ static int read_object_in_cli_mode (hcl_t* hcl)
 				//if (LIST_FLAG_GET_CONCODE(oldflagv) == HCL_CONCODE_ARRAY) array_level--;
 				goto done	;
 			}
+
+			
+			case HCL_IOTOK_LBRACE:
+				
+
+			case HCL_IOTOK_RBRACE:
 
 			case HCL_IOTOK_NUMLIT:
 			case HCL_IOTOK_RADNUMLIT:
@@ -2476,6 +2483,7 @@ int hcl_attachio (hcl_t* hcl, hcl_ioimpl_t reader, hcl_ioimpl_t printer)
 	
 	/* the stream is open. set it as the current input stream */
 	hcl->c->curinp = &hcl->c->inarg;
+	if (hcl->option.trait & HCL_CLI_MODE) SET_TOKEN_TYPE (hcl, HCL_IOTOK_EOL);
 	return 0;
 
 oops:
