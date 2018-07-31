@@ -2227,6 +2227,10 @@ static int read_object_in_cli_mode (hcl_t* hcl)
 				goto redo;
 
 			case HCL_IOTOK_LPAREN: /* () */
+			{
+				int first = 1;
+
+			redo_lparen:
 				flagv = 0;
 				LIST_FLAG_SET_CONCODE (flagv, HCL_CONCODE_XLIST);
 				SET_TOKEN_TYPE (hcl, HCL_IOTOK_EOL); /* to have get_token() to ignore immediate <EOL> after ( */
@@ -2242,15 +2246,42 @@ static int read_object_in_cli_mode (hcl_t* hcl)
 				 * a list literal or an array literal */
 				if (enter_list(hcl, flagv) == HCL_NULL) return -1;
 				level++;
-				if (LIST_FLAG_GET_CONCODE(flagv) == HCL_CONCODE_ARRAY) array_level++;
+				//if (LIST_FLAG_GET_CONCODE(flagv) == HCL_CONCODE_ARRAY) array_level++;
+
+				if (first) 
+				{
+					first = 0;
+					goto redo_lparen;
+				}
 
 				/* read the next token */
 				GET_TOKEN (hcl);
 				goto redo;
+			}
 
 			case HCL_IOTOK_EOL:
+			{
+				int oldflagv;
+				//int concode;
+
+				if (level <= 0)
+				{
+					hcl_setsynerr (hcl, HCL_SYNERR_UNBALPBB, TOKEN_LOC(hcl), HCL_NULL); 
+					return -1;
+				}
+
+				//concode = LIST_FLAG_GET_CONCODE(flagv);
+				obj = leave_list (hcl, &flagv, &oldflagv);
+
+				level--;
+				//if (LIST_FLAG_GET_CONCODE(oldflagv) == HCL_CONCODE_ARRAY) array_level--;
+
+				break;
+			}
+
 			case HCL_IOTOK_RPAREN:
 			{
+				int first = 1;
 				int oldflagv;
 				//int concode;
 
@@ -2261,21 +2292,21 @@ static int read_object_in_cli_mode (hcl_t* hcl)
 					return -1;
 				}
 
-				if (level == 1 && TOKEN_TYPE(hcl) != HCL_IOTOK_EOL) goto unbalpbb;
-				
+			redo_rparen:
 				//concode = LIST_FLAG_GET_CONCODE(flagv);
 				obj = leave_list (hcl, &flagv, &oldflagv);
 
 				level--;
 				//if (LIST_FLAG_GET_CONCODE(oldflagv) == HCL_CONCODE_ARRAY) array_level--;
-				goto done	;
+
+				if (first) 
+				{
+					first = 0;
+					goto redo_rparen;
+				}
+
+				break;
 			}
-
-			
-			case HCL_IOTOK_LBRACE:
-				
-
-			case HCL_IOTOK_RBRACE:
 
 			case HCL_IOTOK_NUMLIT:
 			case HCL_IOTOK_RADNUMLIT:
