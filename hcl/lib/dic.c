@@ -26,7 +26,7 @@
 
 #include "hcl-prv.h"
 
-/*#define SYMBOL_ONLY_KEY */
+#define SYMBOL_ONLY_KEY 
 
 static hcl_oop_oop_t expand_bucket (hcl_t* hcl, hcl_oop_oop_t oldbuc)
 {
@@ -73,6 +73,7 @@ static hcl_oop_oop_t expand_bucket (hcl_t* hcl, hcl_oop_oop_t oldbuc)
 		if ((hcl_oop_t)ass != hcl->_nil)
 		{
 		#if defined(SYMBOL_ONLY_KEY)
+			hcl_oop_char_t key;
 			HCL_ASSERT (hcl, HCL_IS_CONS(hcl,ass));
 			key = (hcl_oop_char_t)ass->car;
 			HCL_ASSERT (hcl, HCL_IS_SYMBOL(hcl,key));
@@ -81,7 +82,7 @@ static hcl_oop_oop_t expand_bucket (hcl_t* hcl, hcl_oop_oop_t oldbuc)
 			int n;
 			HCL_ASSERT (hcl, HCL_IS_CONS(hcl,ass));
 			n = hcl_hashobj(hcl, ass->car, &index);
-			HCL_ASSERT (hcl, n == 0); /* since it's expanding, the existing in the bucket should always be hashable */
+			HCL_ASSERT (hcl, n == 0); /* since it's expanding, the existing one in the bucket should always be hashable */
 			index %= newsz;
 		#endif
 			while (newbuc->slot[index] != hcl->_nil) index = (index + 1) % newsz;
@@ -92,11 +93,7 @@ static hcl_oop_oop_t expand_bucket (hcl_t* hcl, hcl_oop_oop_t oldbuc)
 	return newbuc;
 }
 
-#if defined(SYMBOL_ONLY_KEY)
-static hcl_oop_cons_t find_or_upsert (hcl_t* hcl, hcl_oop_dic_t dic, hcl_oop_char_t key, hcl_oop_t value)
-#else
 static hcl_oop_cons_t find_or_upsert (hcl_t* hcl, hcl_oop_dic_t dic, hcl_oop_t key, hcl_oop_t value)
-#endif
 {
 	hcl_ooi_t tally;
 	hcl_oow_t index;
@@ -112,7 +109,7 @@ static hcl_oop_cons_t find_or_upsert (hcl_t* hcl, hcl_oop_dic_t dic, hcl_oop_t k
 	HCL_ASSERT (hcl, HCL_IS_ARRAY(hcl,dic->bucket));
 
 #if defined(SYMBOL_ONLY_KEY)
-	index = hcl_hashoochars(key->slot, HCL_OBJ_GET_SIZE(key)) % HCL_OBJ_GET_SIZE(dic->bucket);
+	index = hcl_hashoochars(HCL_OBJ_GET_CHAR_SLOT(key), HCL_OBJ_GET_SIZE(key)) % HCL_OBJ_GET_SIZE(dic->bucket);
 #else
 	if (hcl_hashobj(hcl, key, &index) <= -1) return HCL_NULL;
 	index %= HCL_OBJ_GET_SIZE(dic->bucket);
@@ -127,7 +124,7 @@ static hcl_oop_cons_t find_or_upsert (hcl_t* hcl, hcl_oop_dic_t dic, hcl_oop_t k
 		HCL_ASSERT (hcl, HCL_IS_SYMBOL(hcl,ass->car));
 
 		if (HCL_OBJ_GET_SIZE(key) == HCL_OBJ_GET_SIZE(ass->car) &&
-		    hcl_equal_oochars(key->slot, ((hcl_oop_char_t)ass->car)->slot, HCL_OBJ_GET_SIZE(key))) 
+		    hcl_equal_oochars(HCL_OBJ_GET_CHAR_SLOT(key), ((hcl_oop_char_t)ass->car)->slot, HCL_OBJ_GET_SIZE(key))) 
 		{
 			/* the value of HCL_NULL indicates no insertion or update. */
 			if (value) ass->cdr = value; /* update */
@@ -198,7 +195,7 @@ static hcl_oop_cons_t find_or_upsert (hcl_t* hcl, hcl_oop_dic_t dic, hcl_oop_t k
 
 	#if defined(SYMBOL_ONLY_KEY)
 		/* recalculate the index for the expanded bucket */
-		index = hcl_hashoochars(key->slot, HCL_OBJ_GET_SIZE(key)) % HCL_OBJ_GET_SIZE(dic->bucket);
+		index = hcl_hashoochars(HCL_OBJ_GET_CHAR_SLOT(key), HCL_OBJ_GET_SIZE(key)) % HCL_OBJ_GET_SIZE(dic->bucket);
 	#else
 		hcl_hashobj(hcl, key, &index); /* this must succeed as i know 'key' is hashable */
 		index %= HCL_OBJ_GET_SIZE(dic->bucket);
@@ -285,7 +282,7 @@ int hcl_zapatdic (hcl_t* hcl, hcl_oop_dic_t dic, hcl_oop_t key)
 	HCL_ASSERT (hcl, HCL_IS_ARRAY(hcl,dic->bucket));
 
 #if defined(SYMBOL_ONLY_KEY)
-	index = hcl_hashoochars(key->slot, HCL_OBJ_GET_SIZE(key)) % bs;
+	index = hcl_hashoochars(HCL_OBJ_GET_CHAR_SLOT(key), HCL_OBJ_GET_SIZE(key)) % bs;
 #else
 	if (hcl_hashobj(hcl, key, &index) <= -1) return -1;
 	index %= bs;

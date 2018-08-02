@@ -1000,6 +1000,160 @@ static HCL_INLINE int call_primitive (hcl_t* hcl, hcl_ooi_t nargs)
 	return ((hcl_pfimpl_t)rcv->slot[0]) (hcl, (hcl_mod_t*)rcv->slot[3], nargs);
 }
 
+
+#include <unistd.h>
+#include <sys/wait.h>
+#include <sys/stat.h>
+#include <limits.h>
+#include <string.h>
+#include <stdlib.h>
+#include <errno.h>
+
+extern char **environ;
+
+#define _PATH_DEFPATH "/usr/bin:/bin"
+
+static int is_regular_executable_file_by_me(const char *path)
+{
+	struct stat path_stat;
+	stat(path, &path_stat);
+	return S_ISREG(path_stat.st_mode) && access(path, X_OK) == 0; //? use eaccess instead??
+}
+
+static char* find_exec (hcl_t* hcl, const char *name)
+{
+	size_t lp, ln;
+	char buf[PATH_MAX];
+	const char *bp, *path, *p;
+
+	bp = buf;
+
+	/* Get the path we're searching. */
+	if (!(path = getenv("PATH"))) path = _PATH_DEFPATH;
+
+	ln = strlen(name);
+	do 
+	{
+		/* Find the end of this path element. */
+		for (p = path; *path != 0 && *path != ':'; path++) ;
+
+		/*
+		 * It's a SHELL path -- double, leading and trailing colons
+		 * mean the current directory.
+		 */
+		if (p == path) 
+		{
+			p = ".";
+			lp = 1;
+		}
+		else
+		{
+			lp = path - p;
+		}
+
+		/*
+		 * If the path is too long complain.  This is a possible
+		 * security issue; given a way to make the path too long
+		 * the user may execute the wrong program.
+		 */
+		if (lp + ln + 2 > sizeof(buf)) continue;
+
+		memcpy(buf, p, lp);
+		buf[lp] = '/';
+		memcpy(buf + lp + 1, name, ln);
+		buf[lp + ln + 1] = '\0';
+
+		if (is_regular_executable_file_by_me(bp)) return strdup(bp);
+
+	} 
+	while (*path++ == ':'); /* Otherwise, *path was NUL */
+
+
+done:
+	hcl_seterrbfmt (hcl, HCL_ENOENT, "callable %hs not found", name);
+	return HCL_NULL;
+}
+
+
+static HCL_INLINE int exec_syscmd (hcl_t* hcl, hcl_ooi_t nargs)
+{
+	hcl_oop_word_t rcv;
+	hcl_bch_t* cmd, * xcmd;
+
+	rcv = (hcl_oop_word_t)HCL_STACK_GETRCV(hcl, nargs);
+	/*HCL_ASSERT (hcl, HCL_IS_STRING(hcl, rcv) || HCL_IS_SYMBOL(hcl, rcv));*/
+	HCL_ASSERT (hcl, HCL_OBJ_IS_CHAR_POINTER(rcv));
+
+	if (HCL_OBJ_GET_SIZE(rcv) == 0 || hcl_count_oocstr(HCL_OBJ_GET_CHAR_SLOT(rcv)) != HCL_OBJ_GET_SIZE(rcv))
+	{
+		/* '\0' is contained in the middle */
+		hcl_seterrbfmt (hcl, HCL_EINVAL, "invalid callable %O", rcv);
+		return -1;
+	}
+
+	cmd = hcl_dupootobcstr(hcl, HCL_OBJ_GET_CHAR_SLOT(rcv), HCL_NULL);
+	if (!cmd) return -1;
+
+	if (hcl_find_bchar_in_bcstr(cmd, '/'))
+	{
+		if (!is_regular_executable_file_by_me(cmd)) 
+		{
+			hcl_seterrbfmt (hcl, HCL_ECALL, "cannot execute %O", rcv);
+			return -1;
+		}
+
+		xcmd = cmd;
+	}
+	else
+	{
+		xcmd = find_exec(hcl, cmd);
+		if (!xcmd) return -1;
+	}
+
+{ /* TODO: make it a callback ... */
+	pid_t pid;
+	int status;
+
+	pid = fork();
+	if (pid == -1) return -1;
+
+/* TODO: set a new process group / session leader??? */
+
+	if (pid == 0)
+	{
+
+			hcl_bch_t** argv;
+			hcl_ooi_t i;
+
+			/* TODO: close file descriptors??? */
+			argv = (hcl_bch_t**)hcl_allocmem(hcl, (nargs + 2) * HCL_SIZEOF(*argv));
+			if (argv)
+			{
+				argv[0] = cmd;
+				for (i = 0; i < nargs; i++)
+				{
+					hcl_oop_t ta;
+
+					ta = HCL_STACK_GETARG(hcl, nargs, i);
+/* TODO: check if an argument is a string or a symbol */
+					argv[i + 1] = hcl_dupootobchars (hcl, HCL_OBJ_GET_CHAR_SLOT(ta), HCL_OBJ_GET_SIZE(ta), HCL_NULL);
+				}
+				argv[nargs + 1] = HCL_NULL;
+				execvp (xcmd, argv);
+			}
+			_exit (255);
+	}
+
+	waitpid (pid, &status, 0);
+
+	HCL_STACK_SETRET (hcl, nargs, HCL_SMOOI_TO_OOP(WEXITSTATUS(status)));
+}
+
+	hcl_freemem (hcl, cmd);
+	if (xcmd != cmd) hcl_freemem (hcl, xcmd);
+	return 0;
+}
+
 /* ------------------------------------------------------------------------- */
 static hcl_oop_process_t start_initial_process (hcl_t* hcl, hcl_oop_context_t ctx)
 {
@@ -1584,6 +1738,9 @@ static int execute (hcl_t* hcl)
 						case HCL_BRAND_PRIM:
 							if (call_primitive(hcl, b1) <= -1) goto oops;
 							break;
+						case HCL_BRAND_STRING:
+							if ((hcl->option.trait & HCL_CLI_MODE) && exec_syscmd(hcl, b1) >= 0) break;
+							/* fall thru */
 						default:
 							goto cannot_call;
 					}

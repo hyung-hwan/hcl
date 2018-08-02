@@ -1435,7 +1435,7 @@ static int compile_cons_xlist_expression (hcl_t* hcl, hcl_oop_t obj)
 				return -1;
 		}
 	}
-	else if (HCL_IS_SYMBOL(hcl,car) || HCL_IS_CONS_XLIST(hcl,car))
+	else if (HCL_IS_SYMBOL(hcl,car) || HCL_IS_CONS_XLIST(hcl,car) || ((hcl->option.trait & HCL_CLI_MODE) && HCL_IS_STRING(hcl, car)))
 	{
 		/* normal function call 
 		 *  (<operator> <operand1> ...) */
@@ -1449,7 +1449,7 @@ static int compile_cons_xlist_expression (hcl_t* hcl, hcl_oop_t obj)
 		 *       many operations can be performed without taking GC into account */
 
 		/* store the position of COP_EMIT_CALL to be produced with
-		 * SWITCH_TOP_CFRAM() in oldtop for argument count patching 
+		 * SWITCH_TOP_CFRAME() in oldtop for argument count patching 
 		 * further down */
 		oldtop = GET_TOP_CFRAME_INDEX(hcl); 
 		HCL_ASSERT (hcl, oldtop >= 0);
@@ -1483,21 +1483,24 @@ static int compile_cons_xlist_expression (hcl_t* hcl, hcl_oop_t obj)
 			}
 		}
 
-		sdc = hcl_getatsysdic(hcl, car);
-		if (sdc)
+		if (HCL_IS_SYMBOL(hcl, car))
 		{
-			hcl_oop_word_t sdv;
-			sdv = (hcl_oop_word_t)HCL_CONS_CDR(sdc);
-			if (HCL_IS_PRIM(hcl, sdv))
+			sdc = hcl_getatsysdic(hcl, car);
+			if (sdc)
 			{
-				if (nargs < sdv->slot[1] || nargs > sdv->slot[2])
+				hcl_oop_word_t sdv;
+				sdv = (hcl_oop_word_t)HCL_CONS_CDR(sdc);
+				if (HCL_IS_PRIM(hcl, sdv))
 				{
-					hcl_setsynerrbfmt (hcl, HCL_SYNERR_ARGCOUNT, HCL_NULL, HCL_NULL, 
-						"parameters count(%zd) mismatch in function call - %O - expecting %zu-%zu parameters", nargs, obj, sdv->slot[1], sdv->slot[2]); 
-					return -1;
+					if (nargs < sdv->slot[1] || nargs > sdv->slot[2])
+					{
+						hcl_setsynerrbfmt (hcl, HCL_SYNERR_ARGCOUNT, HCL_NULL, HCL_NULL, 
+							"parameters count(%zd) mismatch in function call - %O - expecting %zu-%zu parameters", nargs, obj, sdv->slot[1], sdv->slot[2]); 
+						return -1;
+					}
 				}
 			}
-		};
+		}
 
 		/* redundant cdr check is performed inside compile_object_list() */
 		PUSH_SUBCFRAME (hcl, COP_COMPILE_ARGUMENT_LIST, cdr);
@@ -1564,27 +1567,27 @@ static HCL_INLINE int compile_symbol (hcl_t* hcl, hcl_oop_t obj)
 	}
 
 	/* check if a symbol is a local variable */
-	if (find_temporary_variable_backward (hcl, obj, &index) <= -1)
+	if (find_temporary_variable_backward(hcl, obj, &index) <= -1)
 	{
 		hcl_oop_t cons;
 /* TODO: if i require all variables to be declared, this part is not needed and should handle it as an error */
 /* TODO: change the scheme... allow declaration??? */
 		/* global variable */
-		cons = (hcl_oop_t)hcl_getatsysdic (hcl, obj);
+		cons = (hcl_oop_t)hcl_getatsysdic(hcl, obj);
 		if (!cons) 
 		{
-			cons = (hcl_oop_t)hcl_putatsysdic (hcl, obj, hcl->_nil);
+			cons = (hcl_oop_t)hcl_putatsysdic(hcl, obj, hcl->_nil);
 			if (!cons) return -1;
 		}
 
 		if (add_literal(hcl, cons, &index) <= -1 ||
-		    emit_single_param_instruction (hcl, HCL_CODE_PUSH_OBJECT_0, index) <= -1) return -1;
+		    emit_single_param_instruction(hcl, HCL_CODE_PUSH_OBJECT_0, index) <= -1) return -1;
 
 		return 0;
 	}
 	else
 	{
-		return emit_indexed_variable_access (hcl, index, HCL_CODE_PUSH_CTXTEMPVAR_0, HCL_CODE_PUSH_TEMPVAR_0);
+		return emit_indexed_variable_access(hcl, index, HCL_CODE_PUSH_CTXTEMPVAR_0, HCL_CODE_PUSH_TEMPVAR_0);
 	}
 }
 

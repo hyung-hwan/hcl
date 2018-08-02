@@ -476,6 +476,13 @@ typedef enum hcl_obj_type_t hcl_obj_type_t;
 /* [NOTE] this macro doesn't include the size of the trailer */
 #define HCL_OBJ_BYTESOF(oop) ((HCL_OBJ_GET_SIZE(oop) + HCL_OBJ_GET_FLAGS_EXTRA(oop)) * HCL_OBJ_GET_FLAGS_UNIT(oop))
 
+#define HCL_OBJ_IS_OOP_POINTER(oop)      (HCL_OOP_IS_POINTER(oop) && (HCL_OBJ_GET_FLAGS_TYPE(oop) == HCL_OBJ_TYPE_OOP))
+#define HCL_OBJ_IS_CHAR_POINTER(oop)     (HCL_OOP_IS_POINTER(oop) && (HCL_OBJ_GET_FLAGS_TYPE(oop) == HCL_OBJ_TYPE_CHAR))
+#define HCL_OBJ_IS_BYTE_POINTER(oop)     (HCL_OOP_IS_POINTER(oop) && (HCL_OBJ_GET_FLAGS_TYPE(oop) == HCL_OBJ_TYPE_BYTE))
+#define HCL_OBJ_IS_HALFWORD_POINTER(oop) (HCL_OOP_IS_POINTER(oop) && (HCL_OBJ_GET_FLAGS_TYPE(oop) == HCL_OBJ_TYPE_HALFWORD))
+#define HCL_OBJ_IS_WORD_POINTER(oop)     (HCL_OOP_IS_POINTER(oop) && (HCL_OBJ_GET_FLAGS_TYPE(oop) == HCL_OBJ_TYPE_WORD))
+
+
 /* [NOTE] this macro doesn't check the range of the actual value.
  *        make sure that the value of each bit fields given falls within the 
  *        possible range of the defined bits */
