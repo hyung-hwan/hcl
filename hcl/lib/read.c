@@ -1983,7 +1983,7 @@ static int read_object (hcl_t* hcl)
 					return -1;
 				}
 #endif
-				obj = leave_list (hcl, &flagv, &oldflagv);
+				obj = leave_list(hcl, &flagv, &oldflagv);
 
 				level--;
 				if (LIST_FLAG_GET_CONCODE(oldflagv) == HCL_CONCODE_ARRAY) array_level--;
@@ -2158,7 +2158,7 @@ static int read_object (hcl_t* hcl)
 
 			/* exit out of the quoted list. the quoted list can have 
 			 * one element only. */
-			obj = leave_list (hcl, &flagv, &oldflagv);
+			obj = leave_list(hcl, &flagv, &oldflagv);
 
 			/* one level up toward the top */
 			level--;
@@ -2191,19 +2191,29 @@ static int read_object_in_cli_mode (hcl_t* hcl)
 {
 	int level = 0, array_level = 0, flagv = 0; 
 	hcl_oop_t obj;
+	int start_virtual_list = 1;
+	int prev_eoled = 0;
 
-	flagv = 0;
-	LIST_FLAG_SET_CONCODE (flagv, HCL_CONCODE_XLIST);
-
-	/* push some data to simulate recursion into 
-	 * a list literal or an array literal */
-	if (enter_list(hcl, flagv) == HCL_NULL) return -1;
-	level++;
-	//if (LIST_FLAG_GET_CONCODE(flagv) == HCL_CONCODE_ARRAY) array_level++;
+	if (TOKEN_TYPE(hcl) == HCL_IOTOK_LPAREN) start_virtual_list = 0;
 
 	while (1)
 	{
 	redo:
+		if (start_virtual_list)
+		{
+HCL_DEBUG0 (hcl, "STARTING vritual list...\n");
+			flagv = 0;
+			LIST_FLAG_SET_CONCODE (flagv, HCL_CONCODE_XLIST);
+
+			/* push some data to simulate recursion into 
+			 * a list literal or an array literal */
+			if (enter_list(hcl, flagv) == HCL_NULL) return -1;
+			level++;
+			//if (LIST_FLAG_GET_CONCODE(flagv) == HCL_CONCODE_ARRAY) array_level++;
+
+			start_virtual_list = 0;
+		}
+
 		switch (TOKEN_TYPE(hcl))
 		{
 			default:
@@ -2228,13 +2238,13 @@ static int read_object_in_cli_mode (hcl_t* hcl)
 
 			case HCL_IOTOK_LPAREN: /* () */
 			{
-				int first = 1;
+				/*int first = 1;
 
-			redo_lparen:
+			redo_lparen:*/
 				flagv = 0;
 				LIST_FLAG_SET_CONCODE (flagv, HCL_CONCODE_XLIST);
 				SET_TOKEN_TYPE (hcl, HCL_IOTOK_EOL); /* to have get_token() to ignore immediate <EOL> after ( */
-			start_list:
+			/*start_list:*/
 				if (level >= HCL_TYPE_MAX(int))
 				{
 					/* the nesting level has become too deep */
@@ -2244,18 +2254,21 @@ static int read_object_in_cli_mode (hcl_t* hcl)
 
 				/* push some data to simulate recursion into 
 				 * a list literal or an array literal */
+HCL_DEBUG0 (hcl, "111 STARTING list...\n");
 				if (enter_list(hcl, flagv) == HCL_NULL) return -1;
 				level++;
 				//if (LIST_FLAG_GET_CONCODE(flagv) == HCL_CONCODE_ARRAY) array_level++;
 
+/*
 				if (first) 
 				{
 					first = 0;
 					goto redo_lparen;
 				}
-
+*/
 				/* read the next token */
 				GET_TOKEN (hcl);
+				start_virtual_list = 1;
 				goto redo;
 			}
 
@@ -2271,20 +2284,42 @@ static int read_object_in_cli_mode (hcl_t* hcl)
 				}
 
 				//concode = LIST_FLAG_GET_CONCODE(flagv);
-				obj = leave_list (hcl, &flagv, &oldflagv);
+				obj = leave_list(hcl, &flagv, &oldflagv);
 
 				level--;
 				//if (LIST_FLAG_GET_CONCODE(oldflagv) == HCL_CONCODE_ARRAY) array_level--;
 
+				start_virtual_list = 1;
 				break;
 			}
 
 			case HCL_IOTOK_RPAREN:
 			{
-				int first = 1;
 				int oldflagv;
 				//int concode;
 
+				if (prev_eoled)
+				{
+					/* exit #1 */
+					if (level <= 0)
+					{
+						hcl_setsynerr (hcl, HCL_SYNERR_UNBALPBB, TOKEN_LOC(hcl), HCL_NULL); 
+						return -1;
+					}
+
+					//concode = LIST_FLAG_GET_CONCODE(flagv);
+					obj = leave_list(hcl, &flagv, &oldflagv);
+					level--;
+					//if (LIST_FLAG_GET_CONCODE(oldflagv) == HCL_CONCODE_ARRAY) array_level--;
+
+					if (!obj) return -1;
+					HCL_ASSERT (hcl, level > 0);
+	HCL_DEBUG1 (hcl, "00 ADDING TO LIST %O\n", obj);
+					if (chain_to_list(hcl, obj) == HCL_NULL) return -1;
+					clear_comma_colon_flag (hcl);
+				}
+
+				/* exit #2 */
 				if (level <= 0)
 				{
 				unbalpbb:
@@ -2292,19 +2327,14 @@ static int read_object_in_cli_mode (hcl_t* hcl)
 					return -1;
 				}
 
-			redo_rparen:
 				//concode = LIST_FLAG_GET_CONCODE(flagv);
-				obj = leave_list (hcl, &flagv, &oldflagv);
-
+				obj = leave_list(hcl, &flagv, &oldflagv);
 				level--;
+
+				level--; /* double exit??? */
 				//if (LIST_FLAG_GET_CONCODE(oldflagv) == HCL_CONCODE_ARRAY) array_level--;
 
-				if (first) 
-				{
-					first = 0;
-					goto redo_rparen;
-				}
-
+				SET_TOKEN_TYPE (hcl, HCL_IOTOK_EOL); /* to have get_token() to ignore immediate <EOL> after ( */
 				break;
 			}
 
@@ -2326,9 +2356,11 @@ static int read_object_in_cli_mode (hcl_t* hcl)
 
 		/* if not, append the element read into the current list.
 		 * if we are not at the top level, we must be in a list */
+HCL_DEBUG1 (hcl, "11 ADDING TO LIST %O\n", obj);
 		if (chain_to_list(hcl, obj) == HCL_NULL) return -1;
 		clear_comma_colon_flag (hcl);
 
+		prev_eoled = (TOKEN_TYPE(hcl) == HCL_IOTOK_EOL);
 		/* read the next token */
 		GET_TOKEN (hcl);
 	}

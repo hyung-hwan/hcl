@@ -1130,13 +1130,13 @@ static HCL_INLINE int exec_syscmd (hcl_t* hcl, hcl_ooi_t nargs)
 			if (argv)
 			{
 				argv[0] = cmd;
-				for (i = 0; i < nargs; i++)
+HCL_DEBUG1 (hcl, "NARG %d\n", (int)nargs);
+				for (i = 0; i < nargs;)
 				{
-					hcl_oop_t ta;
-
-					ta = HCL_STACK_GETARG(hcl, nargs, i);
+					hcl_oop_t ta = HCL_STACK_GETARG(hcl, nargs, i);
 /* TODO: check if an argument is a string or a symbol */
-					argv[i + 1] = hcl_dupootobchars (hcl, HCL_OBJ_GET_CHAR_SLOT(ta), HCL_OBJ_GET_SIZE(ta), HCL_NULL);
+					argv[++i] = hcl_dupootobchars(hcl, HCL_OBJ_GET_CHAR_SLOT(ta), HCL_OBJ_GET_SIZE(ta), HCL_NULL);
+HCL_DEBUG2 (hcl, "ARG %d -> %hs\n", (int)i - 1, argv[i]);
 				}
 				argv[nargs + 1] = HCL_NULL;
 				execvp (xcmd, argv);
