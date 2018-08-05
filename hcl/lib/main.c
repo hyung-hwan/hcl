@@ -350,7 +350,6 @@ static HCL_INLINE int read_input (hcl_t* hcl, hcl_ioinarg_t* arg)
 	return 0;
 }
 
-
 static int read_handler (hcl_t* hcl, hcl_iocmd_t cmd, void* arg)
 {
 	switch (cmd)
@@ -1888,7 +1887,11 @@ count++;
 			else if (hcl->errnum == HCL_ESYNERR)
 			{
 				print_synerr (hcl);
-				if (xtn->reader_istty && hcl_getsynerrnum(hcl) != HCL_SYNERR_EOF) continue;
+				if (xtn->reader_istty && hcl_getsynerrnum(hcl) != HCL_SYNERR_EOF) 
+				{
+					/* TODO: drain remaining data in the reader including the actual inputstream and buffered data in hcl */	
+					continue;
+				}
 			}
 			else
 			{
