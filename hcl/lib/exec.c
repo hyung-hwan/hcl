@@ -1015,9 +1015,9 @@ extern char **environ;
 
 static int is_regular_executable_file_by_me(const char *path)
 {
-	struct stat path_stat;
-	stat(path, &path_stat);
-	return S_ISREG(path_stat.st_mode) && access(path, X_OK) == 0; //? use eaccess instead??
+	struct stat st;
+	if (stat(path, &st) == -1) return 0;
+	return S_ISREG(st.st_mode) && access(path, X_OK) == 0; //? use eaccess instead??
 }
 
 static char* find_exec (hcl_t* hcl, const char *name)
@@ -1078,7 +1078,8 @@ done:
 static HCL_INLINE int exec_syscmd (hcl_t* hcl, hcl_ooi_t nargs)
 {
 	hcl_oop_word_t rcv;
-	hcl_bch_t* cmd, * xcmd;
+	hcl_bch_t* cmd = HCL_NULL;
+	hcl_bch_t* xcmd = HCL_NULL;
 
 	rcv = (hcl_oop_word_t)HCL_STACK_GETRCV(hcl, nargs);
 	/*HCL_ASSERT (hcl, HCL_IS_STRING(hcl, rcv) || HCL_IS_SYMBOL(hcl, rcv));*/
@@ -1088,18 +1089,18 @@ static HCL_INLINE int exec_syscmd (hcl_t* hcl, hcl_ooi_t nargs)
 	{
 		/* '\0' is contained in the middle */
 		hcl_seterrbfmt (hcl, HCL_EINVAL, "invalid callable %O", rcv);
-		return -1;
+		goto oops;
 	}
 
 	cmd = hcl_dupootobcstr(hcl, HCL_OBJ_GET_CHAR_SLOT(rcv), HCL_NULL);
-	if (!cmd) return -1;
+	if (!cmd) goto oops;
 
 	if (hcl_find_bchar_in_bcstr(cmd, '/'))
 	{
 		if (!is_regular_executable_file_by_me(cmd)) 
 		{
 			hcl_seterrbfmt (hcl, HCL_ECALL, "cannot execute %O", rcv);
-			return -1;
+			goto oops;
 		}
 
 		xcmd = cmd;
@@ -1107,7 +1108,7 @@ static HCL_INLINE int exec_syscmd (hcl_t* hcl, hcl_ooi_t nargs)
 	else
 	{
 		xcmd = find_exec(hcl, cmd);
-		if (!xcmd) return -1;
+		if (!xcmd) goto oops;
 	}
 
 { /* TODO: make it a callback ... */
@@ -1115,36 +1116,38 @@ static HCL_INLINE int exec_syscmd (hcl_t* hcl, hcl_ooi_t nargs)
 	int status;
 
 	pid = fork();
-	if (pid == -1) return -1;
+	if (pid == -1) goto oops;
 
 /* TODO: set a new process group / session leader??? */
 
 	if (pid == 0)
 	{
+		hcl_bch_t** argv;
+		hcl_ooi_t i;
 
-			hcl_bch_t** argv;
-			hcl_ooi_t i;
-
-			/* TODO: close file descriptors??? */
-			argv = (hcl_bch_t**)hcl_allocmem(hcl, (nargs + 2) * HCL_SIZEOF(*argv));
-			if (argv)
-			{
-				argv[0] = cmd;
+		/* TODO: close file descriptors??? */
+		argv = (hcl_bch_t**)hcl_allocmem(hcl, (nargs + 2) * HCL_SIZEOF(*argv));
+		if (argv)
+		{
+			argv[0] = cmd;
 HCL_DEBUG1 (hcl, "NARG %d\n", (int)nargs);
-				for (i = 0; i < nargs;)
-				{
-					hcl_oop_t ta = HCL_STACK_GETARG(hcl, nargs, i);
+			for (i = 0; i < nargs;)
+			{
+				hcl_oop_t ta = HCL_STACK_GETARG(hcl, nargs, i);
 /* TODO: check if an argument is a string or a symbol */
-					argv[++i] = hcl_dupootobchars(hcl, HCL_OBJ_GET_CHAR_SLOT(ta), HCL_OBJ_GET_SIZE(ta), HCL_NULL);
+				argv[++i] = hcl_dupootobchars(hcl, HCL_OBJ_GET_CHAR_SLOT(ta), HCL_OBJ_GET_SIZE(ta), HCL_NULL);
 HCL_DEBUG2 (hcl, "ARG %d -> %hs\n", (int)i - 1, argv[i]);
-				}
-				argv[nargs + 1] = HCL_NULL;
-				execvp (xcmd, argv);
 			}
-			_exit (255);
+			argv[nargs + 1] = HCL_NULL;
+			execvp (xcmd, argv);
+		}
+
+		if (cmd) hcl_freemem (hcl, cmd);
+		if (xcmd && xcmd != cmd) hcl_freemem (hcl, xcmd);
+		_exit (255);
 	}
 
-	waitpid (pid, &status, 0);
+	waitpid (pid, &status, 0); /* TOOD: enhance this waiting */
 
 	HCL_STACK_SETRET (hcl, nargs, HCL_SMOOI_TO_OOP(WEXITSTATUS(status)));
 }
@@ -1152,6 +1155,11 @@ HCL_DEBUG2 (hcl, "ARG %d -> %hs\n", (int)i - 1, argv[i]);
 	hcl_freemem (hcl, cmd);
 	if (xcmd != cmd) hcl_freemem (hcl, xcmd);
 	return 0;
+
+oops:
+	if (cmd) hcl_freemem (hcl, cmd);
+	if (xcmd && xcmd != cmd) hcl_freemem (hcl, xcmd);
+	return -1;
 }
 
 /* ------------------------------------------------------------------------- */
@@ -1738,6 +1746,8 @@ static int execute (hcl_t* hcl)
 						case HCL_BRAND_PRIM:
 							if (call_primitive(hcl, b1) <= -1) goto oops;
 							break;
+
+						case HCL_BRAND_SYMBOL:
 						case HCL_BRAND_STRING:
 							if ((hcl->option.trait & HCL_CLI_MODE) && exec_syscmd(hcl, b1) >= 0) break;
 							/* fall thru */

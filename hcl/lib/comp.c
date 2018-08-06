@@ -1566,28 +1566,58 @@ static HCL_INLINE int compile_symbol (hcl_t* hcl, hcl_oop_t obj)
 		return -1;
 	}
 
-	/* check if a symbol is a local variable */
-	if (find_temporary_variable_backward(hcl, obj, &index) <= -1)
+	if (hcl->option.trait & HCL_CLI_MODE)
 	{
-		hcl_oop_t cons;
-/* TODO: if i require all variables to be declared, this part is not needed and should handle it as an error */
-/* TODO: change the scheme... allow declaration??? */
-		/* global variable */
-		cons = (hcl_oop_t)hcl_getatsysdic(hcl, obj);
-		if (!cons) 
+		if (find_temporary_variable_backward(hcl, obj, &index) <= -1)
 		{
-			cons = (hcl_oop_t)hcl_putatsysdic(hcl, obj, hcl->_nil);
-			if (!cons) return -1;
+			hcl_oop_t cons;
+
+			cons = (hcl_oop_t)hcl_getatsysdic(hcl, obj);
+			if (cons) 
+			{
+				if (add_literal(hcl, cons, &index) <= -1 ||
+				    emit_single_param_instruction(hcl, HCL_CODE_PUSH_OBJECT_0, index) <= -1) return -1;
+			}
+			else
+			{
+				/* in the cli mode, a symbol is pushed as a normal literal if it is not resolved
+				 * at the moment of compilation */
+				if (add_literal(hcl, obj, &index) <= -1 ||
+				    emit_single_param_instruction(hcl, HCL_CODE_PUSH_LITERAL_0, index) <= -1) return -1;
+			}
+
+			return 0;
 		}
-
-		if (add_literal(hcl, cons, &index) <= -1 ||
-		    emit_single_param_instruction(hcl, HCL_CODE_PUSH_OBJECT_0, index) <= -1) return -1;
-
-		return 0;
+		else
+		{
+			return emit_indexed_variable_access(hcl, index, HCL_CODE_PUSH_CTXTEMPVAR_0, HCL_CODE_PUSH_TEMPVAR_0);
+		}
 	}
 	else
 	{
-		return emit_indexed_variable_access(hcl, index, HCL_CODE_PUSH_CTXTEMPVAR_0, HCL_CODE_PUSH_TEMPVAR_0);
+		/* check if a symbol is a local variable */
+		if (find_temporary_variable_backward(hcl, obj, &index) <= -1)
+		{
+			hcl_oop_t cons;
+	/* TODO: if i require all variables to be declared, this part is not needed and should handle it as an error */
+	/* TODO: change the scheme... allow declaration??? */
+			/* global variable */
+			cons = (hcl_oop_t)hcl_getatsysdic(hcl, obj);
+			if (!cons) 
+			{
+				cons = (hcl_oop_t)hcl_putatsysdic(hcl, obj, hcl->_nil);
+				if (!cons) return -1;
+			}
+
+			if (add_literal(hcl, cons, &index) <= -1 ||
+			    emit_single_param_instruction(hcl, HCL_CODE_PUSH_OBJECT_0, index) <= -1) return -1;
+
+			return 0;
+		}
+		else
+		{
+			return emit_indexed_variable_access(hcl, index, HCL_CODE_PUSH_CTXTEMPVAR_0, HCL_CODE_PUSH_TEMPVAR_0);
+		}
 	}
 }
 

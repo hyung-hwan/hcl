@@ -2405,8 +2405,12 @@ HCL_DEBUG0 (hcl, "22 LEAVING LIST\n");
 				break;
 
 			case HCL_IOTOK_STRLIT:
+				obj = hcl_makestring(hcl, TOKEN_NAME_PTR(hcl), TOKEN_NAME_LEN(hcl), 0);
+				break;
+
 			case HCL_IOTOK_IDENT:
 				obj = hcl_makestring(hcl, TOKEN_NAME_PTR(hcl), TOKEN_NAME_LEN(hcl), 0);
+				obj = hcl_makesymbol(hcl, TOKEN_NAME_PTR(hcl), TOKEN_NAME_LEN(hcl));
 				break;
 		}
 

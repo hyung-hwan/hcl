@@ -26,7 +26,7 @@
 
 #include "hcl-prv.h"
 
-#define SYMBOL_ONLY_KEY 
+#define SYMBOL_ONLY_KEY
 
 static hcl_oop_oop_t expand_bucket (hcl_t* hcl, hcl_oop_oop_t oldbuc)
 {
