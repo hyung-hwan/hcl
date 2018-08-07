@@ -1008,6 +1008,7 @@ static HCL_INLINE int call_primitive (hcl_t* hcl, hcl_ooi_t nargs)
 #include <string.h>
 #include <stdlib.h>
 #include <errno.h>
+#include <stdio.h>
 
 extern char **environ;
 

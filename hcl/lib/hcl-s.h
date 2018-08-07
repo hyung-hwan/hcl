@@ -199,7 +199,6 @@ HCL_EXPORT void hcl_server_freemem (
 );
 
 
-
 HCL_EXPORT int hcl_server_proto_feed_reply (
 	hcl_server_proto_t* proto,
 	const hcl_ooch_t*   ptr,

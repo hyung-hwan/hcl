@@ -1517,6 +1517,7 @@ static int compile_cons_xlist_expression (hcl_t* hcl, hcl_oop_t obj)
 
 		if (HCL_IS_CONS_CONCODED(hcl,obj,HCL_CONCODE_EXPLIST))
 		{
+			/* nothing to patch */
 		}
 		else
 		{
@@ -1526,6 +1527,11 @@ static int compile_cons_xlist_expression (hcl_t* hcl, hcl_oop_t obj)
 			cf->operand = HCL_SMOOI_TO_OOP(nargs);
 		}
 	}
+	/* TODO:??? else if (HCL_IS_CONS_CONCODED(hcl, car, HCL_CONCODE_EXPLIST))
+	{
+		HCL_ASSERT (hcl, hcl->option.trait & HCL_CLI_MODE);
+		SWITCH_TOP_CFRAME (hcl, COP_COMPILE_OBJECT, HCL_SMOOI_TO_OOP(0));
+	} */
 	else
 	{
 		hcl_setsynerrbfmt (hcl, HCL_SYNERR_CALLABLE, HCL_NULL, HCL_NULL, "invalid callable %O in function call - %O", car, obj); /* error location */
