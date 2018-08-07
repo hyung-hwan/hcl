@@ -2286,7 +2286,7 @@ HCL_DEBUG0 (hcl, "STARTING vritual list...\n");
 
 			case HCL_IOTOK_LPAREN: /* () */
 				flagv = 0;
-				LIST_FLAG_SET_CONCODE (flagv, HCL_CONCODE_XLIST);
+				LIST_FLAG_SET_CONCODE (flagv, HCL_CONCODE_EXPLIST);
 			/*start_list:*/
 				if (level >= HCL_TYPE_MAX(int))
 				{

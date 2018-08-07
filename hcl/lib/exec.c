@@ -1135,7 +1135,17 @@ HCL_DEBUG1 (hcl, "NARG %d\n", (int)nargs);
 			{
 				hcl_oop_t ta = HCL_STACK_GETARG(hcl, nargs, i);
 /* TODO: check if an argument is a string or a symbol */
-				argv[++i] = hcl_dupootobchars(hcl, HCL_OBJ_GET_CHAR_SLOT(ta), HCL_OBJ_GET_SIZE(ta), HCL_NULL);
+				if (HCL_OOP_IS_SMOOI(ta))
+				{
+/* TODO: rewrite this part */
+					hcl_bch_t tmp[64];
+					snprintf (tmp, sizeof(tmp), "%ld", (long int)HCL_OOP_TO_SMOOI(ta));
+					argv[++i] = hcl_dupbchars(hcl, tmp, strlen(tmp));
+				}
+				else
+				{
+					argv[++i] = hcl_dupootobchars(hcl, HCL_OBJ_GET_CHAR_SLOT(ta), HCL_OBJ_GET_SIZE(ta), HCL_NULL);
+				}
 HCL_DEBUG2 (hcl, "ARG %d -> %hs\n", (int)i - 1, argv[i]);
 			}
 			argv[nargs + 1] = HCL_NULL;

@@ -1421,10 +1421,12 @@ enum hcl_concode_t
 {
 	/* these can be set in the SYNCODE flags for cons cells */
 	HCL_CONCODE_XLIST = 0,  /* () - executable list */
-	HCL_CONCODE_ARRAY,      /* #() */
+	HCL_CONCODE_ARRAY,      /* [] */
 	HCL_CONCODE_BYTEARRAY,  /* #[] */
-	HCL_CONCODE_DIC,        /* #{} */
-	HCL_CONCODE_QLIST       /* [] - data list */
+	HCL_CONCODE_DIC,        /* {} */
+	HCL_CONCODE_QLIST,      /* #() - data list */
+
+	HCL_CONCODE_EXPLIST     /* expresssion list used in the cli mode */
 };
 typedef enum hcl_concode_t hcl_concode_t;
 
@@ -1436,7 +1438,7 @@ typedef enum hcl_concode_t hcl_concode_t;
 #define HCL_IS_CONTEXT(hcl,v) (HCL_OOP_IS_POINTER(v) && HCL_OBJ_GET_FLAGS_BRAND(v) == HCL_BRAND_CONTEXT)
 #define HCL_IS_PROCESS(hcl,v) (HCL_OOP_IS_POINTER(v) && HCL_OBJ_GET_FLAGS_BRAND(v) == HCL_BRAND_PROCESS)
 #define HCL_IS_CONS(hcl,v) (HCL_OOP_IS_POINTER(v) && HCL_OBJ_GET_FLAGS_BRAND(v) == HCL_BRAND_CONS)
-#define HCL_IS_CONS_XLIST(hcl,v) (HCL_IS_CONS(hcl,v) && HCL_OBJ_GET_FLAGS_SYNCODE(v) == HCL_CONCODE_XLIST)
+#define HCL_IS_CONS_CONCODED(hcl,v,concode) (HCL_IS_CONS(hcl,v) && HCL_OBJ_GET_FLAGS_SYNCODE(v) == (concode))
 #define HCL_IS_ARRAY(hcl,v) (HCL_OOP_IS_POINTER(v) && HCL_OBJ_GET_FLAGS_BRAND(v) == HCL_BRAND_ARRAY)
 #define HCL_IS_BYTEARRAY(hcl,v) (HCL_OOP_IS_POINTER(v) && HCL_OBJ_GET_FLAGS_BRAND(v) == HCL_BRAND_BYTE_ARRAY)
 #define HCL_IS_DIC(hcl,v) (HCL_OOP_IS_POINTER(v) && HCL_OBJ_GET_FLAGS_BRAND(v) == HCL_BRAND_DIC)
