@@ -26,7 +26,11 @@
 
 #include "hcl-prv.h"
 
-#define SYMBOL_ONLY_KEY
+/* The dictionary functions in this file are used for storing
+ * a dictionary object enclosed in {}. So putting a non-symbol
+ * key is allowed like { 1 2 3 4 } where 1 and 3 are keys.
+ * so SYMBOL_ONLY_KEY must not be defined */
+/*#define SYMBOL_ONLY_KEY*/
 
 static hcl_oop_oop_t expand_bucket (hcl_t* hcl, hcl_oop_oop_t oldbuc)
 {

@@ -161,9 +161,8 @@ static void vm_checkbc (hcl_t* hcl, hcl_oob_t bcode)
 static HCL_INLINE hcl_oop_t make_context (hcl_t* hcl, hcl_ooi_t ntmprs)
 {
 	HCL_ASSERT (hcl, ntmprs >= 0);
-	return hcl_allocoopobj (hcl, HCL_BRAND_CONTEXT, HCL_CONTEXT_NAMED_INSTVARS + (hcl_oow_t)ntmprs);
+	return hcl_allocoopobj(hcl, HCL_BRAND_CONTEXT, HCL_CONTEXT_NAMED_INSTVARS + (hcl_oow_t)ntmprs);
 }
-
 
 static HCL_INLINE int prepare_to_alloc_pid (hcl_t* hcl)
 {
@@ -927,7 +926,7 @@ static int __activate_context (hcl_t* hcl, hcl_oop_context_t rcv_blkctx, hcl_ooi
 
 	/* create a new block context to clone rcv_blkctx */
 	hcl_pushtmp (hcl, (hcl_oop_t*)&rcv_blkctx);
-	blkctx = (hcl_oop_context_t) make_context (hcl, local_ntmprs); 
+	blkctx = (hcl_oop_context_t) make_context(hcl, local_ntmprs); 
 	hcl_poptmp (hcl);
 	if (!blkctx) return -1;
 
@@ -1203,7 +1202,7 @@ static int start_initial_process_and_context (hcl_t* hcl, hcl_ooi_t initial_ip)
 	hcl_oop_process_t proc;
 
 	/* create a fake initial context. */
-	ctx = (hcl_oop_context_t)make_context (hcl, 0); /* no temporary variables */
+	ctx = (hcl_oop_context_t)make_context(hcl, 0); /* no temporary variables */
 	if (!ctx) return -1;
 
 	/* the initial context starts the life of the entire VM
@@ -1758,10 +1757,6 @@ static int execute (hcl_t* hcl)
 							if (call_primitive(hcl, b1) <= -1) goto oops;
 							break;
 
-						case HCL_BRAND_SYMBOL:
-						case HCL_BRAND_STRING:
-							if ((hcl->option.trait & HCL_CLI_MODE) && exec_syscmd(hcl, b1) >= 0) break;
-							/* fall thru */
 						default:
 							goto cannot_call;
 					}
@@ -2281,7 +2276,7 @@ static int execute (hcl_t* hcl)
 				 * clones a block context and activates the cloned context.
 				 * this base block context is created with no temporaries
 				 * for this reason */
-				blkctx = (hcl_oop_context_t)make_context (hcl, 0);
+				blkctx = (hcl_oop_context_t)make_context(hcl, 0);
 				if (!blkctx) goto oops;
 
 				/* the long forward jump instruction has the format of 
@@ -2338,7 +2333,7 @@ static int execute (hcl_t* hcl)
 				 * context and activates the cloned context.
 				 * this base block context is created with no 
 				 * stack for this reason. */
-				blkctx = (hcl_oop_context_t)make_context (hcl, 0);
+				blkctx = (hcl_oop_context_t)make_context(hcl, 0);
 				if (!blkctx) goto oops;
 
 				/* get the receiver to the block copy message after block context instantiation

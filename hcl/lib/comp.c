@@ -1365,8 +1365,7 @@ static int compile_cons_xlist_expression (hcl_t* hcl, hcl_oop_t obj)
 	 * if the name is another function call, i can't know if the 
 	 * function name will be valid at the compile time.
 	 */
-	HCL_ASSERT (hcl, HCL_IS_CONS_CONCODED(hcl, obj, HCL_CONCODE_XLIST) ||
-	                 HCL_IS_CONS_CONCODED(hcl, obj, HCL_CONCODE_EXPLIST));
+	HCL_ASSERT (hcl, HCL_IS_CONS_CONCODED(hcl, obj, HCL_CONCODE_XLIST));
 
 	car = HCL_CONS_CAR(obj);
 	if (HCL_IS_SYMBOL(hcl,car) && (syncode = HCL_OBJ_GET_FLAGS_SYNCODE(car)))
@@ -1437,8 +1436,7 @@ static int compile_cons_xlist_expression (hcl_t* hcl, hcl_oop_t obj)
 				return -1;
 		}
 	}
-	else if (HCL_IS_SYMBOL(hcl,car) || HCL_IS_CONS_CONCODED(hcl,car,HCL_CONCODE_XLIST) || 
-	         ((hcl->option.trait & HCL_CLI_MODE) && HCL_IS_STRING(hcl, car)))
+	else if (HCL_IS_SYMBOL(hcl,car) || HCL_IS_CONS_CONCODED(hcl,car,HCL_CONCODE_XLIST))
 	{
 		/* normal function call 
 		 *  (<operator> <operand1> ...) */
@@ -1457,14 +1455,7 @@ static int compile_cons_xlist_expression (hcl_t* hcl, hcl_oop_t obj)
 		oldtop = GET_TOP_CFRAME_INDEX(hcl); 
 		HCL_ASSERT (hcl, oldtop >= 0);
 
-		if (HCL_IS_CONS_CONCODED(hcl,obj,HCL_CONCODE_EXPLIST))
-		{
-			SWITCH_TOP_CFRAME (hcl, COP_DO_NOTHING, hcl->_nil);
-		}
-		else
-		{
-			SWITCH_TOP_CFRAME (hcl, COP_EMIT_CALL, HCL_SMOOI_TO_OOP(0));
-		}
+		SWITCH_TOP_CFRAME (hcl, COP_EMIT_CALL, HCL_SMOOI_TO_OOP(0));
 
 		/* compile <operator> */
 		PUSH_CFRAME (hcl, COP_COMPILE_OBJECT, car);
@@ -1515,23 +1506,11 @@ static int compile_cons_xlist_expression (hcl_t* hcl, hcl_oop_t obj)
 		/* redundant cdr check is performed inside compile_object_list() */
 		PUSH_SUBCFRAME (hcl, COP_COMPILE_ARGUMENT_LIST, cdr);
 
-		if (HCL_IS_CONS_CONCODED(hcl,obj,HCL_CONCODE_EXPLIST))
-		{
-			/* nothing to patch */
-		}
-		else
-		{
-			/* patch the argument count in the operand field of the COP_EMIT_CALL frame */
-			cf = GET_CFRAME(hcl, oldtop);
-			HCL_ASSERT (hcl, cf->opcode == COP_EMIT_CALL);
-			cf->operand = HCL_SMOOI_TO_OOP(nargs);
-		}
+		/* patch the argument count in the operand field of the COP_EMIT_CALL frame */
+		cf = GET_CFRAME(hcl, oldtop);
+		HCL_ASSERT (hcl, cf->opcode == COP_EMIT_CALL);
+		cf->operand = HCL_SMOOI_TO_OOP(nargs);
 	}
-	/* TODO:??? else if (HCL_IS_CONS_CONCODED(hcl, car, HCL_CONCODE_EXPLIST))
-	{
-		HCL_ASSERT (hcl, hcl->option.trait & HCL_CLI_MODE);
-		SWITCH_TOP_CFRAME (hcl, COP_COMPILE_OBJECT, HCL_SMOOI_TO_OOP(0));
-	} */
 	else
 	{
 		hcl_setsynerrbfmt (hcl, HCL_SYNERR_CALLABLE, HCL_NULL, HCL_NULL, "invalid callable %O in function call - %O", car, obj); /* error location */
@@ -1588,58 +1567,28 @@ static HCL_INLINE int compile_symbol (hcl_t* hcl, hcl_oop_t obj)
 		return -1;
 	}
 
-	if (hcl->option.trait & HCL_CLI_MODE)
+	/* check if a symbol is a local variable */
+	if (find_temporary_variable_backward(hcl, obj, &index) <= -1)
 	{
-		if (find_temporary_variable_backward(hcl, obj, &index) <= -1)
+		hcl_oop_t cons;
+/* TODO: if i require all variables to be declared, this part is not needed and should handle it as an error */
+/* TODO: change the scheme... allow declaration??? */
+		/* global variable */
+		cons = (hcl_oop_t)hcl_getatsysdic(hcl, obj);
+		if (!cons) 
 		{
-			hcl_oop_t cons;
-
-			cons = (hcl_oop_t)hcl_getatsysdic(hcl, obj);
-			if (cons) 
-			{
-				if (add_literal(hcl, cons, &index) <= -1 ||
-				    emit_single_param_instruction(hcl, HCL_CODE_PUSH_OBJECT_0, index) <= -1) return -1;
-			}
-			else
-			{
-				/* in the cli mode, a symbol is pushed as a normal literal if it is not resolved
-				 * at the moment of compilation */
-				if (add_literal(hcl, obj, &index) <= -1 ||
-				    emit_single_param_instruction(hcl, HCL_CODE_PUSH_LITERAL_0, index) <= -1) return -1;
-			}
-
-			return 0;
+			cons = (hcl_oop_t)hcl_putatsysdic(hcl, obj, hcl->_nil);
+			if (!cons) return -1;
 		}
-		else
-		{
-			return emit_indexed_variable_access(hcl, index, HCL_CODE_PUSH_CTXTEMPVAR_0, HCL_CODE_PUSH_TEMPVAR_0);
-		}
+
+		if (add_literal(hcl, cons, &index) <= -1 ||
+		    emit_single_param_instruction(hcl, HCL_CODE_PUSH_OBJECT_0, index) <= -1) return -1;
+
+		return 0;
 	}
 	else
 	{
-		/* check if a symbol is a local variable */
-		if (find_temporary_variable_backward(hcl, obj, &index) <= -1)
-		{
-			hcl_oop_t cons;
-	/* TODO: if i require all variables to be declared, this part is not needed and should handle it as an error */
-	/* TODO: change the scheme... allow declaration??? */
-			/* global variable */
-			cons = (hcl_oop_t)hcl_getatsysdic(hcl, obj);
-			if (!cons) 
-			{
-				cons = (hcl_oop_t)hcl_putatsysdic(hcl, obj, hcl->_nil);
-				if (!cons) return -1;
-			}
-
-			if (add_literal(hcl, cons, &index) <= -1 ||
-			    emit_single_param_instruction(hcl, HCL_CODE_PUSH_OBJECT_0, index) <= -1) return -1;
-
-			return 0;
-		}
-		else
-		{
-			return emit_indexed_variable_access(hcl, index, HCL_CODE_PUSH_CTXTEMPVAR_0, HCL_CODE_PUSH_TEMPVAR_0);
-		}
+		return emit_indexed_variable_access(hcl, index, HCL_CODE_PUSH_CTXTEMPVAR_0, HCL_CODE_PUSH_TEMPVAR_0);
 	}
 }
 
@@ -1684,10 +1633,6 @@ static int compile_object (hcl_t* hcl)
 
 				case HCL_CONCODE_DIC:
 					if (compile_cons_dic_expression(hcl, cf->operand) <= -1) return -1;
-					break;
-
-				case HCL_CONCODE_EXPLIST:
-					if (compile_cons_xlist_expression (hcl, cf->operand) <= -1) return -1;
 					break;
 
 				/* TODO: QLIST? */

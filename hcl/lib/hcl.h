@@ -187,9 +187,6 @@ enum hcl_trait_t
 	HCL_DEBUG_BIGINT = (1u << 1),
 #endif
 
-	/* command line mode */
-	HCL_CLI_MODE = (1u << 7),
-
 	/* perform no garbage collection when the heap is full. 
 	 * you still can use hcl_gc() explicitly. */
 	HCL_NOGC = (1u << 8),
@@ -1424,9 +1421,7 @@ enum hcl_concode_t
 	HCL_CONCODE_ARRAY,      /* [] */
 	HCL_CONCODE_BYTEARRAY,  /* #[] */
 	HCL_CONCODE_DIC,        /* {} */
-	HCL_CONCODE_QLIST,      /* #() - data list */
-
-	HCL_CONCODE_EXPLIST     /* expresssion list used in the cli mode */
+	HCL_CONCODE_QLIST       /* #() - data list */
 };
 typedef enum hcl_concode_t hcl_concode_t;
 

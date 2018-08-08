@@ -1673,7 +1673,6 @@ int main (int argc, char* argv[])
 		{ ":log",         'l' },
 		{ ":memsize",     'm' },
 		{ "large-pages",  '\0' },
-		{ "cli-mode",     '\0' },
 #if defined(HCL_BUILD_DEBUG)
 		{ ":debug",       '\0' }, /* NOTE: there is no short option for --debug */
 #endif
@@ -1688,7 +1687,6 @@ int main (int argc, char* argv[])
 	const char* logopt = HCL_NULL;
 	hcl_oow_t memsize = MIN_MEMSIZE;
 	int large_pages = 0;
-	int cli_mode = 0;
 
 #if defined(HCL_BUILD_DEBUG)
 	const char* dbgopt = HCL_NULL;
@@ -1721,11 +1719,6 @@ int main (int argc, char* argv[])
 				if (hcl_comp_bcstr(opt.lngopt, "large-pages") == 0)
 				{
 					large_pages = 1;
-					break;
-				}
-				else if (hcl_comp_bcstr(opt.lngopt, "cli-mode") == 0)
-				{
-					cli_mode = 1;
 					break;
 				}
 			#if defined(HCL_BUILD_DEBUG)
@@ -1794,8 +1787,6 @@ int main (int argc, char* argv[])
 
 		/*trait |= HCL_NOGC;*/
 		trait |= HCL_AWAIT_PROCS;
-
-		if (cli_mode) trait |= HCL_CLI_MODE;
 		hcl_setoption (hcl, HCL_TRAIT, &trait);
 
 		/* disable GC logs */

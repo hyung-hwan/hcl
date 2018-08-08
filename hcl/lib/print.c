@@ -206,10 +206,9 @@ static HCL_INLINE int outfmt_obj (hcl_t* hcl, hcl_bitmask_t mask, hcl_oop_t obj,
 	{
 		{ "(",   "(" },  /*HCL_CONCODE_XLIST */
 		{ "[",   "[" },  /*HCL_CONCODE_ARRAY */
-		{ "#[",  "[" },  /*HCL_CONCODE_BYTEARRAY */
+		{ "#[",  "[" },  /*HCL_CONCODE_BYTEARRAY */ 
 		{ "{",   "{" },  /*HCL_CONCODE_DIC */
-		{ "#(",  "[" },  /*HCL_CONCODE_QLIST */
-		{ "@(",  "@(" }   /*HCL_CONCODE_EXPLIST */
+		{ "#(",  "[" }   /*HCL_CONCODE_QLIST */
 	};
 
 	static const hcl_bch_t *closing_parens[][2] =
@@ -219,7 +218,6 @@ static HCL_INLINE int outfmt_obj (hcl_t* hcl, hcl_bitmask_t mask, hcl_oop_t obj,
 		{ "]",  "]" },   /*HCL_CONCODE_BYTEARRAY */
 		{ "}",  "}" },   /*HCL_CONCODE_DIC */
 		{ ")",  "]" },   /*HCL_CONCODE_QLIST */
-		{ ")",  ")" }    /*HCL_CONCODE_EXPLIST */
 	};
 
 	static const hcl_bch_t* breakers[][2] = 
