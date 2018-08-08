@@ -651,8 +651,7 @@ enum
 	COP_POST_WHILE_BODY,
 	COP_POST_WHILE_COND,
 
-	COP_UPDATE_BREAK,
-	COP_DO_NOTHING
+	COP_UPDATE_BREAK
 };
 
 /* ========================================================================= */
@@ -2708,11 +2707,6 @@ int hcl_compile (hcl_t* hcl, hcl_oop_t obj)
 
 			case COP_UPDATE_BREAK:
 				if (update_break(hcl) <= -1) goto oops;
-				break;
-
-			case COP_DO_NOTHING:
-				/* do nothing but popping the current cframe */
-				POP_CFRAME (hcl); 
 				break;
 
 			default:
