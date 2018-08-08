@@ -1485,6 +1485,8 @@ static int compile_cons_xlist_expression (hcl_t* hcl, hcl_oop_t obj)
 
 		if (HCL_IS_SYMBOL(hcl, car))
 		{
+			/* only symbols are added to the system dictionary. 
+			 * perform this lookup only if car is a symbol */
 			sdc = hcl_getatsysdic(hcl, car);
 			if (sdc)
 			{
