@@ -232,7 +232,7 @@ AC_TRY_RUN(
 		char buf[100];
 		time_t t = 0;
 		strftime (buf, sizeof(buf), "%z", gmtime(&t));
-		return strcmp(buf, "%z") == 0? 1: 0;
+		return (strcmp(buf, "%z") == 0 || strcmp(buf, "z") == 0)? 1: 0;
 	}],
 	[
 	 	AC_MSG_RESULT(yes)
