@@ -230,12 +230,18 @@ static void log_write (hcl_server_t* server, hcl_oow_t wid, hcl_bitmask_t mask, 
 
 		now = time(NULL);
 
-		tmp = localtime_r (&now, &tm);
-		#if defined(HAVE_STRFTIME_SMALL_Z)
+	#if defined(__OS2__)
+		tmp = _localtime(&now, &tm);
+	#elif defined(HAVE_LOCALTIME_R)
+		tmp = localtime_r(&now, &tm);
+	#else
+		tmp = localtime(&now);
+	#endif
+	#if defined(HAVE_STRFTIME_SMALL_Z)
 		tslen = strftime(ts, sizeof(ts), "%Y-%m-%d %H:%M:%S %z ", tmp);
-		#else
+	#else
 		tslen = strftime(ts, sizeof(ts), "%Y-%m-%d %H:%M:%S %Z ", tmp); 
-		#endif
+	#endif
 		if (tslen == 0) 
 		{
 			strcpy (ts, "0000-00-00 00:00:00 +0000");

@@ -144,6 +144,7 @@ AC_CHECK_FUNCS([gettimeofday settimeofday clock_gettime clock_settime getitimer 
 AC_CHECK_FUNCS([backtrace backtrace_symbols])
 AC_CHECK_FUNCS([makecontext swapcontext getcontext setcontext])
 AC_CHECK_FUNCS([clock_nanosleep nanosleep usleep])
+AC_CHECK_FUNCS([localtime_r gmtime_r])
 AC_CHECK_FUNCS([snprintf _vsnprintf _vsnwprintf])
 AC_CHECK_FUNCS([isatty mmap munmap readv writev])
 

@@ -698,7 +698,13 @@ static void log_write (hcl_t* hcl, hcl_bitmask_t mask, const hcl_ooch_t* msg, hc
 			tslen = 20; 
 		}
 	#else
-		tmp = localtime_r (&now, &tm);
+		#if defined(__OS2__)
+		tmp = _localtime(&now, &tm);
+		#elif defined(HAVE_LOCALTIME_R)
+		tmp = localtime_r(&now, &tm);
+		#else
+		tmp = localtime(&now);
+		#endif
 		#if defined(HAVE_STRFTIME_SMALL_Z)
 		tslen = strftime(ts, sizeof(ts), "%Y-%m-%d %H:%M:%S %z ", tmp);
 		#else
@@ -1662,8 +1668,10 @@ static void cancel_tick (void)
 typedef void(*signal_handler_t)(int);
 #elif defined(macintosh)
 typedef void(*signal_handler_t)(int); /* TODO: */
-#else
+#elif defined(SA_SIGINFO)
 typedef void(*signal_handler_t)(int, siginfo_t*, void*);
+#else
+typedef void(*signal_handler_t)(int);
 #endif
 
 
@@ -1674,8 +1682,13 @@ static void handle_sigint (int sig)
 }
 #elif defined(macintosh)
 /* TODO */
-#else
+#elif defined(SA_SIGINFO)
 static void handle_sigint (int sig, siginfo_t* siginfo, void* ctx)
+{
+	if (g_hcl) hcl_abort (g_hcl);
+}
+#else
+static void handle_sigint (int sig)
 {
 	if (g_hcl) hcl_abort (g_hcl);
 }
@@ -1692,8 +1705,12 @@ static void set_signal (int sig, signal_handler_t handler)
 
 	memset (&sa, 0, sizeof(sa));
 	/*sa.sa_handler = handler;*/
+#if defined(SA_SIGINFO)
 	sa.sa_flags = SA_SIGINFO;
 	sa.sa_sigaction = handler;
+#else
+	sa.sa_handler = handler;
+#endif
 	sigemptyset (&sa.sa_mask);
 
 	sigaction (sig, &sa, NULL);
