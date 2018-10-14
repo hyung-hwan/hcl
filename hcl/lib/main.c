@@ -74,7 +74,7 @@
 #		define sys_dl_close(x) dlclose(x)
 #		define sys_dl_getsym(x,n) dlsym(x,n)
 #	elif defined(__APPLE__) || defined(__MACOSX__)
-#		define USE_MACH_O
+#		define USE_MACH_O_DYLD
 #		include <mach-o/dyld.h>
 #		define sys_dl_error() mach_dlerror()
 #		define sys_dl_open(x) mach_dlopen(x)
@@ -131,7 +131,7 @@
 #	else
 #		if defined(USE_DLFCN)
 #			define HCL_DEFAULT_PFMODPOSTFIX ".so"
-#		elif defined(USE_MACH_O)
+#		elif defined(USE_MACH_O_DYLD)
 #			define HCL_DEFAULT_PFMODPOSTFIX ".dylib"
 #		else
 #			define HCL_DEFAULT_PFMODPOSTFIX ""
@@ -784,7 +784,7 @@ static void syserrstrb (hcl_t* hcl, int syserr, hcl_bch_t* buf, hcl_oow_t len)
 }
 
 /* ========================================================================= */
-#if defined(USE_MACH_O)
+#if defined(USE_MACH_O_DYLD)
 static const char* mach_dlerror_str = "";
 
 static void* mach_dlopen (const char* path)
@@ -853,7 +853,7 @@ static const char* mach_dlerror (void)
 
 static void* dl_open (hcl_t* hcl, const hcl_ooch_t* name, int flags)
 {
-#if defined(USE_LTDL) || defined(USE_DLFCN) || defined(USE_MACH_O)
+#if defined(USE_LTDL) || defined(USE_DLFCN) || defined(USE_MACH_O_DYLD)
 	hcl_bch_t stabuf[128], * bufptr;
 	hcl_oow_t ucslen, bcslen, bufcapa;
 	void* handle;
@@ -1002,7 +1002,7 @@ static void* dl_open (hcl_t* hcl, const hcl_ooch_t* name, int flags)
 
 static void dl_close (hcl_t* hcl, void* handle)
 {
-#if defined(USE_LTDL) || defined(USE_DLFCN) || defined(USE_MACH_O)
+#if defined(USE_LTDL) || defined(USE_DLFCN) || defined(USE_MACH_O_DYLD)
 	HCL_DEBUG1 (hcl, "Closed DL handle %p\n", handle);
 	sys_dl_close (handle);
 
@@ -1014,7 +1014,7 @@ static void dl_close (hcl_t* hcl, void* handle)
 
 static void* dl_getsym (hcl_t* hcl, void* handle, const hcl_ooch_t* name)
 {
-#if defined(USE_LTDL) || defined(USE_DLFCN) || defined(USE_MACH_O)
+#if defined(USE_LTDL) || defined(USE_DLFCN) || defined(USE_MACH_O_DYLD)
 	hcl_bch_t stabuf[64], * bufptr;
 	hcl_oow_t bufcapa, ucslen, bcslen, i;
 	const hcl_bch_t* symname;
