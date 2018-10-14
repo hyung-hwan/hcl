@@ -72,6 +72,14 @@
 #		define sys_dl_openext(x) dlopen(x,RTLD_NOW)
 #		define sys_dl_close(x) dlclose(x)
 #		define sys_dl_getsym(x,n) dlsym(x,n)
+#	elif defined(__APPLE__) || defined(__MACOSX__)
+#		define USE_MACH_O
+#		include <mach-o/dyld.h>
+#		define sys_dl_error() mach_dlerror()
+#		define sys_dl_open(x) mach_dlopen(x)
+#		define sys_dl_openext(x) mach_dlopen(x)
+#		define sys_dl_close(x) mach_dlclose(x)
+#		define sys_dl_getsym(x,n) mach_dlsym(x,n)
 #	else
 #		error UNSUPPORTED DYNAMIC LINKER
 #	endif
@@ -104,6 +112,10 @@
 #	include <poll.h>
 #endif
 
+#if !defined(HCL_DEFAULT_PFMODDIR)
+#	define HCL_DEFAULT_PFMODDIR ""
+#endif
+
 #if !defined(HCL_DEFAULT_PFMODPREFIX)
 #	if defined(_WIN32)
 #		define HCL_DEFAULT_PFMODPREFIX "hcl-"
@@ -126,6 +138,8 @@
 #	else
 #		if defined(USE_DLFCN)
 #			define HCL_DEFAULT_PFMODPOSTFIX ".so"
+#		elif defined(USE_MACH_O)
+#			define HCL_DEFAULT_PFMODPOSTFIX ".dylib"
 #		else
 #			define HCL_DEFAULT_PFMODPOSTFIX ""
 #		endif
@@ -359,6 +373,9 @@ struct hcl_server_t
 #	define IS_PATH_SEP(c) ((c) == '/')
 #	define PATH_SEP_CHAR ('/')
 #endif
+
+/* TODO: handle path with a drive letter or in the UNC notation */
+#define IS_PATH_ABSOLUTE(x) IS_PATH_SEP(x[0])
 
 
 static const hcl_bch_t* get_base_name (const hcl_bch_t* path)
@@ -732,10 +749,76 @@ static void syserrstrb (hcl_t* hcl, int syserr, hcl_bch_t* buf, hcl_oow_t len)
 }
 
 /* ========================================================================= */
+#if defined(USE_MACH_O)
+static const char* mach_dlerror_str = "";
+
+static void* mach_dlopen (const char* path)
+{
+	NSObjectFileImage image;
+	NSObjectFileImageReturnCode rc;
+	void* handle;
+
+	mach_dlerror_str = "";
+	if ((rc = NSCreateObjectFileImageFromFile(path, &image)) != NSObjectFileImageSuccess) 
+	{
+		switch (rc)
+		{
+			case NSObjectFileImageFailure:
+			case NSObjectFileImageFormat:
+				mach_dlerror_str = "unable to crate object file image";
+				break;
+
+			case NSObjectFileImageInappropriateFile:
+				mach_dlerror_str = "inappropriate file";
+				break;
+
+			case NSObjectFileImageArch:
+				mach_dlerror_str = "incompatible architecture";
+				break;
+
+			case NSObjectFileImageAccess:
+				mach_dlerror_str = "inaccessible file";
+				break;
+				
+			default:
+				mach_dlerror_str = "unknown error";
+				break;
+		}
+		return HCL_NULL;
+	}
+	handle = (void*)NSLinkModule(image, path, NSLINKMODULE_OPTION_PRIVATE | NSLINKMODULE_OPTION_RETURN_ON_ERROR);
+	NSDestroyObjectFileImage (image);
+	return handle;
+}
+
+static HCL_INLINE void mach_dlclose (void* handle)
+{
+	mach_dlerror_str = "";
+	NSUnLinkModule (handle, NSUNLINKMODULE_OPTION_NONE);
+}
+
+static HCL_INLINE void* mach_dlsym (void* handle, const char* name)
+{
+	mach_dlerror_str = "";
+	return (void*)NSAddressOfSymbol(NSLookupSymbolInModule(handle, name));
+}
+
+static const char* mach_dlerror (void)
+{
+	int err_no;
+	const char* err_file;
+	NSLinkEditErrors err;
+
+	if (mach_dlerror_str[0] == '\0')
+		NSLinkEditError (&err, &err_no, &err_file, &mach_dlerror_str);
+
+	return mach_dlerror_str;
+}
+#endif
 
 static void* dl_open (hcl_t* hcl, const hcl_ooch_t* name, int flags)
 {
-#if defined(USE_LTDL) || defined(USE_DLFCN)
+#if defined(USE_LTDL) || defined(USE_DLFCN) || defined(USE_MACH_O)
 	hcl_bch_t stabuf[128], * bufptr;
 	hcl_oow_t ucslen, bcslen, bufcapa;
 	void* handle;
@@ -748,7 +831,7 @@ static void* dl_open (hcl_t* hcl, const hcl_ooch_t* name, int flags)
 	#else
 	bufcapa = hcl_count_bcstr(name);
 	#endif
-	bufcapa += HCL_COUNTOF(HCL_DEFAULT_PFMODPREFIX) + HCL_COUNTOF(HCL_DEFAULT_PFMODPOSTFIX) + 1; 
+	bufcapa += HCL_COUNTOF(HCL_DEFAULT_PFMODDIR) + HCL_COUNTOF(HCL_DEFAULT_PFMODPREFIX) + HCL_COUNTOF(HCL_DEFAULT_PFMODPOSTFIX) + 1; 
 
 	if (bufcapa <= HCL_COUNTOF(stabuf)) bufptr = stabuf;
 	else
@@ -759,10 +842,14 @@ static void* dl_open (hcl_t* hcl, const hcl_ooch_t* name, int flags)
 
 	if (flags & HCL_VMPRIM_DLOPEN_PFMOD)
 	{
-		hcl_oow_t len, i, xlen;
+		hcl_oow_t len, i, xlen, dlen;
 
-		/* opening a primitive function module - mostly libhcl-xxxx */
+		/* opening a primitive function module - mostly libhcl-xxxx.
+		 * if PFMODPREFIX is absolute, never use PFMODDIR */
+		dlen = IS_PATH_ABSOLUTE(HCL_DEFAULT_PFMODPREFIX)? 
+			0: hcl_copy_bcstr(bufptr, bufcapa, HCL_DEFAULT_PFMODDIR);
 		len = hcl_copy_bcstr(bufptr, bufcapa, HCL_DEFAULT_PFMODPREFIX);
+		len += dlen;
 
 		bcslen = bufcapa - len;
 	#if defined(HCL_OOCH_IS_UCH)
@@ -771,7 +858,7 @@ static void* dl_open (hcl_t* hcl, const hcl_ooch_t* name, int flags)
 		bcslen = hcl_copy_bcstr(&bufptr[len], bcslen, name);
 	#endif
 
-		/* length including the prefix and the name. but excluding the postfix */
+		/* length including the directory, the prefix and the name. but excluding the postfix */
 		xlen  = len + bcslen; 
 
 		for (i = len; i < xlen; i++) 
@@ -787,7 +874,14 @@ static void* dl_open (hcl_t* hcl, const hcl_ooch_t* name, int flags)
 		handle = sys_dl_openext(bufptr);
 		if (!handle) 
 		{
-			HCL_DEBUG3 (hcl, "Failed to open(ext) DL %hs[%js] - %hs\n", bufptr, name, sys_dl_error());
+			HCL_DEBUG3 (hcl, "Unable to open(ext) PFMOD %hs[%js] - %hs\n", &bufptr[dlen], name, sys_dl_error());
+
+			if (dlen > 0)
+			{
+				handle = sys_dl_openext(&bufptr[0]);
+				if (handle) goto pfmod_open_ok;
+				HCL_DEBUG3 (hcl, "Unable to open(ext) PFMOD %hs[%js] - %hs\n", &bufptr[0], name, sys_dl_error());
+			}
 
 			/* try without prefix and postfix */
 			bufptr[xlen] = '\0';
@@ -797,8 +891,8 @@ static void* dl_open (hcl_t* hcl, const hcl_ooch_t* name, int flags)
 				hcl_bch_t* dash;
 				const hcl_bch_t* dl_errstr;
 				dl_errstr = sys_dl_error();
-				HCL_DEBUG3 (hcl, "Failed to open(ext) DL %hs[%js] - %hs\n", &bufptr[len], name, dl_errstr);
-				hcl_seterrbfmt (hcl, HCL_ESYSERR, "unable to open(ext) DL %js - %hs", name, dl_errstr);
+				HCL_DEBUG3 (hcl, "Unable to open(ext) PFMOD %hs[%js] - %hs\n", &bufptr[len], name, dl_errstr);
+				hcl_seterrbfmt (hcl, HCL_ESYSERR, "unable to open(ext) PFMOD %js - %hs", name, dl_errstr);
 
 				dash = hcl_rfind_bchar(bufptr, hcl_count_bcstr(bufptr), '-');
 				if (dash) 
@@ -813,12 +907,13 @@ static void* dl_open (hcl_t* hcl, const hcl_ooch_t* name, int flags)
 			}
 			else 
 			{
-				HCL_DEBUG3 (hcl, "Opened(ext) DL %hs[%js] handle %p\n", &bufptr[len], name, handle);
+				HCL_DEBUG3 (hcl, "Opened(ext) PFMOD %hs[%js] handle %p\n", &bufptr[len], name, handle);
 			}
 		}
 		else
 		{
-			HCL_DEBUG3 (hcl, "Opened(ext) DL %hs[%js] handle %p\n", bufptr, name, handle);
+		pfmod_open_ok:
+			HCL_DEBUG3 (hcl, "Opened(ext) PFMOD %hs[%js] handle %p\n", &bufptr[dlen], name, handle);
 		}
 	}
 	else
@@ -838,7 +933,7 @@ static void* dl_open (hcl_t* hcl, const hcl_ooch_t* name, int flags)
 			{
 				const hcl_bch_t* dl_errstr;
 				dl_errstr = sys_dl_error();
-				HCL_DEBUG2 (hcl, "Failed to open DL %hs - %hs\n", bufptr, dl_errstr);
+				HCL_DEBUG2 (hcl, "Unable to open DL %hs - %hs\n", bufptr, dl_errstr);
 				hcl_seterrbfmt (hcl, HCL_ESYSERR, "unable to open DL %js - %hs", name, dl_errstr);
 			}
 			else HCL_DEBUG2 (hcl, "Opened DL %hs handle %p\n", bufptr, handle);
@@ -850,7 +945,7 @@ static void* dl_open (hcl_t* hcl, const hcl_ooch_t* name, int flags)
 			{
 				const hcl_bch_t* dl_errstr;
 				dl_errstr = sys_dl_error();
-				HCL_DEBUG2 (hcl, "Failed to open(ext) DL %hs - %s\n", bufptr, dl_errstr);
+				HCL_DEBUG2 (hcl, "Unable to open(ext) DL %hs - %s\n", bufptr, dl_errstr);
 				hcl_seterrbfmt (hcl, HCL_ESYSERR, "unable to open(ext) DL %js - %hs", name, dl_errstr);
 			}
 			else HCL_DEBUG2 (hcl, "Opened(ext) DL %hs handle %p\n", bufptr, handle);
@@ -872,7 +967,7 @@ static void* dl_open (hcl_t* hcl, const hcl_ooch_t* name, int flags)
 
 static void dl_close (hcl_t* hcl, void* handle)
 {
-#if defined(USE_LTDL) || defined(USE_DLFCN)
+#if defined(USE_LTDL) || defined(USE_DLFCN) || defined(USE_MACH_O)
 	HCL_DEBUG1 (hcl, "Closed DL handle %p\n", handle);
 	sys_dl_close (handle);
 
@@ -884,7 +979,7 @@ static void dl_close (hcl_t* hcl, void* handle)
 
 static void* dl_getsym (hcl_t* hcl, void* handle, const hcl_ooch_t* name)
 {
-#if defined(USE_LTDL) || defined(USE_DLFCN)
+#if defined(USE_LTDL) || defined(USE_DLFCN) || defined(USE_MACH_O)
 	hcl_bch_t stabuf[64], * bufptr;
 	hcl_oow_t bufcapa, ucslen, bcslen, i;
 	const hcl_bch_t* symname;

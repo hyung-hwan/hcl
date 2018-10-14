@@ -32,6 +32,19 @@ if ENABLE_LIBUNWIND
 LIBADD_LIB_COMMON += $(UNWIND_LIBS)
 endif
 
+if WIN32
+# you must adjust the value of DEFAULT_MODPOSTFIX according 
+# to the first number in -version-info above
+CPPFLAGS_PFMOD = -DHCL_DEFAULT_PFMODPREFIX=\"libmoo-\" -DHCL_DEFAULT_PFMODPOSTFIX=\"-1.dll\"
+else
+CPPFLAGS_PFMOD = -DHCL_DEFAULT_PFMODPREFIX=\"$(libdir)/libmoo-\" 
+if MACOSX
+CPPFLAGS_PFMOD += -DHCL_DEFAULT_PFMODPOSTFIX=\".dylib\"
+else
+CPPFLAGS_PFMOD += -DHCL_DEFAULT_PFMODPOSTFIX=\".so\"
+endif
+endif
+
 pkgincludedir = $(includedir)
 pkglibdir = $(libdir)
 
@@ -89,8 +102,8 @@ endif
 
 bin_PROGRAMS = hcl
 hcl_SOURCES = main.c 
-hcl_CPPFLAGS = $(CPPFLAGS_LIB_COMMON)
-hcl_LDFLAGS = $(LDFLAGS_LIB_COMMON)
+hcl_CPPFLAGS = $(CPPFLAGS_ALL_COMMON) $(CPPFLAGS_PFMOD)
+hcl_LDFLAGS = $(LDFLAGS_ALL_COMMON)
 hcl_LDADD = $(LIBADD_LIB_COMMON) -lhcl
 hcl_DEPENDENCIES = libhcl.la
 
@@ -103,29 +116,29 @@ libhclex_la_SOURCES = \
 	json.c hcl-json.h \
 	hcl-s.c hcl-s.h \
 	hcl-c.c hcl-c.h
-libhclex_la_CPPFLAGS = $(CPPFLAGS_LIB_COMMON)
+libhclex_la_CPPFLAGS = $(CPPFLAGS_LIB_COMMON) $(CPPFLAGS_PFMOD)
 libhclex_la_LDFLAGS = $(LDFLAGS_LIB_COMMON)
 libhclex_la_LIBADD = $(LIBADD_LIB_COMMON) $(PTHREAD_LIBS) -lhcl
 libhclex_la_DEPENDENCIES = libhcl.la
 
 bin_PROGRAMS += hcls
 hcls_SOURCES = main-s.c
-hcls_CPPFLAGS = $(CPPFLAGS_LIB_COMMON)
-hcls_LDFLAGS = $(LDFLAGS_LIB_COMMON)
+hcls_CPPFLAGS = $(CPPFLAGS_ALL_COMMON)
+hcls_LDFLAGS = $(LDFLAGS_ALL_COMMON)
 hcls_LDADD = $(LIBADD_LIB_COMMON) $(PTHREAD_LIBS) -lhcl -lhclex
 hcls_DEPENDENCIES = libhclex.la
 
 bin_PROGRAMS += hclc
 hclc_SOURCES = main-c.c
-hclc_CPPFLAGS = $(CPPFLAGS_LIB_COMMON)
-hclc_LDFLAGS = $(LDFLAGS_LIB_COMMON)
+hclc_CPPFLAGS = $(CPPFLAGS_ALL_COMMON)
+hclc_LDFLAGS = $(LDFLAGS_ALL_COMMON)
 hclc_LDADD = $(LIBADD_LIB_COMMON) $(PTHREAD_LIBS) -lhcl -lhclex
 hclc_DEPENDENCIES = libhclex.la
 
 bin_PROGRAMS += hclj
 hclj_SOURCES = main-j.c
-hclj_CPPFLAGS = $(CPPFLAGS_LIB_COMMON)
-hclj_LDFLAGS = $(LDFLAGS_LIB_COMMON)
+hclj_CPPFLAGS = $(CPPFLAGS_ALL_COMMON)
+hclj_LDFLAGS = $(LDFLAGS_ALL_COMMON)
 hclj_LDADD = $(LIBADD_LIB_COMMON) $(PTHREAD_LIBS) -lhcl -lhclex
 hclj_DEPENDENCIES = libhclex.la
 endif

@@ -9,14 +9,6 @@ CPPFLAGS_COMMON = \
 	-I$(abs_srcdir)/../lib \
 	-I$(includedir)
 
-if WIN32
-# you must adjust the value of DEFAULT_PFMODPOSTFIX according 
-# to the first number in -version-info above
-CPPFLAGS_COMMON += -DHCL_DEFAULT_PFMODPREFIX=\"libhcl-\" -DHCL_DEFAULT_PFMODPOSTFIX=\"-1\"
-else
-CPPFLAGS_COMMON += -DHCL_DEFAULT_PFMODPREFIX=\"$(libdir)/libhcl-\" -DHCL_DEFAULT_PFMODPOSTFIX=\"\"
-endif
-
 if ENABLE_STATIC_MODULE
 
 ##################################################

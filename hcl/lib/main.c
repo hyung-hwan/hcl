@@ -210,6 +210,8 @@ static hcl_mmgr_t sys_mmgr =
 #	define IS_PATH_SEP(c) ((c) == '/')
 #endif
 
+/* TODO: handle path with a drive letter or in the UNC notation */
+#define IS_PATH_ABSOLUTE(x) IS_PATH_SEP(x[0])
 
 static const hcl_bch_t* get_base_name (const hcl_bch_t* path)
 {
@@ -841,14 +843,6 @@ static const char* mach_dlerror (void)
 
 	return mach_dlerror_str;
 }
-#endif
-
-
-#if defined(_WIN32) || defined(__DOS__) || defined(__OS2__)
-	/* TODO: handle drive letter and UNC notations? */
-#	define IS_PATH_ABSOLUTE(x) (x[0] == '/' || x[0] == '\\')
-#else
-#	define IS_PATH_ABSOLUTE(x) (x[0] == '/')
 #endif
 
 static void* dl_open (hcl_t* hcl, const hcl_ooch_t* name, int flags)

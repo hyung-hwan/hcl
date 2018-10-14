@@ -88,11 +88,6 @@ PRE_UNINSTALL = :
 POST_UNINSTALL = :
 build_triplet = @build@
 host_triplet = @host@
-
-# you must adjust the value of DEFAULT_PFMODPOSTFIX according 
-# to the first number in -version-info above
-@WIN32_TRUE@am__append_1 = -DHCL_DEFAULT_PFMODPREFIX=\"libhcl-\" -DHCL_DEFAULT_PFMODPOSTFIX=\"-1\"
-@WIN32_FALSE@am__append_2 = -DHCL_DEFAULT_PFMODPREFIX=\"$(libdir)/libhcl-\" -DHCL_DEFAULT_PFMODPOSTFIX=\"\"
 subdir = mod
 ACLOCAL_M4 = $(top_srcdir)/aclocal.m4
 am__aclocal_m4_deps = $(top_srcdir)/m4/ax_check_sign.m4 \
@@ -377,7 +372,6 @@ pdfdir = @pdfdir@
 prefix = @prefix@
 program_transform_name = @program_transform_name@
 psdir = @psdir@
-runstatedir = @runstatedir@
 sbindir = @sbindir@
 sharedstatedir = @sharedstatedir@
 srcdir = @srcdir@
@@ -387,9 +381,13 @@ top_build_prefix = @top_build_prefix@
 top_builddir = @top_builddir@
 top_srcdir = @top_srcdir@
 AUTOMAKE_OPTIONS = nostdinc
-CPPFLAGS_COMMON = -I$(abs_builddir) -I$(abs_builddir)/../lib \
-	-I$(abs_srcdir) -I$(abs_srcdir)/../lib -I$(includedir) \
-	$(am__append_1) $(am__append_2)
+CPPFLAGS_COMMON = \
+	-I$(abs_builddir) \
+	-I$(abs_builddir)/../lib \
+	-I$(abs_srcdir) \
+	-I$(abs_srcdir)/../lib \
+	-I$(includedir)
+
 
 ##################################################
 # DYNAMIC MODULES 
