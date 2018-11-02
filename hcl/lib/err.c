@@ -164,167 +164,6 @@ static const hcl_bch_t* synerr_to_errstr (hcl_synerrnum_t errnum)
 }
 
 /* -------------------------------------------------------------------------- 
- * SYSTEM DEPENDENT FUNCTIONS 
- * -------------------------------------------------------------------------- */
-
-#if defined(HAVE_EXECINFO_H)
-#	include <execinfo.h>
-#	include <stdlib.h>
-#endif
-
-#if defined(_WIN32)
-#	include <windows.h>
-#elif defined(__OS2__)
-#	define INCL_DOSPROCESS
-#	define INCL_DOSFILEMGR
-#	define INCL_DOSERRORS
-#	include <os2.h>
-#elif defined(__DOS__)
-#	include <dos.h>
-#	if defined(_INTELC32_)
-#		define DOS_EXIT 0x4C
-#	else
-#		include <dosfunc.h>
-#	endif
-#	include <errno.h>
-#elif defined(vms) || defined(__vms)
-#	define __NEW_STARLET 1
-#	include <starlet.h> /* (SYS$...) */
-#	include <ssdef.h> /* (SS$...) */
-#	include <lib$routines.h> /* (lib$...) */
-#elif defined(macintosh)
-#	include <MacErrors.h>
-#	include <Process.h>
-#	include <Dialogs.h>
-#	include <TextUtils.h>
-#else
-#	include <sys/types.h>
-#	include <unistd.h>
-#	include <signal.h>
-#	include <errno.h>
-#endif
-
-hcl_errnum_t hcl_syserr_to_errnum (int e)
-{
-#if defined(_WIN32)
-	switch (e) 
-	{ 
-		case ERROR_NOT_ENOUGH_MEMORY: 
-		case ERROR_OUTOFMEMORY: 
-			return HCL_ESYSMEM; 
-		case ERROR_INVALID_PARAMETER: 
-		case ERROR_INVALID_HANDLE: 
-		case ERROR_INVALID_NAME: 
-			return HCL_EINVAL; 
-		case ERROR_ACCESS_DENIED: 
-		case ERROR_SHARING_VIOLATION: 
-			return HCL_EACCES; 
-		case ERROR_FILE_NOT_FOUND: 
-		case ERROR_PATH_NOT_FOUND: 
-			return HCL_ENOENT; 
-		case ERROR_ALREADY_EXISTS: 
-		case ERROR_FILE_EXISTS: 
-			return HCL_EEXIST; 
-		case ERROR_BROKEN_PIPE: 
-			return HCL_EPIPE; 
-
-		/*TODO: add more mappings */
-		default: 
-			return HCL_ESYSERR; 
-	}
-
-#elif defined(__OS2__)
-	/* APIRET e */
-	switch (e)
-	{
-		case ERROR_NOT_ENOUGH_MEMORY: return HCL_ESYSMEM;
-
-		case ERROR_INVALID_PARAMETER: 
-		case ERROR_INVALID_HANDLE: 
-		case ERROR_INVALID_NAME: return HCL_EINVAL;
-
-		case ERROR_ACCESS_DENIED: 
-		case ERROR_SHARING_VIOLATION: return HCL_EACCES;
-
-		case ERROR_FILE_NOT_FOUND:
-		case ERROR_PATH_NOT_FOUND: return HCL_ENOENT;
-
-		case ERROR_ALREADY_EXISTS: return HCL_EEXIST;
-
-		/*TODO: add more mappings */
-		default: return HCL_ESYSERR;
-	}
-#elif defined(macintosh)
-	switch (e)
-	{
-		case notEnoughMemoryErr: return HCL_ESYSMEM;
-		case paramErr: return HCL_EINVAL;
-
-		case qErr: /* queue element not found during deletion */
-		case fnfErr: /* file not found */
-		case dirNFErr: /* direcotry not found */
-		case resNotFound: /* resource not found */
-		case resFNotFound: /* resource file not found */
-		case nbpNotFound: /* name not found on remove */
-			return HCL_ENOENT;
-
-		/*TODO: add more mappings */
-		default: return HCL_ESYSERR;
-	}
-
-#else
-	switch (e)
-	{
-		case ENOMEM: return HCL_ESYSMEM;
-		case EINVAL: return HCL_EINVAL;
-
-	#if defined(EBUSY)
-		case EBUSY: return HCL_EBUSY;
-	#endif
-		case EACCES: return HCL_EACCES;
-	#if defined(EPERM)
-		case EPERM: return HCL_EPERM;
-	#endif
-	#if defined(ENOTDIR)
-		case ENOTDIR: return HCL_ENOTDIR;
-	#endif
-		case ENOENT: return HCL_ENOENT;
-	#if defined(EEXIST)
-		case EEXIST: return HCL_EEXIST;
-	#endif
-	#if defined(EINTR)
-		case EINTR:  return HCL_EINTR;
-	#endif
-
-	#if defined(EPIPE)
-		case EPIPE:  return HCL_EPIPE;
-	#endif
-
-	#if defined(EAGAIN) && defined(EWOULDBLOCK) && (EAGAIN != EWOULDBLOCK)
-		case EAGAIN: 
-		case EWOULDBLOCK: return HCL_EAGAIN;
-	#elif defined(EAGAIN)
-		case EAGAIN: return HCL_EAGAIN;
-	#elif defined(EWOULDBLOCK)
-		case EWOULDBLOCK: return HCL_EAGAIN;
-	#endif
-
-	#if defined(EBADF)
-		case EBADF: return HCL_EBADHND;
-	#endif
-
-
-
-	#if defined(EIO)
-		case EIO: return HCL_EIOERR;
-	#endif
-
-		default: return HCL_ESYSERR;
-	}
-#endif
-}
-
-/* -------------------------------------------------------------------------- 
  * ERROR NUMBER/MESSAGE HANDLING
  * -------------------------------------------------------------------------- */
 
@@ -352,20 +191,22 @@ void hcl_seterrnum (hcl_t* hcl, hcl_errnum_t errnum)
 	hcl->errmsg.len = 0; 
 }
 
-void hcl_seterrwithsyserr (hcl_t* hcl, int syserr)
+void hcl_seterrwithsyserr (hcl_t* hcl, int syserr_type, int syserr_code)
 {
+	hcl_errnum_t errnum;
+
 	if (hcl->shuterr) return;
 
 	if (hcl->vmprim.syserrstrb)
 	{
-		hcl->vmprim.syserrstrb (hcl, syserr, hcl->errmsg.tmpbuf.bch, HCL_COUNTOF(hcl->errmsg.tmpbuf.bch));
-		hcl_seterrbfmt (hcl, hcl_syserr_to_errnum(syserr), "%hs", hcl->errmsg.tmpbuf.bch);
+		errnum = hcl->vmprim.syserrstrb(hcl, syserr_type, syserr_code, hcl->errmsg.tmpbuf.bch, HCL_COUNTOF(hcl->errmsg.tmpbuf.bch));
+		hcl_seterrbfmt (hcl, errnum, "%hs", hcl->errmsg.tmpbuf.bch);
 	}
 	else
 	{
 		HCL_ASSERT (hcl, hcl->vmprim.syserrstru != HCL_NULL);
-		hcl->vmprim.syserrstru (hcl, syserr, hcl->errmsg.tmpbuf.uch, HCL_COUNTOF(hcl->errmsg.tmpbuf.uch));
-		hcl_seterrbfmt (hcl, hcl_syserr_to_errnum(syserr), "%ls", hcl->errmsg.tmpbuf.uch);
+		errnum = hcl->vmprim.syserrstru(hcl, syserr_type, syserr_code, hcl->errmsg.tmpbuf.uch, HCL_COUNTOF(hcl->errmsg.tmpbuf.uch));
+		hcl_seterrbfmt (hcl, errnum, "%ls", hcl->errmsg.tmpbuf.uch);
 	}
 }
 
@@ -484,8 +325,61 @@ void hcl_setsynerrufmt (hcl_t* hcl, hcl_synerrnum_t num, const hcl_ioloc_t* loc,
 }
 
 /* -------------------------------------------------------------------------- 
- * STACK FRAME BACKTRACE
+ * ASSERTION SUPPORT
  * -------------------------------------------------------------------------- */
+
+#if defined(HCL_BUILD_RELEASE)
+
+void hcl_assertfailed (hcl_t* hcl, const hcl_bch_t* expr, const hcl_bch_t* file, hcl_oow_t line)
+{
+	/* do nothing */
+}
+
+#else /* defined(HCL_BUILD_RELEASE) */
+
+/* -------------------------------------------------------------------------- 
+ * SYSTEM DEPENDENT HEADERS
+ * -------------------------------------------------------------------------- */
+#if defined(HCL_ENABLE_LIBUNWIND)
+#	include <libunwind.h>
+#elif defined(HAVE_EXECINFO_H)
+#	include <execinfo.h>
+#	include <stdlib.h>
+#endif
+
+#if defined(_WIN32)
+#	include <windows.h>
+#	include <errno.h>
+#elif defined(__OS2__)
+#	define INCL_DOSPROCESS
+#	define INCL_DOSFILEMGR
+#	define INCL_DOSERRORS
+#	include <os2.h>
+#elif defined(__DOS__)
+#	include <dos.h>
+#	if defined(_INTELC32_)
+#		define DOS_EXIT 0x4C
+#	else
+#		include <dosfunc.h>
+#	endif
+#	include <errno.h>
+#elif defined(vms) || defined(__vms)
+#	define __NEW_STARLET 1
+#	include <starlet.h> /* (SYS$...) */
+#	include <ssdef.h> /* (SS$...) */
+#	include <lib$routines.h> /* (lib$...) */
+#elif defined(macintosh)
+#	include <MacErrors.h>
+#	include <Process.h>
+#	include <Dialogs.h>
+#	include <TextUtils.h>
+#else
+#	include <sys/types.h>
+#	include <unistd.h>
+#	include <signal.h>
+#	include <errno.h>
+#endif
+
 #if defined(HCL_ENABLE_LIBUNWIND)
 static void backtrace_stack_frames (hcl_t* hcl)
 {
@@ -543,10 +437,6 @@ static void backtrace_stack_frames (hcl_t* hcl)
 }
 #endif
 
-/* -------------------------------------------------------------------------- 
- * ASSERTION FAILURE HANDLERsemaphore heap full
- * -------------------------------------------------------------------------- */
-
 void hcl_assertfailed (hcl_t* hcl, const hcl_bch_t* expr, const hcl_bch_t* file, hcl_oow_t line)
 {
 	hcl_logbfmt (hcl, HCL_LOG_UNTYPED | HCL_LOG_FATAL, "ASSERTION FAILURE: %s at %s:%zu\n", expr, file, line);
@@ -578,3 +468,5 @@ void hcl_assertfailed (hcl_t* hcl, const hcl_bch_t* expr, const hcl_bch_t* file,
 	_exit (1);
 #endif
 }
+
+#endif /* defined(HCL_BUILD_RELEASE) */

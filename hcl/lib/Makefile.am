@@ -64,6 +64,7 @@ libhcl_la_SOURCES = \
 	hcl-utl.h \
 	hcl-prv.h \
 	bigint.c \
+	cb-impl.h \
 	comp.c \
 	debug.c \
 	decode.c \

@@ -266,7 +266,7 @@ typedef struct hcl_obj_word_t*     hcl_oop_word_t;
  * are set to 1 or 2.
  * 
  * This scheme works because the object allocators aligns the object size to
- * a multiple of sizeof(moo_oop_t). This way, the 2 least-significant bits
+ * a multiple of sizeof(hcl_oop_t). This way, the 2 least-significant bits
  * of a real OOP are always 0s.
  *
  * With 2 bits, i can encode only 3 special types except object pointers. 
@@ -814,16 +814,18 @@ typedef void (*hcl_log_write_t) (
 	hcl_oow_t          len
 );
 
-typedef void (*hcl_syserrstrb_t) (
+typedef hcl_errnum_t (*hcl_syserrstrb_t) (
 	hcl_t*             hcl,
-	int                syserr,
+	int                syserr_type,
+	int                syserr_code,
 	hcl_bch_t*         buf,
 	hcl_oow_t          len
 );
 
-typedef void (*hcl_syserrstru_t) (
+typedef hcl_errnum_t (*hcl_syserrstru_t) (
 	hcl_t*             hcl,
-	int                syserr,
+	int                syserr_type,
+	int                syserr_code,
 	hcl_uch_t*         buf,
 	hcl_oow_t          len
 );
@@ -1525,7 +1527,8 @@ HCL_EXPORT void hcl_seterrnum (
 
 HCL_EXPORT void hcl_seterrwithsyserr (
 	hcl_t*       hcl,
-	int          syserr
+	int          syserr_type,
+	int          syserr_code
 );
 
 HCL_EXPORT void hcl_seterrbfmt (
@@ -1570,10 +1573,6 @@ HCL_EXPORT const hcl_ooch_t* hcl_backuperrmsg (
 
 HCL_EXPORT const hcl_ooch_t* hcl_errnum_to_errstr (
 	hcl_errnum_t errnum
-);
-
-HCL_EXPORT hcl_errnum_t hcl_syserr_to_errnum (
-	int syserr
 );
 
 /**

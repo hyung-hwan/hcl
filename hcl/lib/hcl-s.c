@@ -43,6 +43,8 @@
 #	if defined(HCL_HAVE_CFG_H) && defined(HCL_ENABLE_LIBLTDL)
 #		include <ltdl.h>
 #		define USE_LTDL
+#	else
+#		define USE_WIN_DLL
 #	endif
 #elif defined(__OS2__)
 #	define INCL_DOSMODULEMGR
@@ -59,27 +61,12 @@
 #	if defined(HCL_ENABLE_LIBLTDL)
 #		include <ltdl.h>
 #		define USE_LTDL
-#		define sys_dl_error() lt_dlerror()
-#		define sys_dl_open(x) lt_dlopen(x)
-#		define sys_dl_openext(x) lt_dlopenext(x)
-#		define sys_dl_close(x) lt_dlclose(x)
-#		define sys_dl_getsym(x,n) lt_dlsym(x,n)
 #	elif defined(HAVE_DLFCN_H)
 #		include <dlfcn.h>
 #		define USE_DLFCN
-#		define sys_dl_error() dlerror()
-#		define sys_dl_open(x) dlopen(x,RTLD_NOW)
-#		define sys_dl_openext(x) dlopen(x,RTLD_NOW)
-#		define sys_dl_close(x) dlclose(x)
-#		define sys_dl_getsym(x,n) dlsym(x,n)
 #	elif defined(__APPLE__) || defined(__MACOSX__)
 #		define USE_MACH_O_DYLD
 #		include <mach-o/dyld.h>
-#		define sys_dl_error() mach_dlerror()
-#		define sys_dl_open(x) mach_dlopen(x)
-#		define sys_dl_openext(x) mach_dlopen(x)
-#		define sys_dl_close(x) mach_dlclose(x)
-#		define sys_dl_getsym(x,n) mach_dlsym(x,n)
 #	else
 #		error UNSUPPORTED DYNAMIC LINKER
 #	endif
@@ -542,7 +529,7 @@ static HCL_INLINE int read_input (hcl_t* hcl, hcl_ioinarg_t* arg)
 			if (n <= -1)
 			{
 				if (errno == EINTR) goto start_over;
-				hcl_seterrwithsyserr (hcl, errno);
+				hcl_seterrwithsyserr (hcl, 0, errno);
 				return -1;
 			}
 			else if (n >= 1) break;
@@ -559,7 +546,7 @@ static HCL_INLINE int read_input (hcl_t* hcl, hcl_ioinarg_t* arg)
 		if (x <= -1)
 		{
 			if (errno == EINTR) goto start_over;
-			hcl_seterrwithsyserr (hcl, errno);
+			hcl_seterrwithsyserr (hcl, 0, errno);
 			return -1;
 		}
 
@@ -656,66 +643,6 @@ static int print_handler (hcl_t* hcl, hcl_iocmd_t cmd, void* arg)
 
 /* ========================================================================= */
 
-static void* alloc_heap (hcl_t* hcl, hcl_oow_t size)
-{
-#if defined(HAVE_MMAP) && defined(HAVE_MUNMAP) && defined(MAP_ANONYMOUS)
-	/* It's called via hcl_makeheap() when HCL creates a GC heap.
-	 * The heap is large in size. I can use a different memory allocation
-	 * function instead of an ordinary malloc.
-	 * upon failure, it doesn't require to set error information as hcl_makeheap()
-	 * set the error number to HCL_EOOMEM. */
-
-#if !defined(MAP_HUGETLB) && (defined(__amd64__) || defined(__x86_64__))
-#	define MAP_HUGETLB 0x40000
-#endif
-
-	hcl_oow_t* ptr;
-	int flags;
-	hcl_oow_t actual_size;
-
-	flags = MAP_PRIVATE | MAP_ANONYMOUS;
-
-	#if defined(MAP_HUGETLB)
-	flags |= MAP_HUGETLB;
-	#endif
-
-	#if defined(MAP_UNINITIALIZED)
-	flags |= MAP_UNINITIALIZED;
-	#endif
-
-	actual_size = HCL_SIZEOF(hcl_oow_t) + size;
-	actual_size = HCL_ALIGN_POW2(actual_size, 2 * 1024 * 1024);
-	ptr = (hcl_oow_t*)mmap(NULL, actual_size, PROT_READ | PROT_WRITE, flags, -1, 0);
-	if (ptr == MAP_FAILED) 
-	{
-	#if defined(MAP_HUGETLB)
-		flags &= ~MAP_HUGETLB;
-		ptr = (hcl_oow_t*)mmap(NULL, actual_size, PROT_READ | PROT_WRITE, flags, -1, 0);
-		if (ptr == MAP_FAILED) return HCL_NULL;
-	#else
-		return HCL_NULL;
-	#endif
-	}
-	*ptr = actual_size;
-
-	return (void*)(ptr + 1);
-
-#else
-	return HCL_MMGR_ALLOC(hcl->mmgr, size);
-#endif
-}
-
-static void free_heap (hcl_t* hcl, void* ptr)
-{
-#if defined(HAVE_MMAP) && defined(HAVE_MUNMAP)
-	hcl_oow_t* actual_ptr;
-	actual_ptr = (hcl_oow_t*)ptr - 1;
-	munmap (actual_ptr, *actual_ptr);
-#else
-	return HCL_MMGR_FREE(hcl->mmgr, ptr);
-#endif
-}
-
 static void log_write (hcl_t* hcl, hcl_bitmask_t mask, const hcl_ooch_t* msg, hcl_oow_t len)
 {
 	worker_hcl_xtn_t* xtn = (worker_hcl_xtn_t*)hcl_getxtn(hcl);
@@ -738,357 +665,7 @@ static void log_write_for_dummy (hcl_t* hcl, hcl_bitmask_t mask, const hcl_ooch_
 	pthread_mutex_unlock (&server->log_mutex);
 }
 
-static void syserrstrb (hcl_t* hcl, int syserr, hcl_bch_t* buf, hcl_oow_t len)
-{
-#if defined(HAVE_STRERROR_R)
-	strerror_r (syserr, buf, len);
-#else
-	/* this may not be thread safe */
-	hcl_copy_bcstr (buf, len, strerror(syserr));
-#endif
-}
-
-/* ========================================================================= */
-#if defined(USE_MACH_O_DYLD)
-static const char* mach_dlerror_str = "";
-
-static void* mach_dlopen (const char* path)
-{
-	NSObjectFileImage image;
-	NSObjectFileImageReturnCode rc;
-	void* handle;
-
-	mach_dlerror_str = "";
-	if ((rc = NSCreateObjectFileImageFromFile(path, &image)) != NSObjectFileImageSuccess) 
-	{
-		switch (rc)
-		{
-			case NSObjectFileImageFailure:
-			case NSObjectFileImageFormat:
-				mach_dlerror_str = "unable to crate object file image";
-				break;
-
-			case NSObjectFileImageInappropriateFile:
-				mach_dlerror_str = "inappropriate file";
-				break;
-
-			case NSObjectFileImageArch:
-				mach_dlerror_str = "incompatible architecture";
-				break;
-
-			case NSObjectFileImageAccess:
-				mach_dlerror_str = "inaccessible file";
-				break;
-				
-			default:
-				mach_dlerror_str = "unknown error";
-				break;
-		}
-		return HCL_NULL;
-	}
-	handle = (void*)NSLinkModule(image, path, NSLINKMODULE_OPTION_PRIVATE | NSLINKMODULE_OPTION_RETURN_ON_ERROR);
-	NSDestroyObjectFileImage (image);
-	return handle;
-}
-
-static HCL_INLINE void mach_dlclose (void* handle)
-{
-	mach_dlerror_str = "";
-	NSUnLinkModule (handle, NSUNLINKMODULE_OPTION_NONE);
-}
-
-static HCL_INLINE void* mach_dlsym (void* handle, const char* name)
-{
-	mach_dlerror_str = "";
-	return (void*)NSAddressOfSymbol(NSLookupSymbolInModule(handle, name));
-}
-
-static const char* mach_dlerror (void)
-{
-	int err_no;
-	const char* err_file;
-	NSLinkEditErrors err;
-
-	if (mach_dlerror_str[0] == '\0')
-		NSLinkEditError (&err, &err_no, &err_file, &mach_dlerror_str);
-
-	return mach_dlerror_str;
-}
-#endif
-
-static void* dl_open (hcl_t* hcl, const hcl_ooch_t* name, int flags)
-{
-#if defined(USE_LTDL) || defined(USE_DLFCN) || defined(USE_MACH_O_DYLD)
-	hcl_bch_t stabuf[128], * bufptr;
-	hcl_oow_t ucslen, bcslen, bufcapa;
-	void* handle;
-
-	#if defined(HCL_OOCH_IS_UCH)
-	if (hcl_convootobcstr(hcl, name, &ucslen, HCL_NULL, &bufcapa) <= -1) return HCL_NULL;
-	/* +1 for terminating null. but it's not needed because HCL_COUNTOF(HCL_DEFAULT_PFMODPREFIX)
-	 * and HCL_COUNTOF(HCL_DEFAULT_PFMODPOSTIFX) include the terminating nulls. Never mind about
-	 * the extra 2 characters. */
-	#else
-	bufcapa = hcl_count_bcstr(name);
-	#endif
-	bufcapa += HCL_COUNTOF(HCL_DEFAULT_PFMODDIR) + HCL_COUNTOF(HCL_DEFAULT_PFMODPREFIX) + HCL_COUNTOF(HCL_DEFAULT_PFMODPOSTFIX) + 1; 
-
-	if (bufcapa <= HCL_COUNTOF(stabuf)) bufptr = stabuf;
-	else
-	{
-		bufptr = (hcl_bch_t*)hcl_allocmem(hcl, bufcapa * HCL_SIZEOF(*bufptr));
-		if (!bufptr) return HCL_NULL;
-	}
-
-	if (flags & HCL_VMPRIM_DLOPEN_PFMOD)
-	{
-		hcl_oow_t len, i, xlen, dlen;
-
-		/* opening a primitive function module - mostly libhcl-xxxx.
-		 * if PFMODPREFIX is absolute, never use PFMODDIR */
-		dlen = IS_PATH_ABSOLUTE(HCL_DEFAULT_PFMODPREFIX)? 
-			0: hcl_copy_bcstr(bufptr, bufcapa, HCL_DEFAULT_PFMODDIR);
-		len = hcl_copy_bcstr(bufptr, bufcapa, HCL_DEFAULT_PFMODPREFIX);
-		len += dlen;
-
-		bcslen = bufcapa - len;
-	#if defined(HCL_OOCH_IS_UCH)
-		hcl_convootobcstr(hcl, name, &ucslen, &bufptr[len], &bcslen);
-	#else
-		bcslen = hcl_copy_bcstr(&bufptr[len], bcslen, name);
-	#endif
-
-		/* length including the directory, the prefix and the name. but excluding the postfix */
-		xlen  = len + bcslen; 
-
-		for (i = len; i < xlen; i++) 
-		{
-			/* convert a period(.) to a dash(-) */
-			if (bufptr[i] == '.') bufptr[i] = '-';
-		}
- 
-	retry:
-		hcl_copy_bcstr (&bufptr[xlen], bufcapa - xlen, HCL_DEFAULT_PFMODPOSTFIX);
-
-		/* both prefix and postfix attached. for instance, libhcl-xxx */
-		handle = sys_dl_openext(bufptr);
-		if (!handle) 
-		{
-			HCL_DEBUG3 (hcl, "Unable to open(ext) PFMOD %hs[%js] - %hs\n", &bufptr[dlen], name, sys_dl_error());
-
-			if (dlen > 0)
-			{
-				handle = sys_dl_openext(&bufptr[0]);
-				if (handle) goto pfmod_open_ok;
-				HCL_DEBUG3 (hcl, "Unable to open(ext) PFMOD %hs[%js] - %hs\n", &bufptr[0], name, sys_dl_error());
-			}
-
-			/* try without prefix and postfix */
-			bufptr[xlen] = '\0';
-			handle = sys_dl_openext(&bufptr[len]);
-			if (!handle) 
-			{
-				hcl_bch_t* dash;
-				const hcl_bch_t* dl_errstr;
-				dl_errstr = sys_dl_error();
-				HCL_DEBUG3 (hcl, "Unable to open(ext) PFMOD %hs[%js] - %hs\n", &bufptr[len], name, dl_errstr);
-				hcl_seterrbfmt (hcl, HCL_ESYSERR, "unable to open(ext) PFMOD %js - %hs", name, dl_errstr);
-
-				dash = hcl_rfind_bchar(bufptr, hcl_count_bcstr(bufptr), '-');
-				if (dash) 
-				{
-					/* remove a segment at the back. 
-					 * [NOTE] a dash contained in the original name before
-					 *        period-to-dash transformation may cause extraneous/wrong
-					 *        loading reattempts. */
-					xlen = dash - bufptr;
-					goto retry;
-				}
-			}
-			else 
-			{
-				HCL_DEBUG3 (hcl, "Opened(ext) PFMOD %hs[%js] handle %p\n", &bufptr[len], name, handle);
-			}
-		}
-		else
-		{
-		pfmod_open_ok:
-			HCL_DEBUG3 (hcl, "Opened(ext) PFMOD %hs[%js] handle %p\n", &bufptr[dlen], name, handle);
-		}
-	}
-	else
-	{
-		/* opening a raw shared object without a prefix and/or a postfix */
-	#if defined(HCL_OOCH_IS_UCH)
-		bcslen = bufcapa;
-		hcl_convootobcstr(hcl, name, &ucslen, bufptr, &bcslen);
-	#else
-		bcslen = hcl_copy_bcstr(bufptr, bufcapa, name);
-	#endif
-
-		if (hcl_find_bchar(bufptr, bcslen, '.'))
-		{
-			handle = sys_dl_open(bufptr);
-			if (!handle) 
-			{
-				const hcl_bch_t* dl_errstr;
-				dl_errstr = sys_dl_error();
-				HCL_DEBUG2 (hcl, "Unable to open DL %hs - %hs\n", bufptr, dl_errstr);
-				hcl_seterrbfmt (hcl, HCL_ESYSERR, "unable to open DL %js - %hs", name, dl_errstr);
-			}
-			else HCL_DEBUG2 (hcl, "Opened DL %hs handle %p\n", bufptr, handle);
-		}
-		else
-		{
-			handle = sys_dl_openext(bufptr);
-			if (!handle) 
-			{
-				const hcl_bch_t* dl_errstr;
-				dl_errstr = sys_dl_error();
-				HCL_DEBUG2 (hcl, "Unable to open(ext) DL %hs - %s\n", bufptr, dl_errstr);
-				hcl_seterrbfmt (hcl, HCL_ESYSERR, "unable to open(ext) DL %js - %hs", name, dl_errstr);
-			}
-			else HCL_DEBUG2 (hcl, "Opened(ext) DL %hs handle %p\n", bufptr, handle);
-		}
-	}
-
-	if (bufptr != stabuf) hcl_freemem (hcl, bufptr);
-	return handle;
-
-#else
-
-/* TODO: support various platforms */
-	/* TODO: implemenent this */
-	HCL_DEBUG1 (hcl, "Dynamic loading not implemented - cannot open %js\n", name);
-	hcl_seterrnum (hcl, HCL_ENOIMPL, "dynamic loading not implemented - cannot open %js", name);
-	return HCL_NULL;
-#endif
-}
-
-static void dl_close (hcl_t* hcl, void* handle)
-{
-#if defined(USE_LTDL) || defined(USE_DLFCN) || defined(USE_MACH_O_DYLD)
-	HCL_DEBUG1 (hcl, "Closed DL handle %p\n", handle);
-	sys_dl_close (handle);
-
-#else
-	/* TODO: implemenent this */
-	HCL_DEBUG1 (hcl, "Dynamic loading not implemented - cannot close handle %p\n", handle);
-#endif
-}
-
-static void* dl_getsym (hcl_t* hcl, void* handle, const hcl_ooch_t* name)
-{
-#if defined(USE_LTDL) || defined(USE_DLFCN) || defined(USE_MACH_O_DYLD)
-	hcl_bch_t stabuf[64], * bufptr;
-	hcl_oow_t bufcapa, ucslen, bcslen, i;
-	const hcl_bch_t* symname;
-	void* sym;
-
-	#if defined(HCL_OOCH_IS_UCH)
-	if (hcl_convootobcstr(hcl, name, &ucslen, HCL_NULL, &bcslen) <= -1) return HCL_NULL;
-	#else
-	bcslen = hcl_count_bcstr (name);
-	#endif
-
-	if (bcslen >= HCL_COUNTOF(stabuf) - 2)
-	{
-		bufcapa = bcslen + 3;
-		bufptr = (hcl_bch_t*)hcl_allocmem(hcl, bufcapa * HCL_SIZEOF(*bufptr));
-		if (!bufptr) return HCL_NULL;
-	}
-	else
-	{
-		bufcapa = HCL_COUNTOF(stabuf);
-		bufptr = stabuf;
-	}
-
-	bcslen = bufcapa - 1;
-	#if defined(HCL_OOCH_IS_UCH)
-	hcl_convootobcstr (hcl, name, &ucslen, &bufptr[1], &bcslen);
-	#else
-	bcslen = hcl_copy_bcstr(&bufptr[1], bcslen, name);
-	#endif
-
-	/* convert a period(.) to an underscore(_) */
-	for (i = 1; i <= bcslen; i++) if (bufptr[i] == '.') bufptr[i] = '_';
-
-	symname = &bufptr[1]; /* try the name as it is */
-
-	sym = sys_dl_getsym(handle, symname);
-	if (!sym)
-	{
-		bufptr[0] = '_';
-		symname = &bufptr[0]; /* try _name */
-		sym = sys_dl_getsym(handle, symname);
-		if (!sym)
-		{
-			bufptr[bcslen + 1] = '_'; 
-			bufptr[bcslen + 2] = '\0';
-
-			symname = &bufptr[1]; /* try name_ */
-			sym = sys_dl_getsym(handle, symname);
-
-			if (!sym)
-			{
-				symname = &bufptr[0]; /* try _name_ */
-				sym = sys_dl_getsym(handle, symname);
-				if (!sym)
-				{
-					const hcl_bch_t* dl_errstr;
-					dl_errstr = sys_dl_error();
-					HCL_DEBUG3 (hcl, "Failed to get module symbol %js from handle %p - %hs\n", name, handle, dl_errstr);
-					hcl_seterrbfmt (hcl, HCL_ENOENT, "unable to get module symbol %hs - %hs", symname, dl_errstr);
-					
-				}
-			}
-		}
-	}
-
-	if (sym) HCL_DEBUG3 (hcl, "Loaded module symbol %js from handle %p - %hs\n", name, handle, symname);
-	if (bufptr != stabuf) hcl_freemem (hcl, bufptr);
-	return sym;
-
-#else
-	/* TODO: IMPLEMENT THIS */
-	HCL_DEBUG2 (hcl, "Dynamic loading not implemented - Cannot load module symbol %js from handle %p\n", name, handle);
-	hcl_seterrbfmt (hcl, HCL_ENOIMPL, "dynamic loading not implemented - Cannot load module symbol %js from handle %p", name, handle);
-	return HCL_NULL;
-#endif
-}
-
-/* ========================================================================= */
-
-static void vm_gettime (hcl_t* hcl, hcl_ntime_t* now)
-{
-#if defined(HAVE_CLOCK_GETTIME) && defined(CLOCK_MONOTONIC)
-	struct timespec ts;
-	clock_gettime (CLOCK_MONOTONIC, &ts);
-	HCL_INITNTIME(now, ts.tv_sec, ts.tv_nsec);
-#elif defined(HAVE_CLOCK_GETTIME) && defined(CLOCK_REALTIME)
-	struct timespec ts;
-	clock_gettime (CLOCK_REALTIME, &ts);
-	HCL_INITNTIME(now, ts.tv_sec, ts.tv_nsec);
-#else
-	struct timeval tv;
-	gettimeofday (&tv, HCL_NULL);
-	HCL_INITNTIME(now, tv.tv_sec, HCL_USEC_TO_NSEC(tv.tv_usec));
-#endif
-}
-
-static void vm_sleep (hcl_t* hcl, const hcl_ntime_t* dur)
-{
-#if defined(HAVE_NANOSLEEP)
-	struct timespec ts;
-	ts.tv_sec = dur->sec;
-	ts.tv_nsec = dur->nsec;
-	nanosleep (&ts, HCL_NULL);
-#elif defined(HAVE_USLEEP)
-	usleep (HCL_SECNSEC_TO_USEC(dur->sec, dur->nsec));
-#else
-#	error UNSUPPORT SLEEP
-#endif
-}
+#include "cb-impl.h"
 
 /* ========================================================================= */
 
@@ -1613,7 +1190,7 @@ static int insert_exec_timer (hcl_server_proto_t* proto, const hcl_ntime_t* tmou
 	HCL_MEMSET (&event, 0, HCL_SIZEOF(event));
 	event.ctx = proto;
 	proto->hcl->vmprim.vm_gettime (proto->hcl, &event.when);
-	HCL_ADDNTIME (&event.when, &event.when, tmout);
+	HCL_ADD_NTIME (&event.when, &event.when, tmout);
 	event.handler = exec_runtime_handler;
 	event.updater = exec_runtime_updater;
 
@@ -2027,7 +1604,7 @@ hcl_server_t* hcl_server_open (hcl_mmgr_t* mmgr, hcl_oow_t xtnsize, hcl_server_p
 
 	if (pipe(pfd) <= -1)
 	{
-		if (errnum) *errnum = hcl_syserr_to_errnum(errno);
+		if (errnum) *errnum = syserrstrb(hcl, 0, errno, HCL_NULL, 0);
 		goto oops;
 	}
 
@@ -2071,8 +1648,8 @@ hcl_server_t* hcl_server_open (hcl_mmgr_t* mmgr, hcl_oow_t xtnsize, hcl_server_p
 	server->cfg.worker_stack_size = 512000UL; 
 	server->cfg.actor_heap_size = 512000UL;
 
-	HCL_INITNTIME (&server->cfg.worker_idle_timeout, 0, 0);
-	HCL_INITNTIME (&server->cfg.actor_max_runtime, 0, 0);
+	HCL_INIT_NTIME (&server->cfg.worker_idle_timeout, 0, 0);
+	HCL_INIT_NTIME (&server->cfg.actor_max_runtime, 0, 0);
 
 	server->mux_pipe[0] = pfd[0];
 	server->mux_pipe[1] = pfd[1];
@@ -2407,7 +1984,7 @@ void hcl_server_logufmt (hcl_server_t* server, hcl_bitmask_t mask, const hcl_uch
 	va_end (ap);
 }
 
-static void set_err_with_syserr (hcl_server_t* server, int syserr, const char* bfmt, ...)
+static void set_err_with_syserr (hcl_server_t* server, int syserr_type, int syserr_code, const char* bfmt, ...)
 {
 	hcl_t* hcl = server->dummy_hcl;
 	hcl_errnum_t errnum;
@@ -2419,11 +1996,10 @@ static void set_err_with_syserr (hcl_server_t* server, int syserr, const char* b
 
 	if (hcl->shuterr) return;
 
-	errnum = hcl_syserr_to_errnum(syserr);
 	if (hcl->vmprim.syserrstrb)
 	{
-		hcl->vmprim.syserrstrb (hcl, syserr, hcl->errmsg.tmpbuf.bch, HCL_COUNTOF(hcl->errmsg.tmpbuf.bch));
-		
+		errnum = hcl->vmprim.syserrstrb(hcl, syserr_type, syserr_code, hcl->errmsg.tmpbuf.bch, HCL_COUNTOF(hcl->errmsg.tmpbuf.bch));
+
 		va_start (ap, bfmt);
 		hcl_seterrbfmtv (hcl, errnum, bfmt, ap);
 		va_end (ap);
@@ -2443,7 +2019,7 @@ static void set_err_with_syserr (hcl_server_t* server, int syserr, const char* b
 	{
 		HCL_ASSERT (hcl, hcl->vmprim.syserrstru != HCL_NULL);
 
-		hcl->vmprim.syserrstru (hcl, syserr, hcl->errmsg.tmpbuf.uch, HCL_COUNTOF(hcl->errmsg.tmpbuf.uch));
+		errnum = hcl->vmprim.syserrstru(hcl, syserr_type, syserr_code, hcl->errmsg.tmpbuf.uch, HCL_COUNTOF(hcl->errmsg.tmpbuf.uch));
 
 		va_start (ap, bfmt);
 		hcl_seterrbfmtv (hcl, errnum, bfmt, ap);
@@ -2497,7 +2073,7 @@ static int setup_listeners (hcl_server_t* server, const hcl_bch_t* addrs)
 	ep_fd = epoll_create(1024);
 	if (ep_fd <= -1)
 	{
-		set_err_with_syserr (server, errno, "unable to create multiplexer");
+		set_err_with_syserr (server, 0, errno, "unable to create multiplexer");
 		HCL_LOG1 (server->dummy_hcl, SERVER_LOGMASK_ERROR, "%js\n", hcl_server_geterrmsg(server));
 		return -1;
 	}
@@ -2512,7 +2088,7 @@ static int setup_listeners (hcl_server_t* server, const hcl_bch_t* addrs)
 	ev.data.fd = server->mux_pipe[0];
 	if (epoll_ctl(ep_fd, EPOLL_CTL_ADD, server->mux_pipe[0], &ev) <= -1)
 	{
-		set_err_with_syserr (server, errno, "unable to register pipe %d to multiplexer", server->mux_pipe[0]);
+		set_err_with_syserr (server, 0, errno, "unable to register pipe %d to multiplexer", server->mux_pipe[0]);
 		HCL_LOG1 (server->dummy_hcl, SERVER_LOGMASK_ERROR, "%js\n", hcl_server_geterrmsg(server));
 		close (ep_fd);
 		return -1;
@@ -2543,7 +2119,7 @@ static int setup_listeners (hcl_server_t* server, const hcl_bch_t* addrs)
 		srv_fd = socket(sck_fam, SOCK_STREAM, 0);
 		if (srv_fd <= -1)
 		{
-			set_err_with_syserr (server, errno, "unable to open server socket for %.*hs", addr_len, addr_ptr);
+			set_err_with_syserr (server, 0, errno, "unable to open server socket for %.*hs", addr_len, addr_ptr);
 			HCL_LOG1 (server->dummy_hcl, SERVER_LOGMASK_ERROR, "%js\n", hcl_server_geterrmsg(server));
 			goto next_segment;
 		}
@@ -2568,7 +2144,7 @@ static int setup_listeners (hcl_server_t* server, const hcl_bch_t* addrs)
 
 		if (bind(srv_fd, (struct sockaddr*)&srv_addr, srv_len) == -1)
 		{
-			set_err_with_syserr (server, errno, "unable to bind server socket %d for %.*hs", srv_fd, addr_len, addr_ptr);
+			set_err_with_syserr (server, 0, errno, "unable to bind server socket %d for %.*hs", srv_fd, addr_len, addr_ptr);
 			HCL_LOG1 (server->dummy_hcl, SERVER_LOGMASK_ERROR, "%js\n", hcl_server_geterrmsg(server));
 			close (srv_fd);
 			goto next_segment;
@@ -2576,7 +2152,7 @@ static int setup_listeners (hcl_server_t* server, const hcl_bch_t* addrs)
 
 		if (listen(srv_fd, 128) <= -1)
 		{
-			set_err_with_syserr (server, errno, "unable to listen on server socket %d for %.*hs", srv_fd, addr_len, addr_ptr);
+			set_err_with_syserr (server, 0, errno, "unable to listen on server socket %d for %.*hs", srv_fd, addr_len, addr_ptr);
 			HCL_LOG1 (server->dummy_hcl, SERVER_LOGMASK_ERROR, "%js\n", hcl_server_geterrmsg(server));
 			close (srv_fd);
 			goto next_segment;
@@ -2587,7 +2163,7 @@ static int setup_listeners (hcl_server_t* server, const hcl_bch_t* addrs)
 		ev.data.fd = srv_fd;
 		if (epoll_ctl(ep_fd, EPOLL_CTL_ADD, srv_fd, &ev) <= -1)
 		{
-			set_err_with_syserr (server, errno, "unable to register server socket %d to multiplexer for %.*hs", srv_fd, addr_len, addr_ptr);
+			set_err_with_syserr (server, 0, errno, "unable to register server socket %d to multiplexer for %.*hs", srv_fd, addr_len, addr_ptr);
 			HCL_LOG1 (server->dummy_hcl, SERVER_LOGMASK_ERROR, "%js\n", hcl_server_geterrmsg(server));
 			close (srv_fd);
 			goto next_segment;
@@ -2648,7 +2224,7 @@ int hcl_server_start (hcl_server_t* server, const hcl_bch_t* addrs)
 		pthread_mutex_lock (&server->tmr_mutex);
 		n = hcl_tmr_gettmout(server->tmr,  HCL_NULL, &tmout);
 		pthread_mutex_unlock (&server->tmr_mutex);
-		if (n <= -1) HCL_INITNTIME (&tmout, 10, 0);
+		if (n <= -1) HCL_INIT_NTIME (&tmout, 10, 0);
 
 		n = epoll_wait(server->listener.ep_fd, server->listener.ev_buf, HCL_COUNTOF(server->listener.ev_buf), HCL_SECNSEC_TO_MSEC(tmout.sec, tmout.nsec));
 
@@ -2658,7 +2234,7 @@ int hcl_server_start (hcl_server_t* server, const hcl_bch_t* addrs)
 			if (server->stopreq) break; /* normal termination requested */
 			if (errno == EINTR) continue; /* interrupted but not termination requested */
 
-			set_err_with_syserr (server, errno, "unable to poll for events in server");
+			set_err_with_syserr (server, 0, errno, "unable to poll for events in server");
 			xret = -1;
 			break;
 		}
@@ -2699,7 +2275,7 @@ int hcl_server_start (hcl_server_t* server, const hcl_bch_t* addrs)
 					if (errno == EAGAIN) continue;
 				#endif
 
-					set_err_with_syserr (server, errno, "unable to accept worker on server socket %d", evp->data.fd);
+					set_err_with_syserr (server, 0, errno, "unable to accept worker on server socket %d", evp->data.fd);
 					xret = -1;
 					break;
 				}

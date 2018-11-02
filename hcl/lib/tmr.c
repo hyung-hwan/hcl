@@ -31,7 +31,7 @@
 #define HEAP_LEFT(x)   ((x) * 2 + 1)
 #define HEAP_RIGHT(x)  ((x) * 2 + 2)
 
-#define YOUNGER_THAN(x,y) (HCL_CMPNTIME(&(x)->when, &(y)->when) < 0)
+#define YOUNGER_THAN(x,y) (HCL_CMP_NTIME(&(x)->when, &(y)->when) < 0)
 
 hcl_tmr_t* hcl_tmr_open (hcl_t* hcl, hcl_oow_t xtnsize, hcl_oow_t capa)
 {
@@ -248,7 +248,7 @@ int hcl_tmr_fire (hcl_tmr_t* tmr, const hcl_ntime_t* tm, hcl_oow_t* firecnt)
 
 	while (tmr->size > 0)
 	{
-		if (HCL_CMPNTIME(&tmr->event[0].when, &now) > 0) break;
+		if (HCL_CMP_NTIME(&tmr->event[0].when, &now) > 0) break;
 
 		event = tmr->event[0];
 		hcl_tmr_delete (tmr, 0); /* remove the registered event structure */
@@ -273,8 +273,8 @@ int hcl_tmr_gettmout (hcl_tmr_t* tmr, const hcl_ntime_t* tm, hcl_ntime_t* tmout)
 	/*else if (hcl_gettime(&now) <= -1) return -1;*/
 	tmr->hcl->vmprim.vm_gettime (tmr->hcl, &now);
 
-	HCL_SUBNTIME (tmout, &tmr->event[0].when, &now);
-	if (tmout->sec < 0) HCL_CLEARNTIME (tmout);
+	HCL_SUB_NTIME (tmout, &tmr->event[0].when, &now);
+	if (tmout->sec < 0) HCL_CLEAR_NTIME (tmout);
 
 	return 0;
 }

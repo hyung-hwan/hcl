@@ -1288,12 +1288,12 @@ static int execute (hcl_t* hcl)
 				HCL_ASSERT (hcl, HCL_OOP_IS_SMOOI(hcl->sem_heap[0]->heap_ftime_sec));
 				HCL_ASSERT (hcl, HCL_OOP_IS_SMOOI(hcl->sem_heap[0]->heap_ftime_nsec));
 
-				HCL_INITNTIME (&ft,
+				HCL_INIT_NTIME (&ft,
 					HCL_OOP_TO_SMOOI(hcl->sem_heap[0]->heap_ftime_sec),
 					HCL_OOP_TO_SMOOI(hcl->sem_heap[0]->heap_ftime_nsec)
 				);
 
-				if (HCL_CMPNTIME(&ft, (hcl_ntime_t*)&now) <= 0)
+				if (HCL_CMP_NTIME(&ft, (hcl_ntime_t*)&now) <= 0)
 				{
 					hcl_oop_process_t proc;
 
@@ -1324,7 +1324,7 @@ static int execute (hcl_t* hcl)
 				}
 				else if (hcl->processor->active == hcl->nil_process)
 				{
-					HCL_SUBNTIME (&ft, &ft, (hcl_ntime_t*)&now);
+					HCL_SUB_NTIME (&ft, &ft, (hcl_ntime_t*)&now);
 					hcl->vmprim.vm_sleep (hcl, &ft); /* TODO: change this to i/o multiplexer??? */
 					hcl->vmprim.vm_gettime (hcl, &now);
 				}

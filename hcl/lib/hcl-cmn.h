@@ -393,31 +393,31 @@ struct hcl_ntime_t
 	hcl_int32_t   nsec; /* nanoseconds */
 };
 
-#define HCL_INITNTIME(c,s,ns) (((c)->sec = (s)), ((c)->nsec = (ns)))
-#define HCL_CLEARNTIME(c) HCL_INITNTIME(c, 0, 0)
+#define HCL_INIT_NTIME(c,s,ns) (((c)->sec = (s)), ((c)->nsec = (ns)))
+#define HCL_CLEAR_NTIME(c) HCL_INIT_NTIME(c, 0, 0)
 
-#define HCL_ADDNTIME(c,a,b) \
+#define HCL_ADD_NTIME(c,a,b) \
 	do { \
 		(c)->sec = (a)->sec + (b)->sec; \
 		(c)->nsec = (a)->nsec + (b)->nsec; \
 		while ((c)->nsec >= HCL_NSECS_PER_SEC) { (c)->sec++; (c)->nsec -= HCL_NSECS_PER_SEC; } \
 	} while(0)
 
-#define HCL_ADDNTIMESNS(c,a,s,ns) \
+#define HCL_ADD_NTIME_SNS(c,a,s,ns) \
 	do { \
 		(c)->sec = (a)->sec + (s); \
 		(c)->nsec = (a)->nsec + (ns); \
 		while ((c)->nsec >= HCL_NSECS_PER_SEC) { (c)->sec++; (c)->nsec -= HCL_NSECS_PER_SEC; } \
 	} while(0)
 
-#define HCL_SUBNTIME(c,a,b) \
+#define HCL_SUB_NTIME(c,a,b) \
 	do { \
 		(c)->sec = (a)->sec - (b)->sec; \
 		(c)->nsec = (a)->nsec - (b)->nsec; \
 		while ((c)->nsec < 0) { (c)->sec--; (c)->nsec += HCL_NSECS_PER_SEC; } \
 	} while(0)
 
-#define HCL_SUBNTIMESNS(c,a,s,ns) \
+#define HCL_SUB_NTIME_SNS(c,a,s,ns) \
 	do { \
 		(c)->sec = (a)->sec - s; \
 		(c)->nsec = (a)->nsec - ns; \
@@ -425,7 +425,7 @@ struct hcl_ntime_t
 	} while(0)
 
 
-#define HCL_CMPNTIME(a,b) (((a)->sec == (b)->sec)? ((a)->nsec - (b)->nsec): ((a)->sec - (b)->sec))
+#define HCL_CMP_NTIME(a,b) (((a)->sec == (b)->sec)? ((a)->nsec - (b)->nsec): ((a)->sec - (b)->sec))
 
 /* =========================================================================
  * PRIMITIVE MACROS
