@@ -370,7 +370,7 @@ static void vm_sleep (hcl_t* hcl, const hcl_ntime_t* dur)
 	if (xtn->waitable_timer)
 	{
 		LARGE_INTEGER li;
-		li.QuadPart = -HCL_SECNSEC_TO_NSEC(dur->sec, dur->nsec);
+		li.QuadPart = -(HCL_SECNSEC_TO_NSEC(dur->sec, dur->nsec) / 100); /* in 100 nanoseconds */
 		if(SetWaitableTimer(xtn->waitable_timer, &li, 0, HCL_NULL, HCL_NULL, FALSE) == FALSE) goto normal_sleep;
 		WaitForSingleObject(xtn->waitable_timer, INFINITE);
 	}
