@@ -12,7 +12,7 @@
 #	include <io.h>
 #	include <errno.h>
 
-#	if defined(MOO_HAVE_CFG_H) && defined(MOO_ENABLE_LIBLTDL)
+#	if defined(HCL_HAVE_CFG_H) && defined(HCL_ENABLE_LIBLTDL)
 #		include <ltdl.h>
 #		define USE_LTDL
 #	else
@@ -714,8 +714,8 @@ void hcl_vmprim_sleep (hcl_t* hcl, const hcl_ntime_t* dur)
 
 #elif defined(USE_WIN_DLL)
 #	define sys_dl_error() win_dlerror()
-#	define sys_dl_open(x) LoadLibraryExA(x, MOO_NULL, 0)
-#	define sys_dl_openext(x) LoadLibraryExA(x, MOO_NULL, 0)
+#	define sys_dl_open(x) LoadLibraryExA(x, HCL_NULL, 0)
+#	define sys_dl_openext(x) LoadLibraryExA(x, HCL_NULL, 0)
 #	define sys_dl_close(x) FreeLibrary(x)
 #	define sys_dl_getsym(x,n) GetProcAddress(x,n)
 
@@ -731,14 +731,14 @@ void hcl_vmprim_sleep (hcl_t* hcl, const hcl_ntime_t* dur)
 
 static const char* win_dlerror (void)
 {
-	/* TODO: handle wchar_t, moo_ooch_t etc? */
+	/* TODO: handle wchar_t, hcl_ooch_t etc? */
 	static char buf[256];
 	DWORD rc;
 
 	rc = FormatMessageA (
 		FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS,
 		NULL, GetLastError(), MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), 
-		buf, MOO_COUNTOF(buf), MOO_NULL
+		buf, HCL_COUNTOF(buf), HCL_NULL
 	);
 	while (rc > 0 && buf[rc - 1] == '\r' || buf[rc - 1] == '\n') 
 	{
