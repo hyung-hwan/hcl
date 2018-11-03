@@ -830,6 +830,13 @@ typedef hcl_errnum_t (*hcl_syserrstru_t) (
 	hcl_oow_t          len
 );
 
+typedef void (*hcl_assertfail_t) (
+	hcl_t*             hcl,
+	const hcl_bch_t*   expr,
+	const hcl_bch_t*   file,
+	hcl_oow_t          line
+);
+
 enum hcl_vmprim_dlopen_flag_t
 {
 	HCL_VMPRIM_DLOPEN_PFMOD = (1 << 0)
@@ -879,6 +886,7 @@ struct hcl_vmprim_t
 	hcl_log_write_t       log_write; /* required */
 	hcl_syserrstrb_t      syserrstrb; /* one of syserrstrb or syserrstru required */
 	hcl_syserrstru_t      syserrstru;
+	hcl_assertfail_t      assertfail;
 
 	hcl_vmprim_dlopen_t   dl_open; /* required */
 	hcl_vmprim_dlclose_t  dl_close; /* required */
@@ -1359,7 +1367,7 @@ struct hcl_t
 #if defined(HCL_BUILD_RELEASE)
 #	define HCL_ASSERT(hcl,expr) ((void)0)
 #else
-#	define HCL_ASSERT(hcl,expr) ((void)((expr) || (hcl_assertfailed (hcl, #expr, __FILE__, __LINE__), 0)))
+#	define HCL_ASSERT(hcl,expr) ((void)((expr) || ((hcl)->vmprim.assertfail (hcl, #expr, __FILE__, __LINE__), 0)))
 #endif
 
 /* =========================================================================

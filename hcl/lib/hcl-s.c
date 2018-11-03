@@ -720,6 +720,7 @@ hcl_server_proto_t* hcl_server_proto_open (hcl_oow_t xtnsize, hcl_server_worker_
 	}
 	vmprim.log_write = log_write;
 	vmprim.syserrstrb = syserrstrb;
+	vmprim.assertfail = assert_fail;
 	vmprim.dl_open = dl_open;
 	vmprim.dl_close = dl_close;
 	vmprim.dl_getsym = dl_getsym;

@@ -194,6 +194,150 @@ static hcl_errnum_t syserrstrb (hcl_t* hcl, int syserr_type, int syserr_code, hc
 }
 
 
+/* -------------------------------------------------------------------------- 
+ * ASSERTION SUPPORT
+ * -------------------------------------------------------------------------- */
+
+#if defined(HCL_BUILD_RELEASE)
+
+void assert_failed (hcl_t* hcl, const hcl_bch_t* expr, const hcl_bch_t* file, hcl_oow_t line)
+{
+	/* do nothing */
+}
+
+#else /* defined(HCL_BUILD_RELEASE) */
+
+/* -------------------------------------------------------------------------- 
+ * SYSTEM DEPENDENT HEADERS
+ * -------------------------------------------------------------------------- */
+
+#if defined(_WIN32)
+#	include <windows.h>
+#	include <errno.h>
+#elif defined(__OS2__)
+#	define INCL_DOSPROCESS
+#	define INCL_DOSFILEMGR
+#	define INCL_DOSERRORS
+#	include <os2.h>
+#elif defined(__DOS__)
+#	include <dos.h>
+#	if defined(_INTELC32_)
+#		define DOS_EXIT 0x4C
+#	else
+#		include <dosfunc.h>
+#	endif
+#	include <errno.h>
+#elif defined(vms) || defined(__vms)
+#	define __NEW_STARLET 1
+#	include <starlet.h> /* (SYS$...) */
+#	include <ssdef.h> /* (SS$...) */
+#	include <lib$routines.h> /* (lib$...) */
+#elif defined(macintosh)
+#	include <MacErrors.h>
+#	include <Process.h>
+#	include <Dialogs.h>
+#	include <TextUtils.h>
+#else
+#	include <sys/types.h>
+#	include <unistd.h>
+#	include <signal.h>
+#	include <errno.h>
+#endif
+
+#if defined(HCL_ENABLE_LIBUNWIND)
+#include <libunwind.h>
+static void backtrace_stack_frames (hcl_t* hcl)
+{
+	unw_cursor_t cursor;
+	unw_context_t context;
+	int n;
+
+	unw_getcontext(&context);
+	unw_init_local(&cursor, &context);
+
+	hcl_logbfmt (hcl, HCL_LOG_UNTYPED | HCL_LOG_DEBUG, "[BACKTRACE]\n");
+	for (n = 0; unw_step(&cursor) > 0; n++) 
+	{
+		unw_word_t ip, sp, off;
+		char symbol[256];
+
+		unw_get_reg (&cursor, UNW_REG_IP, &ip);
+		unw_get_reg (&cursor, UNW_REG_SP, &sp);
+
+		if (unw_get_proc_name(&cursor, symbol, HCL_COUNTOF(symbol), &off)) 
+		{
+			hcl_copy_bcstr (symbol, HCL_COUNTOF(symbol), "<unknown>");
+		}
+
+		hcl_logbfmt (hcl, HCL_LOG_UNTYPED | HCL_LOG_DEBUG, 
+			"#%02d ip=0x%*p sp=0x%*p %s+0x%zu\n", 
+			n, HCL_SIZEOF(void*) * 2, (void*)ip, HCL_SIZEOF(void*) * 2, (void*)sp, symbol, (hcl_oow_t)off);
+	}
+}
+#elif defined(HAVE_BACKTRACE)
+#include <execinfo.h>
+static void backtrace_stack_frames (hcl_t* hcl)
+{
+	void* btarray[128];
+	hcl_oow_t btsize;
+	char** btsyms;
+
+	btsize = backtrace (btarray, HCL_COUNTOF(btarray));
+	btsyms = backtrace_symbols (btarray, btsize);
+	if (btsyms)
+	{
+		hcl_oow_t i;
+		hcl_logbfmt (hcl, HCL_LOG_UNTYPED | HCL_LOG_DEBUG, "[BACKTRACE]\n");
+
+		for (i = 0; i < btsize; i++)
+		{
+			hcl_logbfmt(hcl, HCL_LOG_UNTYPED | HCL_LOG_DEBUG, "  %s\n", btsyms[i]);
+		}
+		free (btsyms);
+	}
+}
+#else
+static void backtrace_stack_frames (hcl_t* hcl)
+{
+	/* do nothing. not supported */
+}
+#endif
+
+static void assert_failed (hcl_t* hcl, const hcl_bch_t* expr, const hcl_bch_t* file, hcl_oow_t line)
+{
+	hcl_logbfmt (hcl, HCL_LOG_UNTYPED | HCL_LOG_FATAL, "ASSERTION FAILURE: %s at %s:%zu\n", expr, file, line);
+	backtrace_stack_frames (hcl);
+
+#if defined(_WIN32)
+	ExitProcess (249);
+#elif defined(__OS2__)
+	DosExit (EXIT_PROCESS, 249);
+#elif defined(__DOS__)
+	{
+		union REGS regs;
+		regs.h.ah = DOS_EXIT;
+		regs.h.al = 249;
+		intdos (&regs, &regs);
+	}
+#elif defined(vms) || defined(__vms)
+	lib$stop (SS$_ABORT); /* use SS$_OPCCUS instead? */
+	/* this won't be reached since lib$stop() terminates the process */
+	sys$exit (SS$_ABORT); /* this condition code can be shown with
+	                       * 'show symbol $status' from the command-line. */
+#elif defined(macintosh)
+
+	ExitToShell ();
+
+#else
+
+	kill (getpid(), SIGABRT);
+	_exit (1);
+#endif
+}
+
+#endif /* defined(HCL_BUILD_RELEASE) */
+
+
 /* ----------------------------------------------------------------- 
  * HEAP ALLOCATION
  * ----------------------------------------------------------------- */
@@ -792,3 +936,5 @@ static void* dl_getsym (hcl_t* hcl, void* handle, const hcl_ooch_t* name)
 	return HCL_NULL;
 #endif
 }
+
+

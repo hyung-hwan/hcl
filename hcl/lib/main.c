@@ -1193,6 +1193,7 @@ int main (int argc, char* argv[])
 	}
 	vmprim.log_write = log_write;
 	vmprim.syserrstrb = syserrstrb;
+	vmprim.assertfail = assert_fail;
 	vmprim.dl_open = dl_open;
 	vmprim.dl_close = dl_close;
 	vmprim.dl_getsym = dl_getsym;

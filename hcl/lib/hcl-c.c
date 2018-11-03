@@ -821,6 +821,7 @@ hcl_client_t* hcl_client_open (hcl_mmgr_t* mmgr, hcl_oow_t xtnsize, hcl_client_p
 	HCL_MEMSET (&vmprim, 0, HCL_SIZEOF(vmprim));
 	vmprim.log_write = log_write_for_dummy;
 	vmprim.syserrstrb = syserrstrb;
+	vmprim.assertfail = assert_fail;
 
 	hcl = hcl_open(mmgr, HCL_SIZEOF(*xtn), 2048, &vmprim, errnum);
 	if (!hcl) 
