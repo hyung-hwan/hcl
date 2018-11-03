@@ -688,7 +688,7 @@ struct hcl_process_scheduler_t
  * The HCL_BRANDOF() macro return the brand of an object including a numeric
  * object encoded into a pointer.
  */
-#define HCL_BRANDOF(moo,oop) \
+#define HCL_BRANDOF(hcl,oop) \
 	(HCL_OOP_GET_TAG(oop)? ((hcl)->tagged_brands[HCL_OOP_GET_TAG(oop)]): HCL_OBJ_GET_FLAGS_BRAND(oop))
 
 /**

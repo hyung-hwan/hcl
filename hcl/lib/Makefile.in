@@ -451,12 +451,12 @@ LDFLAGS_LIB_COMMON = $(LDFLAGS_ALL_COMMON) -version-info 1:0:0 -no-undefined
 LIBADD_LIB_COMMON = $(LIBM) $(am__append_1) $(am__append_2) \
 	$(am__append_3)
 @WIN32_FALSE@CPPFLAGS_PFMOD =  \
-@WIN32_FALSE@	-DHCL_DEFAULT_PFMODPREFIX=\"$(libdir)/libmoo-\" \
+@WIN32_FALSE@	-DHCL_DEFAULT_PFMODPREFIX=\"$(libdir)/libhcl-\" \
 @WIN32_FALSE@	$(am__append_4) $(am__append_5)
 
 # you must adjust the value of DEFAULT_MODPOSTFIX according 
 # to the first number in -version-info above
-@WIN32_TRUE@CPPFLAGS_PFMOD = -DHCL_DEFAULT_PFMODPREFIX=\"libmoo-\" \
+@WIN32_TRUE@CPPFLAGS_PFMOD = -DHCL_DEFAULT_PFMODPREFIX=\"libhcl-\" \
 @WIN32_TRUE@	-DHCL_DEFAULT_PFMODPOSTFIX=\"-1.dll\" \
 @WIN32_TRUE@	$(am__append_4) $(am__append_5)
 pkginclude_HEADERS = hcl.h hcl-cmn.h hcl-opt.h hcl-rbt.h hcl-utl.h \

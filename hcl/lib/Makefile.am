@@ -35,9 +35,9 @@ endif
 if WIN32
 # you must adjust the value of DEFAULT_MODPOSTFIX according 
 # to the first number in -version-info above
-CPPFLAGS_PFMOD = -DHCL_DEFAULT_PFMODPREFIX=\"libmoo-\" -DHCL_DEFAULT_PFMODPOSTFIX=\"-1.dll\"
+CPPFLAGS_PFMOD = -DHCL_DEFAULT_PFMODPREFIX=\"libhcl-\" -DHCL_DEFAULT_PFMODPOSTFIX=\"-1.dll\"
 else
-CPPFLAGS_PFMOD = -DHCL_DEFAULT_PFMODPREFIX=\"$(libdir)/libmoo-\" 
+CPPFLAGS_PFMOD = -DHCL_DEFAULT_PFMODPREFIX=\"$(libdir)/libhcl-\" 
 if MACOSX
 CPPFLAGS_PFMOD += -DHCL_DEFAULT_PFMODPOSTFIX=\".dylib\"
 else
