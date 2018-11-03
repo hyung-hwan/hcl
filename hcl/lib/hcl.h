@@ -843,6 +843,14 @@ enum hcl_vmprim_dlopen_flag_t
 };
 typedef enum hcl_vmprim_dlopen_flag_t hcl_vmprim_dlopen_flag_t;
 
+typedef void (*hcl_vmprim_dlstartup_t) (
+	hcl_t*             hcl
+);
+
+typedef void (*hcl_vmprim_dlcleanup_t) (
+	hcl_t*             hcl
+);
+
 typedef void* (*hcl_vmprim_dlopen_t) (
 	hcl_t*             hcl,
 	const hcl_ooch_t*  name,
@@ -867,7 +875,8 @@ typedef void (*hcl_vmprim_gettime_t) (
 
 typedef void (*hcl_vmprim_sleep_t) (
 	hcl_t*             hcl,
-	const hcl_ntime_t* duration);
+	const hcl_ntime_t* duration
+);
 
 struct hcl_vmprim_t
 {
@@ -875,25 +884,27 @@ struct hcl_vmprim_t
 	 * before hcl is fully initialized. so few features are availble
 	 * in this callback function. If it's not provided, the default
 	 * implementation is used. */
-	hcl_alloc_heap_t      alloc_heap; /* optional */
+	hcl_alloc_heap_t       alloc_heap; /* optional */
 
 	/* If you customize the heap allocator by providing the alloc_heap
 	 * callback, you should implement the heap freer. otherwise the default
 	 * implementation doesn't know how to free the heap allocated by 
 	 * the allocator callback. */
-	hcl_free_heap_t       free_heap; /* optional */
+	hcl_free_heap_t        free_heap; /* optional */
 
-	hcl_log_write_t       log_write; /* required */
-	hcl_syserrstrb_t      syserrstrb; /* one of syserrstrb or syserrstru required */
-	hcl_syserrstru_t      syserrstru;
-	hcl_assertfail_t      assertfail;
+	hcl_log_write_t        log_write; /* required */
+	hcl_syserrstrb_t       syserrstrb; /* one of syserrstrb or syserrstru required */
+	hcl_syserrstru_t       syserrstru;
+	hcl_assertfail_t       assertfail;
 
-	hcl_vmprim_dlopen_t   dl_open; /* required */
-	hcl_vmprim_dlclose_t  dl_close; /* required */
-	hcl_vmprim_dlgetsym_t dl_getsym; /* requried */
+	hcl_vmprim_dlstartup_t dl_startup; /* optional */
+	hcl_vmprim_dlcleanup_t dl_cleanup; /* optional */
+	hcl_vmprim_dlopen_t    dl_open; /* required */
+	hcl_vmprim_dlclose_t   dl_close; /* required */
+	hcl_vmprim_dlgetsym_t  dl_getsym; /* requried */
 
-	hcl_vmprim_gettime_t  vm_gettime; /* required */
-	hcl_vmprim_sleep_t    vm_sleep; /* required */
+	hcl_vmprim_gettime_t   gettime; /* required */
+	hcl_vmprim_sleep_t     sleep; /* required */
 };
 
 typedef struct hcl_vmprim_t hcl_vmprim_t;

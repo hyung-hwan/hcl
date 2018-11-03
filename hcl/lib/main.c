@@ -26,6 +26,7 @@
 
 #include "hcl-prv.h"
 #include "hcl-opt.h"
+#include "cb-impl.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -41,36 +42,24 @@
 #	include <fcntl.h>
 #	include <time.h>
 #	include <signal.h>
-#	if defined(HCL_HAVE_CFG_H) && defined(HCL_ENABLE_LIBLTDL)
-#		include <ltdl.h>
-#		define USE_LTDL
-#	else
-#		define USE_WIN_DLL
-#	endif
+
 #elif defined(__OS2__)
 #	define INCL_DOSMODULEMGR
 #	define INCL_DOSPROCESS
 #	define INCL_DOSERRORS
 #	include <os2.h>
-#elif defined(__MSDOS__)
+
+#elif defined(__DOS__)
 #	include <dos.h>
 #	include <time.h>
 #elif defined(macintosh)
 #	include <Timer.h>
 #else
 
-#	if defined(HCL_ENABLE_LIBLTDL)
-#		include <ltdl.h>
-#		define USE_LTDL
-#	elif defined(HAVE_DLFCN_H)
-#		include <dlfcn.h>
-#		define USE_DLFCN
-#	elif defined(__APPLE__) || defined(__MACOSX__)
-#		define USE_MACH_O_DYLD
-#		include <mach-o/dyld.h>
-#	else
-#		error UNSUPPORTED DYNAMIC LINKER
-#	endif
+#	include <sys/types.h>
+#	include <errno.h>
+#	include <unistd.h>
+#	include <fcntl.h>
 
 #	if defined(HAVE_TIME_H)
 #		include <time.h>
@@ -81,49 +70,7 @@
 #	if defined(HAVE_SIGNAL_H)
 #		include <signal.h>
 #	endif
-#	if defined(HAVE_SYS_MMAN_H)
-#		include <sys/mman.h>
-#	endif
-	
-#	include <errno.h>
-#	include <unistd.h>
-#	include <fcntl.h>
 
-
-#endif
-
-#if !defined(HCL_DEFAULT_PFMODDIR)
-#	define HCL_DEFAULT_PFMODDIR ""
-#endif
-
-#if !defined(HCL_DEFAULT_PFMODPREFIX)
-#	if defined(_WIN32)
-#		define HCL_DEFAULT_PFMODPREFIX "hcl-"
-#	elif defined(__OS2__)
-#		define HCL_DEFAULT_PFMODPREFIX "hcl"
-#	elif defined(__DOS__)
-#		define HCL_DEFAULT_PFMODPREFIX "hcl"
-#	else
-#		define HCL_DEFAULT_PFMODPREFIX "libhcl-"
-#	endif
-#endif
-
-#if !defined(HCL_DEFAULT_PFMODPOSTFIX)
-#	if defined(_WIN32)
-#		define HCL_DEFAULT_PFMODPOSTFIX ""
-#	elif defined(__OS2__)
-#		define HCL_DEFAULT_PFMODPOSTFIX ""
-#	elif defined(__DOS__)
-#		define HCL_DEFAULT_PFMODPOSTFIX ""
-#	else
-#		if defined(USE_DLFCN)
-#			define HCL_DEFAULT_PFMODPOSTFIX ".so"
-#		elif defined(USE_MACH_O_DYLD)
-#			define HCL_DEFAULT_PFMODPOSTFIX ".dylib"
-#		else
-#			define HCL_DEFAULT_PFMODPOSTFIX ""
-#		endif
-#	endif
 #endif
 
 typedef struct bb_t bb_t;
@@ -190,23 +137,13 @@ static hcl_mmgr_t sys_mmgr =
 
 /* ========================================================================= */
 
-
-#if defined(_WIN32) || defined(__OS2__) || defined(__DOS__)
-#	define IS_PATH_SEP(c) ((c) == '/' || (c) == '\\')
-#else
-#	define IS_PATH_SEP(c) ((c) == '/')
-#endif
-
-/* TODO: handle path with a drive letter or in the UNC notation */
-#define IS_PATH_ABSOLUTE(x) IS_PATH_SEP(x[0])
-
 static const hcl_bch_t* get_base_name (const hcl_bch_t* path)
 {
 	const hcl_bch_t* p, * last = HCL_NULL;
 
 	for (p = path; *p != '\0'; p++)
 	{
-		if (IS_PATH_SEP(*p)) last = p;
+		if (HCL_IS_PATH_SEP(*p)) last = p;
 	}
 
 	return (last == HCL_NULL)? path: (last + 1);
@@ -699,8 +636,6 @@ static void log_write (hcl_t* hcl, hcl_bitmask_t mask, const hcl_ooch_t* msg, hc
 	flush_log (hcl, logfd);
 }
 
-#include "cb-impl.h"
-
 /* ========================================================================= */
 
 static int vm_startup (hcl_t* hcl)
@@ -882,113 +817,6 @@ static hcl_t* g_hcl = HCL_NULL;
 /* ========================================================================= */
 
 
-#if defined(__MSDOS__) && defined(_INTELC32_)
-static void (*prev_timer_intr_handler) (void);
-
-#pragma interrupt(timer_intr_handler)
-static void timer_intr_handler (void)
-{
-	/*
-	_XSTACK *stk;
-	int r;
-	stk = (_XSTACK *)_get_stk_frame();
-	r = (unsigned short)stk_ptr->eax;   
-	*/
-
-	/* The timer interrupt (normally) occurs 18.2 times per second. */
-	if (g_hcl) hcl_switchprocess (g_hcl);
-	_chain_intr(prev_timer_intr_handler);
-}
-
-#elif defined(macintosh)
-
-static TMTask g_tmtask;
-static ProcessSerialNumber g_psn;
-
-#define TMTASK_DELAY 50 /* milliseconds if positive, microseconds(after negation) if negative */
-
-static pascal void timer_intr_handler (TMTask* task)
-{
-	if (g_hcl) hcl_switchprocess (g_hcl);
-	WakeUpProcess (&g_psn);
-	PrimeTime ((QElem*)&g_tmtask, TMTASK_DELAY);
-}
-
-#else
-static void arrange_process_switching (int sig)
-{
-	if (g_hcl) hcl_switchprocess (g_hcl);
-}
-#endif
-
-#if 0
-static void setup_tick (void)
-{
-#if defined(__MSDOS__) && defined(_INTELC32_)
-
-	prev_timer_intr_handler = _dos_getvect (0x1C);
-	_dos_setvect (0x1C, timer_intr_handler);
-
-#elif defined(macintosh)
-
-	GetCurrentProcess (&g_psn);
-	memset (&g_tmtask, 0, HCL_SIZEOF(g_tmtask));
-	g_tmtask.tmAddr = NewTimerProc (timer_intr_handler);
-	InsXTime ((QElem*)&g_tmtask);
-
-	PrimeTime ((QElem*)&g_tmtask, TMTASK_DELAY);
-
-#elif defined(HAVE_SETITIMER) && defined(SIGVTALRM) && defined(ITIMER_VIRTUAL)
-	struct itimerval itv;
-	struct sigaction act;
-
-	sigemptyset (&act.sa_mask);
-	act.sa_handler = arrange_process_switching;
-	act.sa_flags = 0;
-	sigaction (SIGVTALRM, &act, HCL_NULL);
-
-	itv.it_interval.tv_sec = 0;
-	itv.it_interval.tv_usec = 100; /* 100 microseconds */
-	itv.it_value.tv_sec = 0;
-	itv.it_value.tv_usec = 100;
-	setitimer (ITIMER_VIRTUAL, &itv, HCL_NULL);
-#else
-
-#	error UNSUPPORTED
-#endif
-}
-
-static void cancel_tick (void)
-{
-#if defined(__MSDOS__) && defined(_INTELC32_)
-
-	_dos_setvect (0x1C, prev_timer_intr_handler);
-
-#elif defined(macintosh)
-	RmvTime ((QElem*)&g_tmtask);
-	/*DisposeTimerProc (g_tmtask.tmAddr);*/
-
-#elif defined(HAVE_SETITIMER) && defined(SIGVTALRM) && defined(ITIMER_VIRTUAL)
-	struct itimerval itv;
-	struct sigaction act;
-
-	itv.it_interval.tv_sec = 0;
-	itv.it_interval.tv_usec = 0;
-	itv.it_value.tv_sec = 0; /* make setitimer() one-shot only */
-	itv.it_value.tv_usec = 0;
-	setitimer (ITIMER_VIRTUAL, &itv, HCL_NULL);
-
-	sigemptyset (&act.sa_mask); 
-	act.sa_handler = SIG_IGN; /* ignore the signal potentially fired by the one-shot arrange above */
-	act.sa_flags = 0;
-	sigaction (SIGVTALRM, &act, HCL_NULL);
-
-#else
-#	error UNSUPPORTED
-#endif
-}
-#endif
-
 /* ========================================================================= */
 
 #if defined(_WIN32) || defined(__MSDOS__) || defined(__OS2__) || defined(macintosh)
@@ -1061,7 +889,6 @@ static void set_signal_to_default (int sig)
 	sigaction (sig, &sa, NULL);
 #endif
 }
-
 
 /* ========================================================================= */
 
@@ -1188,23 +1015,21 @@ int main (int argc, char* argv[])
 	memset (&vmprim, 0, HCL_SIZEOF(vmprim));
 	if (large_pages)
 	{
-		vmprim.alloc_heap = alloc_heap;
-		vmprim.free_heap = free_heap;
+		vmprim.alloc_heap = hcl_vmprim_alloc_heap;
+		vmprim.free_heap = hcl_vmprim_free_heap;
 	}
 	vmprim.log_write = log_write;
-	vmprim.syserrstrb = syserrstrb;
-	vmprim.assertfail = assert_fail;
-	vmprim.dl_open = dl_open;
-	vmprim.dl_close = dl_close;
-	vmprim.dl_getsym = dl_getsym;
-	vmprim.vm_gettime = vm_gettime;
-	vmprim.vm_sleep = vm_sleep;
+	vmprim.syserrstrb = hcl_vmprim_syserrstrb;
+	vmprim.assertfail = hcl_vmprim_assertfail;
+	vmprim.dl_startup = hcl_vmprim_dl_startup;
+	vmprim.dl_cleanup = hcl_vmprim_dl_cleanup;
+	vmprim.dl_open = hcl_vmprim_dl_open;
+	vmprim.dl_close = hcl_vmprim_dl_close;
+	vmprim.dl_getsym = hcl_vmprim_dl_getsym;
+	vmprim.gettime = hcl_vmprim_gettime;
+	vmprim.sleep = hcl_vmprim_sleep;
 
-#if defined(USE_LTDL)
-	lt_dlinit ();
-#endif
-
-	hcl = hcl_open (&sys_mmgr, HCL_SIZEOF(xtn_t), memsize, &vmprim, HCL_NULL);
+	hcl = hcl_open(&sys_mmgr, HCL_SIZEOF(xtn_t), memsize, &vmprim, HCL_NULL);
 	if (!hcl)
 	{
 		printf ("ERROR: cannot open hcl\n");
@@ -1417,16 +1242,10 @@ count++;
 	set_signal_to_default (SIGINT);
 	hcl_close (hcl);
 
-#if defined(USE_LTDL)
-	lt_dlexit ();
-#endif
 	return 0;
 
 oops:
 	set_signal_to_default (SIGINT); /* harmless to call multiple times without set_signal() */
 	if (hcl) hcl_close (hcl);
-#if defined(USE_LTDL)
-	lt_dlexit ();
-#endif
 	return -1;
 }

@@ -26,6 +26,7 @@
 
 #include "hcl-json.h"
 #include "hcl-prv.h"
+#include "cb-impl.h"
 
 #include <string.h>
 #include <errno.h>
@@ -117,16 +118,6 @@ static void log_write_for_dummy (hcl_t* hcl, hcl_bitmask_t mask, const hcl_ooch_
 
 	json = xtn->json;
 	json->prim.log_write (json, mask, msg, len);
-}
-
-static void syserrstrb (hcl_t* hcl, int syserr, hcl_bch_t* buf, hcl_oow_t len)
-{
-#if defined(HAVE_STRERROR_R)
-	strerror_r (syserr, buf, len);
-#else
-	/* this may not be thread safe */
-	hcl_copy_bcstr (buf, len, strerror(syserr));
-#endif
 }
 
 /* ========================================================================= */
@@ -909,8 +900,8 @@ hcl_json_t* hcl_json_open (hcl_mmgr_t* mmgr, hcl_oow_t xtnsize, hcl_json_prim_t*
 
 	HCL_MEMSET (&vmprim, 0, HCL_SIZEOF(vmprim));
 	vmprim.log_write = log_write_for_dummy;
-	vmprim.syserrstrb = syserrstrb;
-	vmprim.assertfail = assert_fail;
+	vmprim.syserrstrb = hcl_vmprim_syserrstrb;
+	vmprim.assertfail = hcl_vmprim_assertfail;
 
 	hcl = hcl_open(mmgr, HCL_SIZEOF(*xtn), 2048, &vmprim, errnum);
 	if (!hcl) 

@@ -28,6 +28,7 @@
 #include "hcl-prv.h"
 #include "hcl-tmr.h"
 #include "hcl-xutl.h"
+#include "cb-impl.h"
 
 #include <stdio.h>
 #include <string.h>
@@ -354,15 +355,15 @@ struct hcl_server_t
 /* ========================================================================= */
 
 #if defined(_WIN32) || defined(__OS2__) || defined(__DOS__)
-#	define IS_PATH_SEP(c) ((c) == '/' || (c) == '\\')
+#	define HCL_IS_PATH_SEP(c) ((c) == '/' || (c) == '\\')
 #	define PATH_SEP_CHAR ('\\')
 #else
-#	define IS_PATH_SEP(c) ((c) == '/')
+#	define HCL_IS_PATH_SEP(c) ((c) == '/')
 #	define PATH_SEP_CHAR ('/')
 #endif
 
 /* TODO: handle path with a drive letter or in the UNC notation */
-#define IS_PATH_ABSOLUTE(x) IS_PATH_SEP(x[0])
+#define HCL_IS_PATH_ABSOLUTE(x) HCL_IS_PATH_SEP(x[0])
 
 
 static const hcl_bch_t* get_base_name (const hcl_bch_t* path)
@@ -371,7 +372,7 @@ static const hcl_bch_t* get_base_name (const hcl_bch_t* path)
 
 	for (p = path; *p != '\0'; p++)
 	{
-		if (IS_PATH_SEP(*p)) last = p;
+		if (HCL_IS_PATH_SEP(*p)) last = p;
 	}
 
 	return (last == HCL_NULL)? path: (last + 1);
@@ -426,7 +427,7 @@ static HCL_INLINE int open_input (hcl_t* hcl, hcl_ioinarg_t* arg)
 		#else
 			hcl_copy_bchars (bb->fn, server->cfg.script_include_path, parlen);
 		#endif
-			if (!IS_PATH_SEP(bb->fn[parlen])) bb->fn[parlen++] = PATH_SEP_CHAR; /* +2 was used in hcl_callocmem() for this (+1 for this, +1 for '\0' */
+			if (!HCL_IS_PATH_SEP(bb->fn[parlen])) bb->fn[parlen++] = PATH_SEP_CHAR; /* +2 was used in hcl_callocmem() for this (+1 for this, +1 for '\0' */
 		}
 		else
 		{
@@ -665,8 +666,6 @@ static void log_write_for_dummy (hcl_t* hcl, hcl_bitmask_t mask, const hcl_ooch_
 	pthread_mutex_unlock (&server->log_mutex);
 }
 
-#include "cb-impl.h"
-
 /* ========================================================================= */
 
 static int vm_startup (hcl_t* hcl)
@@ -715,17 +714,19 @@ hcl_server_proto_t* hcl_server_proto_open (hcl_oow_t xtnsize, hcl_server_worker_
 	HCL_MEMSET (&vmprim, 0, HCL_SIZEOF(vmprim));
 	if (worker->server->cfg.trait & HCL_SERVER_TRAIT_USE_LARGE_PAGES)
 	{
-		vmprim.alloc_heap = alloc_heap;
-		vmprim.free_heap = free_heap;
+		vmprim.alloc_heap = hcl_vmprim_alloc_heap;
+		vmprim.free_heap = hcl_vmprim_free_heap;
 	}
 	vmprim.log_write = log_write;
-	vmprim.syserrstrb = syserrstrb;
-	vmprim.assertfail = assert_fail;
-	vmprim.dl_open = dl_open;
-	vmprim.dl_close = dl_close;
-	vmprim.dl_getsym = dl_getsym;
-	vmprim.vm_gettime = vm_gettime;
-	vmprim.vm_sleep = vm_sleep;
+	vmprim.syserrstrb = hcl_vmprim_syserrstrb;
+	vmprim.assertfail = hcl_vmprim_assertfail;
+	vmprim.dl_startup = hcl_vmprim_dl_startup;
+	vmprim.dl_cleanup = hcl_vmprim_dl_cleanup;
+	vmprim.dl_open = hcl_vmprim_dl_open;
+	vmprim.dl_close = hcl_vmprim_dl_close;
+	vmprim.dl_getsym = hcl_vmprim_dl_getsym;
+	vmprim.gettime = hcl_vmprim_gettime;
+	vmprim.sleep = hcl_vmprim_sleep;
 
 	proto = (hcl_server_proto_t*)hcl_server_allocmem(worker->server, HCL_SIZEOF(*proto));
 	if (!proto) return HCL_NULL;
@@ -1190,7 +1191,7 @@ static int insert_exec_timer (hcl_server_proto_t* proto, const hcl_ntime_t* tmou
 
 	HCL_MEMSET (&event, 0, HCL_SIZEOF(event));
 	event.ctx = proto;
-	proto->hcl->vmprim.vm_gettime (proto->hcl, &event.when);
+	proto->hcl->vmprim.gettime (proto->hcl, &event.when);
 	HCL_ADD_NTIME (&event.when, &event.when, tmout);
 	event.handler = exec_runtime_handler;
 	event.updater = exec_runtime_updater;
@@ -1582,12 +1583,15 @@ hcl_server_t* hcl_server_open (hcl_mmgr_t* mmgr, hcl_oow_t xtnsize, hcl_server_p
 
 	HCL_MEMSET (&vmprim, 0, HCL_SIZEOF(vmprim));
 	vmprim.log_write = log_write_for_dummy;
-	vmprim.syserrstrb = syserrstrb;
-	vmprim.dl_open = dl_open;
-	vmprim.dl_close = dl_close;
-	vmprim.dl_getsym = dl_getsym;
-	vmprim.vm_gettime = vm_gettime;
-	vmprim.vm_sleep = vm_sleep;
+	vmprim.syserrstrb = hcl_vmprim_syserrstrb;
+	vmprim.assertfail = hcl_vmprim_assertfail;
+	vmprim.dl_startup = hcl_vmprim_dl_startup;
+	vmprim.dl_cleanup = hcl_vmprim_dl_cleanup;
+	vmprim.dl_open = hcl_vmprim_dl_open;
+	vmprim.dl_close = hcl_vmprim_dl_close;
+	vmprim.dl_getsym = hcl_vmprim_dl_getsym;
+	vmprim.gettime = hcl_vmprim_gettime;
+	vmprim.sleep = hcl_vmprim_sleep;
 
 #if defined(USE_LTDL)
 	lt_dlinit ();
@@ -1605,7 +1609,7 @@ hcl_server_t* hcl_server_open (hcl_mmgr_t* mmgr, hcl_oow_t xtnsize, hcl_server_p
 
 	if (pipe(pfd) <= -1)
 	{
-		if (errnum) *errnum = syserrstrb(hcl, 0, errno, HCL_NULL, 0);
+		if (errnum) *errnum = hcl_vmprim_syserrstrb(hcl, 0, errno, HCL_NULL, 0);
 		goto oops;
 	}
 
@@ -1682,9 +1686,6 @@ oops:
 	/* NOTE: pipe should be closed if jump to here is made after pipe() above */
 	if (tmr) hcl_tmr_close (tmr);
 	if (hcl) hcl_close (hcl);
-#if defined(USE_LTDL)
-	lt_dlexit ();
-#endif
 	if (server) HCL_MMGR_FREE (mmgr, server);
 
 	return HCL_NULL;
@@ -1713,10 +1714,6 @@ void hcl_server_close (hcl_server_t* server)
 
 	hcl_tmr_close (server->tmr);
 	hcl_close (server->dummy_hcl);
-
-#if defined(USE_LTDL)
-	lt_dlexit ();
-#endif
 
 	HCL_MMGR_FREE (server->mmgr, server);
 }
@@ -1811,7 +1808,7 @@ static hcl_server_worker_t* alloc_worker (hcl_server_t* server, int cli_sck, con
 	worker->peeraddr = *peeraddr;
 	worker->server = server;
 	
-	server->dummy_hcl->vmprim.vm_gettime (server->dummy_hcl, &worker->alloc_time); /* TODO: the callback may return monotonic time. find a way to guarantee it is realtime??? */
+	server->dummy_hcl->vmprim.gettime (server->dummy_hcl, &worker->alloc_time); /* TODO: the callback may return monotonic time. find a way to guarantee it is realtime??? */
 
 	if (server->wid_map.free_first == HCL_SERVER_WID_INVALID && prepare_to_acquire_wid(server) <= -1) 
 	{

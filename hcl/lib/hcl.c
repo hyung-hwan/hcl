@@ -103,6 +103,14 @@ int hcl_init (hcl_t* hcl, hcl_mmgr_t* mmgr, hcl_oow_t heapsz, const hcl_vmprim_t
 		return -1;
 	}
 
+#if !defined(HCL_BUILD_RELEASE)
+	if (!vmprim->assertfail)
+	{
+		hcl_seterrnum (hcl, HCL_EINVAL);
+		return -1;
+	}
+#endif
+
 	HCL_MEMSET (hcl, 0, HCL_SIZEOF(*hcl));
 	hcl->mmgr = mmgr;
 	hcl->cmgr = hcl_get_utf8_cmgr();
@@ -149,6 +157,7 @@ int hcl_init (hcl_t* hcl, hcl_mmgr_t* mmgr, hcl_oow_t heapsz, const hcl_vmprim_t
 	hcl->newheap = hcl_makeheap(hcl, heapsz);
 	if (!hcl->newheap) goto oops;
 
+	if (hcl->vmprim.dl_startup) hcl->vmprim.dl_startup (hcl);
 	return 0;
 
 oops:
@@ -284,6 +293,8 @@ void hcl_fini (hcl_t* hcl)
 		hcl->sprintf.xbuf.capa = 0;
 		hcl->sprintf.xbuf.len = 0;
 	}
+
+	if (hcl->vmprim.dl_cleanup) hcl->vmprim.dl_cleanup (hcl);
 }
 
 void hcl_reset (hcl_t* hcl)

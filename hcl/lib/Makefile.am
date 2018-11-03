@@ -102,7 +102,7 @@ libhcl_la_DEPENDENCIES += $(abs_builddir)/../mod/libhcl-str.la
 endif
 
 bin_PROGRAMS = hcl
-hcl_SOURCES = main.c 
+hcl_SOURCES = main.c cb-impl.c cb-impl.h
 hcl_CPPFLAGS = $(CPPFLAGS_ALL_COMMON) $(CPPFLAGS_PFMOD)
 hcl_LDFLAGS = $(LDFLAGS_ALL_COMMON)
 hcl_LDADD = $(LIBADD_LIB_COMMON) -lhcl
@@ -123,21 +123,21 @@ libhclex_la_LIBADD = $(LIBADD_LIB_COMMON) $(PTHREAD_LIBS) -lhcl
 libhclex_la_DEPENDENCIES = libhcl.la
 
 bin_PROGRAMS += hcls
-hcls_SOURCES = main-s.c
+hcls_SOURCES = main-s.c cb-impl.c cb-impl.h
 hcls_CPPFLAGS = $(CPPFLAGS_ALL_COMMON)
 hcls_LDFLAGS = $(LDFLAGS_ALL_COMMON)
 hcls_LDADD = $(LIBADD_LIB_COMMON) $(PTHREAD_LIBS) -lhcl -lhclex
 hcls_DEPENDENCIES = libhclex.la
 
 bin_PROGRAMS += hclc
-hclc_SOURCES = main-c.c
+hclc_SOURCES = main-c.c cb-impl.c cb-impl.h
 hclc_CPPFLAGS = $(CPPFLAGS_ALL_COMMON)
 hclc_LDFLAGS = $(LDFLAGS_ALL_COMMON)
 hclc_LDADD = $(LIBADD_LIB_COMMON) $(PTHREAD_LIBS) -lhcl -lhclex
 hclc_DEPENDENCIES = libhclex.la
 
 bin_PROGRAMS += hclj
-hclj_SOURCES = main-j.c
+hclj_SOURCES = main-j.c cb-impl.c cb-impl.h
 hclj_CPPFLAGS = $(CPPFLAGS_ALL_COMMON)
 hclj_LDFLAGS = $(LDFLAGS_ALL_COMMON)
 hclj_LDADD = $(LIBADD_LIB_COMMON) $(PTHREAD_LIBS) -lhcl -lhclex

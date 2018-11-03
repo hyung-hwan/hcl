@@ -132,7 +132,7 @@ static int vm_startup (hcl_t* hcl)
 			return -1;
 		}
 	}
-	hcl->vmprim.vm_gettime (hcl, &hcl->exec_start_time); /* raw time. no adjustment */
+	hcl->vmprim.gettime (hcl, &hcl->exec_start_time); /* raw time. no adjustment */
 
 	return 0;
 }
@@ -140,7 +140,7 @@ static int vm_startup (hcl_t* hcl)
 static void vm_cleanup (hcl_t* hcl)
 {
 	hcl_cb_t* cb;
-	hcl->vmprim.vm_gettime (hcl, &hcl->exec_end_time); /* raw time. no adjustment */
+	hcl->vmprim.gettime (hcl, &hcl->exec_end_time); /* raw time. no adjustment */
 	for (cb = hcl->cblist; cb; cb = cb->next)
 	{
 		if (cb->vm_cleanup) cb->vm_cleanup(hcl);
@@ -1281,7 +1281,7 @@ static int execute (hcl_t* hcl)
 		if (hcl->sem_heap_count > 0)
 		{
 			hcl_ntime_t ft, now;
-			hcl->vmprim.vm_gettime (hcl, &now);
+			hcl->vmprim.gettime (hcl, &now);
 
 			do
 			{
@@ -1325,8 +1325,8 @@ static int execute (hcl_t* hcl)
 				else if (hcl->processor->active == hcl->nil_process)
 				{
 					HCL_SUB_NTIME (&ft, &ft, (hcl_ntime_t*)&now);
-					hcl->vmprim.vm_sleep (hcl, &ft); /* TODO: change this to i/o multiplexer??? */
-					hcl->vmprim.vm_gettime (hcl, &now);
+					hcl->vmprim.sleep (hcl, &ft); /* TODO: change this to i/o multiplexer??? */
+					hcl->vmprim.gettime (hcl, &now);
 				}
 				else 
 				{
