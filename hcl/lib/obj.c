@@ -139,7 +139,7 @@ static HCL_INLINE hcl_oop_t alloc_numeric_array (hcl_t* hcl, int brand, const vo
 	xbytes = len * unit; 
 	/* 'extra' indicates an extra unit to append at the end.
 	 * it's useful to store a string with a terminating null */
-	nbytes = extra? xbytes + len: xbytes; 
+	nbytes = extra? xbytes + unit: xbytes; 
 	nbytes_aligned = HCL_ALIGN(nbytes, HCL_SIZEOF(hcl_oop_t));
 /* TODO: check overflow in size calculation*/
 
