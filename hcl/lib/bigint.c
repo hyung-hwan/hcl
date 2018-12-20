@@ -4110,7 +4110,7 @@ hcl_oop_t hcl_inttostr (hcl_t* hcl, hcl_oop_t num, int radix, int ngc)
 		reqcapa = HCL_OOW_BITS + 1;
 		if (hcl->inttostr.xbuf.capa < reqcapa)
 		{
-			xbuf = (hcl_ooch_t*)hcl_reallocmem(hcl, hcl->inttostr.xbuf.ptr, reqcapa);
+			xbuf = (hcl_ooch_t*)hcl_reallocmem(hcl, hcl->inttostr.xbuf.ptr, reqcapa * HCL_SIZEOF(*xbuf));
 			if (!xbuf) return HCL_NULL;
 			hcl->inttostr.xbuf.capa = reqcapa;
 			hcl->inttostr.xbuf.ptr = xbuf;
@@ -4146,10 +4146,10 @@ hcl_oop_t hcl_inttostr (hcl_t* hcl, hcl_oop_t num, int radix, int ngc)
 		xlen = as * ((HCL_LIW_BITS + exp) / exp) + 1;
 		xpos = xlen;
 
-		reqcapa = HCL_SIZEOF(*xbuf) * xlen; 
+		reqcapa = xlen; 
 		if (hcl->inttostr.xbuf.capa < reqcapa)
 		{
-			xbuf = (hcl_ooch_t*)hcl_reallocmem(hcl, hcl->inttostr.xbuf.ptr, reqcapa);
+			xbuf = (hcl_ooch_t*)hcl_reallocmem(hcl, hcl->inttostr.xbuf.ptr, reqcapa * HCL_SIZEOF(*xbuf));
 			if (!xbuf) return HCL_NULL;
 			hcl->inttostr.xbuf.capa = reqcapa;
 			hcl->inttostr.xbuf.ptr = xbuf;
@@ -4203,10 +4203,10 @@ hcl_oop_t hcl_inttostr (hcl_t* hcl, hcl_oop_t num, int radix, int ngc)
 
 	/* Do it in a hard way for other cases */
 /* TODO: find an optimial buffer size */
-	reqcapa = HCL_SIZEOF(*xbuf) * (as * HCL_LIW_BITS + 1); 
+	reqcapa = as * HCL_LIW_BITS + 1; 
 	if (hcl->inttostr.xbuf.capa < reqcapa)
 	{
-		xbuf = (hcl_ooch_t*)hcl_reallocmem(hcl, hcl->inttostr.xbuf.ptr, reqcapa);
+		xbuf = (hcl_ooch_t*)hcl_reallocmem(hcl, hcl->inttostr.xbuf.ptr, reqcapa * HCL_SIZEOF(*xbuf));
 		if (!xbuf) return HCL_NULL;
 		hcl->inttostr.xbuf.capa = reqcapa;
 		hcl->inttostr.xbuf.ptr = xbuf;
@@ -4216,10 +4216,10 @@ hcl_oop_t hcl_inttostr (hcl_t* hcl, hcl_oop_t num, int radix, int ngc)
 		xbuf = hcl->inttostr.xbuf.ptr;
 	}
 
-	reqcapa = HCL_SIZEOF(*t) * as * 3;
+	reqcapa = as * 3;
 	if (hcl->inttostr.t.capa < reqcapa)
 	{
-		t = (hcl_liw_t*)hcl_reallocmem(hcl, hcl->inttostr.t.ptr, reqcapa);
+		t = (hcl_liw_t*)hcl_reallocmem(hcl, hcl->inttostr.t.ptr, reqcapa * HCL_SIZEOF(*t));
 		if (!t) return HCL_NULL;
 		hcl->inttostr.t.capa = reqcapa;
 		hcl->inttostr.t.ptr = t;
