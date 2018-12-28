@@ -1797,6 +1797,7 @@ hcl_oop_t hcl_mulints (hcl_t* hcl, hcl_oop_t x, hcl_oop_t y)
 	else
 	{
 		hcl_ooi_t v;
+		int neg;
 
 		if (HCL_OOP_IS_SMOOI(x))
 		{
@@ -1845,13 +1846,10 @@ hcl_oop_t hcl_mulints (hcl_t* hcl, hcl_oop_t x, hcl_oop_t y)
 		}
 
 	normal:
-		hcl_pushtmp (hcl, &x);
-		hcl_pushtmp (hcl, &y);
+		neg = (HCL_OBJ_GET_FLAGS_BRAND(x) != HCL_OBJ_GET_FLAGS_BRAND(y));
 		z = multiply_unsigned_integers (hcl, x, y);
-		hcl_poptmps (hcl, 2);
 		if (!z) return HCL_NULL;
-		if (HCL_OBJ_GET_FLAGS_BRAND(x) != HCL_OBJ_GET_FLAGS_BRAND(y))
-			HCL_OBJ_SET_FLAGS_BRAND (z, HCL_BRAND_NBIGINT);
+		if (neg) HCL_OBJ_SET_FLAGS_BRAND (z, HCL_BRAND_NBIGINT);
 	}
 
 	return normalize_bigint (hcl, z);
