@@ -259,16 +259,18 @@ static hcl_oop_t string_to_fpdec (hcl_t* hcl, hcl_oocs_t* str, const hcl_ioloc_t
 			}
 
 			HCL_ASSERT (hcl, scale > 0);
-			/*if (scale > 0)*/ HCL_MEMMOVE (&str->ptr[pos], &str->ptr[pos + 1], scale * HCL_SIZEOF(str->ptr[0]));
+			/*if (scale > 0)*/ HCL_MEMMOVE (&str->ptr[pos], &str->ptr[pos + 1], scale * HCL_SIZEOF(str->ptr[0])); /* remove the decimal point */
 			break;
 		}
 	}
 
+	/* if no decimal point is included or no digit after the point , you must not call this function */
+	HCL_ASSERT (hcl, scale > 0);
+
 	v = hcl_strtoint(hcl, str->ptr, str->len - 1, 10);
-	/*if (scale > 0)*/ HCL_MEMMOVE (&str->ptr[pos + 1], &str->ptr[pos], scale * HCL_SIZEOF(str->ptr[0]));
 	if (!v) return HCL_NULL;
 
-	return hcl_makefpdec (hcl, v, scale);
+	return hcl_makefpdec(hcl, v, scale);
 }
 
 static HCL_INLINE int is_spacechar (hcl_ooci_t c)
