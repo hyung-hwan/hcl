@@ -50,7 +50,7 @@ static hcl_ooi_t equalize_scale (hcl_t* hcl, hcl_oop_t* x, hcl_oop_t* y)
 	
 	ys = 0;
 	yv = *y;
-	if (HCL_IS_FPDEC(hcl, *y))
+	if (HCL_IS_FPDEC(hcl, yv))
 	{
 		ys = HCL_OOP_TO_SMOOI(((hcl_oop_fpdec_t)yv)->scale);
 		yv = ((hcl_oop_fpdec_t)yv)->value;
