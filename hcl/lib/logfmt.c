@@ -421,6 +421,12 @@ hcl_ooi_t hcl_logbfmtv (hcl_t* hcl, hcl_bitmask_t mask, const hcl_bch_t* fmt, va
 		 * it'll get turned back on */
 		mask |= (hcl->log.default_type_mask & HCL_LOG_ALL_TYPES);
 	}
+	else if (!(mask & HCL_LOG_ALL_TYPES)) 
+	{
+		/* no type is set in the given mask and no default type is set.
+		 * make it UNTYPED. */
+		mask |= HCL_LOG_UNTYPED;
+	}
 
 	fo.mask = mask;
 	fo.putch = put_logch;
@@ -457,6 +463,10 @@ hcl_ooi_t hcl_logufmtv (hcl_t* hcl, hcl_bitmask_t mask, const hcl_uch_t* fmt, va
 	{
 		mask &= ~HCL_LOG_UNTYPED;
 		mask |= (hcl->log.default_type_mask & HCL_LOG_ALL_TYPES);
+	}
+	else if (!(mask & HCL_LOG_ALL_TYPES)) 
+	{
+		mask |= HCL_LOG_UNTYPED;
 	}
 
 	fo.mask = mask;
