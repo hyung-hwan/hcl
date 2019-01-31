@@ -466,7 +466,15 @@ static int logfmtv (hcl_t* hcl, const fmtchar_t* fmt, hcl_fmtout_t* data, va_lis
 
 		#if defined(HCL_OOCH_IS_UCH)
 			/* get the length */
-			for (bslen = 0; bsp[bslen]; bslen++);
+			if (flagc & FLAGC_DOT)
+			{
+				for (bslen = 0; bslen < precision && bsp[bslen]; bslen++);
+			}
+			else
+			{
+				for (bslen = 0; bsp[bslen]; bslen++);
+			}
+
 
 			/*if (hcl_convbtooochars(hcl, bsp, &bslen, HCL_NULL, &slen) <= -1) goto oops;*/
 			if (hcl_conv_bchars_to_uchars_with_cmgr(bsp, &bslen, HCL_NULL, &slen, hcl->cmgr, 0) <= -1) goto oops;
@@ -537,7 +545,14 @@ static int logfmtv (hcl_t* hcl, const fmtchar_t* fmt, hcl_fmtout_t* data, va_lis
 
 		#if defined(HCL_OOCH_IS_BCH)
 			/* get the length */
-			for (uslen = 0; usp[uslen]; uslen++);
+			if (flagc & FLAGC_DOT)
+			{
+				for (uslen = 0; uslen < precision && usp[uslen]; uslen++);
+			}
+			else
+			{
+				for (uslen = 0; usp[uslen]; uslen++);
+			}
 
 			/*if (hcl_convutooochars(hcl, usp, &uslen, HCL_NULL, &slen) <= -1) goto oops;*/
 			if (hcl_conv_uchars_to_bchars_with_cmgr(usp, &uslen, HCL_NULL, &slen, hcl->cmgr) <= -1) goto oops;
