@@ -1,6 +1,6 @@
 dnl AC_PREREQ([2.67])
 
-AC_INIT([hcl],[0.1.0],[Chung, Hyung-Hwan (hyunghwan.chung@gmail.com)],[],[http://code.abiyo.net/@hcl])
+AC_INIT([hcl],[0.1.0],[Chung, Hyung-Hwan (hyunghwan.chung@gmail.com)],[],[http://code.miflux.com/@hcl])
 
 AC_CONFIG_HEADER([lib/hcl-cfg.h])
 AC_CONFIG_AUX_DIR([ac])
