@@ -257,6 +257,18 @@ HCL_EXPORT hcl_oow_t hcl_copy_bcstr (
 	const hcl_bch_t* src
 );
 
+HCL_EXPORT void hcl_fill_uchars (
+	hcl_uch_t*       dst,
+	const hcl_uch_t  ch,
+	hcl_oow_t        len
+);
+
+HCL_EXPORT void hcl_fill_bchars (
+	hcl_bch_t*       dst,
+	const hcl_bch_t  ch,
+	hcl_oow_t        len
+);
+
 HCL_EXPORT hcl_uch_t* hcl_find_uchar (
 	const hcl_uch_t* ptr,
 	hcl_oow_t        len,
@@ -310,6 +322,7 @@ HCL_EXPORT hcl_oow_t hcl_count_bcstr (
 #	define hcl_copy_oochars(dst,src,len) hcl_copy_uchars(dst,src,len)
 #	define hcl_copy_bchars_to_oochars(dst,src,len) hcl_copy_bchars_to_uchars(dst,src,len)
 #	define hcl_copy_oocstr(dst,len,src) hcl_copy_ucstr(dst,len,src)
+#	define hcl_fill_oochars(dst,ch,len) hcl_fill_uchars(dst,ch,len)
 #	define hcl_find_oochar(ptr,len,c) hcl_find_uchar(ptr,len,c)
 #	define hcl_rfind_oochar(ptr,len,c) hcl_rfind_uchar(ptr,len,c)
 #	define hcl_find_oochar_in_oocstr(ptr,c) hcl_find_uchar_in_ucstr(ptr,c)
@@ -325,6 +338,7 @@ HCL_EXPORT hcl_oow_t hcl_count_bcstr (
 #	define hcl_copy_oochars(dst,src,len) hcl_copy_bchars(dst,src,len)
 #	define hcl_copy_bchars_to_oochars(dst,src,len) hcl_copy_bchars(dst,src,len)
 #	define hcl_copy_oocstr(dst,len,src) hcl_copy_bcstr(dst,len,src)
+#	define hcl_fill_oochars(dst,ch,len) hcl_fill_bchars(dst,ch,len)
 #	define hcl_find_oochar(ptr,len,c) hcl_find_bchar(ptr,len,c)
 #	define hcl_rfind_oochar(ptr,len,c) hcl_rfind_bchar(ptr,len,c)
 #	define hcl_find_oochar_in_oocstr(ptr,c) hcl_find_bchar_in_bcstr(ptr,c)

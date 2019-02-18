@@ -257,6 +257,18 @@ hcl_oow_t hcl_copy_bcstr (hcl_bch_t* dst, hcl_oow_t len, const hcl_bch_t* src)
 	return p - dst;
 }
 
+void hcl_fill_uchars (hcl_uch_t* dst, hcl_uch_t ch, hcl_oow_t len)
+{
+	hcl_oow_t i;
+	for (i = 0; i < len; i++) dst[i] = ch;
+}
+
+void hcl_fill_bchars (hcl_bch_t* dst, hcl_bch_t ch, hcl_oow_t len)
+{
+	hcl_oow_t i;
+	for (i = 0; i < len; i++) dst[i] = ch;
+}
+
 hcl_oow_t hcl_count_ucstr (const hcl_uch_t* str)
 {
 	const hcl_uch_t* ptr = str;
