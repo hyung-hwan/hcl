@@ -710,11 +710,24 @@ static HCL_INLINE int is_greater (hcl_t* hcl, hcl_oop_t x, hcl_oop_t y)
 	}
 }
 
+static HCL_INLINE int is_equal_unsigned_array (const hcl_liw_t* x, hcl_oow_t xs, const hcl_liw_t* y, hcl_oow_t ys)
+{
+	return xs == ys && HCL_MEMCMP(x, y, xs * HCL_SIZEOF(*x)) == 0;
+}
+
+static HCL_INLINE int is_equal_unsigned (hcl_oop_t x, hcl_oop_t y)
+{
+	return is_equal_unsigned_array(
+		((hcl_oop_liword_t)x)->slot, HCL_OBJ_GET_SIZE(x), 
+		((hcl_oop_liword_t)y)->slot, HCL_OBJ_GET_SIZE(y));
+}
+
 static HCL_INLINE int is_equal (hcl_t* hcl, hcl_oop_t x, hcl_oop_t y)
 {
 	/* check if two large integers are equal to each other */
-	return HCL_OBJ_GET_FLAGS_BRAND(x) == HCL_OBJ_GET_FLAGS_BRAND(y) && HCL_OBJ_GET_SIZE(x) == HCL_OBJ_GET_SIZE(y) &&
-	       HCL_MEMCMP(((hcl_oop_liword_t)x)->slot,  ((hcl_oop_liword_t)y)->slot, HCL_OBJ_GET_SIZE(x) * HCL_SIZEOF(hcl_liw_t)) == 0;
+	/*return HCL_OBJ_GET_FLAGS_BRAND(x) == HCL_OBJ_GET_FLAGS_BRAND(y) && HCL_OBJ_GET_SIZE(x) == HCL_OBJ_GET_SIZE(y) &&
+	       HCL_MEMCMP(((hcl_oop_liword_t)x)->slot,  ((hcl_oop_liword_t)y)->slot, HCL_OBJ_GET_SIZE(x) * HCL_SIZEOF(hcl_liw_t)) == 0;*/
+	return HCL_OBJ_GET_FLAGS_BRAND(x) == HCL_OBJ_GET_FLAGS_BRAND(y) && HCL_OBJ_GET_SIZE(x) == HCL_OBJ_GET_SIZE(y) && is_equal_unsigned(x, y);
 }
 
 static void complement2_unsigned_array (hcl_t* hcl, const hcl_liw_t* x, hcl_oow_t xs, hcl_liw_t* z)
@@ -1535,8 +1548,33 @@ static hcl_oop_t divide_unsigned_integers (hcl_t* hcl, hcl_oop_t x, hcl_oop_t y,
 {
 	hcl_oop_t qq, rr;
 
+	if (is_less_unsigned(x, y))
+	{
+		rr = clone_bigint(hcl, x, HCL_OBJ_GET_SIZE(x));
+		if (!rr) return HCL_NULL;
+
+		hcl_pushtmp (hcl, &rr);
+		qq = make_bigint_with_ooi(hcl, 0); /* TODO: inefficient. no need to create a bigint object for zero. */
+		hcl_poptmp (hcl);
+
+		if (qq) *r = rr;
+		return qq;
+	}
+	else if (is_equal_unsigned(x, y))
+	{
+		rr = make_bigint_with_ooi(hcl, 0); /* TODO: inefficient. no need to create a bigint object for zero. */
+		if (!rr) return HCL_NULL;
+
+		hcl_pushtmp (hcl, &rr);
+		qq = make_bigint_with_ooi(hcl, 1); /* TODO: inefficient. no need to create a bigint object for zero. */
+		hcl_poptmp (hcl);
+
+		if (qq) *r = rr;
+		return qq;
+	}
+
 	/* the caller must ensure that x >= y */
-	HCL_ASSERT (hcl, !is_less_unsigned (x, y)); 
+	HCL_ASSERT (hcl, !is_less_unsigned(x, y)); 
 	hcl_pushtmp (hcl, &x);
 	hcl_pushtmp (hcl, &y);
 	qq = hcl_makebigint(hcl, HCL_BRAND_PBIGINT, HCL_NULL, HCL_OBJ_GET_SIZE(x));
