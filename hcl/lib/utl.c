@@ -64,8 +64,8 @@ hcl_oow_t hcl_hash_bytes (const hcl_oob_t* ptr, hcl_oow_t len)
 	h = FNV_MAGIC_INIT;
 	while (bp < be)
 	{
-		 h ^= (hcl_oow_t)(*bp++);
-		 h *= FNV_MAGIC_PRIME;
+		h ^= (hcl_oow_t)(*bp++);
+		h *= FNV_MAGIC_PRIME;
 	}
 #else
 	/* SDBM hash is known to produce good overall distribution
