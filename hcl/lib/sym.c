@@ -73,7 +73,7 @@ static hcl_oop_oop_t expand_bucket (hcl_t* hcl, hcl_oop_oop_t oldbuc)
 			HCL_ASSERT (hcl, HCL_IS_SYMBOL(hcl, symbol));
 			/*HCL_ASSERT (hcl, sym->size > 0);*/
 
-			index = hcl_hashoochars(symbol->slot, HCL_OBJ_GET_SIZE(symbol)) % newsz;
+			index = hcl_hash_oochars(symbol->slot, HCL_OBJ_GET_SIZE(symbol)) % newsz;
 			while (newbuc->slot[index] != hcl->_nil) index = (index + 1) % newsz;
 			newbuc->slot[index] = (hcl_oop_t)symbol;
 		}
@@ -97,7 +97,7 @@ static hcl_oop_t find_or_make_symbol (hcl_t* hcl, const hcl_ooch_t* ptr, hcl_oow
 	}
 
 	HCL_ASSERT (hcl, HCL_IS_ARRAY(hcl, hcl->symtab->bucket));
-	index = hcl_hashoochars(ptr, len) % HCL_OBJ_GET_SIZE(hcl->symtab->bucket);
+	index = hcl_hash_oochars(ptr, len) % HCL_OBJ_GET_SIZE(hcl->symtab->bucket);
 
 	/* find a matching symbol in the open-addressed symbol table */
 	while (hcl->symtab->bucket->slot[index] != hcl->_nil) 
@@ -153,7 +153,7 @@ static hcl_oop_t find_or_make_symbol (hcl_t* hcl, const hcl_ooch_t* ptr, hcl_oow
 		hcl->symtab->bucket = bucket;
 
 		/* recalculate the index for the expanded bucket */
-		index = hcl_hashoochars(ptr, len) % HCL_OBJ_GET_SIZE(hcl->symtab->bucket);
+		index = hcl_hash_oochars(ptr, len) % HCL_OBJ_GET_SIZE(hcl->symtab->bucket);
 
 		while (hcl->symtab->bucket->slot[index] != hcl->_nil) 
 			index = (index + 1) % HCL_OBJ_GET_SIZE(hcl->symtab->bucket);

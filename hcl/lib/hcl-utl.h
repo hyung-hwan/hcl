@@ -116,46 +116,126 @@
 #endif
 
 
+#if (HCL_SIZEOF_SIZE_T == 4)
+#	define HCL_HASH_FNV_MAGIC_INIT (0x811c9dc5)
+#	define HCL_HASH_FNV_MAGIC_PRIME (0x01000193)
+#elif (HCL_SIZEOF_SIZE_T == 8)
+
+#	define HCL_HASH_FNV_MAGIC_INIT (0xCBF29CE484222325)
+#	define HCL_HASH_FNV_MAGIC_PRIME (0x100000001B3l)
+
+#elif (HCL_SIZEOF_SIZE_T == 16)
+#	define HCL_HASH_FNV_MAGIC_INIT (0x6C62272E07BB014262B821756295C58D)
+#	define HCL_HASH_FNV_MAGIC_PRIME (0x1000000000000000000013B)
+#endif
+
+#if defined(HCL_HASH_FNV_MAGIC_INIT)
+	/* FNV-1 hash */
+#	define HCL_HASH_INIT HCL_HASH_FNV_MAGIC_INIT
+#	define HCL_HASH_VALUE(hv,v) (((hv) ^ (v)) * HCL_HASH_FNV_MAGIC_PRIME)
+
+#else
+	/* SDBM hash */
+#	define HCL_HASH_INIT 0
+#	define HCL_HASH_VALUE(hv,v) (((hv) << 6) + ((hv) << 16) - (hv) + (v))
+#endif
+
+#define HCL_HASH_VPTL(hv, ptr, len, type) do { \
+	hv = HCL_HASH_INIT; \
+	HCL_HASH_MORE_VPTL (hv, ptr, len, type); \
+} while(0)
+
+#define HCL_HASH_MORE_VPTL(hv, ptr, len, type) do { \
+	type* __hcl_hash_more_vptl_p = (type*)(ptr); \
+	type* __hcl_hash_more_vptl_q = (type*)__hcl_hash_more_vptl_p + (len); \
+	while (__hcl_hash_more_vptl_p < __hcl_hash_more_vptl_q) \
+	{ \
+		hv = HCL_HASH_VALUE(hv, *__hcl_hash_more_vptl_p); \
+		__hcl_hash_more_vptl_p++; \
+	} \
+} while(0)
+
+#define HCL_HASH_VPTR(hv, ptr, type) do { \
+	hv = HCL_HASH_INIT; \
+	HCL_HASH_MORE_VPTR (hv, ptr, type); \
+} while(0)
+
+#define HCL_HASH_MORE_VPTR(hv, ptr, type) do { \
+	type* __hcl_hash_more_vptr_p = (type*)(ptr); \
+	while (*__hcl_hash_more_vptr_p) \
+	{ \
+		hv = HCL_HASH_VALUE(hv, *__hcl_hash_more_vptr_p); \
+		__hcl_hash_more_vptr_p++; \
+	} \
+} while(0)
+
+#define HCL_HASH_BYTES(hv, ptr, len) HCL_HASH_VPTL(hv, ptr, len, const hcl_uint8_t)
+#define HCL_HASH_MORE_BYTES(hv, ptr, len) HCL_HASH_MORE_VPTL(hv, ptr, len, const hcl_uint8_t)
+
+#define HCL_HASH_BCHARS(hv, ptr, len) HCL_HASH_VPTL(hv, ptr, len, const hcl_bch_t)
+#define HCL_HASH_MORE_BCHARS(hv, ptr, len) HCL_HASH_MORE_VPTL(hv, ptr, len, const hcl_bch_t)
+
+#define HCL_HASH_UCHARS(hv, ptr, len) HCL_HASH_VPTL(hv, ptr, len, const hcl_uch_t)
+#define HCL_HASH_MORE_UCHARS(hv, ptr, len) HCL_HASH_MORE_VPTL(hv, ptr, len, const hcl_uch_t)
+
+#define HCL_HASH_BCSTR(hv, ptr) HCL_HASH_VPTR(hv, ptr, const hcl_bch_t)
+#define HCL_HASH_MORE_BCSTR(hv, ptr) HCL_HASH_MORE_VPTR(hv, ptr, const hcl_bch_t)
+
+#define HCL_HASH_UCSTR(hv, ptr) HCL_HASH_VPTR(hv, ptr, const hcl_uch_t)
+#define HCL_HASH_MORE_UCSTR(hv, ptr) HCL_HASH_MORE_VPTR(hv, ptr, const hcl_uch_t)
+
+
+
 #if defined(__cplusplus)
 extern "C" {
 #endif
 
-HCL_EXPORT hcl_oow_t hcl_hash_bytes (
+HCL_EXPORT hcl_oow_t hcl_hash_bytes_ (
 	const hcl_oob_t* ptr,
 	hcl_oow_t        len
 );
 
 #if defined(HCL_HAVE_INLINE)
-	static HCL_INLINE hcl_oow_t hcl_hashbchars (const hcl_bch_t* ptr, hcl_oow_t len)
+	static HCL_INLINE hcl_oow_t hcl_hash_bytes (const hcl_oob_t* ptr, hcl_oow_t len)
+	{
+		hcl_oow_t hv;
+		HCL_HASH_BYTES (hv, ptr, len);
+		/* constrain the hash value to be representable in a small integer
+		 * for convenience sake */
+		return hv % ((hcl_oow_t)HCL_SMOOI_MAX + 1);
+	}
+
+	static HCL_INLINE hcl_oow_t hcl_hash_bchars (const hcl_bch_t* ptr, hcl_oow_t len)
 	{
 		return hcl_hash_bytes((const hcl_oob_t*)ptr, len * HCL_SIZEOF(hcl_bch_t));
 	}
 
-	static HCL_INLINE hcl_oow_t hcl_hashuchars (const hcl_uch_t* ptr, hcl_oow_t len)
+	static HCL_INLINE hcl_oow_t hcl_hash_uchars (const hcl_uch_t* ptr, hcl_oow_t len)
 	{
 		return hcl_hash_bytes((const hcl_oob_t*)ptr, len * HCL_SIZEOF(hcl_uch_t));
 	}
 
-	static HCL_INLINE hcl_oow_t hcl_hashwords (const hcl_oow_t* ptr, hcl_oow_t len)
+	static HCL_INLINE hcl_oow_t hcl_hash_words (const hcl_oow_t* ptr, hcl_oow_t len)
 	{
 		return hcl_hash_bytes((const hcl_oob_t*)ptr, len * HCL_SIZEOF(hcl_oow_t));
 	}
 
-	static HCL_INLINE hcl_oow_t hcl_hashhalfwords (const hcl_oohw_t* ptr, hcl_oow_t len)
+	static HCL_INLINE hcl_oow_t hcl_hash_halfwords (const hcl_oohw_t* ptr, hcl_oow_t len)
 	{
 		return hcl_hash_bytes((const hcl_oob_t*)ptr, len * HCL_SIZEOF(hcl_oohw_t));
 	}
 #else
-#	define hcl_hashbchars(ptr,len)    hcl_hash_bytes((const hcl_oob_t*)ptr, len * HCL_SIZEOF(hcl_bch_t))
-#	define hcl_hashuchars(ptr,len)    hcl_hash_bytes((const hcl_oob_t*)ptr, len * HCL_SIZEOF(hcl_uch_t))
-#	define hcl_hashwords(ptr,len)     hcl_hash_bytes((const hcl_oob_t*)ptr, len * HCL_SIZEOF(hcl_oow_t))
-#	define hcl_hashhalfwords(ptr,len) hcl_hash_bytes((const hcl_oob_t*)ptr, len * HCL_SIZEOF(hcl_oohw_t))
+#	define hcl_hash_bytes(ptr,len)     hcl_hash_bytes_(ptr, len)
+#	define hcl_hash_bchars(ptr,len)    hcl_hash_bytes((const hcl_oob_t*)ptr, len * HCL_SIZEOF(hcl_bch_t))
+#	define hcl_hash_uchars(ptr,len)    hcl_hash_bytes((const hcl_oob_t*)ptr, len * HCL_SIZEOF(hcl_uch_t))
+#	define hcl_hash_words(ptr,len)     hcl_hash_bytes((const hcl_oob_t*)ptr, len * HCL_SIZEOF(hcl_oow_t))
+#	define hcl_hash_halfwords(ptr,len) hcl_hash_bytes((const hcl_oob_t*)ptr, len * HCL_SIZEOF(hcl_oohw_t))
 #endif
 
 #if defined(HCL_OOCH_IS_UCH)
-#	define hcl_hashoochars(ptr,len) hcl_hashuchars(ptr,len)
+#	define hcl_hash_oochars(ptr,len) hcl_hash_uchars(ptr,len)
 #else
-#	define hcl_hashoochars(ptr,len) hcl_hashbchars(ptr,len)
+#	define hcl_hash_oochars(ptr,len) hcl_hash_bchars(ptr,len)
 #endif
 
 /**

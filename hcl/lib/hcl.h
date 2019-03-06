@@ -196,8 +196,12 @@ enum hcl_trait_t
 };
 typedef enum hcl_trait_t hcl_trait_t;
 
-typedef struct hcl_obj_t           hcl_obj_t;
-typedef struct hcl_obj_t*          hcl_oop_t;
+/* =========================================================================
+ * SPECIALIZED OOP TYPES
+ * ========================================================================= */
+
+/* hcl_oop_t defined in hcl-cmn.h
+ * hcl_obj_t defined further down */
 
 /* these are more specialized types for hcl_obj_t */
 typedef struct hcl_obj_oop_t       hcl_obj_oop_t;
@@ -219,9 +223,9 @@ typedef struct hcl_obj_word_t*     hcl_oop_word_t;
 #define HCL_OOHW_BITS (HCL_SIZEOF_OOHW_T * 8)
 
 
-/* ========================================================================= */
-/* BIGINT TYPES AND MACROS                                                   */
-/* ========================================================================= */
+/* =========================================================================
+ * BIGINT TYPES AND MACROS
+ * ========================================================================= */
 #if (HCL_SIZEOF_UINTMAX_T > HCL_SIZEOF_OOW_T)
 #	define HCL_USE_FULL_WORD
 #endif
@@ -254,102 +258,9 @@ typedef struct hcl_obj_word_t*     hcl_oop_word_t;
 
 #endif
 
-
-/* 
- * OOP encoding
- * An object pointer(OOP) is an ordinary pointer value to an object.
- * but some simple numeric values are also encoded into OOP using a simple
- * bit-shifting and masking.
- *
- * A real OOP is stored without any bit-shifting while a non-pointer value encoded
- * in an OOP is bit-shifted to the left by 2 and the 2 least-significant bits
- * are set to 1 or 2.
- * 
- * This scheme works because the object allocators aligns the object size to
- * a multiple of sizeof(hcl_oop_t). This way, the 2 least-significant bits
- * of a real OOP are always 0s.
- *
- * With 2 bits, i can encode only 3 special types except object pointers. 
- * Since I need more than 3 special types, I extend the tag bits up to 4 bits
- * to represent a special data type that doesn't require a range as wide
- * as a small integer. A unicode character, for instance, only requires 21 
- * bits at most. An error doesn't need to be as diverse as a small integer.
- */
-
-#define HCL_OOP_TAG_BITS_LO     2
-#define HCL_OOP_TAG_BITS_HI     2
-
-#define HCL_OOP_TAG_SMOOI       1    /* 01 */
-#define HCL_OOP_TAG_SMPTR       2    /* 10 */
-#define HCL_OOP_TAG_EXTENDED    3    /* 11 - internal use only */
-#define HCL_OOP_TAG_CHAR        3    /* 0011 */
-#define HCL_OOP_TAG_ERROR       7    /* 0111 */
-#define HCL_OOP_TAG_RESERVED0   11   /* 1011 */
-#define HCL_OOP_TAG_RESERVED1   15   /* 1111 */
-
-#define HCL_OOP_GET_TAG_LO(oop) (((hcl_oow_t)oop) & HCL_LBMASK(hcl_oow_t, HCL_OOP_TAG_BITS_LO))
-#define HCL_OOP_GET_TAG_LOHI(oop) (((hcl_oow_t)oop) & HCL_LBMASK(hcl_oow_t, HCL_OOP_TAG_BITS_LO + HCL_OOP_TAG_BITS_HI))
-#define HCL_OOP_GET_TAG(oop) (HCL_OOP_GET_TAG_LO(oop) == HCL_OOP_TAG_EXTENDED? HCL_OOP_GET_TAG_LOHI(oop): HCL_OOP_GET_TAG_LO(oop))
-
-#define HCL_OOP_IS_NUMERIC(oop) (HCL_OOP_GET_TAG_LO(oop) != 0)
-#define HCL_OOP_IS_POINTER(oop) (HCL_OOP_GET_TAG_LO(oop) == 0)
-
-#define HCL_OOP_IS_SMOOI(oop) (HCL_OOP_GET_TAG_LO(oop) == HCL_OOP_TAG_SMOOI)
-#define HCL_OOP_IS_SMPTR(oop) (HCL_OOP_GET_TAG_LO(oop) == HCL_OOP_TAG_SMPTR)
-
-#define HCL_SMOOI_TO_OOP(num) ((hcl_oop_t)((((hcl_oow_t)(hcl_ooi_t)(num)) << HCL_OOP_TAG_BITS_LO) | HCL_OOP_TAG_SMOOI))
-#define HCL_OOP_TO_SMOOI(oop) (((hcl_ooi_t)oop) >> HCL_OOP_TAG_BITS_LO)
-/*
-#define HCL_SMPTR_TO_OOP(ptr) ((hcl_oop_t)((((hcl_oow_t)(ptr)) << HCL_OOP_TAG_BITS_LO) | HCL_OOP_TAG_SMPTR))
-#define HCL_OOP_TO_SMPTR(oop) (((hcl_ooi_t)oop) >> HCL_OOP_TAG_BITS_LO)
-*/
-#define HCL_SMPTR_TO_OOP(ptr) ((hcl_oop_t)(((hcl_oow_t)ptr) | HCL_OOP_TAG_SMPTR))
-#define HCL_OOP_TO_SMPTR(oop) ((void*)(((hcl_oow_t)oop) & ~HCL_LBMASK(hcl_oow_t, HCL_OOP_TAG_BITS_LO)))
-
-#define HCL_OOP_IS_CHAR(oop) (HCL_OOP_GET_TAG(oop) == HCL_OOP_TAG_CHAR)
-#define HCL_OOP_IS_ERROR(oop) (HCL_OOP_GET_TAG(oop) == HCL_OOP_TAG_ERROR)
-
-#define HCL_OOP_TO_CHAR(oop) (((hcl_oow_t)oop) >> (HCL_OOP_TAG_BITS_LO + HCL_OOP_TAG_BITS_LO))
-#define HCL_CHAR_TO_OOP(num) ((hcl_oop_t)((((hcl_oow_t)(num)) << (HCL_OOP_TAG_BITS_LO + HCL_OOP_TAG_BITS_LO)) | HCL_OOP_TAG_CHAR))
-#define HCL_OOP_TO_ERROR(oop) (((hcl_oow_t)oop) >> (HCL_OOP_TAG_BITS_LO + HCL_OOP_TAG_BITS_LO))
-#define HCL_ERROR_TO_OOP(num) ((hcl_oop_t)((((hcl_oow_t)(num)) << (HCL_OOP_TAG_BITS_LO + HCL_OOP_TAG_BITS_LO)) | HCL_OOP_TAG_ERROR))
-
-/* SMOOI takes up 62 bit on a 64-bit architecture and 30 bits 
- * on a 32-bit architecture. The absolute value takes up 61 bits and 29 bits
- * respectively for the 1 sign bit. */
-#define HCL_SMOOI_BITS (HCL_OOI_BITS - HCL_OOP_TAG_BITS_LO)
-#define HCL_SMOOI_ABS_BITS (HCL_SMOOI_BITS - 1)
-#define HCL_SMOOI_MAX ((hcl_ooi_t)(~((hcl_oow_t)0) >> (HCL_OOP_TAG_BITS_LO + 1)))
-/* Sacrificing 1 bit pattern for a negative SMOOI makes 
- * implementation a lot eaisier in many respect. */
-/*#define HCL_SMOOI_MIN (-HCL_SMOOI_MAX - 1)*/
-#define HCL_SMOOI_MIN (-HCL_SMOOI_MAX)
-#define HCL_IN_SMOOI_RANGE(ooi)  ((ooi) >= HCL_SMOOI_MIN && (ooi) <= HCL_SMOOI_MAX)
-
-
-/* SMPTR is a special value which has been devised to encode an address value
- * whose low HCL_OOP_TAG_BITS_LO bits are 0. its class is SmallPointer. A pointer
- * returned by most of system functions would be aligned to the pointer size. 
- * you can use the followings macros when converting such a pointer without loss. */
-#define HCL_IN_SMPTR_RANGE(ptr) ((((hcl_oow_t)ptr) & HCL_LBMASK(hcl_oow_t, HCL_OOP_TAG_BITS_LO)) == 0)
-
-#define HCL_CHAR_BITS (HCL_OOI_BITS - HCL_OOP_TAG_BITS_LO - HCL_OOP_TAG_BITS_HI)
-#define HCL_CHAR_MIN 0
-#define HCL_CHAR_MAX (~((hcl_oow_t)0) >> (HCL_OOP_TAG_BITS_LO + HCL_OOP_TAG_BITS_HI))
-
-#define HCL_ERROR_BITS (HCL_OOI_BITS - HCL_OOP_TAG_BITS_LO - HCL_OOP_TAG_BITS_HI)
-#define HCL_ERROR_MIN 0
-#define HCL_ERROR_MAX (~((hcl_oow_t)0) >> (HCL_OOP_TAG_BITS_LO + HCL_OOP_TAG_BITS_HI))
-
-/* TODO: There are untested code where smint is converted to hcl_oow_t.
- *       for example, the spec making macro treats the number as hcl_oow_t instead of hcl_ooi_t.
- *       as of this writing, i skip testing that part with the spec value exceeding HCL_SMOOI_MAX.
- *       later, please verify it works, probably by limiting the value ranges in such macros
- */
-
-/*
- * Object structure
- */
+/* =========================================================================
+ * OBJECT STRUCTURE
+ * ========================================================================= */
 enum hcl_obj_type_t
 {
 	HCL_OBJ_TYPE_OOP,
@@ -706,6 +617,10 @@ struct hcl_process_scheduler_t
 #define HCL_ISTYPEOF(hcl,oop,type) \
 	(!HCL_OOP_IS_NUMERIC(oop) && HCL_OBJ_GET_FLAGS_TYPE(oop) == (type))
 
+/* =========================================================================
+ * HEAP
+ * ========================================================================= */
+
 typedef struct hcl_heap_t hcl_heap_t;
 
 struct hcl_heap_t
@@ -716,7 +631,7 @@ struct hcl_heap_t
 };
 
 /* =========================================================================
- * HCL VM LOGGING
+ * VM LOGGING
  * ========================================================================= */
 
 enum hcl_log_mask_t

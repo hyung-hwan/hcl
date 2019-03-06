@@ -96,7 +96,7 @@ static void compact_symbol_table (hcl_t* hcl, hcl_oop_t _nil)
 
 			HCL_ASSERT (hcl, HCL_IS_SYMBOL(hcl, symbol));
 
-			z = hcl_hashoochars(symbol->slot, HCL_OBJ_GET_SIZE(symbol)) % bucket_size;
+			z = hcl_hash_oochars(symbol->slot, HCL_OBJ_GET_SIZE(symbol)) % bucket_size;
 
 			/* move an element if necessary */
 			if ((y > x && (z <= x || z > y)) ||

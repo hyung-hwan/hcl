@@ -81,7 +81,7 @@ static hcl_oop_oop_t expand_bucket (hcl_t* hcl, hcl_oop_oop_t oldbuc)
 			HCL_ASSERT (hcl, HCL_IS_CONS(hcl,ass));
 			key = (hcl_oop_char_t)ass->car;
 			HCL_ASSERT (hcl, HCL_IS_SYMBOL(hcl,key));
-			index = hcl_hashoochars(key->slot, HCL_OBJ_GET_SIZE(key)) % newsz;
+			index = hcl_hash_oochars(key->slot, HCL_OBJ_GET_SIZE(key)) % newsz;
 		#else
 			int n;
 			HCL_ASSERT (hcl, HCL_IS_CONS(hcl,ass));
@@ -113,7 +113,7 @@ static hcl_oop_cons_t find_or_upsert (hcl_t* hcl, hcl_oop_dic_t dic, hcl_oop_t k
 	HCL_ASSERT (hcl, HCL_IS_ARRAY(hcl,dic->bucket));
 
 #if defined(SYMBOL_ONLY_KEY)
-	index = hcl_hashoochars(HCL_OBJ_GET_CHAR_SLOT(key), HCL_OBJ_GET_SIZE(key)) % HCL_OBJ_GET_SIZE(dic->bucket);
+	index = hcl_hash_oochars(HCL_OBJ_GET_CHAR_SLOT(key), HCL_OBJ_GET_SIZE(key)) % HCL_OBJ_GET_SIZE(dic->bucket);
 #else
 	if (hcl_hashobj(hcl, key, &index) <= -1) return HCL_NULL;
 	index %= HCL_OBJ_GET_SIZE(dic->bucket);
@@ -199,7 +199,7 @@ static hcl_oop_cons_t find_or_upsert (hcl_t* hcl, hcl_oop_dic_t dic, hcl_oop_t k
 
 	#if defined(SYMBOL_ONLY_KEY)
 		/* recalculate the index for the expanded bucket */
-		index = hcl_hashoochars(HCL_OBJ_GET_CHAR_SLOT(key), HCL_OBJ_GET_SIZE(key)) % HCL_OBJ_GET_SIZE(dic->bucket);
+		index = hcl_hash_oochars(HCL_OBJ_GET_CHAR_SLOT(key), HCL_OBJ_GET_SIZE(key)) % HCL_OBJ_GET_SIZE(dic->bucket);
 	#else
 		hcl_hashobj(hcl, key, &index); /* this must succeed as i know 'key' is hashable */
 		index %= HCL_OBJ_GET_SIZE(dic->bucket);
@@ -286,7 +286,7 @@ int hcl_zapatdic (hcl_t* hcl, hcl_oop_dic_t dic, hcl_oop_t key)
 	HCL_ASSERT (hcl, HCL_IS_ARRAY(hcl,dic->bucket));
 
 #if defined(SYMBOL_ONLY_KEY)
-	index = hcl_hashoochars(HCL_OBJ_GET_CHAR_SLOT(key), HCL_OBJ_GET_SIZE(key)) % bs;
+	index = hcl_hash_oochars(HCL_OBJ_GET_CHAR_SLOT(key), HCL_OBJ_GET_SIZE(key)) % bs;
 #else
 	if (hcl_hashobj(hcl, key, &index) <= -1) return -1;
 	index %= bs;
@@ -336,7 +336,7 @@ found:
 	#if defined(SYMBOL_ONLY_KEY)
 		/* get the natural hash index for the data in the slot at
 		 * the current hash index */
-		z = hcl_hashoochars(HCL_OBJ_GET_CHAR_SLOT(ass->car), HCL_OBJ_GET_SIZE(ass->car)) % bs;
+		z = hcl_hash_oochars(HCL_OBJ_GET_CHAR_SLOT(ass->car), HCL_OBJ_GET_SIZE(ass->car)) % bs;
 	#else
 		if (hcl_hashobj(hcl, ass->car, &z) <= -1) return -1;
 		z %= bs;

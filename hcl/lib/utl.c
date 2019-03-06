@@ -35,48 +35,13 @@
  *  utobcstr -> ucstr to bcstr
  */
 
-#if HCL_SIZEOF_OOW_T == 4
-#	define FNV_MAGIC_INIT (0x811c9dc5)
-#	define FNV_MAGIC_PRIME (0x01000193)
-#elif HCL_SIZEOF_OOW_T == 8
-#	define FNV_MAGIC_INIT (0xCBF29CE484222325)
-#	define FNV_MAGIC_PRIME (0x100000001B3)
-#elif HCL_SIZEOF_OOW_T == 16
-#	define FNV_MAGIC_INIT (0x6C62272E07BB014262B821756295C58D)
-#	define FNV_MAGIC_PRIME (0x1000000000000000000013B)
-#endif
-
-hcl_oow_t hcl_hash_bytes (const hcl_oob_t* ptr, hcl_oow_t len)
+hcl_oow_t hcl_hash_bytes_ (const hcl_oob_t* ptr, hcl_oow_t len)
 {
-	hcl_oow_t h;
-	const hcl_uint8_t* bp, * be;
-
-	bp = ptr; be = bp + len;
-
-	/* this hash doesn't produce good distribution */
-	/* 
-	h = 0
-	while (bp < be) h = h * 31 + *bp++;
-	*/
-
-#if defined(FNV_MAGIC_INIT)
-	/* FNV-1 hash */
-	h = FNV_MAGIC_INIT;
-	while (bp < be)
-	{
-		h ^= (hcl_oow_t)(*bp++);
-		h *= FNV_MAGIC_PRIME;
-	}
-#else
-	/* SDBM hash is known to produce good overall distribution
-	 * for many different data sets */
-	h = 0;
-	while (bp < be) h = (h << 6) + (h << 16) - h + *bp++;
-#endif
-
+	hcl_oow_t hv;
+	HCL_HASH_BYTES (hv, ptr, len);
 	/* constrain the hash value to be representable in a small integer
 	 * for convenience sake */
-	return h % ((hcl_oow_t)HCL_SMOOI_MAX + 1);
+	return hv % ((hcl_oow_t)HCL_SMOOI_MAX + 1);
 }
 
 int hcl_equal_uchars (const hcl_uch_t* str1, const hcl_uch_t* str2, hcl_oow_t len)
