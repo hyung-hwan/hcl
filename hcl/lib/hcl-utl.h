@@ -120,15 +120,15 @@
  * HASH
  * ========================================================================= */
 
-#if (HCL_SIZEOF_SIZE_T == 4)
+#if (HCL_SIZEOF_OOW_T == 4)
 #	define HCL_HASH_FNV_MAGIC_INIT (0x811c9dc5)
 #	define HCL_HASH_FNV_MAGIC_PRIME (0x01000193)
-#elif (HCL_SIZEOF_SIZE_T == 8)
+#elif (HCL_SIZEOF_OOW_T == 8)
 
 #	define HCL_HASH_FNV_MAGIC_INIT (0xCBF29CE484222325)
 #	define HCL_HASH_FNV_MAGIC_PRIME (0x100000001B3l)
 
-#elif (HCL_SIZEOF_SIZE_T == 16)
+#elif (HCL_SIZEOF_OOW_T == 16)
 #	define HCL_HASH_FNV_MAGIC_INIT (0x6C62272E07BB014262B821756295C58D)
 #	define HCL_HASH_FNV_MAGIC_PRIME (0x1000000000000000000013B)
 #endif
