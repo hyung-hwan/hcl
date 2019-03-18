@@ -359,6 +359,42 @@ hcl_bch_t* hcl_find_bchar_in_bcstr (const hcl_bch_t* ptr, hcl_bch_t c)
 
 /* ----------------------------------------------------------------------- */
 
+hcl_oow_t hcl_byte_to_bcstr (hcl_uint8_t byte, hcl_bch_t* buf, hcl_oow_t size, int flagged_radix, hcl_bch_t fill)
+{
+	hcl_bch_t tmp[(HCL_SIZEOF(hcl_uint8_t) * 8)];
+	hcl_bch_t* p = tmp, * bp = buf, * be = buf + size - 1;
+	int radix;
+	hcl_bch_t radix_char;
+
+	radix = (flagged_radix & HCL_BYTE_TO_BCSTR_RADIXMASK);
+	radix_char = (flagged_radix & HCL_BYTE_TO_BCSTR_LOWERCASE)? 'a': 'A';
+	if (radix < 2 || radix > 36 || size <= 0) return 0;
+
+	do 
+	{
+		hcl_uint8_t digit = byte % radix;	
+		if (digit < 10) *p++ = digit + '0';
+		else *p++ = digit + radix_char - 10;
+		byte /= radix;
+	}
+	while (byte > 0);
+
+	if (fill != '\0') 
+	{
+		while (size - 1 > p - tmp) 
+		{
+			*bp++ = fill;
+			size--;
+		}
+	}
+
+	while (p > tmp && bp < be) *bp++ = *--p;
+	*bp = '\0';
+	return bp - buf;
+}
+
+/* ----------------------------------------------------------------------- */
+
 HCL_INLINE int hcl_conv_bchars_to_uchars_with_cmgr (
 	const hcl_bch_t* bcs, hcl_oow_t* bcslen,
 	hcl_uch_t* ucs, hcl_oow_t* ucslen, hcl_cmgr_t* cmgr, int all)

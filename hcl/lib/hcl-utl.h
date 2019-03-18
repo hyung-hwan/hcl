@@ -429,8 +429,16 @@ HCL_EXPORT hcl_oow_t hcl_count_bcstr (
 #	define hcl_count_oocstr(str) hcl_count_bcstr(str)
 #endif
 
+#define HCL_BYTE_TO_BCSTR_RADIXMASK (0xFF)
+#define HCL_BYTE_TO_BCSTR_LOWERCASE (1 << 8)
 
-
+hcl_oow_t hcl_byte_to_bcstr (
+	hcl_uint8_t   byte,  
+	hcl_bch_t*    buf,
+	hcl_oow_t     size,
+	int           flagged_radix,
+	hcl_bch_t     fill
+);
 
 
 HCL_EXPORT int hcl_conv_bcs_to_ucs_with_cmgr (
