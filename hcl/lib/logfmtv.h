@@ -90,9 +90,9 @@
 	} \
 } while (0)
 
-#define PUT_BYTE_IN_HEX(byte) do { \
+#define PUT_BYTE_IN_HEX(byte,extra_flags) do { \
 	hcl_bch_t __xbuf[3]; \
-	hcl_byte_to_bcstr (byte, __xbuf, HCL_COUNTOF(__xbuf), (16 | (ch == 'w'? HCL_BYTE_TO_BCSTR_LOWERCASE: 0)), '0'); \
+	hcl_byte_to_bcstr ((byte), __xbuf, HCL_COUNTOF(__xbuf), (16 | (extra_flags)), '0'); \
 	PUT_OOCH(__xbuf[0], 1); \
 	PUT_OOCH(__xbuf[1], 1); \
 } while (0)
@@ -747,20 +747,22 @@ static int logfmtv (hcl_t* hcl, const fmtchar_t* fmt, hcl_fmtout_t* data, va_lis
 				else if (!(lm_flag & LF_L) && *usp <= 0xFFFF) 
 				{
 					hcl_uint16_t u16 = *usp;
+					int extra_flags = ((ch) == 'w'? HCL_BYTE_TO_BCSTR_LOWERCASE: 0);
 					PUT_OOCH('\\', 1);
 					PUT_OOCH('u', 1);
-					PUT_BYTE_IN_HEX((u16 >> 8) & 0xFF);
-					PUT_BYTE_IN_HEX(u16 & 0xFF);
+					PUT_BYTE_IN_HEX((u16 >> 8) & 0xFF, extra_flags);
+					PUT_BYTE_IN_HEX(u16 & 0xFF, extra_flags);
 				}
 				else
 				{
 					hcl_uint32_t u32 = *usp;
+					int extra_flags = ((ch) == 'w'? HCL_BYTE_TO_BCSTR_LOWERCASE: 0);
 					PUT_OOCH('\\', 1);
 					PUT_OOCH('U', 1);
-					PUT_BYTE_IN_HEX((u32 >> 24) & 0xFF);
-					PUT_BYTE_IN_HEX((u32 >> 16) & 0xFF);
-					PUT_BYTE_IN_HEX((u32 >> 8) & 0xFF);
-					PUT_BYTE_IN_HEX(u32 & 0xFF);
+					PUT_BYTE_IN_HEX((u32 >> 24) & 0xFF, extra_flags);
+					PUT_BYTE_IN_HEX((u32 >> 16) & 0xFF, extra_flags);
+					PUT_BYTE_IN_HEX((u32 >> 8) & 0xFF, extra_flags);
+					PUT_BYTE_IN_HEX(u32 & 0xFF, extra_flags);
 				}
 				usp++;
 			}
