@@ -516,7 +516,7 @@ HCL_INLINE int hcl_conv_bchars_to_uchars_with_cmgr (
 	return ret;
 }
 
-HCL_INLINE int hcl_conv_bcs_to_ucs_with_cmgr (
+HCL_INLINE int hcl_conv_bcstr_to_ucstr_with_cmgr (
 	const hcl_bch_t* bcs, hcl_oow_t* bcslen,
 	hcl_uch_t* ucs, hcl_oow_t* ucslen, hcl_cmgr_t* cmgr, int all)
 {
@@ -608,7 +608,7 @@ HCL_INLINE int hcl_conv_uchars_to_bchars_with_cmgr (
 	return ret;
 }
 
-HCL_INLINE int hcl_conv_ucs_to_bcs_with_cmgr (
+HCL_INLINE int hcl_conv_ucstr_to_bcstr_with_cmgr (
 	const hcl_uch_t* ucs, hcl_oow_t* ucslen,
 	hcl_bch_t* bcs, hcl_oow_t* bcslen, hcl_cmgr_t* cmgr)
 {
@@ -717,13 +717,13 @@ int hcl_conv_uchars_to_utf8 (const hcl_uch_t* ucs, hcl_oow_t* ucslen, hcl_bch_t*
 int hcl_conv_utf8_to_ucstr (const hcl_bch_t* bcs, hcl_oow_t* bcslen, hcl_uch_t* ucs, hcl_oow_t* ucslen)
 {
 	/* null-terminated. */
-	return hcl_conv_bcs_to_ucs_with_cmgr(bcs, bcslen, ucs, ucslen, &utf8_cmgr, 0);
+	return hcl_conv_bcstr_to_ucstr_with_cmgr(bcs, bcslen, ucs, ucslen, &utf8_cmgr, 0);
 }
 
 int hcl_conv_ucstr_to_utf8 (const hcl_uch_t* ucs, hcl_oow_t* ucslen, hcl_bch_t* bcs, hcl_oow_t* bcslen)
 {
 	/* null-terminated */
-	return hcl_conv_ucs_to_bcs_with_cmgr(ucs, ucslen, bcs, bcslen, &utf8_cmgr);
+	return hcl_conv_ucstr_to_bcstr_with_cmgr(ucs, ucslen, bcs, bcslen, &utf8_cmgr);
 }
 
 /* ----------------------------------------------------------------------- */
@@ -764,7 +764,7 @@ int hcl_convbtoucstr (hcl_t* hcl, const hcl_bch_t* bcs, hcl_oow_t* bcslen, hcl_u
 	/* null-terminated. */
 	int n;
 
-	n = hcl_conv_bcs_to_ucs_with_cmgr(bcs, bcslen, ucs, ucslen, hcl->cmgr, 0);
+	n = hcl_conv_bcstr_to_ucstr_with_cmgr(bcs, bcslen, ucs, ucslen, hcl->cmgr, 0);
 
 	if (n <= -1)
 	{
@@ -779,7 +779,7 @@ int hcl_convutobcstr (hcl_t* hcl, const hcl_uch_t* ucs, hcl_oow_t* ucslen, hcl_b
 	/* null-terminated */
 	int n;
 
-	n = hcl_conv_ucs_to_bcs_with_cmgr(ucs, ucslen, bcs, bcslen, hcl->cmgr);
+	n = hcl_conv_ucstr_to_bcstr_with_cmgr(ucs, ucslen, bcs, bcslen, hcl->cmgr);
 
 	if (n <= -1)
 	{

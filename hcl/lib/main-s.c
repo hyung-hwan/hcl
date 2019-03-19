@@ -130,10 +130,7 @@ static int write_all (int fd, const hcl_bch_t* ptr, hcl_oow_t len)
 
 static int write_log (hcl_server_t* server, int fd, const hcl_bch_t* ptr, hcl_oow_t len)
 {
-	server_xtn_t* xtn;
-
-
-	xtn = hcl_server_getxtn(server);
+	server_xtn_t* xtn = (server_xtn_t*)hcl_server_getxtn(server);
 
 	while (len > 0)
 	{
@@ -182,8 +179,8 @@ static int write_log (hcl_server_t* server, int fd, const hcl_bch_t* ptr, hcl_oo
 
 static void flush_log (hcl_server_t* server, int fd)
 {
-	server_xtn_t* xtn;
-	xtn = hcl_server_getxtn(server);
+	server_xtn_t* xtn = (server_xtn_t*)hcl_server_getxtn(server);
+
 	if (xtn->logbuf.len > 0)
 	{
 		write_all (fd, xtn->logbuf.buf, xtn->logbuf.len);
@@ -193,13 +190,11 @@ static void flush_log (hcl_server_t* server, int fd)
 
 static void log_write (hcl_server_t* server, hcl_oow_t wid, hcl_bitmask_t mask, const hcl_ooch_t* msg, hcl_oow_t len)
 {
+	server_xtn_t* xtn = (server_xtn_t*)hcl_server_getxtn(server);
 	hcl_bch_t buf[256];
 	hcl_oow_t ucslen, bcslen;
-	server_xtn_t* xtn;
 	hcl_oow_t msgidx;
 	int n, logfd;
-
-	xtn = hcl_server_getxtn(server);
 
 	if (mask & HCL_LOG_STDERR)
 	{
@@ -491,7 +486,7 @@ static int handle_incpath (hcl_server_t* server, const char* str)
 	hcl_oow_t bcslen, ucslen;
 
 	ucslen = HCL_COUNTOF(incpath);
-	if (hcl_conv_bcs_to_ucs_with_cmgr(str, &bcslen, incpath, &ucslen, hcl_server_getcmgr(server), 1) <= -1) return -1;
+	if (hcl_conv_bcstr_to_ucstr_with_cmgr(str, &bcslen, incpath, &ucslen, hcl_server_getcmgr(server), 1) <= -1) return -1;
 	return hcl_server_setoption(server, HCL_SERVER_SCRIPT_INCLUDE_PATH, incpath);
 #else
 	return hcl_server_setoption(server, HCL_SERVER_SCRIPT_INCLUDE_PATH, str);

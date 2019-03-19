@@ -441,7 +441,7 @@ hcl_oow_t hcl_byte_to_bcstr (
 );
 
 
-HCL_EXPORT int hcl_conv_bcs_to_ucs_with_cmgr (
+HCL_EXPORT int hcl_conv_bcstr_to_ucstr_with_cmgr (
 	const hcl_bch_t* bcs,
 	hcl_oow_t*       bcslen,
 	hcl_uch_t*       ucs,
@@ -459,7 +459,7 @@ HCL_EXPORT int hcl_conv_bchars_to_uchars_with_cmgr (
 	int              all
 );
 
-HCL_EXPORT int hcl_conv_ucs_to_bcs_with_cmgr (
+HCL_EXPORT int hcl_conv_ucstr_to_bcstr_with_cmgr (
 	const hcl_uch_t* ucs,
 	hcl_oow_t*       ucslen,
 	hcl_bch_t*       bcs,
@@ -476,10 +476,10 @@ HCL_EXPORT int hcl_conv_uchars_to_bchars_with_cmgr (
 );
 
 #if defined(HCL_OOCH_IS_UCH)
-#	define hcl_conv_oocs_to_bcs_with_cmgr(oocs,oocslen,bcs,bcslen,cmgr) hcl_conv_ucs_to_bcs_with_cmgr(oocs,oocslen,bcs,bcslen,cmgr)
+#	define hcl_conv_oocstr_to_bcstr_with_cmgr(oocs,oocslen,bcs,bcslen,cmgr) hcl_conv_ucstr_to_bcstr_with_cmgr(oocs,oocslen,bcs,bcslen,cmgr)
 #	define hcl_conv_oochars_to_bchars_with_cmgr(oocs,oocslen,bcs,bcslen,cmgr) hcl_conv_uchars_to_bchars_with_cmgr(oocs,oocslen,bcs,bcslen,cmgr)
 #else
-#	define hcl_conv_oocs_to_ucs_with_cmgr(oocs,oocslen,ucs,ucslen,cmgr) hcl_conv_bcs_to_ucs_with_cmgr(oocs,oocslen,ucs,ucslen,cmgr,0)
+#	define hcl_conv_oocstr_to_ucstr_with_cmgr(oocs,oocslen,ucs,ucslen,cmgr) hcl_conv_bcstr_to_ucstr_with_cmgr(oocs,oocslen,ucs,ucslen,cmgr,0)
 #	define hcl_conv_oochars_to_uchars_with_cmgr(oocs,oocslen,ucs,ucslen,cmgr) hcl_conv_bchars_to_uchars_with_cmgr(oocs,oocslen,ucs,ucslen,cmgr,0)
 #endif
 

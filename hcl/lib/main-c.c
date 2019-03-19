@@ -701,7 +701,7 @@ static int handle_request (hcl_client_t* client, const char* ipaddr, const char*
 			hcl_oow_t ucslen, bcslen;
 
 			bcslen = HCL_COUNTOF(errbuf);
-			hcl_conv_ucs_to_bcs_with_cmgr (errmsg, &ucslen, errbuf, &bcslen, hcl_client_getcmgr(client));
+			hcl_conv_ucstr_to_bcstr_with_cmgr (errmsg, &ucslen, errbuf, &bcslen, hcl_client_getcmgr(client));
 			fprintf (stderr, "Client error [%d] - %s\n", (int)errnum, errbuf);
 		#else
 			fprintf (stderr, "Client error [%d] - %s\n", (int)hcl_client_geterrnum(client), hcl_client_geterrmsg(client));
