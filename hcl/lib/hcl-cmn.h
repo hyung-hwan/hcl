@@ -65,45 +65,60 @@
 #if defined(HCL_SIZEOF_CHAR) && (HCL_SIZEOF_CHAR == 1)
 #	define HCL_HAVE_UINT8_T
 #	define HCL_HAVE_INT8_T
+#	define HCL_SIZEOF_UINT8_T (HCL_SIZEOF_CHAR)
+#	define HCL_SIZEOF_INT8_T (HCL_SIZEOF_CHAR)
 	typedef unsigned char      hcl_uint8_t;
 	typedef signed char        hcl_int8_t;
 #elif defined(HCL_SIZEOF___INT8) && (HCL_SIZEOF___INT8 == 1)
 #	define HCL_HAVE_UINT8_T
 #	define HCL_HAVE_INT8_T
+#	define HCL_SIZEOF_UINT8_T (HCL_SIZEOF___INT8)
+#	define HCL_SIZEOF_INT8_T (HCL_SIZEOF___INT8)
 	typedef unsigned __int8    hcl_uint8_t;
 	typedef signed __int8      hcl_int8_t;
 #elif defined(HCL_SIZEOF___INT8_T) && (HCL_SIZEOF___INT8_T == 1)
 #	define HCL_HAVE_UINT8_T
 #	define HCL_HAVE_INT8_T
+#	define HCL_SIZEOF_UINT8_T (HCL_SIZEOF___INT8_T)
+#	define HCL_SIZEOF_INT8_T (HCL_SIZEOF___INT8_T)
 	typedef unsigned __int8_t  hcl_uint8_t;
 	typedef signed __int8_t    hcl_int8_t;
 #else
 #	define HCL_HAVE_UINT8_T
 #	define HCL_HAVE_INT8_T
+#	define HCL_SIZEOF_UINT8_T (1)
+#	define HCL_SIZEOF_INT8_T (1)
 	typedef unsigned char      hcl_uint8_t;
 	typedef signed char        hcl_int8_t;
 #endif
-
 
 /* hcl_int16_t */
 #if defined(HCL_SIZEOF_SHORT) && (HCL_SIZEOF_SHORT == 2)
 #	define HCL_HAVE_UINT16_T
 #	define HCL_HAVE_INT16_T
+#	define HCL_SIZEOF_UINT16_T (HCL_SIZEOF_SHORT)
+#	define HCL_SIZEOF_INT16_T (HCL_SIZEOF_SHORT)
 	typedef unsigned short int  hcl_uint16_t;
 	typedef signed short int    hcl_int16_t;
 #elif defined(HCL_SIZEOF___INT16) && (HCL_SIZEOF___INT16 == 2)
 #	define HCL_HAVE_UINT16_T
 #	define HCL_HAVE_INT16_T
+#	define HCL_SIZEOF_UINT16_T (HCL_SIZEOF___INT16)
+#	define HCL_SIZEOF_INT16_T (HCL_SIZEOF___INT16)
 	typedef unsigned __int16    hcl_uint16_t;
 	typedef signed __int16      hcl_int16_t;
 #elif defined(HCL_SIZEOF___INT16_T) && (HCL_SIZEOF___INT16_T == 2)
 #	define HCL_HAVE_UINT16_T
 #	define HCL_HAVE_INT16_T
+#	define HCL_SIZEOF_UINT16_T (HCL_SIZEOF___INT16_T)
+#	define HCL_SIZEOF_INT16_T (HCL_SIZEOF___INT16_T)
 	typedef unsigned __int16_t  hcl_uint16_t;
 	typedef signed __int16_t    hcl_int16_t;
 #else
 #	define HCL_HAVE_UINT16_T
 #	define HCL_HAVE_INT16_T
+#	define HCL_SIZEOF_UINT16_T (2)
+#	define HCL_SIZEOF_INT16_T (2)
 	typedef unsigned short int  hcl_uint16_t;
 	typedef signed short int    hcl_int16_t;
 #endif
@@ -113,31 +128,43 @@
 #if defined(HCL_SIZEOF_INT) && (HCL_SIZEOF_INT == 4)
 #	define HCL_HAVE_UINT32_T
 #	define HCL_HAVE_INT32_T
+#	define HCL_SIZEOF_UINT32_T (HCL_SIZEOF_INT)
+#	define HCL_SIZEOF_INT32_T (HCL_SIZEOF_INT)
 	typedef unsigned int        hcl_uint32_t;
 	typedef signed int          hcl_int32_t;
 #elif defined(HCL_SIZEOF_LONG) && (HCL_SIZEOF_LONG == 4)
 #	define HCL_HAVE_UINT32_T
 #	define HCL_HAVE_INT32_T
+#	define HCL_SIZEOF_UINT32_T (HCL_SIZEOF_LONG)
+#	define HCL_SIZEOF_INT32_T (HCL_SIZEOF_LONG)
 	typedef unsigned long int   hcl_uint32_t;
 	typedef signed long int     hcl_int32_t;
 #elif defined(HCL_SIZEOF___INT32) && (HCL_SIZEOF___INT32 == 4)
 #	define HCL_HAVE_UINT32_T
 #	define HCL_HAVE_INT32_T
+#	define HCL_SIZEOF_UINT32_T (HCL_SIZEOF___INT32)
+#	define HCL_SIZEOF_INT32_T (HCL_SIZEOF___INT32)
 	typedef unsigned __int32    hcl_uint32_t;
 	typedef signed __int32      hcl_int32_t;
 #elif defined(HCL_SIZEOF___INT32_T) && (HCL_SIZEOF___INT32_T == 4)
 #	define HCL_HAVE_UINT32_T
 #	define HCL_HAVE_INT32_T
+#	define HCL_SIZEOF_UINT32_T (HCL_SIZEOF___INT32_T)
+#	define HCL_SIZEOF_INT32_T (HCL_SIZEOF___INT32_T)
 	typedef unsigned __int32_t  hcl_uint32_t;
 	typedef signed __int32_t    hcl_int32_t;
 #elif defined(__DOS__)
 #	define HCL_HAVE_UINT32_T
 #	define HCL_HAVE_INT32_T
+#	define HCL_SIZEOF_UINT32_T (4)
+#	define HCL_SIZEOF_INT32_T (4)
 	typedef unsigned long int   hcl_uint32_t;
 	typedef signed long int     hcl_int32_t;
 #else
 #	define HCL_HAVE_UINT32_T
 #	define HCL_HAVE_INT32_T
+#	define HCL_SIZEOF_UINT32_T (4)
+#	define HCL_SIZEOF_INT32_T (4)
 	typedef unsigned int        hcl_uint32_t;
 	typedef signed int          hcl_int32_t;
 #endif
@@ -146,26 +173,36 @@
 #if defined(HCL_SIZEOF_INT) && (HCL_SIZEOF_INT == 8)
 #	define HCL_HAVE_UINT64_T
 #	define HCL_HAVE_INT64_T
+#	define HCL_SIZEOF_UINT64_T (HCL_SIZEOF_INT)
+#	define HCL_SIZEOF_INT64_T (HCL_SIZEOF_INT)
 	typedef unsigned int        hcl_uint64_t;
 	typedef signed int          hcl_int64_t;
 #elif defined(HCL_SIZEOF_LONG) && (HCL_SIZEOF_LONG == 8)
 #	define HCL_HAVE_UINT64_T
 #	define HCL_HAVE_INT64_T
+#	define HCL_SIZEOF_UINT64_T (HCL_SIZEOF_LONG)
+#	define HCL_SIZEOF_INT64_T (HCL_SIZEOF_LONG)
 	typedef unsigned long int  hcl_uint64_t;
 	typedef signed long int    hcl_int64_t;
 #elif defined(HCL_SIZEOF_LONG_LONG) && (HCL_SIZEOF_LONG_LONG == 8)
 #	define HCL_HAVE_UINT64_T
 #	define HCL_HAVE_INT64_T
+#	define HCL_SIZEOF_UINT64_T (HCL_SIZEOF_LONG_LONG)
+#	define HCL_SIZEOF_INT64_T (HCL_SIZEOF_LONG_LONG)
 	typedef unsigned long long int  hcl_uint64_t;
 	typedef signed long long int    hcl_int64_t;
 #elif defined(HCL_SIZEOF___INT64) && (HCL_SIZEOF___INT64 == 8)
 #	define HCL_HAVE_UINT64_T
 #	define HCL_HAVE_INT64_T
+#	define HCL_SIZEOF_UINT64_T (HCL_SIZEOF_LONG___INT64)
+#	define HCL_SIZEOF_INT64_T (HCL_SIZEOF_LONG___INT64)
 	typedef unsigned __int64    hcl_uint64_t;
 	typedef signed __int64      hcl_int64_t;
 #elif defined(HCL_SIZEOF___INT64_T) && (HCL_SIZEOF___INT64_T == 8)
 #	define HCL_HAVE_UINT64_T
 #	define HCL_HAVE_INT64_T
+#	define HCL_SIZEOF_UINT64_T (HCL_SIZEOF_LONG___INT64_T)
+#	define HCL_SIZEOF_INT64_T (HCL_SIZEOF_LONG___INT64_T)
 	typedef unsigned __int64_t  hcl_uint64_t;
 	typedef signed __int64_t    hcl_int64_t;
 #else
@@ -176,26 +213,36 @@
 #if defined(HCL_SIZEOF_INT) && (HCL_SIZEOF_INT == 16)
 #	define HCL_HAVE_UINT128_T
 #	define HCL_HAVE_INT128_T
+#	define HCL_SIZEOF_UINT128_T (HCL_SIZEOF_INT)
+#	define HCL_SIZEOF_INT128_T (HCL_SIZEOF_INT)
 	typedef unsigned int        hcl_uint128_t;
 	typedef signed int          hcl_int128_t;
 #elif defined(HCL_SIZEOF_LONG) && (HCL_SIZEOF_LONG == 16)
 #	define HCL_HAVE_UINT128_T
 #	define HCL_HAVE_INT128_T
+#	define HCL_SIZEOF_UINT128_T (HCL_SIZEOF_LONG)
+#	define HCL_SIZEOF_INT128_T (HCL_SIZEOF_LONG)
 	typedef unsigned long int   hcl_uint128_t;
 	typedef signed long int     hcl_int128_t;
 #elif defined(HCL_SIZEOF_LONG_LONG) && (HCL_SIZEOF_LONG_LONG == 16)
 #	define HCL_HAVE_UINT128_T
 #	define HCL_HAVE_INT128_T
+#	define HCL_SIZEOF_UINT128_T (HCL_SIZEOF_LONG_LONG)
+#	define HCL_SIZEOF_INT128_T (HCL_SIZEOF_LONG_LONG)
 	typedef unsigned long long int hcl_uint128_t;
 	typedef signed long long int   hcl_int128_t;
 #elif defined(HCL_SIZEOF___INT128) && (HCL_SIZEOF___INT128 == 16)
 #	define HCL_HAVE_UINT128_T
 #	define HCL_HAVE_INT128_T
+#	define HCL_SIZEOF_UINT128_T (HCL_SIZEOF___INT128)
+#	define HCL_SIZEOF_INT128_T (HCL_SIZEOF___INT128)
 	typedef unsigned __int128    hcl_uint128_t;
 	typedef signed __int128      hcl_int128_t;
 #elif defined(HCL_SIZEOF___INT128_T) && (HCL_SIZEOF___INT128_T == 16)
 #	define HCL_HAVE_UINT128_T
 #	define HCL_HAVE_INT128_T
+#	define HCL_SIZEOF_UINT128_T (HCL_SIZEOF___INT128_T)
+#	define HCL_SIZEOF_INT128_T (HCL_SIZEOF___INT128_T)
 	#if defined(HCL_SIZEOF___UINT128_T) && (HCL_SIZEOF___UINT128_T == HCL_SIZEOF___INT128_T)
 	typedef __uint128_t  hcl_uint128_t;
 	typedef __int128_t   hcl_int128_t;
@@ -868,6 +915,8 @@ typedef struct hcl_t hcl_t;
 
 	#if (__GNUC__ >= 4) || (__GNUC__ == 3 && __GNUC_MINOR__ >= 4)
 		#define HCL_HAVE_BUILTIN_CTZ
+		#define HCL_HAVE_BUILTIN_CTZL
+		#define HCL_HAVE_BUILTIN_CTZLL
 		#define HCL_HAVE_BUILTIN_EXPECT
 	#endif
 

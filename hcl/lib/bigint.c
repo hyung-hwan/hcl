@@ -34,21 +34,110 @@
 #	error UNSUPPORTED LIW BIT SIZE
 #endif
 
-/*#define IS_POWER_OF_2(ui) (((ui) > 0) && (((ui) & (~(ui)+ 1)) == (ui)))*/
-#define IS_POWER_OF_2(ui) (((ui) > 0) && ((ui) & ((ui) - 1)) == 0)
 
 #define IS_SIGN_DIFF(x,y) (((x) ^ (y)) < 0)
+
+/*#define IS_POW2(ui) (((ui) > 0) && (((ui) & (~(ui)+ 1)) == (ui)))*/
+#define IS_POW2(ui) (((ui) > 0) && ((ui) & ((ui) - 1)) == 0)
 
 /* digit character array */
 static char _digitc_upper[] = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ";
 static char _digitc_lower[] = "0123456789abcdefghijklmnopqrstuvwxyz";
 
-/* exponent table */
-static hcl_uint8_t _exp_tab[] = 
+/* exponent table for pow2 between 1 and 32 inclusive. */
+static hcl_uint8_t _exp_tab[32] = 
 {
-	0, 0, 1, 0, 2, 0, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0, 4, 
-	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 5, 0
+	0, 1, 0, 2, 0, 0, 0, 3,
+	0, 0, 0, 0, 0, 0, 0, 4,
+	0, 0, 0, 0, 0, 0, 0, 0,
+	0, 0, 0, 0, 0, 0, 0, 5
 };
+
+static const hcl_uint8_t debruijn_32[32] = 
+{
+	0, 1, 28, 2, 29, 14, 24, 3,
+	30, 22, 20, 15, 25, 17, 4, 8, 
+	31, 27, 13, 23, 21, 19, 16, 7,
+	26, 12, 18, 6, 11, 5, 10, 9
+};
+
+static const hcl_uint8_t debruijn_64[64] = 
+{
+	0, 1,  2, 53,  3,  7, 54, 27,
+	4, 38, 41,  8, 34, 55, 48, 28,
+	62,  5, 39, 46, 44, 42, 22,  9,
+	24, 35, 59, 56, 49, 18, 29, 11,
+	63, 52,  6, 26, 37, 40, 33, 47,
+	61, 45, 43, 21, 23, 58, 17, 10,
+	51, 25, 36, 32, 60, 20, 57, 16,
+	50, 31, 19, 15, 30, 14, 13, 12
+};
+
+#if defined(HCL_HAVE_UINT32_T)
+#	define LOG2_FOR_POW2_32(x) (debruijn_32[(hcl_uint32_t)((hcl_uint32_t)(x) * 0x077CB531) >> 27])
+#endif
+
+#if defined(HCL_HAVE_UINT64_T)
+#	define LOG2_FOR_POW2_64(x) (debruijn_64[(hcl_uint64_t)((hcl_uint64_t)(x) * 0x022fdd63cc95386d) >> 58])
+#endif
+
+static HCL_INLINE int get_pos_of_msb_set (hcl_oow_t x)
+{
+	/* the caller must ensure that x is power of 2. if x happens to be zero,
+	 * the return value is undefined as each method used may give different result. */
+#if defined(HCL_HAVE_BUILTIN_CTZLL) && (HCL_SIZEOF_OOW_T == HCL_SIZEOF_LONG_LONG)
+	return __builtin_ctzll(x); /* count the number of trailing zeros */
+#elif defined(HCL_HAVE_BUILTIN_CTZL) && (HCL_SIZEOF_OOW_T == HCL_SIZEOF_LONG)
+	return __builtin_ctzl(x); /* count the number of trailing zeros */
+#elif defined(HCL_HAVE_BUILTIN_CTZ) && (HCL_SIZEOF_OOW_T == HCL_SIZEOF_INT)
+	return __builtin_ctz(x); /* count the number of trailing zeros */
+#elif defined(__GNUC__) && (defined(__x86_64) || defined(__amd64) || defined(__i386) || defined(i386))
+	hcl_oow_t pos;
+	/* use the Bit Scan Forward instruction */
+#if 1
+	__asm__ volatile (
+		"bsf %1,%0\n\t"
+		: "=r"(pos) /* output */
+		: "r"(x) /* input */
+	);
+#else
+	__asm__ volatile (
+		"bsf %[X],%[EXP]\n\t"
+		: [EXP]"=r"(pos) /* output */
+		: [X]"r"(x) /* input */
+	);
+#endif
+	return (int)pos;
+#elif defined(USE_UGLY_CODE) && defined(__GNUC__) && defined(__arm__) && (defined(__ARM_ARCH_5__) || defined(__ARM_ARCH_6__) || defined(__ARM_ARCH_7__) || defined(__ARM_ARCH_8__))
+	hcl_oow_t pos;
+
+	/* CLZ is available in ARMv5T and above. there is no instruction to
+	 * count trailing zeros or something similar. using RBIT with CLZ
+	 * would be good in ARMv6T2 and above to avoid further calculation
+	 * afte CLZ */
+	__asm__ volatile (
+		"clz %0,%1\n\t"
+		: "=r"(pos) /* output */
+		: "r"(x) /* input */
+	);
+	return (int)((HCL_SIZEOF(pos) * 8) - pos - 1); 
+
+	/* TODO: PPC - use cntlz, cntlzw, cntlzd, SPARC - use lzcnt, MIPS clz */
+
+#else
+	int pos = 0;
+	while (x >>= 1) pos++;
+	return pos;
+#endif
+}
+
+#if defined(HCL_HAVE_UINT32_T) && (HCL_SIZEOF_OOW_T == HCL_SIZEOF_UINT32_T)
+#	define LOG2_FOR_POW2(x) LOG2_FOR_POW2_32(x)
+#elif defined(HCL_HAVE_UINT64_T) && (HCL_SIZEOF_OOW_T == HCL_SIZEOF_UINT64_T)
+#	define LOG2_FOR_POW2(x) LOG2_FOR_POW2_64(x)
+#else
+#	define LOG2_FOR_POW2(x) get_pos_of_msb_set(x)
+#endif
 
 
 #if (HCL_SIZEOF_OOW_T == HCL_SIZEOF_INT) && defined(HCL_HAVE_BUILTIN_UADD_OVERFLOW)
@@ -1904,7 +1993,7 @@ hcl_oop_t hcl_divints (hcl_t* hcl, hcl_oop_t x, hcl_oop_t y, int modulo, hcl_oop
 
 	if (HCL_OOP_IS_SMOOI(x) && HCL_OOP_IS_SMOOI(y))
 	{
-		hcl_ooi_t xv, yv, q, r;
+		hcl_ooi_t xv, yv, q, ri;
 
 		xv = HCL_OOP_TO_SMOOI(x);
 		yv = HCL_OOP_TO_SMOOI(y);
@@ -1942,8 +2031,8 @@ hcl_oop_t hcl_divints (hcl_t* hcl, hcl_oop_t x, hcl_oop_t y, int modulo, hcl_oop
 		q = xv / yv;
 		HCL_ASSERT (hcl, HCL_IN_SMOOI_RANGE(q));
 
-		r = xv - yv * q; /* xv % yv; */
-		if (r)
+		ri = xv - yv * q; /* xv % yv; */
+		if (ri)
 		{
 			if (modulo)
 			{
@@ -1959,13 +2048,13 @@ hcl_oop_t hcl_divints (hcl_t* hcl, hcl_oop_t x, hcl_oop_t y, int modulo, hcl_oop
 
 				/* r must be floored. that is, it rounds away from zero 
 				 * and towards negative infinity */
-				if (IS_SIGN_DIFF(yv, r))
+				if (IS_SIGN_DIFF(yv, ri))
 				{
 					/* if the divisor has a different sign from r,
 					 * change the sign of r to the divisor's sign */
-					r += yv;
+					ri += yv;
 					--q;
-					HCL_ASSERT (hcl, r && !IS_SIGN_DIFF(yv, r));
+					HCL_ASSERT (hcl, ri && !IS_SIGN_DIFF(yv, ri));
 				}
 			}
 			else
@@ -1979,7 +2068,7 @@ hcl_oop_t hcl_divints (hcl_t* hcl, hcl_oop_t x, hcl_oop_t y, int modulo, hcl_oop
 					 7      -3     -2       1
 					-7      -3      2      -1
 				 */
-				if (xv && IS_SIGN_DIFF(xv, r)) 
+				if (xv && IS_SIGN_DIFF(xv, ri)) 
 				{
 					/* if the dividend has a different sign from r,
 					 * change the sign of r to the dividend's sign.
@@ -1987,17 +2076,17 @@ hcl_oop_t hcl_divints (hcl_t* hcl, hcl_oop_t x, hcl_oop_t y, int modulo, hcl_oop
 					 * the quotient and the remainder that don't need
 					 * any adjustment. however, there may be an esoteric
 					 * architecture. */
-					r -= yv;
+					ri -= yv;
 					++q;
-					HCL_ASSERT (hcl, xv && !IS_SIGN_DIFF(xv, r));
+					HCL_ASSERT (hcl, xv && !IS_SIGN_DIFF(xv, ri));
 				}
 			}
 		}
 
 		if (rem)
 		{
-			HCL_ASSERT (hcl, HCL_IN_SMOOI_RANGE(r));
-			*rem = HCL_SMOOI_TO_OOP(r);
+			HCL_ASSERT (hcl, HCL_IN_SMOOI_RANGE(ri));
+			*rem = HCL_SMOOI_TO_OOP(ri);
 		}
 
 		return HCL_SMOOI_TO_OOP((hcl_ooi_t)q);
@@ -2024,12 +2113,12 @@ hcl_oop_t hcl_divints (hcl_t* hcl, hcl_oop_t x, hcl_oop_t y, int modulo, hcl_oop
 		}
 		else if (HCL_OOP_IS_SMOOI(y))
 		{
-			hcl_ooi_t v;
+			hcl_ooi_t yv;
 
 			if (!is_bigint(hcl,x)) goto oops_einval;
 
-			v = HCL_OOP_TO_SMOOI(y);
-			switch (v)
+			yv = HCL_OOP_TO_SMOOI(y);
+			switch (yv)
 			{
 				case 0:
 					hcl_seterrnum (hcl, HCL_EDIVBY0);
@@ -2048,22 +2137,99 @@ hcl_oop_t hcl_divints (hcl_t* hcl, hcl_oop_t x, hcl_oop_t y, int modulo, hcl_oop
 					if (rem) *rem = HCL_SMOOI_TO_OOP(0);
 					return z;
 
-	/*
+	
 				default:
-					if (IS_POWER_OF_2(v))
+					/* TODO: do division by shifting if both x & y are in different sign */
+					if (yv < 0)
 					{
-	TODO:
-	DO SHIFTING. how to get remainder..
-	if v is powerof2, do shifting???
+						hcl_oow_t yv_neg = -yv;
+						if (IS_POW2(yv_neg) && HCL_IS_NBIGINT(hcl, x))
+						{
+							hcl_oow_t nshifts;
 
-						z = clone_bigint_negated (hcl, x, HCL_OBJ_GET_SIZE(x));
-						rshift_unsigned_array (z, HCL_OBJ_GET_SIZE(z), 10);
+							nshifts = LOG2_FOR_POW2(yv_neg);
+
+							hcl_pushtmp (hcl, &x);
+							z = clone_bigint_negated(hcl, x, HCL_OBJ_GET_SIZE(x));
+							hcl_poptmp (hcl);
+							if (!z) return HCL_NULL;
+
+							rshift_unsigned_array (((hcl_oop_liword_t)z)->slot, HCL_OBJ_GET_SIZE(z), nshifts);
+
+							hcl_pushtmp (hcl, &x);
+							z = normalize_bigint(hcl, z);
+							hcl_poptmp (hcl);
+							if (!z) return HCL_NULL;
+
+							if (rem) 
+							{
+								hcl_pushtmp (hcl, &x);
+								hcl_pushtmp (hcl, &z);
+								r = hcl_mulints(hcl, HCL_SMOOI_TO_OOP(yv_neg), z);
+								hcl_poptmps (hcl, 2);
+								if (!r) return HCL_NULL;
+
+								hcl_pushtmp (hcl, &z);
+								r = hcl_addints(hcl, x, r);
+								hcl_poptmp (hcl);
+								if (!r) return HCL_NULL;
+
+								*rem = r;
+							}
+
+							return z;
+						}
 					}
-	*/
+					else
+					{
+						/* yv > 0 */
+						if (IS_POW2(yv) && HCL_IS_PBIGINT(hcl, x))
+						{
+							hcl_oow_t nshifts;
+
+							/* 
+							2**x = v
+							x = log2(v)
+							x is the number of shift to make */
+							nshifts = LOG2_FOR_POW2(yv);
+
+							/* no pushtmp() on y as y is SMOOI here */
+							hcl_pushtmp (hcl, &x);
+							z = clone_bigint(hcl, x, HCL_OBJ_GET_SIZE(x));
+							hcl_poptmp (hcl);
+							if (!z) return HCL_NULL;
+
+							rshift_unsigned_array (((hcl_oop_liword_t)z)->slot, HCL_OBJ_GET_SIZE(z), nshifts);
+
+							hcl_pushtmp (hcl, &x);
+							z = normalize_bigint(hcl, z);
+							hcl_poptmp (hcl);
+							if (!z) return HCL_NULL;
+
+							if (rem) 
+							{
+								hcl_pushtmp (hcl, &x);
+								hcl_pushtmp (hcl, &z);
+								r = hcl_mulints(hcl, y, z);
+								hcl_poptmps (hcl, 2);
+								if (!r) return HCL_NULL;
+
+								hcl_pushtmp (hcl, &z);
+								r = hcl_subints(hcl, x, r);
+								hcl_poptmp (hcl);
+								if (!r) return HCL_NULL;
+
+								*rem = r;
+							}
+
+							return z;
+						}
+					}
+					break;
 			}
 
 			hcl_pushtmp (hcl, &x);
-			y = make_bigint_with_ooi (hcl, v);
+			y = make_bigint_with_ooi (hcl, yv);
 			hcl_poptmp (hcl);
 			if (!y) return HCL_NULL;
 		}
@@ -3615,7 +3781,7 @@ hcl_oop_t hcl_strtoint (hcl_t* hcl, const hcl_ooch_t* str, hcl_oow_t len, int ra
 	hwlen = 0;
 	start = ptr; /* this is the real start */
 
-	if (IS_POWER_OF_2(radix))
+	if (IS_POW2(radix))
 	{
 		unsigned int exp;
 		unsigned int bitcnt;
@@ -3649,7 +3815,7 @@ hcl_oop_t hcl_strtoint (hcl_t* hcl, const hcl_ooch_t* str, hcl_oow_t len, int ra
 
 		/* TODO: PPC - use cntlz, cntlzw, cntlzd, SPARC - use lzcnt, MIPS clz */
 	#else
-		exp = _exp_tab[radix];
+		exp = _exp_tab[radix - 1];
 	#endif
 
 		/* bytes */
@@ -4175,13 +4341,13 @@ hcl_oop_t hcl_inttostr (hcl_t* hcl, hcl_oop_t num, int radix, int ngc)
 
 	as = HCL_OBJ_GET_SIZE(num);
 
-	if (IS_POWER_OF_2(radix))
+	if (IS_POW2(radix))
 	{
 		unsigned int exp, accbits;
 		hcl_lidw_t acc;
 		hcl_oow_t xpos;
 
-		exp = _exp_tab[radix];
+		exp = _exp_tab[radix - 1];
 		xlen = as * ((HCL_LIW_BITS + exp) / exp) + 1;
 		xpos = xlen;
 
