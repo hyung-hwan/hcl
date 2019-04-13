@@ -1445,13 +1445,13 @@ HCL_EXPORT void hcl_setinloc (
 	static HCL_INLINE hcl_errnum_t hcl_geterrnum (hcl_t* hcl) { return hcl->errnum; }
 	
 #else
-#	define hcl_getmmgr(hcl) ((hcl)->mmgr)
-#	define hcl_getxtn(hcl) ((void*)((hcl) + 1))
+#	define hcl_getmmgr(hcl) (((hcl_t*)(hcl))->mmgr)
+#	define hcl_getxtn(hcl) ((void*)((hcl_t*)(hcl) + 1))
 
-#	define hcl_getcmgr(hcl) ((hcl)->cmgr)
-#	define hcl_setcmgr(hcl,mgr) ((hcl)->cmgr = (mgr))
+#	define hcl_getcmgr(hcl) (((hcl_t*)(hcl))->cmgr)
+#	define hcl_setcmgr(hcl,mgr) (((hcl_t*)(hcl))->cmgr = (mgr))
 
-#	define hcl_geterrnum(hcl) ((hcl)->errnum)
+#	define hcl_geterrnum(hcl) (((hcl_t*)(hcl))->errnum)
 #endif
 
 HCL_EXPORT void hcl_seterrnum (
