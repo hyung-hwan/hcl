@@ -945,12 +945,13 @@ int main (int argc, char* argv[])
 	};
 	static hcl_bopt_t opt =
 	{
-		"l:m:",
+		"l:m:v",
 		lopt
 	};
 
 	const char* logopt = HCL_NULL;
 	hcl_oow_t memsize = MIN_MEMSIZE;
+	int verbose = 0;
 	int large_pages = 0;
 
 #if defined(HCL_BUILD_DEBUG)
@@ -978,6 +979,10 @@ int main (int argc, char* argv[])
 			case 'm':
 				memsize = strtoul(opt.arg, HCL_NULL, 0);
 				if (memsize <= MIN_MEMSIZE) memsize = MIN_MEMSIZE;
+				break;
+
+			case 'v':
+				verbose = 1;
 				break;
 
 			case '\0':
@@ -1155,7 +1160,7 @@ count++;
 			goto oops;
 		}
 
-		if (hcl_print(hcl, obj) <= -1)
+		if (verbose && hcl_print(hcl, obj) <= -1)
 		{
 			hcl_logbfmt (hcl, HCL_LOG_STDERR, "ERROR: cannot print object - [%d] %js\n", hcl_geterrnum(hcl), hcl_geterrmsg(hcl));
 		}
@@ -1231,7 +1236,7 @@ count++;
 		}
 		else
 		{
-			hcl_logbfmt (hcl, HCL_LOG_STDERR, "EXECUTION OK - EXITED WITH %O\n", retv);
+			if (verbose) hcl_logbfmt (hcl, HCL_LOG_STDERR, "EXECUTION OK - EXITED WITH %O\n", retv);
 		}
 
 		/*cancel_tick();*/
