@@ -84,6 +84,12 @@ struct bb_t
 	hcl_bch_t* fn;
 };
 
+enum logfd_flag_t
+{
+	LOGFD_TTY = (1 << 0),
+	LOGFD_OPENED_HERE = (1 << 1)
+};
+
 typedef struct xtn_t xtn_t;
 struct xtn_t
 {
@@ -95,18 +101,19 @@ struct xtn_t
 
 	int vm_running;
 
-	int logfd;
-	hcl_bitmask_t logmask;
-	int logfd_istty;
-	
-	struct 
+	struct
 	{
-		hcl_bch_t buf[4096];
-		hcl_oow_t len;
-	} logbuf;
+		int fd;
+		int fd_flag; /* bitwise OR'ed fo logfd_flag_t bits */
+
+		struct
+		{
+			hcl_bch_t buf[4096];
+			hcl_oow_t len;
+		} out;
+	} log;
 
 	int reader_istty;
-	
 	hcl_oop_t sym_errstr;
 };
 
@@ -438,32 +445,29 @@ static int write_all (int fd, const hcl_bch_t* ptr, hcl_oow_t len)
 	return 0;
 }
 
-
 static int write_log (hcl_t* hcl, int fd, const hcl_bch_t* ptr, hcl_oow_t len)
 {
-	xtn_t* xtn;
-
-	xtn = (xtn_t*)hcl_getxtn(hcl);
+	xtn_t* xtn = (xtn_t*)hcl_getxtn(hcl);
 
 	while (len > 0)
 	{
-		if (xtn->logbuf.len > 0)
+		if (xtn->log.out.len > 0)
 		{
 			hcl_oow_t rcapa, cplen;
 
-			rcapa = HCL_COUNTOF(xtn->logbuf.buf) - xtn->logbuf.len;
+			rcapa = HCL_COUNTOF(xtn->log.out.buf) - xtn->log.out.len;
 			cplen = (len >= rcapa)? rcapa: len;
 
-			memcpy (&xtn->logbuf.buf[xtn->logbuf.len], ptr, cplen);
-			xtn->logbuf.len += cplen;
+			HCL_MEMCPY (&xtn->log.out.buf[xtn->log.out.len], ptr, cplen);
+			xtn->log.out.len += cplen;
 			ptr += cplen;
 			len -= cplen;
 
-			if (xtn->logbuf.len >= HCL_COUNTOF(xtn->logbuf.buf))
+			if (xtn->log.out.len >= HCL_COUNTOF(xtn->log.out.buf))
 			{
 				int n;
-				n = write_all(fd, xtn->logbuf.buf, xtn->logbuf.len);
-				xtn->logbuf.len = 0;
+				n = write_all(fd, xtn->log.out.buf, xtn->log.out.len);
+				xtn->log.out.len = 0;
 				if (n <= -1) return -1;
 			}
 		}
@@ -471,7 +475,7 @@ static int write_log (hcl_t* hcl, int fd, const hcl_bch_t* ptr, hcl_oow_t len)
 		{
 			hcl_oow_t rcapa;
 
-			rcapa = HCL_COUNTOF(xtn->logbuf.buf);
+			rcapa = HCL_COUNTOF(xtn->log.out.buf);
 			if (len >= rcapa)
 			{
 				if (write_all(fd, ptr, rcapa) <= -1) return -1;
@@ -480,11 +484,10 @@ static int write_log (hcl_t* hcl, int fd, const hcl_bch_t* ptr, hcl_oow_t len)
 			}
 			else
 			{
-				memcpy (xtn->logbuf.buf, ptr, len);
-				xtn->logbuf.len += len;
+				HCL_MEMCPY (xtn->log.out.buf, ptr, len);
+				xtn->log.out.len += len;
 				ptr += len;
 				len -= len;
-				
 			}
 		}
 	}
@@ -494,14 +497,14 @@ static int write_log (hcl_t* hcl, int fd, const hcl_bch_t* ptr, hcl_oow_t len)
 
 static void flush_log (hcl_t* hcl, int fd)
 {
-	xtn_t* xtn;
-	xtn = (xtn_t*)hcl_getxtn(hcl);
-	if (xtn->logbuf.len > 0)
+	xtn_t* xtn = (xtn_t*)hcl_getxtn(hcl);
+	if (xtn->log.out.len > 0)
 	{
-		write_all (fd, xtn->logbuf.buf, xtn->logbuf.len);
-		xtn->logbuf.len = 0;
+		write_all (fd, xtn->log.out.buf, xtn->log.out.len);
+		xtn->log.out.len = 0;
 	}
 }
+
 
 static void log_write (hcl_t* hcl, hcl_bitmask_t mask, const hcl_ooch_t* msg, hcl_oow_t len)
 {
@@ -512,23 +515,12 @@ static void log_write (hcl_t* hcl, hcl_bitmask_t mask, const hcl_ooch_t* msg, hc
 	xtn_t* xtn = (xtn_t*)hcl_getxtn(hcl);
 	int logfd;
 
-	if (mask & HCL_LOG_STDERR)
-	{
-		/* the messages that go to STDERR don't get masked out */
-		logfd = 2;
-	}
+	if (mask & HCL_LOG_STDERR) logfd = 2;
+	else if (mask & HCL_LOG_STDOUT) logfd = 1;
 	else
 	{
-		if (!(xtn->logmask & mask & ~HCL_LOG_ALL_LEVELS)) return;  /* check log types */
-		if (!(xtn->logmask & mask & ~HCL_LOG_ALL_TYPES)) return;  /* check log levels */
-
-		if (mask & HCL_LOG_STDOUT) logfd = 1;
-		else
-		{
-
-			logfd = xtn->logfd;
-			if (logfd <= -1) return;
-		}
+		logfd = xtn->log.fd;
+		if (logfd <= -1) return;
 	}
 
 /* TODO: beautify the log message.
@@ -540,35 +532,43 @@ static void log_write (hcl_t* hcl, hcl_bitmask_t mask, const hcl_ooch_t* msg, hc
 		size_t tslen;
 		struct tm tm, *tmp;
 
-		now = time(NULL);
+		now = time(HCL_NULL);
 	#if defined(_WIN32)
 		tmp = localtime(&now);
 		tslen = strftime(ts, sizeof(ts), "%Y-%m-%d %H:%M:%S %z ", tmp);
 		if (tslen == 0) 
 		{
-			tslen = strftime(ts, sizeof(ts), "%Y-%m-%d %H:%M:%S ", tmp);
-			if (tslen == 0)
-			{
-				strcpy (ts, "0000-00-00 00:00:00 +0000 ");
-				tslen = 26; 
-			}
+			tslen = sprintf(ts, "%04d-%02d-%02d %02d:%02d:%02d ", tmp->tm_year + 1900, tmp->tm_mon + 1, tmp->tm_mday, tmp->tm_hour, tmp->tm_min, tmp->tm_sec);
 		}
-	#elif defined(__DOS__)
+	#elif defined(__OS2__)
+		#if defined(__WATCOMC__)
+		tmp = _localtime(&now, &tm);
+		#else
 		tmp = localtime(&now);
-		tslen = strftime(ts, sizeof(ts), "%Y-%m-%d %H:%M:%S ", tmp); /* no timezone info */
+		#endif
+
+		#if defined(__BORLANDC__)
+		/* the borland compiler doesn't handle %z properly - it showed 00 all the time */
+		tslen = strftime(ts, sizeof(ts), "%Y-%m-%d %H:%M:%S %Z ", tmp);
+		#else
+		tslen = strftime(ts, sizeof(ts), "%Y-%m-%d %H:%M:%S %z ", tmp);
+		#endif
 		if (tslen == 0) 
 		{
-			strcpy (ts, "0000-00-00 00:00:00 ");
-			tslen = 20; 
+			tslen = sprintf(ts, "%04d-%02d-%02d %02d:%02d:%02d ", tmp->tm_year + 1900, tmp->tm_mon + 1, tmp->tm_mday, tmp->tm_hour, tmp->tm_min, tmp->tm_sec);
 		}
+
+	#elif defined(__DOS__)
+		tmp = localtime(&now);
+		/* since i know that %z/%Z is not available in strftime, i switch to sprintf immediately */
+		tslen = sprintf(ts, "%04d-%02d-%02d %02d:%02d:%02d ", tmp->tm_year + 1900, tmp->tm_mon + 1, tmp->tm_mday, tmp->tm_hour, tmp->tm_min, tmp->tm_sec);
 	#else
-		#if defined(__OS2__)
-		tmp = _localtime(&now, &tm);
-		#elif defined(HAVE_LOCALTIME_R)
+		#if defined(HAVE_LOCALTIME_R)
 		tmp = localtime_r(&now, &tm);
 		#else
 		tmp = localtime(&now);
 		#endif
+
 		#if defined(HAVE_STRFTIME_SMALL_Z)
 		tslen = strftime(ts, sizeof(ts), "%Y-%m-%d %H:%M:%S %z ", tmp);
 		#else
@@ -576,14 +576,13 @@ static void log_write (hcl_t* hcl, hcl_bitmask_t mask, const hcl_ooch_t* msg, hc
 		#endif
 		if (tslen == 0) 
 		{
-			strcpy (ts, "0000-00-00 00:00:00 +0000 ");
-			tslen = 26; 
+			tslen = sprintf(ts, "%04d-%02d-%02d %02d:%02d:%02d ", tmp->tm_year + 1900, tmp->tm_mon + 1, tmp->tm_mday, tmp->tm_hour, tmp->tm_min, tmp->tm_sec);
 		}
 	#endif
 		write_log (hcl, logfd, ts, tslen);
 	}
 
-	if (logfd == xtn->logfd && xtn->logfd_istty)
+	if (logfd == xtn->log.fd && (xtn->log.fd_flag & LOGFD_TTY))
 	{
 		if (mask & HCL_LOG_FATAL) write_log (hcl, logfd, "\x1B[1;31m", 7);
 		else if (mask & HCL_LOG_ERROR) write_log (hcl, logfd, "\x1B[1;32m", 7);
@@ -628,7 +627,7 @@ static void log_write (hcl_t* hcl, hcl_bitmask_t mask, const hcl_ooch_t* msg, hc
 	write_log (hcl, logfd, msg, len);
 #endif
 
-	if (logfd == xtn->logfd && xtn->logfd_istty)
+	if (logfd == xtn->log.fd && (xtn->log.fd_flag & LOGFD_TTY))
 	{
 		if (mask & (HCL_LOG_FATAL | HCL_LOG_ERROR | HCL_LOG_WARN)) write_log (hcl, logfd, "\x1B[0m", 4);
 	}
@@ -677,22 +676,32 @@ static void gc_hcl (hcl_t* hcl)
 	if (xtn->sym_errstr) xtn->sym_errstr = hcl_moveoop(hcl, xtn->sym_errstr);
 }
 
+static HCL_INLINE void reset_log_to_default (xtn_t* xtn)
+{
+#if defined(ENABLE_LOG_INITIALLY)
+	xtn->log.fd = 2;
+	xtn->log.fd_flag = 0;
+	#if defined(HAVE_ISATTY)
+	if (isatty(xtn->log.fd)) xtn->log.fd_flag |= LOGFD_TTY;
+	#endif
+#else
+	xtn->log.fd = -1;
+	xtn->log.fd_flag = 0;
+#endif
+}
+
 static void fini_hcl (hcl_t* hcl)
 {
 	xtn_t* xtn = (xtn_t*)hcl_getxtn(hcl);
-	if (xtn->logfd >= 0)
-	{
-		close (xtn->logfd);
-		xtn->logfd = -1;
-		xtn->logfd_istty = 0;
-	}
+	if ((xtn->log.fd_flag & LOGFD_OPENED_HERE) && xtn->log.fd >= 0) close (xtn->log.fd);
+	reset_log_to_default (xtn);
 }
 
 /* ========================================================================= */
 
 static int handle_logopt (hcl_t* hcl, const hcl_bch_t* str)
 {
-	xtn_t* xtn = (xtn_t*)hcl_getxtn (hcl);
+	xtn_t* xtn = (xtn_t*)hcl_getxtn(hcl);
 	hcl_bch_t* xstr = (hcl_bch_t*)str;
 	hcl_bch_t* cm, * flt;
 	hcl_bitmask_t logmask;
@@ -712,7 +721,7 @@ static int handle_logopt (hcl_t* hcl, const hcl_bch_t* str)
 		cm = hcl_find_bchar_in_bcstr(xstr, ',');
 		*cm = '\0';
 
-		logmask = xtn->logmask;
+		logmask = 0;
 		do
 		{
 			flt = cm + 1;
@@ -759,23 +768,24 @@ static int handle_logopt (hcl_t* hcl, const hcl_bch_t* str)
 	}
 
 #if defined(_WIN32)
-	xtn->logfd = _open(xstr, _O_CREAT | _O_WRONLY | _O_APPEND | _O_BINARY , 0644);
+	xtn->log.fd = _open(xstr, _O_CREAT | _O_WRONLY | _O_APPEND | _O_BINARY , 0644);
 #else
-	xtn->logfd = open(xstr, O_CREAT | O_WRONLY | O_APPEND , 0644);
+	xtn->log.fd = open(xstr, O_CREAT | O_WRONLY | O_APPEND , 0644);
 #endif
-	if (xtn->logfd == -1)
+	if (xtn->log.fd == -1)
 	{
 		fprintf (stderr, "ERROR: cannot open a log file %s\n", xstr);
 		if (str != xstr) hcl_freemem (hcl, xstr);
 		return -1;
 	}
 
-	xtn->logmask = logmask;
+	xtn->log.fd_flag |= LOGFD_OPENED_HERE;
 #if defined(HAVE_ISATTY)
-	xtn->logfd_istty = isatty(xtn->logfd);
+	if (isatty(xtn->log.fd)) xtn->log.fd_flag |= LOGFD_TTY;
 #endif
 
 	if (str != xstr) hcl_freemem (hcl, xstr);
+	hcl_setoption (hcl, HCL_LOG_MASK, &logmask);
 	return 0;
 }
 
@@ -1063,9 +1073,8 @@ int main (int argc, char* argv[])
 		hcl_setoption (hcl, HCL_LOG_MASK, &trait);*/
 	}
 
-	xtn = (xtn_t*)hcl_getxtn (hcl);
-	xtn->logfd = -1;
-	xtn->logfd_istty = 0;
+	xtn = (xtn_t*)hcl_getxtn(hcl);
+	reset_log_to_default (xtn);
 
 	memset (&hclcb, 0, HCL_SIZEOF(hclcb));
 	hclcb.fini = fini_hcl;
@@ -1077,12 +1086,7 @@ int main (int argc, char* argv[])
 
 	if (logopt)
 	{
-		if (handle_logopt (hcl, logopt) <= -1) goto oops;
-	}
-	else
-	{
-		/* default logging mask when no logging option is set */
-		xtn->logmask = HCL_LOG_ALL_TYPES | HCL_LOG_ERROR | HCL_LOG_FATAL;
+		if (handle_logopt(hcl, logopt) <= -1) goto oops;
 	}
 
 #if defined(HCL_BUILD_DEBUG)
@@ -1170,7 +1174,7 @@ count++;
 
 			code_offset = hcl_getbclen(hcl);
 
-			hcl_proutbfmt (hcl, 0, "\n");
+			/*hcl_proutbfmt (hcl, 0, "\n");*/
 			if (hcl_compile(hcl, obj) <= -1)
 			{
 				if (hcl->errnum == HCL_ESYNERR)
@@ -1201,8 +1205,9 @@ count++;
 				}
 				else
 				{
-					hcl_logbfmt (hcl, HCL_LOG_STDERR, "OK: EXITED WITH %O\n", retv);
-				
+					/* print the result in the interactive mode regardless 'verbose' */
+					hcl_logbfmt (hcl, HCL_LOG_STDOUT, "%O\n", retv);
+
 					/*
 					 * print the value of ERRSTR.
 					hcl_oop_cons_t cons = hcl_getatsysdic(hcl, xtn->sym_errstr);
@@ -1234,9 +1239,9 @@ count++;
 		{
 			hcl_logbfmt (hcl, HCL_LOG_STDERR, "ERROR: cannot execute - [%d] %js\n", hcl_geterrnum(hcl), hcl_geterrmsg(hcl));
 		}
-		else
+		else if (verbose)
 		{
-			if (verbose) hcl_logbfmt (hcl, HCL_LOG_STDERR, "EXECUTION OK - EXITED WITH %O\n", retv);
+			hcl_logbfmt (hcl, HCL_LOG_STDERR, "EXECUTION OK - EXITED WITH %O\n", retv);
 		}
 
 		/*cancel_tick();*/

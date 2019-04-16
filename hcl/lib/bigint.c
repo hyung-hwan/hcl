@@ -41,8 +41,11 @@
 #define IS_POW2(ui) (((ui) > 0) && ((ui) & ((ui) - 1)) == 0)
 
 /* digit character array */
-static char _digitc_upper[] = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ";
-static char _digitc_lower[] = "0123456789abcdefghijklmnopqrstuvwxyz";
+static char* _digitc_array[] =
+{
+	"0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ",
+	"0123456789abcdefghijklmnopqrstuvwxyz"
+};
 
 /* exponent table for pow2 between 1 and 32 inclusive. */
 static hcl_uint8_t _exp_tab[32] = 
@@ -4387,22 +4390,14 @@ oops_einval:
 	return HCL_NULL;
 }
 
-static hcl_oow_t oow_to_text (hcl_t* hcl, hcl_oow_t w, int radix, hcl_ooch_t* buf)
+static hcl_oow_t oow_to_text (hcl_t* hcl, hcl_oow_t w, int flagged_radix, hcl_ooch_t* buf)
 {
 	hcl_ooch_t* ptr;
 	const char* _digitc;
+	int radix;
 
-	if (radix < 0) 
-	{
-
-		_digitc = _digitc_lower;
-		radix = -radix;
-	}
-	else
-	{
-		_digitc = _digitc_upper;
-	}
-
+	radix = flagged_radix & HCL_INTTOSTR_RADIXMASK;
+	_digitc =  _digitc_array[!!(flagged_radix & HCL_INTTOSTR_LOWERCASE)];
 	HCL_ASSERT (hcl, radix >= 2 && radix <= 36);
 
 	ptr = buf;
@@ -4712,7 +4707,7 @@ static HCL_INLINE hcl_liw_t get_last_digit (hcl_t* hcl, hcl_liw_t* x, hcl_oow_t*
 	return carry;
 }
 
-hcl_oop_t hcl_inttostr (hcl_t* hcl, hcl_oop_t num, int radix, int ngc)
+hcl_oop_t hcl_inttostr (hcl_t* hcl, hcl_oop_t num, int flagged_radix)
 {
 	hcl_ooi_t v = 0;
 	hcl_oow_t w;
@@ -4721,18 +4716,11 @@ hcl_oop_t hcl_inttostr (hcl_t* hcl, hcl_oop_t num, int radix, int ngc)
 	hcl_ooch_t* xbuf = HCL_NULL;
 	hcl_oow_t xlen = 0, reqcapa;
  
+	int radix;
 	const char* _digitc;
-	int orgradix = radix;
  
-	if (radix < 0) 
-	{
-		_digitc = _digitc_lower;
-		radix = -radix;
-	}
-	else
-	{
-		_digitc = _digitc_upper;
-	}
+	radix = flagged_radix & HCL_INTTOSTR_RADIXMASK;
+	_digitc =  _digitc_array[!!(flagged_radix & HCL_INTTOSTR_LOWERCASE)];
 	HCL_ASSERT (hcl, radix >= 2 && radix <= 36);
  
 	if (!hcl_isint(hcl,num)) goto oops_einval;
@@ -4758,11 +4746,10 @@ hcl_oop_t hcl_inttostr (hcl_t* hcl, hcl_oop_t num, int radix, int ngc)
 			xbuf = hcl->inttostr.xbuf.ptr;
 		}
  
-		xlen = oow_to_text(hcl, w, orgradix, xbuf);
+		xlen = oow_to_text(hcl, w, flagged_radix, xbuf);
 		if (v < 0) xbuf[xlen++] = '-';
  
 		reverse_string (xbuf, xlen);
-	#if 0
 		if (flagged_radix & HCL_INTTOSTR_NONEWOBJ)
 		{
 			/* special case. don't create a new object.
@@ -4770,7 +4757,6 @@ hcl_oop_t hcl_inttostr (hcl_t* hcl, hcl_oop_t num, int radix, int ngc)
 			hcl->inttostr.xbuf.len = xlen;
 			return hcl->_nil;
 		} 
-	#endif
 		return hcl_makestring(hcl, xbuf, xlen, 0);
 	}
  
@@ -4812,7 +4798,7 @@ hcl_oop_t hcl_inttostr (hcl_t* hcl, hcl_oop_t num, int radix, int ngc)
  
 	if (HCL_IS_NBIGINT(hcl, num)) xbuf[xlen++] = '-';
 	reverse_string (xbuf, xlen);
-	if (ngc < 0)
+	if (flagged_radix & HCL_INTTOSTR_NONEWOBJ)
 	{
 		/* special case. don't create a new object.
 		 * the caller can use the data left in hcl->inttostr.xbuf */

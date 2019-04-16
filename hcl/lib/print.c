@@ -272,7 +272,7 @@ next:
 			/* -1 to drive hcl_inttostr() to not create a new string object.
 			 * not using the object memory. the result stays in the temporary
 			 * buffer */
-			tmp = hcl_inttostr(hcl, obj, 10, -1); 
+			tmp = hcl_inttostr(hcl, obj, 10 | HCL_INTTOSTR_NONEWOBJ); 
 			if (!tmp) return -1;
 
 			HCL_ASSERT (hcl, (hcl_oop_t)tmp == hcl->_nil); 
@@ -303,7 +303,7 @@ next:
 				hcl_oop_t tmp;
 				hcl_oow_t len, adj;
 
-				tmp = hcl_inttostr(hcl, f->value, 10, -1);
+				tmp = hcl_inttostr(hcl, f->value, 10 | HCL_INTTOSTR_NONEWOBJ);
 				if (!tmp) return -1;
 
 				adj = (hcl->inttostr.xbuf.ptr[0] == '-');

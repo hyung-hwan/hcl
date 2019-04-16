@@ -778,7 +778,7 @@ static HCL_INLINE int print_formatted (hcl_t* hcl, hcl_ooi_t nargs, hcl_fmtout_t
 	const hcl_ooch_t* fmt, * fmtend;
 	const hcl_ooch_t* checkpoint, * percent;
 
-	int n, base, neg, sign;
+	int n, radix, neg, sign, radix_flags;
 	hcl_ooi_t extra, width, precision;
 	hcl_ooch_t padc, ooch;
 	hcl_ooci_t ch;
@@ -840,6 +840,7 @@ static HCL_INLINE int print_formatted (hcl_t* hcl, hcl_ooi_t nargs, hcl_fmtout_t
 		neg = 0; sign = 0;
 
 		flagc = 0; 
+		radix_flags = HCL_INTTOSTR_NONEWOBJ;
 
 	reswitch:
 		GET_NEXT_CHAR_TO (hcl, fmt, fmtend, ch);
@@ -955,23 +956,24 @@ static HCL_INLINE int print_formatted (hcl_t* hcl, hcl_ooi_t nargs, hcl_fmtout_t
 		/* integer conversions */
 		case 'd':
 		case 'i': /* signed conversion */
-			base = 10;
+			radix = 10;
 			sign = 1;
 			goto print_integer;
 		case 'o': 
-			base = 8;
+			radix = 8;
 			goto print_integer;
 		case 'u':
-			base = 10;
+			radix = 10;
 			goto print_integer;
-		case 'X':
-			base = 16;
-			goto print_integer;
+
 		case 'x':
-			base = -16;
+			radix_flags |= HCL_INTTOSTR_LOWERCASE;
+		case 'X':
+			radix= 16;
 			goto print_integer;
+		
 		case 'b':
-			base = 2;
+			radix = 2;
 			goto print_integer;
 		/* end of integer conversions */
 
@@ -993,7 +995,7 @@ static HCL_INLINE int print_formatted (hcl_t* hcl, hcl_ooi_t nargs, hcl_fmtout_t
 				arg = fa->value;
 			}
 
-			if (!hcl_inttostr(hcl, arg, 10, -1)) 
+			if (!hcl_inttostr(hcl, arg, 10 | HCL_INTTOSTR_NONEWOBJ)) 
 			{
 				HCL_LOG1 (hcl, HCL_LOG_WARN | HCL_LOG_UNTYPED, "unable to convert %O to string \n", arg);
 				goto invalid_format;
@@ -1183,7 +1185,7 @@ static HCL_INLINE int print_formatted (hcl_t* hcl, hcl_ooi_t nargs, hcl_fmtout_t
 				arg = nv;
 			}
 
-			if (!hcl_inttostr(hcl, arg, base, -1)) 
+			if (!hcl_inttostr(hcl, arg, radix | radix_flags)) 
 			{
 				/*hcl_seterrbfmt (hcl, HCL_EINVAL, "not a valid number - %O", arg);
 				goto oops;*/
@@ -1209,7 +1211,7 @@ static HCL_INLINE int print_formatted (hcl_t* hcl, hcl_ooi_t nargs, hcl_fmtout_t
 
 			if ((flagc & FLAGC_SHARP) && arg != HCL_SMOOI_TO_OOP(0)) 
 			{
-				if (base == 2 || base == 8 || base == 16 || base == -16) extra += 2;
+				if (radix == 2 || radix == 8 || radix == 16 || radix == -16) extra += 2;
 			}
 			if (neg) extra++;
 			else if (flagc & FLAGC_SIGN) extra++;
@@ -1233,17 +1235,17 @@ static HCL_INLINE int print_formatted (hcl_t* hcl, hcl_ooi_t nargs, hcl_fmtout_t
 
 			if ((flagc & FLAGC_SHARP) && arg != HCL_SMOOI_TO_OOP(0)) 
 			{
-				if (base == 2) 
+				if (radix == 2) 
 				{
 					PRINT_OOCH ('#', 1);
 					PRINT_OOCH ('b', 1);
 				}
-				if (base == 8) 
+				if (radix == 8) 
 				{
 					PRINT_OOCH ('#', 1);
 					PRINT_OOCH ('o', 1);
 				} 
-				else if (base == 16 || base == -16) 
+				else if (radix == 16 || radix == -16) 
 				{
 					PRINT_OOCH ('#', 1);
 					PRINT_OOCH ('x', 1);

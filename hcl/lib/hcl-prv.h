@@ -959,20 +959,21 @@ hcl_oop_t hcl_strtoint (
 	int               radix
 );
 
+
+#define HCL_INTTOSTR_RADIXMASK (0xFF)
+#define HCL_INTTOSTR_LOWERCASE (1 << 8)
+#define HCL_INTTOSTR_NONEWOBJ  (1 << 9)
 /**
  * The hcl_inttostr() function converts an integer object to a string object
- * printed in the given radix. If ngc is 0, it creates a normal string object
- * managed by object memory manager. If ngc greater than 0, it creates a non-GC
- * string object that should be destroyed with hcl_freengcobj() later. If ngc
- * is less than 0, it returns hcl->_nil but keeps the result in the buffer 
- * pointed to by hcl->inttostr.xbuf.ptr with the length stored in 
- * hcl->inttostr.xbuf.len. If the function fails, it returns #HCL_NULL.
+ * printed in the given radix. If HCL_INTTOSTR_NONEWOBJ is set in flags_radix,
+ * it returns hcl->_nil but keeps the result in the buffer pointed to by 
+ * hcl->inttostr.xbuf.ptr with the length stored in hcl->inttostr.xbuf.len.
+ * If the function fails, it returns #HCL_NULL.
  */
 hcl_oop_t hcl_inttostr (
 	hcl_t*      hcl,
 	hcl_oop_t   num,
-	int         radix,
-	int         ngc
+	int         flagged_radix /* radix between 2 and 36 inclusive, optionally bitwise ORed of HCL_INTTOSTR_XXX bits */
 );
 
 /* ========================================================================= */
