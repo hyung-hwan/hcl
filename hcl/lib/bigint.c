@@ -81,7 +81,7 @@ static const hcl_uint8_t debruijn_64[64] =
 #	define LOG2_FOR_POW2_64(x) (debruijn_64[(hcl_uint64_t)((hcl_uint64_t)(x) * 0x022fdd63cc95386d) >> 58])
 #endif
 
-static HCL_INLINE int get_pos_of_msb_set (hcl_oow_t x)
+static HCL_INLINE int get_pos_of_msb_set_pow2 (hcl_oow_t x)
 {
 	/* the caller must ensure that x is power of 2. if x happens to be zero,
 	 * the return value is undefined as each method used may give different result. */
@@ -108,35 +108,68 @@ static HCL_INLINE int get_pos_of_msb_set (hcl_oow_t x)
 	);
 #endif
 	return (int)pos;
-#elif defined(USE_UGLY_CODE) && defined(__GNUC__) && defined(__arm__) && (defined(__ARM_ARCH_5__) || defined(__ARM_ARCH_6__) || defined(__ARM_ARCH_7__) || defined(__ARM_ARCH_8__))
-	hcl_oow_t pos;
-
+#elif defined(__GNUC__) && defined(__arm__) && (defined(__ARM_ARCH_5__) || defined(__ARM_ARCH_6__) || defined(__ARM_ARCH_7__) || defined(__ARM_ARCH_8__))
+	hcl_oow_t n;
+ 
 	/* CLZ is available in ARMv5T and above. there is no instruction to
 	 * count trailing zeros or something similar. using RBIT with CLZ
 	 * would be good in ARMv6T2 and above to avoid further calculation
 	 * afte CLZ */
 	__asm__ volatile (
 		"clz %0,%1\n\t"
-		: "=r"(pos) /* output */
+		: "=r"(n) /* output */
 		: "r"(x) /* input */
 	);
-	return (int)((HCL_SIZEOF(pos) * 8) - pos - 1); 
-
+	return (int)(HCL_OOW_BITS - n - 1); 
 	/* TODO: PPC - use cntlz, cntlzw, cntlzd, SPARC - use lzcnt, MIPS clz */
-
 #else
 	int pos = 0;
 	while (x >>= 1) pos++;
 	return pos;
 #endif
 }
-
+ 
+static HCL_INLINE int get_pos_of_msb_set (hcl_oow_t x)
+{
+	/* x doesn't have to be power of 2. if x is zero, the result is undefined */
+#if defined(HCL_HAVE_BUILTIN_CLZLL) && (HCL_SIZEOF_OOW_T == HCL_SIZEOF_LONG_LONG)
+	return HCL_OOW_BITS - __builtin_clzll(x) - 1; /* count the number of leading zeros */
+#elif defined(HCL_HAVE_BUILTIN_CLZL) && (HCL_SIZEOF_OOW_T == HCL_SIZEOF_LONG)
+	return HCL_OOW_BITS - __builtin_clzl(x) - 1; /* count the number of leading zeros */
+#elif defined(HCL_HAVE_BUILTIN_CLZ) && (HCL_SIZEOF_OOW_T == HCL_SIZEOF_INT)
+	return HCL_OOW_BITS - __builtin_clz(x) - 1; /* count the number of leading zeros */
+#elif defined(__GNUC__) && (defined(__x86_64) || defined(__amd64) || defined(__i386) || defined(i386))
+	/* bit scan reverse. not all x86 CPUs have LZCNT. */
+	hcl_oow_t pos;
+	__asm__ volatile (
+		"bsr %1,%0\n\t"
+		: "=r"(pos) /* output */
+		: "r"(x) /* input */
+	);
+	return (int)pos;
+#elif defined(__GNUC__) && defined(__arm__) && (defined(__ARM_ARCH_5__) || defined(__ARM_ARCH_6__) || defined(__ARM_ARCH_7__) || defined(__ARM_ARCH_8__))
+	hcl_oow_t n;
+	__asm__ volatile (
+		"clz %0,%1\n\t"
+		: "=r"(n) /* output */
+		: "r"(x) /* input */
+	);
+	return (int)(HCL_OOW_BITS - n - 1); 
+	/* TODO: PPC - use cntlz, cntlzw, cntlzd, SPARC - use lzcnt, MIPS clz */
+ 
+#else
+	int pos = 0;
+	while (x >>= 1) pos++;
+	return pos;
+#endif
+}
+ 
 #if defined(HCL_HAVE_UINT32_T) && (HCL_SIZEOF_OOW_T == HCL_SIZEOF_UINT32_T)
 #	define LOG2_FOR_POW2(x) LOG2_FOR_POW2_32(x)
 #elif defined(HCL_HAVE_UINT64_T) && (HCL_SIZEOF_OOW_T == HCL_SIZEOF_UINT64_T)
 #	define LOG2_FOR_POW2(x) LOG2_FOR_POW2_64(x)
 #else
-#	define LOG2_FOR_POW2(x) get_pos_of_msb_set(x)
+#	define LOG2_FOR_POW2(x) get_pos_of_msb_set_pow2(x)
 #endif
 
 
@@ -1048,6 +1081,23 @@ static HCL_INLINE void multiply_unsigned_array (const hcl_liw_t* x, hcl_oow_t xs
 		y = (hcl_liw_t*)i;
 	}
 
+	if (ys == 1)
+	{
+		hcl_lidw_t dw;
+		hcl_liw_t carry = 0;
+		hcl_oow_t i;
+ 
+		for (i = 0; i < xs; i++)
+		{
+			dw = ((hcl_lidw_t)x[i] * y[0]) + carry;
+			carry = (hcl_liw_t)(dw >> HCL_LIW_BITS);
+			z[i] = (hcl_liw_t)dw;
+		}
+ 
+		z[i] = carry;
+		return;
+	}
+
 	pa = xs;
 	if (pa <= ((hcl_oow_t)1 << (HCL_LIDW_BITS - (HCL_LIW_BITS * 2))))
 	{
@@ -1202,6 +1252,23 @@ static HCL_INLINE hcl_oow_t multiply_unsigned_array_karatsuba (hcl_t* hcl, const
 		y = (hcl_liw_t*)i;
 	}
 
+	if (ys == 1)
+	{
+		hcl_lidw_t dw;
+		hcl_liw_t carry = 0;
+		hcl_oow_t i;
+ 
+		for (i = 0; i < xs; i++)
+		{
+			dw = ((hcl_lidw_t)x[i] * y[0]) + carry;
+			carry = (hcl_liw_t)(dw >> HCL_LIW_BITS);
+			z[i] = (hcl_liw_t)dw;
+		}
+ 
+		z[i] = carry;
+		return count_effective(z, xs + 1);
+	}
+ 
 	/* calculate value of nshifts, that is 2^(HCL_LIW_BITS*nshifts) */
 	nshifts = (xs + 1) / 2;
 
@@ -1226,10 +1293,10 @@ static HCL_INLINE hcl_oow_t multiply_unsigned_array_karatsuba (hcl_t* hcl, const
 	if (!tmp[0]) goto oops;
 
 	/* tmp[0] = a0 + a1 */
-	tmplen[0] = add_unsigned_array (x, ndigits_xl, x + nshifts, ndigits_xh, tmp[0]);
+	tmplen[0] = add_unsigned_array(x, ndigits_xl, x + nshifts, ndigits_xh, tmp[0]);
 
 	/* tmp[1] = b0 + b1 */
-	tmplen[1] = add_unsigned_array (y, ndigits_yl, y + nshifts, ndigits_yh, tmp[1]);
+	tmplen[1] = add_unsigned_array(y, ndigits_yl, y + nshifts, ndigits_yh, tmp[1]);
 
 	/*HCL_DEBUG6 (hcl, "karatsuba t %p u %p ndigits_xl %d ndigits_xh %d ndigits_yl %d ndigits_yh %d\n", tmp[0], tmp[1], (int)ndigits_xl, (int)ndigits_xh, (int)ndigits_yl, (int)ndigits_yh);*/
 	/*HCL_DEBUG5 (hcl, "zcapa %d, tmplen[0] %d tmplen[1] %d nshifts %d total %d\n", (int)zcapa, (int)tmplen[0], (int)tmplen[1], (int)nshifts, (int)(tmplen[0] + tmplen[1] + nshifts));*/
@@ -1239,7 +1306,7 @@ static HCL_INLINE hcl_oow_t multiply_unsigned_array_karatsuba (hcl_t* hcl, const
 	if (CANNOT_KARATSUBA(hcl, tmplen[0], tmplen[1]))
 	{
 		multiply_unsigned_array (tmp[0], tmplen[0], tmp[1], tmplen[1], zsp);
-		xlen = count_effective (zsp, tmplen[0] + tmplen[1]);
+		xlen = count_effective(zsp, tmplen[0] + tmplen[1]);
 	}
 	else 
 	{
@@ -1257,7 +1324,7 @@ static HCL_INLINE hcl_oow_t multiply_unsigned_array_karatsuba (hcl_t* hcl, const
 	}
 	else
 	{
-		tmplen[0] = multiply_unsigned_array_karatsuba (hcl, x, ndigits_xl, y, ndigits_yl, tmp[0]);
+		tmplen[0] = multiply_unsigned_array_karatsuba(hcl, x, ndigits_xl, y, ndigits_yl, tmp[0]);
 		if (tmplen[0] <= 0) goto oops;
 	}
 
@@ -1267,11 +1334,11 @@ static HCL_INLINE hcl_oow_t multiply_unsigned_array_karatsuba (hcl_t* hcl, const
 	if (CANNOT_KARATSUBA(hcl, ndigits_xh, ndigits_yh))
 	{
 		multiply_unsigned_array (x + nshifts, ndigits_xh, y + nshifts, ndigits_yh, tmp[1]);
-		tmplen[1] = count_effective (tmp[1], tmplen[1]);
+		tmplen[1] = count_effective(tmp[1], tmplen[1]);
 	}
 	else
 	{
-		tmplen[1] = multiply_unsigned_array_karatsuba (hcl, x + nshifts, ndigits_xh, y + nshifts, ndigits_yh, tmp[1]);
+		tmplen[1] = multiply_unsigned_array_karatsuba(hcl, x + nshifts, ndigits_xh, y + nshifts, ndigits_yh, tmp[1]);
 		if (tmplen[1] <= 0) goto oops;
 	}
 
@@ -1283,7 +1350,7 @@ static HCL_INLINE hcl_oow_t multiply_unsigned_array_karatsuba (hcl_t* hcl, const
 	/* a1b1 is in tmp[1]. add (a1b1 * B^2n) to the high part of 'z' */
 	zsp = z + (nshifts * 2); /* emulate shifting for "* B^2n". */
 	xlen = zcapa - (nshifts * 2);
-	xlen = add_unsigned_array (zsp, xlen, tmp[1], tmplen[1], zsp);
+	xlen = add_unsigned_array(zsp, xlen, tmp[1], tmplen[1], zsp);
 
 	/* z = z + a0b0. a0b0 is in tmp[0] */
 	xlen = add_unsigned_array(z, zcapa, tmp[0], tmplen[0], z);
@@ -1322,6 +1389,23 @@ oops:
 		y = (hcl_liw_t*)i;
 	}
 
+	if (ys == 1)
+	{
+		hcl_lidw_t dw;
+		hcl_liw_t carry = 0;
+		hcl_oow_t i;
+ 
+		for (i = 0; i < xs; i++)
+		{
+			dw = ((hcl_lidw_t)x[i] * y[0]) + carry;
+			carry = (hcl_liw_t)(dw >> HCL_LIW_BITS);
+			z[i] = (hcl_liw_t)dw;
+		}
+ 
+		z[i] = carry;
+		return;
+	}
+
 	/* calculate value of nshifts, that is 2^(HCL_LIW_BITS*nshifts) */
 	nshifts = (xs + 1) / 2;
 
@@ -1337,19 +1421,19 @@ oops:
 	tmplen[0] = ndigits_yl + ndigits_yh + 1; 
 	tmplen[1] = ndigits_xh + ndigits_yh;
 	if (tmplen[1] < tmplen[0]) tmplen[1] = tmplen[0];
-	tmp[1] = hcl_callocmem (hcl, HCL_SIZEOF(hcl_liw_t) * tmplen[1]);
+	tmp[1] = hcl_callocmem(hcl, HCL_SIZEOF(hcl_liw_t) * tmplen[1]);
 	if (!tmp[1]) goto oops;
 
 	/* make a temporary for (a0 + a1) and (a0 * b0) */
 	tmplen[0] = ndigits_xl + ndigits_yl;
-	tmp[0] = hcl_callocmem (hcl, HCL_SIZEOF(hcl_liw_t) * tmplen[0]);
+	tmp[0] = hcl_callocmem(hcl, HCL_SIZEOF(hcl_liw_t) * tmplen[0]);
 	if (!tmp[0]) goto oops;
 
 	/* tmp[0] = a0 + a1 */
-	tmplen[0] = add_unsigned_array (x, ndigits_xl, x + nshifts, ndigits_xh, tmp[0]);
+	tmplen[0] = add_unsigned_array(x, ndigits_xl, x + nshifts, ndigits_xh, tmp[0]);
 
 	/* tmp[1] = b0 + b1 */
-	tmplen[1] = add_unsigned_array (y, ndigits_yl, y + nshifts, ndigits_yh, tmp[1]);
+	tmplen[1] = add_unsigned_array(y, ndigits_yl, y + nshifts, ndigits_yh, tmp[1]);
 
 	/* tmp[2] = (a0 + a1) * (b0 + b1) */
 	tmplen[2] = tmplen[0] + tmplen[1]; 
@@ -1358,7 +1442,7 @@ oops:
 	if (CANNOT_KARATSUBA(hcl, tmplen[0], tmplen[1]))
 	{
 		multiply_unsigned_array (tmp[0], tmplen[0], tmp[1], tmplen[1], tmp[2]);
-		xlen = count_effective (tmp[2], tmplen[2]);
+		xlen = count_effective(tmp[2], tmplen[2]);
 	}
 	else 
 	{
@@ -1376,7 +1460,7 @@ oops:
 	}
 	else
 	{
-		tmplen[0] = multiply_unsigned_array_karatsuba (hcl, x, ndigits_xl, y, ndigits_yl, tmp[0]);
+		tmplen[0] = multiply_unsigned_array_karatsuba(hcl, x, ndigits_xl, y, ndigits_yl, tmp[0]);
 		if (tmplen[0] <= 0) goto oops;
 	}
 
@@ -1386,11 +1470,11 @@ oops:
 	if (CANNOT_KARATSUBA(hcl, ndigits_xh, ndigits_yh))
 	{
 		multiply_unsigned_array (x + nshifts, ndigits_xh, y + nshifts, ndigits_yh, tmp[1]);
-		tmplen[1] = count_effective (tmp[1], tmplen[1]);
+		tmplen[1] = count_effective(tmp[1], tmplen[1]);
 	}
 	else
 	{
-		tmplen[1] = multiply_unsigned_array_karatsuba (hcl, x + nshifts, ndigits_xh, y + nshifts, ndigits_yh, tmp[1]);
+		tmplen[1] = multiply_unsigned_array_karatsuba(hcl, x + nshifts, ndigits_xh, y + nshifts, ndigits_yh, tmp[1]);
 		if (tmplen[1] <= 0) goto oops;
 	}
 
@@ -1404,7 +1488,7 @@ oops:
 	/* a1b1 is in tmp[1]. add (a1b1 * B^2n) to the high part of 'z' */
 	zsp = z + (nshifts * 2); /* emulate shifting for "* B^2n". */
 	xlen = zcapa - (nshifts * 2);
-	xlen = add_unsigned_array (zsp, xlen, tmp[1], tmplen[1], zsp);
+	xlen = add_unsigned_array(zsp, xlen, tmp[1], tmplen[1], zsp);
 
 	/* z = z + a0b0. a0b0 is in tmp[0] */
 	xlen = add_unsigned_array(z, zcapa, tmp[0], tmplen[0], z);
@@ -1413,7 +1497,7 @@ oops:
 	hcl_freemem (hcl, tmp[1]);
 	hcl_freemem (hcl, tmp[0]);
 
-	return count_effective (z, xlen);
+	return count_effective(z, xlen);
 
 oops:
 	if (tmp[2]) hcl_freemem (hcl, tmp[2]);
@@ -1515,24 +1599,33 @@ static void divide_unsigned_array (hcl_t* hcl, const hcl_liw_t* x, hcl_oow_t xs,
 	 * end 
 	 */
 
-	hcl_oow_t rs, i , j;
-
+	hcl_oow_t rs, rrs, i , j;
+ 
 	HCL_ASSERT (hcl, xs >= ys);
-	HCL_MEMSET (q, 0, HCL_SIZEOF(*q) * xs);
-	HCL_MEMSET (r, 0, HCL_SIZEOF(*q) * xs);
-
+ 
+	/* the caller must ensure:
+	 *   - q and r are all zeros. can skip memset() with zero.
+	 *   - q is as large as xs in size.
+	 *   - r is as large as ys + 1 in size  */
+	/*HCL_MEMSET (q, 0, HCL_SIZEOF(*q) * xs);
+	HCL_MEMSET (r, 0, HCL_SIZEOF(*q) * ys);*/
+ 
+	rrs = ys + 1;
 	for (i = xs; i > 0; )
 	{
 		--i;
 		for (j = HCL_LIW_BITS; j > 0;)
 		{
 			--j;
-
-			lshift_unsigned_array (r, xs, 1);
+ 
+			/* the value of the remainder 'r' may get bigger than the 
+			 * divisor 'y' temporarily until subtraction is performed
+			 * below. so ys + 1(kept in rrs) is needed for shifting here. */
+			lshift_unsigned_array (r, rrs, 1); 
 			HCL_SETBITS (hcl_liw_t, r[0], 0, 1, HCL_GETBITS(hcl_liw_t, x[i], j, 1));
-
-			rs = count_effective (r, xs);
-			if (!is_less_unsigned_array (r, rs, y, ys))
+ 
+			rs = count_effective(r, rrs);
+			if (!is_less_unsigned_array(r, rs, y, ys))
 			{
 				subtract_unsigned_array (hcl, r, rs, y, ys, r);
 				HCL_SETBITS (hcl_liw_t, q[i], j, 1, 1);
@@ -1541,6 +1634,326 @@ static void divide_unsigned_array (hcl_t* hcl, const hcl_liw_t* x, hcl_oow_t xs,
 	}
 }
 
+static HCL_INLINE hcl_liw_t calculate_remainder (hcl_t* hcl, hcl_liw_t* qr, hcl_liw_t* y, hcl_liw_t quo, int qr_start, int stop)
+{
+	hcl_lidw_t dw;
+	hcl_liw_t b, c, c2, qyk;
+	hcl_oow_t j, k;
+ 
+	for (b = 0, c = 0, c2 = 0, j = qr_start, k = 0; k < stop; j++, k++)
+	{
+		dw = (hcl_lidw_t)qr[j] - b;
+		b = (hcl_liw_t)((dw >> HCL_LIW_BITS) & 1); /* b = -(dw mod BASE) */
+		qr[j] = (hcl_liw_t)dw;
+ 
+		dw = ((hcl_lidw_t)y[k] * quo) + c;
+		c = (hcl_liw_t)(dw >> HCL_LIW_BITS);
+		qyk = (hcl_liw_t)dw;
+ 
+		dw = (hcl_lidw_t)qr[j] - qyk;
+		c2 = (hcl_liw_t)((dw >> HCL_LIW_BITS) & 1);
+		qr[j] = (hcl_liw_t)dw;
+ 
+		dw = (hcl_lidw_t)b + c2 + c;
+		c = (hcl_liw_t)(dw >> HCL_LIW_BITS);
+		b = (hcl_liw_t)dw;
+ 
+		HCL_ASSERT (hcl, c == 0);
+	}
+	return b;
+}
+ 
+static void divide_unsigned_array2 (hcl_t* hcl, const hcl_liw_t* x, hcl_oow_t xs, const hcl_liw_t* y, hcl_oow_t ys, hcl_liw_t* q, hcl_liw_t* r)
+{
+	hcl_oow_t i;
+	hcl_liw_t d, y1, y2;
+ 
+	/* the caller must ensure:
+	 *  - q can hold 'xs + 1' words and r can hold 'ys' words. 
+	 *  - q and r are set to all zeros. */
+	HCL_ASSERT (hcl, xs >= ys);
+ 
+	if (ys == 1)
+	{
+		/* the divisor has a single word only. perform simple division */
+		hcl_lidw_t dw;
+		hcl_liw_t carry = 0;
+		for (i = xs; i > 0; )
+		{
+			--i;
+			dw = ((hcl_lidw_t)carry << HCL_LIW_BITS) + x[i];
+			q[i] = (hcl_liw_t)(dw / y[0]);
+			carry = (hcl_liw_t)(dw % y[0]);
+		}
+		r[0] = carry;
+		return;
+	}
+ 
+	for (i = 0; i < xs; i++) q[i] = x[i]; /* copy x to q */
+	q[xs] = 0; /* store zero in the last extra word */
+	for (i = 0; i < ys; i++) r[i] = y[i]; /* copy y to r */
+ 
+	y1 = r[ys - 1]; /* highest divisor word */
+ 
+	/*d = (y1 == HCL_TYPE_MAX(hcl_liw_t)? ((hcl_liw_t)1): ((hcl_liw_t)(((hcl_lidw_t)1 << HCL_LIW_BITS) / (y1 + 1))));*/
+	d = (hcl_liw_t)(((hcl_lidw_t)1 << HCL_LIW_BITS) / ((hcl_lidw_t)y1 + 1));
+	if (d > 1)
+	{
+		hcl_lidw_t dw;
+		hcl_liw_t carry;
+ 
+		/* shift the divisor such that its high-order bit is on.
+		 * shift the dividend the same amount as the previous step */
+ 
+		/* r = r * d */
+		for (carry = 0, i = 0; i < ys; i++)
+		{
+			dw = ((hcl_lidw_t)r[i] * d) + carry;
+			carry = (hcl_liw_t)(dw >> HCL_LIW_BITS);
+			r[i] = (hcl_liw_t)dw;
+		}
+		HCL_ASSERT (hcl, carry == 0);
+ 
+		/* q = q * d */
+		for (carry = 0, i = 0; i < xs; i++)
+		{
+			dw = ((hcl_lidw_t)q[i] * d) + carry;
+			carry = (hcl_liw_t)(dw >> HCL_LIW_BITS);
+			q[i] = (hcl_liw_t)dw;
+		}
+		q[xs] = carry;
+	}
+ 
+	y1 = r[ys - 1];
+	y2 = r[ys - 2];
+ 
+	for (i = xs; i >= ys; --i)
+	{
+		hcl_lidw_t dw, quo, rem;
+		hcl_liw_t b, xhi, xlo;
+ 
+		/* ---------------------------------------------------------- */
+		/* estimate the quotient.
+		 *  2-current-dividend-words / 2-most-significant-divisor-words */
+ 
+		xhi = q[i];
+		xlo = q[i - 1];
+ 
+		/* adjust the quotient if over-estimated */
+		dw = ((hcl_lidw_t)xhi << HCL_LIW_BITS) + xlo;
+		/* TODO: optimize it with ASM - no seperate / and % */
+		quo = dw / y1;
+		rem = dw % y1;
+ 
+	adjust_quotient:
+		if (quo > HCL_TYPE_MAX(hcl_liw_t) || (quo * y2) > ((rem << HCL_LIW_BITS) + q[i - 2]))
+		{
+			--quo;
+			rem += y1;
+			if (rem <= HCL_TYPE_MAX(hcl_liw_t)) goto adjust_quotient;
+		}
+ 
+		/* ---------------------------------------------------------- */
+		b = calculate_remainder(hcl, q, r, quo, i - ys, ys);
+ 
+		b = (hcl_liw_t)((((hcl_lidw_t)xhi - b) >> HCL_LIW_BITS) & 1); /* is the sign bit set? */
+		if (b)
+		{
+			/* yes. underflow */
+			hcl_lidw_t dw;
+			hcl_liw_t carry;
+			hcl_oow_t j, k;
+ 
+			for (carry = 0, j = i - ys, k = 0; k < ys; j++, k++)
+			{
+				dw = (hcl_lidw_t)q[j] + r[k] + carry;
+				carry = (hcl_liw_t)(dw >> HCL_LIW_BITS);
+				q[j] = (hcl_liw_t)dw;
+			}
+ 
+			HCL_ASSERT (hcl, carry == 1);
+			q[i] = quo - 1;
+		}
+		else
+		{
+			q[i] = quo;
+		}
+	}
+ 
+	if (d > 1)
+	{
+		hcl_lidw_t dw;
+		hcl_liw_t carry;
+		for (carry = 0, i = ys; i > 0; )
+		{
+			--i;
+			dw = ((hcl_lidw_t)carry << HCL_LIW_BITS) + q[i];
+			/* TODO: optimize it with ASM - no seperate / and % */
+			q[i] = (hcl_liw_t)(dw / d);
+			carry = (hcl_liw_t)(dw % d);
+		}
+	}
+ 
+	/* split quotient and remainder held in q to q and r respectively 
+	 *   q      [<--- quotient     ---->|<-- remainder     -->]
+	 *  index   |xs  xs-1  ...  ys+1  ys|ys-1  ys-2  ...  1  0|
+	 */
+	for (i = 0; i < ys; i++) { r[i] = q[i]; q[i] = 0;  }
+	for (; i <= xs; i++) { q[i - ys] = q[i]; q[i] = 0; }
+ 
+}
+ 
+static void divide_unsigned_array3 (hcl_t* hcl, const hcl_liw_t* x, hcl_oow_t xs, const hcl_liw_t* y, hcl_oow_t ys, hcl_liw_t* q, hcl_liw_t* r)
+{
+	hcl_oow_t s, i, j, g, k;
+	hcl_lidw_t dw, qhat, rhat;
+	hcl_lidi_t di, ci;
+	hcl_liw_t* qq, y1, y2;
+ 
+	/* the caller must ensure:
+	 *  - q can hold 'xs + 1' words and r can hold 'ys' words. 
+	 *  - q and r are set to all zeros. */
+	HCL_ASSERT (hcl, xs >= ys);
+ 
+	if (ys == 1)
+	{
+		/* the divisor has a single word only. perform simple division */
+		hcl_lidw_t dw;
+		hcl_liw_t carry = 0;
+		for (i = xs; i > 0; )
+		{
+			--i;
+			dw = ((hcl_lidw_t)carry << HCL_LIW_BITS) + x[i];
+			q[i] = (hcl_liw_t)(dw / y[0]);
+			carry = (hcl_liw_t)(dw % y[0]);
+		}
+		r[0] = carry;
+		return;
+	}
+ 
+#define SHARED_QQ
+ 
+#if defined(SHARED_QQ)
+	/* as long as q is 2 words longer than x, this algorithm can store
+	 * both quotient and remainder in q at the same time. */
+	qq = q;
+#else
+	/* this part requires an extra buffer. proper error handling isn't easy
+	 * since the return type of this function is void */
+	if (hcl->inttostr.t.capa <= xs)
+	{
+		hcl_liw_t* t;
+		hcl_oow_t reqcapa;
+ 
+		reqcapa = HCL_ALIGN_POW2(xs + 1, 32);
+		t = (hcl_liw_t*)hcl_reallocmem(hcl, hcl->inttostr.t.ptr, reqcapa * HCL_SIZEOF(*t));
+		/* TODO: TODO: TODO: ERROR HANDLING
+		if (!t) return -1; */
+ 
+		hcl->inttostr.t.capa = xs + 1;
+		hcl->inttostr.t.ptr = t;
+	}
+	qq = hcl->inttostr.t.ptr;
+#endif
+ 
+	y1 = y[ys - 1];
+	/*s = HCL_LIW_BITS - ((y1 == 0)? -1: get_pos_of_msb_set(y1)) - 1;*/
+	HCL_ASSERT (hcl, y1 > 0); /* the highest word can't be non-zero in the context where this function is called */
+	s = HCL_LIW_BITS - get_pos_of_msb_set(y1) - 1;
+	for (i = ys; i > 1; )
+	{
+		--i;
+		r[i] = (y[i] << s) | ((hcl_lidw_t)y[i - 1] >> (HCL_LIW_BITS - s));
+	}
+	r[0] = y[0] << s;
+ 
+	qq[xs] = (hcl_lidw_t)x[xs - 1] >> (HCL_LIW_BITS - s);
+	for (i = xs; i > 1; )
+	{
+		--i;
+		qq[i] = (x[i] << s) | ((hcl_lidw_t)x[i - 1] >> (HCL_LIW_BITS - s));
+	}
+	qq[0] = x[0] << s;
+ 
+	y1 = r[ys - 1];
+	y2 = r[ys - 2];
+ 
+	for (j = xs; j >= ys; --j)
+	{
+		g = j - ys; /* position where remainder begins in qq */
+ 
+		/* estimate */
+		dw = ((hcl_lidw_t)qq[j] << HCL_LIW_BITS) + qq[j - 1];
+		qhat = dw / y1;
+		rhat = dw - (qhat * y1);
+ 
+	adjust_quotient:
+		if (qhat > HCL_TYPE_MAX(hcl_liw_t) || (qhat * y2) > ((rhat << HCL_LIW_BITS) + qq[j - 2]))
+		{
+			qhat = qhat - 1;
+			rhat = rhat + y1;
+			if (rhat <= HCL_TYPE_MAX(hcl_liw_t)) goto adjust_quotient;
+		}
+ 
+		/* multiply and subtract */
+		for (ci = 0, i = g, k = 0; k < ys; i++, k++)
+		{
+			dw = qhat * r[k];
+			di = qq[i] - ci - (dw & HCL_TYPE_MAX(hcl_liw_t));
+			ci = (dw >> HCL_LIW_BITS) - (di >> HCL_LIW_BITS);
+			qq[i] = (hcl_liw_t)di;
+		}
+		HCL_ASSERT (hcl, i == j);
+		di = qq[i] - ci;
+		qq[i] = di;
+ 
+		/* test remainder */
+		if (di < 0)
+		{
+			for (ci = 0, i = g, k = 0; k < ys; i++, k++)
+			{
+				di = (hcl_lidw_t)qq[i] + r[k] + ci;
+				ci = (hcl_liw_t)(di >> HCL_LIW_BITS);
+				qq[i] = (hcl_liw_t)di;
+			}
+ 
+			HCL_ASSERT (hcl, i == j);
+			/*HCL_ASSERT (hcl, ci == 1);*/
+			qq[i] += ci;
+ 
+		#if defined(SHARED_QQ)
+			/* store the quotient word right after the remainder in q */
+			q[i + 1] = qhat - 1;
+		#else
+			q[g] = qhat - 1;
+		#endif
+		}
+		else
+		{
+		#if defined(SHARED_QQ)
+			/* store the quotient word right after the remainder in q */
+			q[i + 1] = qhat;
+		#else
+			q[g] = qhat;
+		#endif
+		}
+	}
+ 
+	for (i = 0; i < ys - 1; i++)
+	{
+		r[i] = (qq[i] >> s) | ((hcl_lidw_t)qq[i + 1] << (HCL_LIW_BITS - s));
+	}
+	r[i] = qq[i] >> s;
+ 
+#if defined(SHARED_QQ)
+	for (i = 0; i <= ys; i++) { q[i] = 0;  }
+	for (; i <= xs + 1; i++) { q[i - ys - 1] = q[i]; q[i] = 0; }
+#endif
+ 
+}
+ 
+/* ======================================================================== */
+ 
 static hcl_oop_t add_unsigned_integers (hcl_t* hcl, hcl_oop_t x, hcl_oop_t y)
 {
 	hcl_oow_t as, bs, zs;
@@ -1612,7 +2025,7 @@ static hcl_oop_t multiply_unsigned_integers (hcl_t* hcl, hcl_oop_t x, hcl_oop_t 
 	if (!z) return HCL_NULL;
 
 #if defined(HCL_ENABLE_KARATSUBA)
-	if (CANNOT_KARATSUBA(hcl,xs, ys))
+	if (CANNOT_KARATSUBA(hcl, xs, ys))
 	{
 #endif
 		multiply_unsigned_array (
@@ -1666,7 +2079,17 @@ static hcl_oop_t divide_unsigned_integers (hcl_t* hcl, hcl_oop_t x, hcl_oop_t y,
 	HCL_ASSERT (hcl, !is_less_unsigned(x, y)); 
 	hcl_pushtmp (hcl, &x);
 	hcl_pushtmp (hcl, &y);
+
+#define USE_DIVIDE_UNSIGNED_ARRAY2
+/*#define USE_DIVIDE_UNSIGNED_ARRAY3*/
+
+#if defined(USE_DIVIDE_UNSIGNED_ARRAY3)
+	qq = hcl_makebigint(hcl, HCL_BRAND_PBIGINT, HCL_NULL, HCL_OBJ_GET_SIZE(x) + 2);
+#elif defined(USE_DIVIDE_UNSIGNED_ARRAY2)
+	qq = hcl_makebigint(hcl, HCL_BRAND_PBIGINT, HCL_NULL, HCL_OBJ_GET_SIZE(x) + 1);
+#else
 	qq = hcl_makebigint(hcl, HCL_BRAND_PBIGINT, HCL_NULL, HCL_OBJ_GET_SIZE(x));
+#endif
 	if (!qq) 
 	{
 		hcl_poptmps (hcl, 2);
@@ -1674,11 +2097,24 @@ static hcl_oop_t divide_unsigned_integers (hcl_t* hcl, hcl_oop_t x, hcl_oop_t y,
 	}
 
 	hcl_pushtmp (hcl, &qq);
-	rr = hcl_makebigint(hcl, HCL_BRAND_PBIGINT, HCL_NULL, HCL_OBJ_GET_SIZE(x));
+#if defined(USE_DIVIDE_UNSIGNED_ARRAY3)
+	rr = hcl_makebigint(hcl, HCL_BRAND_PBIGINT, HCL_NULL, HCL_OBJ_GET_SIZE(y));
+#elif defined(USE_DIVIDE_UNSIGNED_ARRAY2)
+	rr = hcl_makebigint(hcl, HCL_BRAND_PBIGINT, HCL_NULL, HCL_OBJ_GET_SIZE(y));
+#else
+	rr = hcl_makebigint(hcl, HCL_BRAND_PBIGINT, HCL_NULL, HCL_OBJ_GET_SIZE(y) + 1);
+#endif
 	hcl_poptmps (hcl, 3);
 	if (!rr) return HCL_NULL;
 
+
+#if defined(USE_DIVIDE_UNSIGNED_ARRAY3)
+	divide_unsigned_array3 (hcl,
+#elif defined(USE_DIVIDE_UNSIGNED_ARRAY2)
+	divide_unsigned_array2 (hcl,
+#else
 	divide_unsigned_array (hcl,
+#endif
 		((hcl_oop_liword_t)x)->slot, HCL_OBJ_GET_SIZE(x),
 		((hcl_oop_liword_t)y)->slot, HCL_OBJ_GET_SIZE(y),
 		((hcl_oop_liword_t)qq)->slot, ((hcl_oop_liword_t)rr)->slot);
@@ -1686,6 +2122,8 @@ static hcl_oop_t divide_unsigned_integers (hcl_t* hcl, hcl_oop_t x, hcl_oop_t y,
 	*r = rr;
 	return qq;
 }
+
+/* ======================================================================== */
 
 hcl_oop_t hcl_addints (hcl_t* hcl, hcl_oop_t x, hcl_oop_t y)
 {
@@ -1887,7 +2325,7 @@ hcl_oop_t hcl_mulints (hcl_t* hcl, hcl_oop_t x, hcl_oop_t y)
 
 	if (HCL_OOP_IS_SMOOI(x) && HCL_OOP_IS_SMOOI(y))
 	{
-	#if HCL_SIZEOF_INTMAX_T > HCL_SIZEOF_OOI_T
+	#if (HCL_SIZEOF_INTMAX_T > HCL_SIZEOF_OOI_T)
 		hcl_intmax_t i;
 		i = (hcl_intmax_t)HCL_OOP_TO_SMOOI(x) * (hcl_intmax_t)HCL_OOP_TO_SMOOI(y);
 		if (HCL_IN_SMOOI_RANGE(i)) return HCL_SMOOI_TO_OOP((hcl_ooi_t)i);
@@ -1912,7 +2350,7 @@ hcl_oop_t hcl_mulints (hcl_t* hcl, hcl_oop_t x, hcl_oop_t y)
 			hcl_poptmp (hcl);
 			if (!y) return HCL_NULL;
 
-			goto normal;
+			goto full_multiply;
 		}
 		else
 		{
@@ -1972,7 +2410,7 @@ hcl_oop_t hcl_mulints (hcl_t* hcl, hcl_oop_t x, hcl_oop_t y)
 			if (!is_bigint(hcl,y)) goto oops_einval;
 		}
 
-	normal:
+	full_multiply:
 		neg = (HCL_OBJ_GET_FLAGS_BRAND(x) != HCL_OBJ_GET_FLAGS_BRAND(y));
 		z = multiply_unsigned_integers (hcl, x, y);
 		if (!z) return HCL_NULL;
@@ -1989,7 +2427,7 @@ oops_einval:
 hcl_oop_t hcl_divints (hcl_t* hcl, hcl_oop_t x, hcl_oop_t y, int modulo, hcl_oop_t* rem)
 {
 	hcl_oop_t z, r;
-	int x_neg, y_neg;
+	int x_neg_sign, y_neg_sign;
 
 	if (HCL_OOP_IS_SMOOI(x) && HCL_OOP_IS_SMOOI(y))
 	{
@@ -2095,19 +2533,28 @@ hcl_oop_t hcl_divints (hcl_t* hcl, hcl_oop_t x, hcl_oop_t y, int modulo, hcl_oop
 	{
 		if (HCL_OOP_IS_SMOOI(x))
 		{
-			hcl_ooi_t v;
-
+			hcl_ooi_t xv;
+ 
 			if (!is_bigint(hcl,y)) goto oops_einval;
-
-			v = HCL_OOP_TO_SMOOI(x);
-			if (v == 0)
+ 
+			/* divide a small integer by a big integer. 
+			 * the dividend is guaranteed to be greater than the divisor
+			 * if both are positive. */
+ 
+			xv = HCL_OOP_TO_SMOOI(x);
+			x_neg_sign = (xv < 0);
+			y_neg_sign = HCL_IS_NBIGINT(hcl, y);
+			if (x_neg_sign == y_neg_sign || !modulo)
 			{
-				if (rem) *rem = HCL_SMOOI_TO_OOP(0);
+				/* simple. the quotient is zero and the
+				 * dividend becomes the remainder as a whole. */
+				if (rem) *rem = x;
 				return HCL_SMOOI_TO_OOP(0);
 			}
-
+ 
+			/* carry on to the full bigint division */
 			hcl_pushtmp (hcl, &y);
-			x = make_bigint_with_ooi (hcl, v);
+			x = make_bigint_with_ooi(hcl, xv);
 			hcl_poptmp (hcl);
 			if (!x) return HCL_NULL;
 		}
@@ -2117,6 +2564,8 @@ hcl_oop_t hcl_divints (hcl_t* hcl, hcl_oop_t x, hcl_oop_t y, int modulo, hcl_oop
 
 			if (!is_bigint(hcl,x)) goto oops_einval;
 
+			/* divide a big integer by a small integer. */
+
 			yv = HCL_OOP_TO_SMOOI(y);
 			switch (yv)
 			{
@@ -2125,109 +2574,83 @@ hcl_oop_t hcl_divints (hcl_t* hcl, hcl_oop_t x, hcl_oop_t y, int modulo, hcl_oop
 					return HCL_NULL;
 
 				case 1:
-					z = clone_bigint (hcl, x, HCL_OBJ_GET_SIZE(x));
+					z = clone_bigint(hcl, x, HCL_OBJ_GET_SIZE(x));
 					if (!z) return HCL_NULL;
 					if (rem) *rem = HCL_SMOOI_TO_OOP(0);
 					return z;
-
 
 				case -1:
-					z = clone_bigint_negated (hcl, x, HCL_OBJ_GET_SIZE(x));
+					z = clone_bigint_negated(hcl, x, HCL_OBJ_GET_SIZE(x));
 					if (!z) return HCL_NULL;
 					if (rem) *rem = HCL_SMOOI_TO_OOP(0);
 					return z;
 
-	
 				default:
-					/* TODO: do division by shifting if both x & y are in different sign */
-					if (yv < 0)
+				{
+					hcl_lidw_t dw;
+					hcl_liw_t carry = 0;
+					hcl_liw_t* zw;
+					hcl_oow_t zs, i;
+					hcl_ooi_t yv_abs, ri;
+ 
+					yv_abs = (yv < 0)? -yv: yv;
+				#if (HCL_LIW_BITS < HCL_OOI_BITS)
+					if (yv_abs > HCL_TYPE_MAX(hcl_liw_t)) break;
+				#endif
+ 
+					x_neg_sign = (HCL_IS_NBIGINT(hcl, x));
+					y_neg_sign = (yv < 0);
+ 
+					z = clone_bigint_to_positive(hcl, x, HCL_OBJ_GET_SIZE(x));
+					if (!z) return HCL_NULL;
+ 
+					zw = ((hcl_oop_liword_t)z)->slot;
+					zs = HCL_OBJ_GET_SIZE(z);
+					for (i = zs; i > 0; )
 					{
-						hcl_oow_t yv_neg = -yv;
-						if (IS_POW2(yv_neg) && HCL_IS_NBIGINT(hcl, x))
+						--i;
+						dw = ((hcl_lidw_t)carry << HCL_LIW_BITS) + zw[i];
+						/* TODO: optimize it with ASM - no seperate / and % */
+						zw[i] = (hcl_liw_t)(dw / yv_abs);
+						carry = (hcl_liw_t)(dw % yv_abs);
+					}
+					/*if (zw[zs - 1] == 0) zs--;*/
+ 
+					HCL_ASSERT (hcl, carry <= HCL_SMOOI_MAX);
+					ri = carry;
+					if (x_neg_sign) ri = -ri;
+ 
+					z = normalize_bigint(hcl, z);
+					if (!z) return HCL_NULL;
+ 
+					if (x_neg_sign != y_neg_sign)
+					{
+						HCL_OBJ_SET_FLAGS_BRAND (z, HCL_BRAND_NBIGINT);
+						if (ri && modulo)
 						{
-							hcl_oow_t nshifts;
-
-							nshifts = LOG2_FOR_POW2(yv_neg);
-
-							hcl_pushtmp (hcl, &x);
-							z = clone_bigint_negated(hcl, x, HCL_OBJ_GET_SIZE(x));
-							hcl_poptmp (hcl);
+							z = hcl_subints(hcl, z, HCL_SMOOI_TO_OOP(1)); 
 							if (!z) return HCL_NULL;
-
-							rshift_unsigned_array (((hcl_oop_liword_t)z)->slot, HCL_OBJ_GET_SIZE(z), nshifts);
-
-							hcl_pushtmp (hcl, &x);
-							z = normalize_bigint(hcl, z);
-							hcl_poptmp (hcl);
-							if (!z) return HCL_NULL;
-
-							if (rem) 
+							if (rem)
 							{
-								hcl_pushtmp (hcl, &x);
-								hcl_pushtmp (hcl, &z);
-								r = hcl_mulints(hcl, HCL_SMOOI_TO_OOP(yv_neg), z);
-								hcl_poptmps (hcl, 2);
-								if (!r) return HCL_NULL;
-
-								hcl_pushtmp (hcl, &z);
-								r = hcl_addints(hcl, x, r);
+ 								hcl_pushtmp (hcl, &z);
+								r = hcl_addints(hcl, HCL_SMOOI_TO_OOP(ri), HCL_SMOOI_TO_OOP(yv));
+ 
 								hcl_poptmp (hcl);
 								if (!r) return HCL_NULL;
-
+ 
 								*rem = r;
 							}
-
+ 
 							return z;
 						}
 					}
-					else
-					{
-						/* yv > 0 */
-						if (IS_POW2(yv) && HCL_IS_PBIGINT(hcl, x))
-						{
-							hcl_oow_t nshifts;
-
-							/* 
-							2**x = v
-							x = log2(v)
-							x is the number of shift to make */
-							nshifts = LOG2_FOR_POW2(yv);
-
-							/* no pushtmp() on y as y is SMOOI here */
-							hcl_pushtmp (hcl, &x);
-							z = clone_bigint(hcl, x, HCL_OBJ_GET_SIZE(x));
-							hcl_poptmp (hcl);
-							if (!z) return HCL_NULL;
-
-							rshift_unsigned_array (((hcl_oop_liword_t)z)->slot, HCL_OBJ_GET_SIZE(z), nshifts);
-
-							hcl_pushtmp (hcl, &x);
-							z = normalize_bigint(hcl, z);
-							hcl_poptmp (hcl);
-							if (!z) return HCL_NULL;
-
-							if (rem) 
-							{
-								hcl_pushtmp (hcl, &x);
-								hcl_pushtmp (hcl, &z);
-								r = hcl_mulints(hcl, y, z);
-								hcl_poptmps (hcl, 2);
-								if (!r) return HCL_NULL;
-
-								hcl_pushtmp (hcl, &z);
-								r = hcl_subints(hcl, x, r);
-								hcl_poptmp (hcl);
-								if (!r) return HCL_NULL;
-
-								*rem = r;
-							}
-
-							return z;
-						}
-					}
-					break;
+ 
+					if (rem) *rem = HCL_SMOOI_TO_OOP(ri);
+					return z;
+				}
 			}
 
+			/* carry on to the full bigint division */
 			hcl_pushtmp (hcl, &x);
 			y = make_bigint_with_ooi (hcl, yv);
 			hcl_poptmp (hcl);
@@ -2240,8 +2663,8 @@ hcl_oop_t hcl_divints (hcl_t* hcl, hcl_oop_t x, hcl_oop_t y, int modulo, hcl_oop
 		}
 	}
 
-	x_neg = HCL_IS_NBIGINT(hcl, x);
-	y_neg = HCL_IS_NBIGINT(hcl, y);
+	x_neg_sign = HCL_IS_NBIGINT(hcl, x);
+	y_neg_sign = HCL_IS_NBIGINT(hcl, y);
 
 	hcl_pushtmp (hcl, &x);
 	hcl_pushtmp (hcl, &y);
@@ -2249,14 +2672,14 @@ hcl_oop_t hcl_divints (hcl_t* hcl, hcl_oop_t x, hcl_oop_t y, int modulo, hcl_oop
 	hcl_poptmps (hcl, 2);
 	if (!z) return HCL_NULL;
 
-	if (x_neg) 
+	if (x_neg_sign) 
 	{
 		/* the class on r must be set before normalize_bigint() 
 		 * because it can get changed to a small integer */
 		HCL_OBJ_SET_FLAGS_BRAND (r, HCL_BRAND_NBIGINT);
 	}
 
-	if (x_neg != y_neg)
+	if (x_neg_sign != y_neg_sign)
 	{
 		HCL_OBJ_SET_FLAGS_BRAND (z, HCL_BRAND_NBIGINT);
 
@@ -4267,26 +4690,40 @@ hcl_oop_t hcl_absint (hcl_t* hcl, hcl_oop_t x)
 	return x;
 }
 
+static HCL_INLINE hcl_liw_t get_last_digit (hcl_t* hcl, hcl_liw_t* x, hcl_oow_t* xs, int radix)
+{
+	/* this function changes the contents of the large integer word array */
+	hcl_oow_t oxs = *xs;
+	hcl_liw_t carry = 0;
+	hcl_oow_t i;
+	hcl_lidw_t dw;
+ 
+	HCL_ASSERT (hcl, oxs > 0);
+ 
+	for (i = oxs; i > 0; )
+	{
+		--i;
+		dw = ((hcl_lidw_t)carry << HCL_LIW_BITS) + x[i];
+		/* TODO: optimize it with ASM - no seperate / and % */
+		x[i] = (hcl_liw_t)(dw / radix);
+		carry = (hcl_liw_t)(dw % radix);
+	}
+	if (/*oxs > 0 &&*/ x[oxs - 1] == 0) *xs = oxs - 1;
+	return carry;
+}
+
 hcl_oop_t hcl_inttostr (hcl_t* hcl, hcl_oop_t num, int radix, int ngc)
 {
 	hcl_ooi_t v = 0;
 	hcl_oow_t w;
-	hcl_oow_t as, bs, rs;
-#if (HCL_LIW_BITS == HCL_OOW_BITS)
-	hcl_liw_t b[1];
-#elif (HCL_LIW_BITS == HCL_OOHW_BITS)
-	hcl_liw_t b[2];
-#else
-#	error UNSUPPORTED LIW BIT SIZE
-#endif
-	hcl_liw_t* a, * q, * r;
-	hcl_liw_t* t = HCL_NULL;
+	hcl_oow_t as;
+  	hcl_liw_t* t = HCL_NULL;
 	hcl_ooch_t* xbuf = HCL_NULL;
-	hcl_oow_t xlen = 0, seglen, reqcapa;
-
+	hcl_oow_t xlen = 0, reqcapa;
+ 
 	const char* _digitc;
 	int orgradix = radix;
-
+ 
 	if (radix < 0) 
 	{
 		_digitc = _digitc_lower;
@@ -4297,21 +4734,17 @@ hcl_oop_t hcl_inttostr (hcl_t* hcl, hcl_oop_t num, int radix, int ngc)
 		_digitc = _digitc_upper;
 	}
 	HCL_ASSERT (hcl, radix >= 2 && radix <= 36);
-
-	if (!hcl_isint(hcl,num)) 
-	{
-		hcl_seterrbfmt (hcl, HCL_EINVAL, "parameter not integer - %O", num);
-		return HCL_NULL;
-	}
+ 
+	if (!hcl_isint(hcl,num)) goto oops_einval;
 	v = integer_to_oow(hcl, num, &w);
-
+ 
 	if (v)
 	{
 		/* The largest buffer is required for radix 2.
 		 * For a binary conversion(radix 2), the number of bits is
 		 * the maximum number of digits that can be produced. +1 is
 		 * needed for the sign. */
-
+ 
 		reqcapa = HCL_OOW_BITS + 1;
 		if (hcl->inttostr.xbuf.capa < reqcapa)
 		{
@@ -4324,90 +4757,25 @@ hcl_oop_t hcl_inttostr (hcl_t* hcl, hcl_oop_t num, int radix, int ngc)
 		{
 			xbuf = hcl->inttostr.xbuf.ptr;
 		}
-
+ 
 		xlen = oow_to_text(hcl, w, orgradix, xbuf);
 		if (v < 0) xbuf[xlen++] = '-';
-
+ 
 		reverse_string (xbuf, xlen);
-		if (ngc < 0)
+	#if 0
+		if (flagged_radix & HCL_INTTOSTR_NONEWOBJ)
 		{
 			/* special case. don't create a new object.
 			 * the caller can use the data left in hcl->inttostr.xbuf */
 			hcl->inttostr.xbuf.len = xlen;
 			return hcl->_nil;
-		}
-		return hcl_makestring(hcl, xbuf, xlen, ngc);
+		} 
+	#endif
+		return hcl_makestring(hcl, xbuf, xlen, 0);
 	}
-
+ 
 	as = HCL_OBJ_GET_SIZE(num);
-
-	if (IS_POW2(radix))
-	{
-		unsigned int exp, accbits;
-		hcl_lidw_t acc;
-		hcl_oow_t xpos;
-
-		exp = _exp_tab[radix - 1];
-		xlen = as * ((HCL_LIW_BITS + exp) / exp) + 1;
-		xpos = xlen;
-
-		reqcapa = xlen; 
-		if (hcl->inttostr.xbuf.capa < reqcapa)
-		{
-			xbuf = (hcl_ooch_t*)hcl_reallocmem(hcl, hcl->inttostr.xbuf.ptr, reqcapa * HCL_SIZEOF(*xbuf));
-			if (!xbuf) return HCL_NULL;
-			hcl->inttostr.xbuf.capa = reqcapa;
-			hcl->inttostr.xbuf.ptr = xbuf;
-		}
-		else
-		{
-			xbuf = hcl->inttostr.xbuf.ptr;
-		}
-
-		acc = 0;
-		accbits = 0;
-
-		w = 0;
-		while (w < as)
-		{
-			acc |= (hcl_lidw_t)((hcl_oop_liword_t)num)->slot[w] << accbits;
-			accbits += HCL_LIW_BITS;
-
-			w++;
-			do
-			{
-				xbuf[--xpos] = _digitc[acc & (radix - 1)]; /* acc % radix */
-				accbits -= exp;
-				acc >>= exp;
-				if (w < as)
-				{
-					if (accbits < exp) break;
-				}
-				else
-				{
-					if (acc <= 0) break;
-				}
-			}
-			while (1);
-		}
-
-		HCL_ASSERT (hcl, xpos >= 1);
-		if (HCL_IS_NBIGINT(hcl, num)) xbuf[--xpos] = '-';
-
-		if (ngc < 0)
-		{
-			/* special case. don't create a new object.
-			 * the caller can use the data left in hcl->inttostr.xbuf */
-			HCL_MEMMOVE (&xbuf[0], &xbuf[xpos], HCL_SIZEOF(*xbuf) * (xlen - xpos));
-			hcl->inttostr.xbuf.len = xlen - xpos;
-			return hcl->_nil;
-		}
-
-		return hcl_makestring(hcl, &xbuf[xpos], xlen - xpos, ngc);
-	}
-
-	/* Do it in a hard way for other cases */
-/* TODO: find an optimial buffer size */
+  
 	reqcapa = as * HCL_LIW_BITS + 1; 
 	if (hcl->inttostr.xbuf.capa < reqcapa)
 	{
@@ -4420,89 +4788,28 @@ hcl_oop_t hcl_inttostr (hcl_t* hcl, hcl_oop_t num, int radix, int ngc)
 	{
 		xbuf = hcl->inttostr.xbuf.ptr;
 	}
-
-	reqcapa = as * 3;
-	if (hcl->inttostr.t.capa < reqcapa)
-	{
+ 
+	if (hcl->inttostr.t.capa < as)
+ 	{
 		t = (hcl_liw_t*)hcl_reallocmem(hcl, hcl->inttostr.t.ptr, reqcapa * HCL_SIZEOF(*t));
 		if (!t) return HCL_NULL;
-		hcl->inttostr.t.capa = reqcapa;
+		hcl->inttostr.t.capa = as;
 		hcl->inttostr.t.ptr = t;
 	}
 	else 
 	{
 		t = hcl->inttostr.t.ptr;
 	}
-
-#if (HCL_LIW_BITS == HCL_OOW_BITS)
-	b[0] = hcl->bigint[radix].multiplier; /* block divisor */
-	bs = 1;
-#elif (HCL_LIW_BITS == HCL_OOHW_BITS)
-	b[0] = hcl->bigint[radix].multiplier /*& HCL_LBMASK(hcl_oow_t, HCL_LIW_BITS)*/;
-	b[1] = hcl->bigint[radix].multiplier >> HCL_LIW_BITS;
-	bs = (b[1] > 0)? 2: 1;
-#else
-#	error UNSUPPORTED LIW BIT SIZE
-#endif
-
-	a = &t[0];
-	q = &t[as];
-	r = &t[as * 2];
-
-	HCL_MEMCPY (a, ((hcl_oop_liword_t)num)->slot, HCL_SIZEOF(*a) * as);
-
+ 
+	HCL_MEMCPY (t, ((hcl_oop_liword_t)num)->slot, HCL_SIZEOF(*t) * as);
+  
 	do
 	{
-		if (is_less_unsigned_array (b, bs, a, as))
-		{
-			hcl_liw_t* tmp;
-
-			divide_unsigned_array (hcl, a, as, b, bs, q, r);
-
-			/* get 'rs' before 'as' gets changed */
-			rs = count_effective (r, as); 
+		hcl_liw_t dv = get_last_digit(hcl, t, &as, radix);
+		xbuf[xlen++] = _digitc[dv];
+ 	}
+	while (as > 0);
  
-			/* swap a and q for later division */
-			tmp = a;
-			a = q;
-			q = tmp;
-
-			as = count_effective (a, as);
-		}
-		else
-		{
-			/* it is the last block */
-			r = a;
-			rs = as;
-		}
-
-	#if (HCL_LIW_BITS == HCL_OOW_BITS)
-		HCL_ASSERT (hcl, rs == 1);
-		w = r[0];
-	#elif (HCL_LIW_BITS == HCL_OOHW_BITS)
-		if (rs == 1) w = r[0];
-		else 
-		{
-			HCL_ASSERT (hcl, rs == 2);
-			w = MAKE_WORD (r[0], r[1]);
-		}
-	#else
-	#	error UNSUPPORTED LIW BIT SIZE
-	#endif
-		seglen = oow_to_text (hcl, w, orgradix, &xbuf[xlen]);
-		xlen += seglen;
-		if (r == a) break; /* reached the last block */
-
-		/* fill unfilled leading digits with zeros as it's not 
-		 * the last block */
-		while (seglen < hcl->bigint[radix].safe_ndigits)
-		{
-			xbuf[xlen++] = '0';
-			seglen++;
-		}
-	}
-	while (1);
-
 	if (HCL_IS_NBIGINT(hcl, num)) xbuf[xlen++] = '-';
 	reverse_string (xbuf, xlen);
 	if (ngc < 0)
@@ -4513,5 +4820,9 @@ hcl_oop_t hcl_inttostr (hcl_t* hcl, hcl_oop_t num, int radix, int ngc)
 		return hcl->_nil;
 	}
 
-	return hcl_makestring(hcl, xbuf, xlen, ngc);
+	return hcl_makestring(hcl, xbuf, xlen, 0);
+ 
+oops_einval:
+	hcl_seterrnum (hcl, HCL_EINVAL);
+	return HCL_NULL;
 }

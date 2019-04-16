@@ -842,6 +842,16 @@ typedef struct hcl_t hcl_t;
 		#define HCL_HAVE_BUILTIN_CTZLL
 	#endif
 
+	#if __has_builtin(__builtin_clz)
+		#define HCL_HAVE_BUILTIN_CLZ
+	#endif
+	#if __has_builtin(__builtin_clzl)
+		#define HCL_HAVE_BUILTIN_CLZL
+	#endif
+	#if __has_builtin(__builtin_clzll)
+		#define HCL_HAVE_BUILTIN_CLZLL
+	#endif
+ 
 	#if __has_builtin(__builtin_uadd_overflow)
 		#define HCL_HAVE_BUILTIN_UADD_OVERFLOW 
 	#endif
@@ -917,6 +927,9 @@ typedef struct hcl_t hcl_t;
 		#define HCL_HAVE_BUILTIN_CTZ
 		#define HCL_HAVE_BUILTIN_CTZL
 		#define HCL_HAVE_BUILTIN_CTZLL
+		#define HCL_HAVE_BUILTIN_CLZ
+		#define HCL_HAVE_BUILTIN_CLZL
+		#define HCL_HAVE_BUILTIN_CLZLL
 		#define HCL_HAVE_BUILTIN_EXPECT
 	#endif
 
