@@ -226,7 +226,7 @@ typedef struct hcl_obj_word_t*     hcl_oop_word_t;
 /* =========================================================================
  * BIGINT TYPES AND MACROS
  * ========================================================================= */
-#if (HCL_SIZEOF_UINTMAX_T > HCL_SIZEOF_OOW_T)
+#if defined(HCL_ENABLE_FULL_LIW) && (HCL_SIZEOF_UINTMAX_T > HCL_SIZEOF_OOW_T)
 #	define HCL_USE_FULL_WORD
 #endif
 

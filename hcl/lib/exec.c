@@ -1000,6 +1000,10 @@ static HCL_INLINE int call_primitive (hcl_t* hcl, hcl_ooi_t nargs)
 }
 
 
+
+#if 0
+/* EXPERIMENTAL CODE INTEGRATING EXTERNAL COMMANDS */
+
 #include <unistd.h>
 #include <sys/wait.h>
 #include <sys/stat.h>
@@ -1171,6 +1175,8 @@ oops:
 	if (xcmd && xcmd != cmd) hcl_freemem (hcl, xcmd);
 	return -1;
 }
+
+#endif
 
 /* ------------------------------------------------------------------------- */
 static hcl_oop_process_t start_initial_process (hcl_t* hcl, hcl_oop_context_t ctx)
