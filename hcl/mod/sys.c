@@ -27,15 +27,37 @@
 
 #include "_sys.h"
 #include <stdlib.h>
+#include <time.h>
 
 static hcl_pfrc_t pf_sys_time (hcl_t* hcl, hcl_mod_t* mod, hcl_ooi_t nargs)
 {
 	hcl_ntime_t now;
 	hcl_oop_t tv;
-	hcl->vmprim.gettime(hcl, &now);
+	hcl->vmprim.gettime(hcl, &now); /* should I use time() instead? */
 	tv = hcl_oowtoint(hcl, now.sec);
 	if (!tv) return HCL_PF_FAILURE;
 	HCL_STACK_SETRET (hcl, nargs, tv);
+	return HCL_PF_SUCCESS;
+}
+
+static hcl_pfrc_t pf_sys_stime (hcl_t* hcl, hcl_mod_t* mod, hcl_ooi_t nargs)
+{
+	hcl_oop_t t;
+	hcl_ooi_t ti;
+	time_t tv;
+
+	t = HCL_STACK_GETARG(hcl, nargs, 0);
+	if (hcl_inttoooi(hcl, t, &ti) == 0)
+	{
+		const hcl_ooch_t* orgmsg = hcl_backuperrmsg(hcl);
+		hcl_seterrbfmt (hcl, HCL_EINVAL, "unacceptiable time value - %O - %js", t, orgmsg);
+		return HCL_PF_FAILURE;
+	}
+
+	tv = ti;
+	stime (&tv);
+
+	HCL_STACK_SETRET (hcl, nargs, hcl->_nil);
 	return HCL_PF_SUCCESS;
 }
 
@@ -70,6 +92,7 @@ static hcl_pfinfo_t pfinfos[] =
 	/*{ { 'V','A','R','\0' },                  { HCL_PFBASE_VAR,  HCL_NULL,           0,  0 } },*/
 	{ { 'r','a','n','d','o','m','\0' },      { HCL_PFBASE_FUNC,  pf_sys_random,       0,  0 } },
 	{ { 's','r','a','n','d','o','m','\0' },  { HCL_PFBASE_FUNC,  pf_sys_srandom,      1,  1 } },
+	{ { 's','t','i','m','e','\0' },          { HCL_PFBASE_FUNC,  pf_sys_stime,        1,  1 } },
 	{ { 't','i','m','e','\0' },              { HCL_PFBASE_FUNC,  pf_sys_time,         0,  0 } }
 };
 
