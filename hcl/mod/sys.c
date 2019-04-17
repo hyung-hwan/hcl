@@ -27,7 +27,13 @@
 
 #include "_sys.h"
 #include <stdlib.h>
-#include <time.h>
+
+#if defined(HAVE_SYS_TIME_H)
+#	include <sys/time.h>
+#endif
+#if defined(HAVE_TIME_H)
+#	include <time.h>
+#endif
 
 static hcl_pfrc_t pf_sys_time (hcl_t* hcl, hcl_mod_t* mod, hcl_ooi_t nargs)
 {
@@ -44,7 +50,6 @@ static hcl_pfrc_t pf_sys_stime (hcl_t* hcl, hcl_mod_t* mod, hcl_ooi_t nargs)
 {
 	hcl_oop_t t;
 	hcl_ooi_t ti;
-	time_t tv;
 
 	t = HCL_STACK_GETARG(hcl, nargs, 0);
 	if (hcl_inttoooi(hcl, t, &ti) == 0)
@@ -54,8 +59,22 @@ static hcl_pfrc_t pf_sys_stime (hcl_t* hcl, hcl_mod_t* mod, hcl_ooi_t nargs)
 		return HCL_PF_FAILURE;
 	}
 
-	tv = ti;
-	stime (&tv);
+	/* ---------------------------------------------------------------- */
+#if defined(HAVE_SETTIMEOFDAY)
+	{
+		struct timeval tv;
+		tv.tv_sec = ti;
+		tv.tv_usec = 0;
+		settimeofday (&tv, HCL_NULL);
+	}
+#else
+	{
+		time_t tv;
+		tv = ti;
+		stime (&tv);
+	}
+#endif
+	/* ---------------------------------------------------------------- */
 
 	HCL_STACK_SETRET (hcl, nargs, hcl->_nil);
 	return HCL_PF_SUCCESS;
