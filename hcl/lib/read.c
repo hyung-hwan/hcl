@@ -2298,10 +2298,10 @@ int hcl_attachio (hcl_t* hcl, hcl_ioimpl_t reader, hcl_ioimpl_t printer)
 		HCL_MEMSET (&cb, 0, HCL_SIZEOF(cb));
 		cb.gc = gc_compiler;
 		cb.fini = fini_compiler;
-		cbp = hcl_regcb (hcl, &cb);
+		cbp = hcl_regcb(hcl, &cb);
 		if (!cbp) return -1;
 
-		hcl->c = (hcl_compiler_t*)hcl_callocmem (hcl, HCL_SIZEOF(*hcl->c));
+		hcl->c = (hcl_compiler_t*)hcl_callocmem(hcl, HCL_SIZEOF(*hcl->c));
 		if (!hcl->c) 
 		{
 			hcl_deregcb (hcl, cbp);
@@ -2341,11 +2341,11 @@ int hcl_attachio (hcl_t* hcl, hcl_ioimpl_t reader, hcl_ioimpl_t printer)
 	hcl->c->inarg.colm = 1;
 
 	/* open the top-level stream */
-	n = hcl->c->reader (hcl, HCL_IO_OPEN, &hcl->c->inarg);
+	n = hcl->c->reader(hcl, HCL_IO_OPEN, &hcl->c->inarg);
 	if (n <= -1) goto oops;
 
 	HCL_MEMSET (&hcl->c->outarg, 0, HCL_SIZEOF(hcl->c->outarg));
-	n = hcl->c->printer (hcl, HCL_IO_OPEN, &hcl->c->outarg);
+	n = hcl->c->printer(hcl, HCL_IO_OPEN, &hcl->c->outarg);
 	if (n <= -1) 
 	{
 		hcl->c->reader (hcl, HCL_IO_CLOSE, &hcl->c->inarg);
@@ -2369,6 +2369,14 @@ oops:
 		hcl->c->reader = HCL_NULL;
 	}
 	return -1;
+}
+
+void hcl_flushio (hcl_t* hcl)
+{
+	if (hcl->c)
+	{
+		if (hcl->c->printer) hcl->c->printer (hcl, HCL_IO_FLUSH, &hcl->c->outarg);
+	}
 }
 
 void hcl_detachio (hcl_t* hcl)

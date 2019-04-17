@@ -310,6 +310,10 @@ static int read_handler (hcl_t* hcl, hcl_iocmd_t cmd, void* arg)
 		case HCL_IO_READ:
 			return read_input (hcl, (hcl_ioinarg_t*)arg);
 
+		case HCL_IO_FLUSH:
+			/* no effect on an input stream */
+			return 0;
+
 		default:
 			hcl_seterrnum (hcl, HCL_EINTERN);
 			return -1;
@@ -390,18 +394,32 @@ static HCL_INLINE int write_output (hcl_t* hcl, hcl_iooutarg_t* arg)
 	return 0;
 }
 
+static HCL_INLINE int flush_output (hcl_t* hcl, hcl_iooutarg_t* arg)
+{
+	FILE* fp;
+
+	fp = (FILE*)arg->handle;
+	HCL_ASSERT (hcl, fp != HCL_NULL);
+
+	fflush (fp);
+	return 0;
+}
+
 static int print_handler (hcl_t* hcl, hcl_iocmd_t cmd, void* arg)
 {
 	switch (cmd)
 	{
 		case HCL_IO_OPEN:
-			return open_output (hcl, (hcl_iooutarg_t*)arg);
+			return open_output(hcl, (hcl_iooutarg_t*)arg);
 
 		case HCL_IO_CLOSE:
-			return close_output (hcl, (hcl_iooutarg_t*)arg);
+			return close_output(hcl, (hcl_iooutarg_t*)arg);
 
 		case HCL_IO_WRITE:
-			return write_output (hcl, (hcl_iooutarg_t*)arg);
+			return write_output(hcl, (hcl_iooutarg_t*)arg);
+
+		case HCL_IO_FLUSH:
+			return flush_output(hcl, (hcl_iooutarg_t*)arg);
 
 		default:
 			hcl_seterrnum (hcl, HCL_EINTERN);
@@ -1191,6 +1209,7 @@ count++;
 			}
 			else if (xtn->reader_istty)
 			{
+				/* interactive mode */
 				hcl_oop_t retv;
 
 				hcl_decode (hcl, code_offset, hcl_getbclen(hcl));
@@ -1199,6 +1218,10 @@ count++;
 				//setup_tick ();
 
 				retv = hcl_executefromip(hcl, code_offset);
+
+				/* flush pending output data in the interactive mode(e.g. printf without a newline) */
+				hcl_flushio (hcl); 
+
 				if (!retv)
 				{
 					hcl_logbfmt (hcl, HCL_LOG_STDERR, "ERROR: cannot execute - [%d] %js\n", hcl_geterrnum(hcl), hcl_geterrmsg(hcl));

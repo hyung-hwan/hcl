@@ -833,7 +833,8 @@ enum hcl_iocmd_t
 	HCL_IO_OPEN,
 	HCL_IO_CLOSE,
 	HCL_IO_READ,
-	HCL_IO_WRITE
+	HCL_IO_WRITE,
+	HCL_IO_FLUSH
 };
 typedef enum hcl_iocmd_t hcl_iocmd_t;
 
@@ -1620,6 +1621,9 @@ HCL_EXPORT void hcl_detachio (
 	hcl_t*       hcl
 );
 
+HCL_EXPORT void hcl_flushio (
+	hcl_t*       hcl
+);
 
 HCL_EXPORT hcl_oop_t hcl_read (
 	hcl_t*       hcl
