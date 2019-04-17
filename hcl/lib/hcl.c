@@ -513,6 +513,7 @@ void hcl_freemem (hcl_t* hcl, void* ptr)
 #include "../mod/_arr.h"
 #include "../mod/_dic.h"
 #include "../mod/_str.h"
+#include "../mod/_sys.h"
 
 static struct
 {
@@ -523,7 +524,8 @@ static_modtab[] =
 {
 	{ "arr",      hcl_mod_arr },
 	{ "dic",      hcl_mod_dic },
-	{ "str",      hcl_mod_str }
+	{ "str",      hcl_mod_str },
+	{ "sys",      hcl_mod_sys }
 };
 #endif
 

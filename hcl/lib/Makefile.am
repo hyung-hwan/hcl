@@ -99,6 +99,8 @@ libhcl_la_LIBADD += -lhcl-dic
 libhcl_la_DEPENDENCIES += $(abs_builddir)/../mod/libhcl-dic.la
 libhcl_la_LIBADD += -lhcl-str
 libhcl_la_DEPENDENCIES += $(abs_builddir)/../mod/libhcl-str.la
+libhcl_la_LIBADD += -lhcl-sys
+libhcl_la_DEPENDENCIES += $(abs_builddir)/../mod/libhcl-sys.la
 endif
 
 bin_PROGRAMS = hcl

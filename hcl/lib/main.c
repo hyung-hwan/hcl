@@ -1174,7 +1174,7 @@ count++;
 
 			code_offset = hcl_getbclen(hcl);
 
-			/*hcl_proutbfmt (hcl, 0, "\n");*/
+			if (verbose) hcl_proutbfmt (hcl, 0, "\n"); /* flush the output buffer by hcl_print above */
 			if (hcl_compile(hcl, obj) <= -1)
 			{
 				if (hcl->errnum == HCL_ESYNERR)

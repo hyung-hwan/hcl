@@ -396,7 +396,7 @@ int hcl_inttooow (hcl_t* hcl, hcl_oop_t x, hcl_oow_t* w)
 		}
 	}
 
-	if (is_bigint(hcl, x)) return bigint_to_oow (hcl, x, w);
+	if (is_bigint(hcl, x)) return bigint_to_oow(hcl, x, w);
 
 	hcl_seterrbfmt (hcl, HCL_EINVAL, "parameter not integer - %O", x);
 	return 0; /* not convertable - too big, too small, or not integer */

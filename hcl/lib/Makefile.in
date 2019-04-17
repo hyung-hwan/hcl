@@ -94,10 +94,11 @@ host_triplet = @host@
 @MACOSX_TRUE@@WIN32_FALSE@am__append_4 = -DHCL_DEFAULT_PFMODPOSTFIX=\".dylib\"
 @MACOSX_FALSE@@WIN32_FALSE@am__append_5 = -DHCL_DEFAULT_PFMODPOSTFIX=\".so\"
 @ENABLE_STATIC_MODULE_TRUE@am__append_6 = -lhcl-arr -lhcl-dic \
-@ENABLE_STATIC_MODULE_TRUE@	-lhcl-str
+@ENABLE_STATIC_MODULE_TRUE@	-lhcl-str -lhcl-sys
 @ENABLE_STATIC_MODULE_TRUE@am__append_7 = $(abs_builddir)/../mod/libhcl-arr.la \
 @ENABLE_STATIC_MODULE_TRUE@	$(abs_builddir)/../mod/libhcl-dic.la \
-@ENABLE_STATIC_MODULE_TRUE@	$(abs_builddir)/../mod/libhcl-str.la
+@ENABLE_STATIC_MODULE_TRUE@	$(abs_builddir)/../mod/libhcl-str.la \
+@ENABLE_STATIC_MODULE_TRUE@	$(abs_builddir)/../mod/libhcl-sys.la
 bin_PROGRAMS = hcl$(EXEEXT) $(am__EXEEXT_1)
 @ENABLE_HCLEX_TRUE@am__append_8 = libhclex.la
 @ENABLE_HCLEX_TRUE@am__append_9 = hcl-c.h hcl-s.h hcl-tmr.h hcl-xutl.h hcl-json.h
@@ -425,7 +426,6 @@ pdfdir = @pdfdir@
 prefix = @prefix@
 program_transform_name = @program_transform_name@
 psdir = @psdir@
-runstatedir = @runstatedir@
 sbindir = @sbindir@
 sharedstatedir = @sharedstatedir@
 srcdir = @srcdir@
