@@ -650,7 +650,7 @@ AC_ARG_ENABLE([static-module],
 
 if test "x${enable_shared}" = "xno" -a "x${enable_static}" = "xyes"
 then
-	enable_static_module_is="xyes"
+	enable_static_module_is="yes"
 fi
 
 if test "x${enable_static_module_is}" = "xyes"
