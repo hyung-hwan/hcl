@@ -89,32 +89,130 @@
 */
 
 /* =========================================================================
- * ENDIAN CHANGE
+ * ENDIAN CHANGE OF A CONSTANT
  * ========================================================================= */
+#define HCL_CONST_BSWAP16(x) \
+	((hcl_uint16_t)((((hcl_uint16_t)(x) & ((hcl_uint16_t)0xff << 0)) << 8) | \
+	                (((hcl_uint16_t)(x) & ((hcl_uint16_t)0xff << 8)) >> 8)))
 
-#define HCL_CONST_SWAP16(x) \
-	((qse_uint16_t)((((qse_uint16_t)(x) & (qse_uint16_t)0x00ffU) << 8) | \
-	                (((qse_uint16_t)(x) & (qse_uint16_t)0xff00U) >> 8) ))
+#define HCL_CONST_BSWAP32(x) \
+	((hcl_uint32_t)((((hcl_uint32_t)(x) & ((hcl_uint32_t)0xff <<  0)) << 24) | \
+	                (((hcl_uint32_t)(x) & ((hcl_uint32_t)0xff <<  8)) <<  8) | \
+	                (((hcl_uint32_t)(x) & ((hcl_uint32_t)0xff << 16)) >>  8) | \
+	                (((hcl_uint32_t)(x) & ((hcl_uint32_t)0xff << 24)) >> 24)))
 
-#define HCL_CONST_SWAP32(x) \
-	((qse_uint32_t)((((qse_uint32_t)(x) & (qse_uint32_t)0x000000ffUL) << 24) | \
-	                (((qse_uint32_t)(x) & (qse_uint32_t)0x0000ff00UL) <<  8) | \
-	                (((qse_uint32_t)(x) & (qse_uint32_t)0x00ff0000UL) >>  8) | \
-	                (((qse_uint32_t)(x) & (qse_uint32_t)0xff000000UL) >> 24) ))
+#if defined(HCL_HAVE_UINT64_T)
+#define HCL_CONST_BSWAP64(x) \
+	((hcl_uint64_t)((((hcl_uint64_t)(x) & ((hcl_uint64_t)0xff <<  0)) << 56) | \
+	                (((hcl_uint64_t)(x) & ((hcl_uint64_t)0xff <<  8)) << 40) | \
+	                (((hcl_uint64_t)(x) & ((hcl_uint64_t)0xff << 16)) << 24) | \
+	                (((hcl_uint64_t)(x) & ((hcl_uint64_t)0xff << 24)) <<  8) | \
+	                (((hcl_uint64_t)(x) & ((hcl_uint64_t)0xff << 32)) >>  8) | \
+	                (((hcl_uint64_t)(x) & ((hcl_uint64_t)0xff << 40)) >> 24) | \
+	                (((hcl_uint64_t)(x) & ((hcl_uint64_t)0xff << 48)) >> 40) | \
+	                (((hcl_uint64_t)(x) & ((hcl_uint64_t)0xff << 56)) >> 56)))
+#endif
+
+#if defined(HCL_HAVE_UINT128_T)
+#define HCL_CONST_BSWAP128(x) \
+	((hcl_uint128_t)((((hcl_uint128_t)(x) & ((hcl_uint128_t)0xff << 0)) << 120) | \
+	                 (((hcl_uint128_t)(x) & ((hcl_uint128_t)0xff << 8)) << 104) | \
+	                 (((hcl_uint128_t)(x) & ((hcl_uint128_t)0xff << 16)) << 88) | \
+	                 (((hcl_uint128_t)(x) & ((hcl_uint128_t)0xff << 24)) << 72) | \
+	                 (((hcl_uint128_t)(x) & ((hcl_uint128_t)0xff << 32)) << 56) | \
+	                 (((hcl_uint128_t)(x) & ((hcl_uint128_t)0xff << 40)) << 40) | \
+	                 (((hcl_uint128_t)(x) & ((hcl_uint128_t)0xff << 48)) << 24) | \
+	                 (((hcl_uint128_t)(x) & ((hcl_uint128_t)0xff << 56)) << 8) | \
+	                 (((hcl_uint128_t)(x) & ((hcl_uint128_t)0xff << 64)) >> 8) | \
+	                 (((hcl_uint128_t)(x) & ((hcl_uint128_t)0xff << 72)) >> 24) | \
+	                 (((hcl_uint128_t)(x) & ((hcl_uint128_t)0xff << 80)) >> 40) | \
+	                 (((hcl_uint128_t)(x) & ((hcl_uint128_t)0xff << 88)) >> 56) | \
+	                 (((hcl_uint128_t)(x) & ((hcl_uint128_t)0xff << 96)) >> 72) | \
+	                 (((hcl_uint128_t)(x) & ((hcl_uint128_t)0xff << 104)) >> 88) | \
+	                 (((hcl_uint128_t)(x) & ((hcl_uint128_t)0xff << 112)) >> 104) | \
+	                 (((hcl_uint128_t)(x) & ((hcl_uint128_t)0xff << 120)) >> 120)))
+#endif
 
 #if defined(HCL_ENDIAN_LITTLE)
-#	define HCL_CONST_NTOH16(x) HCL_CONST_SWAP16(x)
-#	define HCL_CONST_HTON16(x) HCL_CONST_SWAP16(x)
-#	define HCL_CONST_NTOH32(x) HCL_CONST_SWAP32(x)
-#	define HCL_CONST_HTON32(x) HCL_CONST_SWAP32(x)
+
+#	if defined(HCL_HAVE_UINT16_T)
+#	define HCL_CONST_NTOH16(x) HCL_CONST_BSWAP16(x)
+#	define HCL_CONST_HTON16(x) HCL_CONST_BSWAP16(x)
+#	define HCL_CONST_HTOBE16(x) HCL_CONST_BSWAP16(x)
+#	define HCL_CONST_HTOLE16(x) (x)
+#	define HCL_CONST_BE16TOH(x) HCL_CONST_BSWAP16(x)
+#	define HCL_CONST_LE16TOH(x) (x)
+#	endif
+
+#	if defined(HCL_HAVE_UINT32_T)
+#	define HCL_CONST_NTOH32(x) HCL_CONST_BSWAP32(x)
+#	define HCL_CONST_HTON32(x) HCL_CONST_BSWAP32(x)
+#	define HCL_CONST_HTOBE32(x) HCL_CONST_BSWAP32(x)
+#	define HCL_CONST_HTOLE32(x) (x)
+#	define HCL_CONST_BE32TOH(x) HCL_CONST_BSWAP32(x)
+#	define HCL_CONST_LE32TOH(x) (x)
+#	endif
+
+#	if defined(HCL_HAVE_UINT64_T)
+#	define HCL_CONST_NTOH64(x) HCL_CONST_BSWAP64(x)
+#	define HCL_CONST_HTON64(x) HCL_CONST_BSWAP64(x)
+#	define HCL_CONST_HTOBE64(x) HCL_CONST_BSWAP64(x)
+#	define HCL_CONST_HTOLE64(x) (x)
+#	define HCL_CONST_BE64TOH(x) HCL_CONST_BSWAP64(x)
+#	define HCL_CONST_LE64TOH(x) (x)
+#	endif
+
+#	if defined(HCL_HAVE_UINT128_T)
+#	define HCL_CONST_NTOH128(x) HCL_CONST_BSWAP128(x)
+#	define HCL_CONST_HTON128(x) HCL_CONST_BSWAP128(x)
+#	define HCL_CONST_HTOBE128(x) HCL_CONST_BSWAP128(x)
+#	define HCL_CONST_HTOLE128(x) (x)
+#	define HCL_CONST_BE128TOH(x) HCL_CONST_BSWAP128(x)
+#	define HCL_CONST_LE128TOH(x) (x)
+#endif
+
 #elif defined(HCL_ENDIAN_BIG)
+
+#	if defined(HCL_HAVE_UINT16_T)
 #	define HCL_CONST_NTOH16(x) (x)
 #	define HCL_CONST_HTON16(x) (x)
+#	define HCL_CONST_HTOBE16(x) (x)
+#	define HCL_CONST_HTOLE16(x) HCL_CONST_BSWAP16(x)
+#	define HCL_CONST_BE16TOH(x) (x)
+#	define HCL_CONST_LE16TOH(x) HCL_CONST_BSWAP16(x)
+#	endif
+
+#	if defined(HCL_HAVE_UINT32_T)
 #	define HCL_CONST_NTOH32(x) (x)
 #	define HCL_CONST_HTON32(x) (x)
+#	define HCL_CONST_HTOBE32(x) (x)
+#	define HCL_CONST_HTOLE32(x) HCL_CONST_BSWAP32(x)
+#	define HCL_CONST_BE32TOH(x) (x)
+#	define HCL_CONST_LE32TOH(x) HCL_CONST_BSWAP32(x)
+#	endif
+
+#	if defined(HCL_HAVE_UINT64_T)
+#	define HCL_CONST_NTOH64(x) (x)
+#	define HCL_CONST_HTON64(x) (x)
+#	define HCL_CONST_HTOBE64(x) (x)
+#	define HCL_CONST_HTOLE64(x) HCL_CONST_BSWAP64(x)
+#	define HCL_CONST_BE64TOH(x) (x)
+#	define HCL_CONST_LE64TOH(x) HCL_CONST_BSWAP64(x)
+#	endif
+
+#	if defined(HCL_HAVE_UINT128_T)
+#	define HCL_CONST_NTOH128(x) (x)
+#	define HCL_CONST_HTON128(x) (x)
+#	define HCL_CONST_HTOBE128(x) (x)
+#	define HCL_CONST_HTOLE128(x) HCL_CONST_BSWAP128(x)
+#	define HCL_CONST_BE128TOH(x) (x)
+#	define HCL_CONST_LE128TOH(x) HCL_CONST_BSWAP128(x)
+#	endif
+
 #else
 #	error UNKNOWN ENDIAN
 #endif
+
 
 /* =========================================================================
  * HASH
@@ -589,46 +687,186 @@ HCL_EXPORT int hcl_ucwidth (
 
 /* ------------------------------------------------------------------------- */
 
-#if defined(HCL_HAVE_UINT16_T)
-HCL_EXPORT hcl_uint16_t hcl_ntoh16 (
-	hcl_uint16_t x
-);
+#if defined(HCL_HAVE_INLINE)
 
-HCL_EXPORT hcl_uint16_t hcl_hton16 (
-	hcl_uint16_t x
-);
+#if defined(HCL_HAVE_UINT16_T)
+static HCL_INLINE hcl_uint16_t hcl_bswap16 (hcl_uint16_t x)
+{
+	return (x << 8) | (x >> 8);
+}
 #endif
 
 #if defined(HCL_HAVE_UINT32_T)
-HCL_EXPORT hcl_uint32_t hcl_ntoh32 (
-	hcl_uint32_t x
-);
-
-HCL_EXPORT hcl_uint32_t hcl_hton32 (
-	hcl_uint32_t x
-);
+static HCL_INLINE hcl_uint32_t hcl_bswap32 (hcl_uint32_t x)
+{
+	return ((x >> 24)) | 
+	       ((x >>  8) & ((hcl_uint32_t)0xff << 8)) | 
+	       ((x <<  8) & ((hcl_uint32_t)0xff << 16)) | 
+	       ((x << 24));
+}
 #endif
 
 #if defined(HCL_HAVE_UINT64_T)
-HCL_EXPORT hcl_uint64_t hcl_ntoh64 (
-	hcl_uint64_t x
-);
-
-HCL_EXPORT hcl_uint64_t hcl_hton64 (
-	hcl_uint64_t x
-);
+static HCL_INLINE hcl_uint64_t hcl_bswap64 (hcl_uint64_t x)
+{
+	return ((x >> 56)) | 
+	       ((x >> 40) & ((hcl_uint64_t)0xff << 8)) | 
+	       ((x >> 24) & ((hcl_uint64_t)0xff << 16)) | 
+	       ((x >>  8) & ((hcl_uint64_t)0xff << 24)) | 
+	       ((x <<  8) & ((hcl_uint64_t)0xff << 32)) | 
+	       ((x << 24) & ((hcl_uint64_t)0xff << 40)) | 
+	       ((x << 40) & ((hcl_uint64_t)0xff << 48)) | 
+	       ((x << 56));
+}
 #endif
 
 #if defined(HCL_HAVE_UINT128_T)
-HCL_EXPORT hcl_uint128_t hcl_ntoh128 (
-	hcl_uint128_t x
-);
-
-HCL_EXPORT hcl_uint128_t hcl_hton128 (
-	hcl_uint128_t x
-);
+static HCL_INLINE hcl_uint128_t hcl_bswap128 (hcl_uint128_t x)
+{
+	return ((x >> 120)) | 
+	       ((x >> 104) & ((hcl_uint128_t)0xff << 8)) |
+	       ((x >>  88) & ((hcl_uint128_t)0xff << 16)) |
+	       ((x >>  72) & ((hcl_uint128_t)0xff << 24)) |
+	       ((x >>  56) & ((hcl_uint128_t)0xff << 32)) |
+	       ((x >>  40) & ((hcl_uint128_t)0xff << 40)) |
+	       ((x >>  24) & ((hcl_uint128_t)0xff << 48)) |
+	       ((x >>   8) & ((hcl_uint128_t)0xff << 56)) |
+	       ((x <<   8) & ((hcl_uint128_t)0xff << 64)) |
+	       ((x <<  24) & ((hcl_uint128_t)0xff << 72)) |
+	       ((x <<  40) & ((hcl_uint128_t)0xff << 80)) |
+	       ((x <<  56) & ((hcl_uint128_t)0xff << 88)) |
+	       ((x <<  72) & ((hcl_uint128_t)0xff << 96)) |
+	       ((x <<  88) & ((hcl_uint128_t)0xff << 104)) |
+	       ((x << 104) & ((hcl_uint128_t)0xff << 112)) |
+	       ((x << 120));
+}
 #endif
 
+#else
+
+#if defined(HCL_HAVE_UINT16_T)
+#	define hcl_bswap16(x) ((hcl_uint16_t)(((hcl_uint16_t)(x)) << 8) | (((hcl_uint16_t)(x)) >> 8))
+#endif
+
+#if defined(HCL_HAVE_UINT32_T)
+#	define hcl_bswap32(x) ((hcl_uint32_t)(((((hcl_uint32_t)(x)) >> 24)) | \
+	                                      ((((hcl_uint32_t)(x)) >>  8) & ((hcl_uint32_t)0xff << 8)) | \
+	                                      ((((hcl_uint32_t)(x)) <<  8) & ((hcl_uint32_t)0xff << 16)) | \
+	                                      ((((hcl_uint32_t)(x)) << 24))))
+#endif
+
+#if defined(HCL_HAVE_UINT64_T)
+#	define hcl_bswap64(x) ((hcl_uint64_t)(((((hcl_uint64_t)(x)) >> 56)) | \
+	                                      ((((hcl_uint64_t)(x)) >> 40) & ((hcl_uint64_t)0xff << 8)) | \
+	                                      ((((hcl_uint64_t)(x)) >> 24) & ((hcl_uint64_t)0xff << 16)) | \
+	                                      ((((hcl_uint64_t)(x)) >>  8) & ((hcl_uint64_t)0xff << 24)) | \
+	                                      ((((hcl_uint64_t)(x)) <<  8) & ((hcl_uint64_t)0xff << 32)) | \
+	                                      ((((hcl_uint64_t)(x)) << 24) & ((hcl_uint64_t)0xff << 40)) | \
+	                                      ((((hcl_uint64_t)(x)) << 40) & ((hcl_uint64_t)0xff << 48)) | \
+	                                      ((((hcl_uint64_t)(x)) << 56))))
+#endif
+
+#if defined(HCL_HAVE_UINT128_T)
+#	define hcl_bswap128(x) ((hcl_uint128_t)(((((hcl_uint128_t)(x)) >> 120)) |  \
+	                                        ((((hcl_uint128_t)(x)) >> 104) & ((hcl_uint128_t)0xff << 8)) | \
+	                                        ((((hcl_uint128_t)(x)) >>  88) & ((hcl_uint128_t)0xff << 16)) | \
+	                                        ((((hcl_uint128_t)(x)) >>  72) & ((hcl_uint128_t)0xff << 24)) | \
+	                                        ((((hcl_uint128_t)(x)) >>  56) & ((hcl_uint128_t)0xff << 32)) | \
+	                                        ((((hcl_uint128_t)(x)) >>  40) & ((hcl_uint128_t)0xff << 40)) | \
+	                                        ((((hcl_uint128_t)(x)) >>  24) & ((hcl_uint128_t)0xff << 48)) | \
+	                                        ((((hcl_uint128_t)(x)) >>   8) & ((hcl_uint128_t)0xff << 56)) | \
+	                                        ((((hcl_uint128_t)(x)) <<   8) & ((hcl_uint128_t)0xff << 64)) | \
+	                                        ((((hcl_uint128_t)(x)) <<  24) & ((hcl_uint128_t)0xff << 72)) | \
+	                                        ((((hcl_uint128_t)(x)) <<  40) & ((hcl_uint128_t)0xff << 80)) | \
+	                                        ((((hcl_uint128_t)(x)) <<  56) & ((hcl_uint128_t)0xff << 88)) | \
+	                                        ((((hcl_uint128_t)(x)) <<  72) & ((hcl_uint128_t)0xff << 96)) | \
+	                                        ((((hcl_uint128_t)(x)) <<  88) & ((hcl_uint128_t)0xff << 104)) | \
+	                                        ((((hcl_uint128_t)(x)) << 104) & ((hcl_uint128_t)0xff << 112)) | \
+	                                        ((((hcl_uint128_t)(x)) << 120))))
+#endif
+
+#endif /* HCL_HAVE_INLINE */
+
+
+#if defined(HCL_ENDIAN_LITTLE)
+
+#	if defined(HCL_HAVE_UINT16_T)
+#	define hcl_ntoh16(x) hcl_bswap16(x)
+#	define hcl_hton16(x) hcl_bswap16(x)
+#	define hcl_htobe16(x) hcl_bswap16(x)
+#	define hcl_htole16(x) (x)
+#	define hcl_be16toh(x) hcl_bswap16(x)
+#	define hcl_le16toh(x) (x)
+#	endif
+
+#	if defined(HCL_HAVE_UINT32_T)
+#	define hcl_ntoh32(x) hcl_bswap32(x)
+#	define hcl_hton32(x) hcl_bswap32(x)
+#	define hcl_htobe32(x) hcl_bswap32(x)
+#	define hcl_htole32(x) (x)
+#	define hcl_be32toh(x) hcl_bswap32(x)
+#	define hcl_le32toh(x) (x)
+#	endif
+
+#	if defined(HCL_HAVE_UINT64_T)
+#	define hcl_ntoh64(x) hcl_bswap64(x)
+#	define hcl_hton64(x) hcl_bswap64(x)
+#	define hcl_htobe64(x) hcl_bswap64(x)
+#	define hcl_htole64(x) (x)
+#	define hcl_be64toh(x) hcl_bswap64(x)
+#	define hcl_le64toh(x) (x)
+#	endif
+
+#	if defined(HCL_HAVE_UINT128_T)
+#	define hcl_ntoh128(x) hcl_bswap128(x)
+#	define hcl_hton128(x) hcl_bswap128(x)
+#	define hcl_htobe128(x) hcl_bswap128(x)
+#	define hcl_htole128(x) (x)
+#	define hcl_be128toh(x) hcl_bswap128(x)
+#	define hcl_le128toh(x) (x)
+#	endif
+
+#elif defined(HCL_ENDIAN_BIG)
+
+#	if defined(HCL_HAVE_UINT16_T)
+#	define hcl_ntoh16(x) (x)
+#	define hcl_hton16(x) (x)
+#	define hcl_htobe16(x) (x)
+#	define hcl_htole16(x) hcl_bswap16(x)
+#	define hcl_be16toh(x) (x)
+#	define hcl_le16toh(x) hcl_bswap16(x)
+#	endif
+
+#	if defined(HCL_HAVE_UINT32_T)
+#	define hcl_ntoh32(x) (x)
+#	define hcl_hton32(x) (x)
+#	define hcl_htobe32(x) (x)
+#	define hcl_htole32(x) hcl_bswap32(x)
+#	define hcl_be32toh(x) (x)
+#	define hcl_le32toh(x) hcl_bswap32(x)
+#	endif
+
+#	if defined(HCL_HAVE_UINT64_T)
+#	define hcl_ntoh64(x) (x)
+#	define hcl_hton64(x) (x)
+#	define hcl_htobe64(x) (x)
+#	define hcl_htole64(x) hcl_bswap64(x)
+#	define hcl_be64toh(x) (x)
+#	define hcl_le64toh(x) hcl_bswap64(x)
+#	endif
+
+#	if defined(HCL_HAVE_UINT128_T)
+#	define hcl_ntoh128(x) (x)
+#	define hcl_hton128(x) (x)
+#	define hcl_htobe128(x) (x)
+#	define hcl_htole128(x) hcl_bswap128(x)
+#	define hcl_be128toh(x) (x)
+#	define hcl_le128toh(x) hcl_bswap128(x)
+#	endif
+
+#else
+#	error UNKNOWN ENDIAN
+#endif
 
 #if defined(__cplusplus)
 }
