@@ -757,8 +757,8 @@ typedef struct hcl_t hcl_t;
 #	define HCL_PRIVATE
 #endif
 
-#if defined(__STDC_VERSION__) && (__STDC_VERSION__>=199901L)
-	/* C99 has inline */
+#if defined(__cplusplus) || (defined(__STDC_VERSION__) && (__STDC_VERSION__>=199901L))
+	/* C++/C99 has inline */
 #	define HCL_INLINE inline
 #	define HCL_HAVE_INLINE
 #elif defined(__GNUC__) && defined(__GNUC_GNU_INLINE__)
