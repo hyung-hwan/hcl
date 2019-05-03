@@ -791,82 +791,84 @@ static HCL_INLINE hcl_uint128_t hcl_bswap128 (hcl_uint128_t x)
 #if defined(HCL_ENDIAN_LITTLE)
 
 #	if defined(HCL_HAVE_UINT16_T)
-#	define hcl_ntoh16(x) hcl_bswap16(x)
 #	define hcl_hton16(x) hcl_bswap16(x)
+#	define hcl_ntoh16(x) hcl_bswap16(x)
 #	define hcl_htobe16(x) hcl_bswap16(x)
-#	define hcl_htole16(x) (x)
 #	define hcl_be16toh(x) hcl_bswap16(x)
-#	define hcl_le16toh(x) (x)
+#	define hcl_htole16(x) ((hcl_uint16_t)(x))
+#	define hcl_le16toh(x) ((hcl_uint16_t)(x))
 #	endif
 
 #	if defined(HCL_HAVE_UINT32_T)
-#	define hcl_ntoh32(x) hcl_bswap32(x)
 #	define hcl_hton32(x) hcl_bswap32(x)
+#	define hcl_ntoh32(x) hcl_bswap32(x)
 #	define hcl_htobe32(x) hcl_bswap32(x)
-#	define hcl_htole32(x) (x)
 #	define hcl_be32toh(x) hcl_bswap32(x)
-#	define hcl_le32toh(x) (x)
+#	define hcl_htole32(x) ((hcl_uint32_t)(x))
+#	define hcl_le32toh(x) ((hcl_uint32_t)(x))
 #	endif
 
 #	if defined(HCL_HAVE_UINT64_T)
-#	define hcl_ntoh64(x) hcl_bswap64(x)
 #	define hcl_hton64(x) hcl_bswap64(x)
+#	define hcl_ntoh64(x) hcl_bswap64(x)
 #	define hcl_htobe64(x) hcl_bswap64(x)
-#	define hcl_htole64(x) (x)
 #	define hcl_be64toh(x) hcl_bswap64(x)
-#	define hcl_le64toh(x) (x)
+#	define hcl_htole64(x) ((hcl_uint64_t)(x))
+#	define hcl_le64toh(x) ((hcl_uint64_t)(x))
 #	endif
 
 #	if defined(HCL_HAVE_UINT128_T)
-#	define hcl_ntoh128(x) hcl_bswap128(x)
+
 #	define hcl_hton128(x) hcl_bswap128(x)
+#	define hcl_ntoh128(x) hcl_bswap128(x)
 #	define hcl_htobe128(x) hcl_bswap128(x)
-#	define hcl_htole128(x) (x)
 #	define hcl_be128toh(x) hcl_bswap128(x)
-#	define hcl_le128toh(x) (x)
+#	define hcl_htole128(x) ((hcl_uint128_t)(x))
+#	define hcl_le128toh(x) ((hcl_uint128_t)(x))
 #	endif
 
 #elif defined(HCL_ENDIAN_BIG)
 
 #	if defined(HCL_HAVE_UINT16_T)
-#	define hcl_ntoh16(x) (x)
-#	define hcl_hton16(x) (x)
-#	define hcl_htobe16(x) (x)
+#	define hcl_hton16(x) ((hcl_uint16_t)(x))
+#	define hcl_ntoh16(x) ((hcl_uint16_t)(x))
+#	define hcl_htobe16(x) ((hcl_uint16_t)(x))
+#	define hcl_be16toh(x) ((hcl_uint16_t)(x))
 #	define hcl_htole16(x) hcl_bswap16(x)
-#	define hcl_be16toh(x) (x)
 #	define hcl_le16toh(x) hcl_bswap16(x)
 #	endif
 
 #	if defined(HCL_HAVE_UINT32_T)
-#	define hcl_ntoh32(x) (x)
-#	define hcl_hton32(x) (x)
-#	define hcl_htobe32(x) (x)
+#	define hcl_hton32(x) ((hcl_uint32_t)(x))
+#	define hcl_ntoh32(x) ((hcl_uint32_t)(x))
+#	define hcl_htobe32(x) ((hcl_uint32_t)(x))
+#	define hcl_be32toh(x) ((hcl_uint32_t)(x))
 #	define hcl_htole32(x) hcl_bswap32(x)
-#	define hcl_be32toh(x) (x)
 #	define hcl_le32toh(x) hcl_bswap32(x)
 #	endif
 
 #	if defined(HCL_HAVE_UINT64_T)
-#	define hcl_ntoh64(x) (x)
-#	define hcl_hton64(x) (x)
-#	define hcl_htobe64(x) (x)
+#	define hcl_hton64(x) ((hcl_uint64_t)(x))
+#	define hcl_ntoh64(x) ((hcl_uint64_t)(x))
+#	define hcl_htobe64(x) ((hcl_uint64_t)(x))
+#	define hcl_be64toh(x) ((hcl_uint64_t)(x))
 #	define hcl_htole64(x) hcl_bswap64(x)
-#	define hcl_be64toh(x) (x)
 #	define hcl_le64toh(x) hcl_bswap64(x)
 #	endif
 
 #	if defined(HCL_HAVE_UINT128_T)
-#	define hcl_ntoh128(x) (x)
-#	define hcl_hton128(x) (x)
-#	define hcl_htobe128(x) (x)
+#	define hcl_hton128(x) ((hcl_uint128_t)(x))
+#	define hcl_ntoh128(x) ((hcl_uint128_t)(x))
+#	define hcl_htobe128(x) ((hcl_uint128_t)(x))
+#	define hcl_be128toh(x) ((hcl_uint128_t)(x))
 #	define hcl_htole128(x) hcl_bswap128(x)
-#	define hcl_be128toh(x) (x)
 #	define hcl_le128toh(x) hcl_bswap128(x)
 #	endif
 
 #else
 #	error UNKNOWN ENDIAN
 #endif
+
 
 #if defined(__cplusplus)
 }
