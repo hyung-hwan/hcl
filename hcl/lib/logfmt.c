@@ -41,7 +41,7 @@
 
 /* Max number conversion buffer length: 
  * hcl_intmax_t in base 2, plus NUL byte. */
-#define MAXNBUF (HCL_SIZEOF(hcl_intmax_t) * 8 + 1)
+#define MAXNBUF (HCL_SIZEOF(hcl_intmax_t) * HCL_BITS_PER_BYTE + 1)
 
 enum
 {

@@ -33,11 +33,11 @@
 
 #define HCL_CLIENT_TOKEN_NAME_ALIGN 64
 
-struct dummy_hcl_xtn_t
+struct client_hcl_xtn_t
 {
 	hcl_client_t* client;
 };
-typedef struct dummy_hcl_xtn_t dummy_hcl_xtn_t;
+typedef struct client_hcl_xtn_t client_hcl_xtn_t;
 
 enum hcl_client_reply_attr_type_t
 {
@@ -131,7 +131,7 @@ struct hcl_client_t
 
 static void log_write_for_dummy (hcl_t* hcl, hcl_bitmask_t mask, const hcl_ooch_t* msg, hcl_oow_t len)
 {
-	dummy_hcl_xtn_t* xtn = (dummy_hcl_xtn_t*)hcl_getxtn(hcl);
+	client_hcl_xtn_t* xtn = (client_hcl_xtn_t*)hcl_getxtn(hcl);
 	hcl_client_t* client;
 
 	client = xtn->client;
@@ -184,7 +184,7 @@ static int add_to_reply_token (hcl_client_t* client, hcl_ooch_t ch)
 		hcl_oow_t newcapa;
 
 		newcapa = HCL_ALIGN_POW2(client->rep.tok.len + 1, HCL_CLIENT_TOKEN_NAME_ALIGN);
-		tmp = hcl_client_reallocmem(client, client->rep.tok.ptr, newcapa * HCL_SIZEOF(*tmp));
+		tmp = (hcl_ooch_t*)hcl_client_reallocmem(client, client->rep.tok.ptr, newcapa * HCL_SIZEOF(*tmp));
 		if (!tmp) return -1;
 
 		client->rep.tok.capa = newcapa;
@@ -458,7 +458,7 @@ static int handle_char (hcl_client_t* client, hcl_ooci_t c, hcl_oow_t nbytes)
 				{
 					hcl_ooch_t* tmp;
 					
-					tmp = hcl_client_reallocmem(client, client->rep.last_attr_key.ptr, client->rep.tok.capa * HCL_SIZEOF(*tmp));
+					tmp = (hcl_ooch_t*)hcl_client_reallocmem(client, client->rep.last_attr_key.ptr, client->rep.tok.capa * HCL_SIZEOF(*tmp));
 					if (!tmp) goto oops;
 
 					client->rep.last_attr_key.ptr = tmp;
@@ -800,7 +800,7 @@ hcl_client_t* hcl_client_open (hcl_mmgr_t* mmgr, hcl_oow_t xtnsize, hcl_client_p
 	hcl_client_t* client;
 	hcl_t* hcl;
 	hcl_vmprim_t vmprim;
-	dummy_hcl_xtn_t* xtn;
+	client_hcl_xtn_t* xtn;
 
 	client = (hcl_client_t*)HCL_MMGR_ALLOC(mmgr, HCL_SIZEOF(*client) + xtnsize);
 	if (!client) 
@@ -821,7 +821,7 @@ hcl_client_t* hcl_client_open (hcl_mmgr_t* mmgr, hcl_oow_t xtnsize, hcl_client_p
 		return HCL_NULL;
 	}
 
-	xtn = (dummy_hcl_xtn_t*)hcl_getxtn(hcl);
+	xtn = (client_hcl_xtn_t*)hcl_getxtn(hcl);
 	xtn->client = client;
 
 	HCL_MEMSET (client, 0, HCL_SIZEOF(*client) + xtnsize);

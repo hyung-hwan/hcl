@@ -517,7 +517,7 @@ void hcl_freemem (hcl_t* hcl, void* ptr)
 
 static struct
 {
-	hcl_bch_t* modname;
+	const hcl_bch_t* modname;
 	int (*modload) (hcl_t* hcl, hcl_mod_t* mod);
 }
 static_modtab[] = 

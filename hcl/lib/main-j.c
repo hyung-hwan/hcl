@@ -88,9 +88,7 @@ static int write_all (int fd, const hcl_bch_t* ptr, hcl_oow_t len)
 
 static int write_log (hcl_json_t* json, int fd, const hcl_bch_t* ptr, hcl_oow_t len)
 {
-	json_xtn_t* xtn;
-
-	xtn = hcl_json_getxtn(json);
+	json_xtn_t* xtn = (json_xtn_t*)hcl_json_getxtn(json);
 
 	while (len > 0)
 	{
@@ -139,8 +137,7 @@ static int write_log (hcl_json_t* json, int fd, const hcl_bch_t* ptr, hcl_oow_t 
 
 static void flush_log (hcl_json_t* json, int fd)
 {
-	json_xtn_t* xtn;
-	xtn = hcl_json_getxtn(json);
+	json_xtn_t* xtn = (json_xtn_t*)hcl_json_getxtn(json);
 	if (xtn->logbuf.len > 0)
 	{
 		write_all (fd, xtn->logbuf.buf, xtn->logbuf.len);
@@ -150,13 +147,12 @@ static void flush_log (hcl_json_t* json, int fd)
 
 static void log_write (hcl_json_t* json, hcl_bitmask_t mask, const hcl_ooch_t* msg, hcl_oow_t len)
 {
+	json_xtn_t* xtn = (json_xtn_t*)hcl_json_getxtn(json);
 	hcl_bch_t buf[256];
 	hcl_oow_t ucslen, bcslen;
-	json_xtn_t* xtn;
+	
 	hcl_oow_t msgidx;
 	int n, logfd;
-
-	xtn = hcl_json_getxtn(json);
 
 	if (mask & HCL_LOG_STDERR)
 	{
@@ -267,9 +263,7 @@ static void log_write (hcl_json_t* json, hcl_bitmask_t mask, const hcl_ooch_t* m
 
 static int instcb (hcl_json_t* json, hcl_json_inst_t it, const hcl_oocs_t* str)
 {
-	json_xtn_t* json_xtn;
-
-	json_xtn = hcl_json_getxtn(json);
+	json_xtn_t* json_xtn = (json_xtn_t*)hcl_json_getxtn(json);
 
 	switch (it)
 	{
@@ -323,7 +317,7 @@ int main (int argc, char* argv[])
 
 	json = hcl_json_open (&sys_mmgr, HCL_SIZEOF(json_xtn_t), &json_prim, NULL);
 
-	json_xtn = hcl_json_getxtn(json);
+	json_xtn = (json_xtn_t*)hcl_json_getxtn(json);
 	json_xtn->logmask = HCL_LOG_ALL_LEVELS | HCL_LOG_ALL_TYPES;
 
 	p = "[ \"ab\\xab\\uC88B\\uC544\\uC6A9c\", \"kaden\", \"iron\", true, { \"null\": \"a\\1bc\", \"123\": \"AA20AA\", \"10\": -0.123, \"way\": '\\uC88A' } ]";

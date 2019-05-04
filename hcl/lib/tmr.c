@@ -37,15 +37,14 @@ hcl_tmr_t* hcl_tmr_open (hcl_t* hcl, hcl_oow_t xtnsize, hcl_oow_t capa)
 {
 	hcl_tmr_t* tmr;
 
-	tmr = HCL_MMGR_ALLOC(hcl->mmgr, HCL_SIZEOF(hcl_tmr_t) + xtnsize);
+	tmr = (hcl_tmr_t*)hcl_allocmem(hcl, HCL_SIZEOF(*tmr) + xtnsize);
 	if (tmr)
 	{
 		if (hcl_tmr_init(tmr, hcl, capa) <= -1)
 		{
-			HCL_MMGR_FREE (hcl->mmgr, tmr);
+			hcl_freemem (tmr->hcl, tmr);
 			return HCL_NULL;
 		}
-
 		else HCL_MEMSET (tmr + 1, 0, xtnsize);
 	}
 
@@ -55,7 +54,7 @@ hcl_tmr_t* hcl_tmr_open (hcl_t* hcl, hcl_oow_t xtnsize, hcl_oow_t capa)
 void hcl_tmr_close (hcl_tmr_t* tmr)
 {
 	hcl_tmr_fini (tmr);
-	HCL_MMGR_FREE (tmr->hcl->mmgr, tmr);
+	hcl_freemem (tmr->hcl, tmr);
 }
 
 int hcl_tmr_init (hcl_tmr_t* tmr, hcl_t* hcl, hcl_oow_t capa)
@@ -66,8 +65,8 @@ int hcl_tmr_init (hcl_tmr_t* tmr, hcl_t* hcl, hcl_oow_t capa)
 
 	if (capa <= 0) capa = 1;
 
-	tmp = HCL_MMGR_ALLOC(hcl->mmgr, capa * HCL_SIZEOF(*tmp));
-	if (tmp == HCL_NULL) return -1;
+	tmp = (hcl_tmr_event_t*)hcl_allocmem(hcl, capa * HCL_SIZEOF(*tmp));
+	if (!tmp) return -1;
 
 	tmr->hcl = hcl;
 	tmr->capa = capa;
@@ -79,7 +78,11 @@ int hcl_tmr_init (hcl_tmr_t* tmr, hcl_t* hcl, hcl_oow_t capa)
 void hcl_tmr_fini (hcl_tmr_t* tmr)
 {
 	hcl_tmr_clear (tmr);
-	if (tmr->event) HCL_MMGR_FREE (tmr->hcl->mmgr, tmr->event);
+	if (tmr->event) 
+	{
+		hcl_freemem (tmr->hcl, tmr->event);
+		tmr->event = HCL_NULL;
+	}
 }
 
 /*
@@ -208,8 +211,8 @@ hcl_tmr_index_t hcl_tmr_insert (hcl_tmr_t* tmr, const hcl_tmr_event_t* event)
 
 		HCL_ASSERT (tmr->hcl, tmr->capa >= 1);
 		new_capa = tmr->capa * 2;
-		tmp = HCL_MMGR_REALLOC(tmr->hcl->mmgr, tmr->event, new_capa * HCL_SIZEOF(*tmp));
-		if (tmp == HCL_NULL) return HCL_TMR_INVALID_INDEX;
+		tmp = (hcl_tmr_event_t*)hcl_reallocmem(tmr->hcl, tmr->event, new_capa * HCL_SIZEOF(*tmp));
+		if (!tmp) return HCL_TMR_INVALID_INDEX;
 
 		tmr->event = tmp;
 		tmr->capa = new_capa;

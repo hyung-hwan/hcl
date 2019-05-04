@@ -26,7 +26,6 @@
 
 #include "hcl-prv.h"
 
-
 void* hcl_allocbytes (hcl_t* hcl, hcl_oow_t size)
 {
 	hcl_uint8_t* ptr;

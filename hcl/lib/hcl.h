@@ -217,20 +217,16 @@ typedef struct hcl_obj_byte_t*     hcl_oop_byte_t;
 typedef struct hcl_obj_halfword_t* hcl_oop_halfword_t;
 typedef struct hcl_obj_word_t*     hcl_oop_word_t;
 
-#define HCL_OOW_BITS  (HCL_SIZEOF_OOW_T * 8)
-#define HCL_OOI_BITS  (HCL_SIZEOF_OOI_T * 8)
-#define HCL_OOP_BITS  (HCL_SIZEOF_OOP_T * 8)
-#define HCL_OOHW_BITS (HCL_SIZEOF_OOHW_T * 8)
-
+#define HCL_OOP_BITS  (HCL_SIZEOF_OOP_T * HCL_BITS_PER_BYTE)
 
 /* =========================================================================
  * BIGINT TYPES AND MACROS
  * ========================================================================= */
 #if defined(HCL_ENABLE_FULL_LIW) && (HCL_SIZEOF_UINTMAX_T > HCL_SIZEOF_OOW_T)
-#	define HCL_USE_FULL_WORD
+#	define HCL_USE_OOW_FOR_LIW
 #endif
 
-#if defined(HCL_USE_FULL_WORD)
+#if defined(HCL_USE_OOW_FOR_LIW)
 	typedef hcl_oow_t          hcl_liw_t; /* large integer word */
 	typedef hcl_ooi_t          hcl_lii_t;
 	typedef hcl_uintmax_t      hcl_lidw_t; /* large integer double word */
@@ -238,7 +234,7 @@ typedef struct hcl_obj_word_t*     hcl_oop_word_t;
 #	define HCL_SIZEOF_LIW_T    HCL_SIZEOF_OOW_T
 #	define HCL_SIZEOF_LIDW_T   HCL_SIZEOF_UINTMAX_T
 #	define HCL_LIW_BITS        HCL_OOW_BITS
-#	define HCL_LIDW_BITS       (HCL_SIZEOF_UINTMAX_T * 8) 
+#	define HCL_LIDW_BITS       (HCL_SIZEOF_UINTMAX_T * HCL_BITS_PER_BYTE) 
 
 	typedef hcl_oop_word_t     hcl_oop_liword_t;
 #	define HCL_OBJ_TYPE_LIWORD HCL_OBJ_TYPE_WORD

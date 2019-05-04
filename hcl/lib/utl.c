@@ -361,7 +361,7 @@ hcl_bch_t* hcl_find_bchar_in_bcstr (const hcl_bch_t* ptr, hcl_bch_t c)
 
 hcl_oow_t hcl_byte_to_bcstr (hcl_uint8_t byte, hcl_bch_t* buf, hcl_oow_t size, int flagged_radix, hcl_bch_t fill)
 {
-	hcl_bch_t tmp[(HCL_SIZEOF(hcl_uint8_t) * 8)];
+	hcl_bch_t tmp[(HCL_SIZEOF(hcl_uint8_t) * HCL_BITS_PER_BYTE)];
 	hcl_bch_t* p = tmp, * bp = buf, * be = buf + size - 1;
 	int radix;
 	hcl_bch_t radix_char;
@@ -395,9 +395,7 @@ hcl_oow_t hcl_byte_to_bcstr (hcl_uint8_t byte, hcl_bch_t* buf, hcl_oow_t size, i
 
 /* ----------------------------------------------------------------------- */
 
-HCL_INLINE int hcl_conv_bchars_to_uchars_with_cmgr (
-	const hcl_bch_t* bcs, hcl_oow_t* bcslen,
-	hcl_uch_t* ucs, hcl_oow_t* ucslen, hcl_cmgr_t* cmgr, int all)
+HCL_INLINE int hcl_conv_bchars_to_uchars_with_cmgr (const hcl_bch_t* bcs, hcl_oow_t* bcslen, hcl_uch_t* ucs, hcl_oow_t* ucslen, hcl_cmgr_t* cmgr, int all)
 {
 	const hcl_bch_t* p;
 	int ret = 0;
@@ -516,9 +514,7 @@ HCL_INLINE int hcl_conv_bchars_to_uchars_with_cmgr (
 	return ret;
 }
 
-HCL_INLINE int hcl_conv_bcstr_to_ucstr_with_cmgr (
-	const hcl_bch_t* bcs, hcl_oow_t* bcslen,
-	hcl_uch_t* ucs, hcl_oow_t* ucslen, hcl_cmgr_t* cmgr, int all)
+HCL_INLINE int hcl_conv_bcstr_to_ucstr_with_cmgr (const hcl_bch_t* bcs, hcl_oow_t* bcslen, hcl_uch_t* ucs, hcl_oow_t* ucslen, hcl_cmgr_t* cmgr, int all)
 {
 	const hcl_bch_t* bp;
 	hcl_oow_t mlen, wlen;
@@ -539,9 +535,7 @@ HCL_INLINE int hcl_conv_bcstr_to_ucstr_with_cmgr (
 	return n;
 }
 
-HCL_INLINE int hcl_conv_uchars_to_bchars_with_cmgr (
-	const hcl_uch_t* ucs, hcl_oow_t* ucslen,
-	hcl_bch_t* bcs, hcl_oow_t* bcslen, hcl_cmgr_t* cmgr)
+HCL_INLINE int hcl_conv_uchars_to_bchars_with_cmgr (const hcl_uch_t* ucs, hcl_oow_t* ucslen, hcl_bch_t* bcs, hcl_oow_t* bcslen, hcl_cmgr_t* cmgr)
 {
 	const hcl_uch_t* p = ucs;
 	const hcl_uch_t* end = ucs + *ucslen;
@@ -608,9 +602,7 @@ HCL_INLINE int hcl_conv_uchars_to_bchars_with_cmgr (
 	return ret;
 }
 
-HCL_INLINE int hcl_conv_ucstr_to_bcstr_with_cmgr (
-	const hcl_uch_t* ucs, hcl_oow_t* ucslen,
-	hcl_bch_t* bcs, hcl_oow_t* bcslen, hcl_cmgr_t* cmgr)
+HCL_INLINE int hcl_conv_ucstr_to_bcstr_with_cmgr (const hcl_uch_t* ucs, hcl_oow_t* ucslen, hcl_bch_t* bcs, hcl_oow_t* bcslen, hcl_cmgr_t* cmgr)
 {
 	const hcl_uch_t* p = ucs;
 	int ret = 0;

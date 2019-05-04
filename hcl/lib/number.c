@@ -26,7 +26,6 @@
 
 #include "hcl-prv.h"
 
-
 static hcl_ooi_t equalize_scale (hcl_t* hcl, hcl_oop_t* x, hcl_oop_t* y)
 {
 	hcl_ooi_t xs, ys;

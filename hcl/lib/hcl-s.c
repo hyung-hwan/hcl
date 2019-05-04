@@ -151,11 +151,11 @@ struct worker_hcl_xtn_t
 };
 typedef struct worker_hcl_xtn_t worker_hcl_xtn_t;
 
-struct dummy_hcl_xtn_t
+struct server_hcl_xtn_t
 {
 	hcl_server_t* server;
 };
-typedef struct dummy_hcl_xtn_t dummy_hcl_xtn_t;
+typedef struct server_hcl_xtn_t server_hcl_xtn_t;
 
 enum hcl_server_proto_token_type_t
 {
@@ -657,7 +657,7 @@ static void log_write (hcl_t* hcl, hcl_bitmask_t mask, const hcl_ooch_t* msg, hc
 
 static void log_write_for_dummy (hcl_t* hcl, hcl_bitmask_t mask, const hcl_ooch_t* msg, hcl_oow_t len)
 {
-	dummy_hcl_xtn_t* xtn = (dummy_hcl_xtn_t*)hcl_getxtn(hcl);
+	server_hcl_xtn_t* xtn = (server_hcl_xtn_t*)hcl_getxtn(hcl);
 	hcl_server_t* server;
 
 	server = xtn->server;
@@ -794,7 +794,7 @@ static int write_reply_chunk (hcl_server_proto_t* proto)
 		if (proto->reply.nchunks <= 0)
 		{
 			/* this is the first chunk */
-			iov[count].iov_base = ".OK\n.DATA chunked\n";
+			iov[count].iov_base = (void*)".OK\n.DATA chunked\n";
 			iov[count++].iov_len = 18;
 		}
 
@@ -1570,7 +1570,7 @@ hcl_server_t* hcl_server_open (hcl_mmgr_t* mmgr, hcl_oow_t xtnsize, hcl_server_p
 	hcl_t* hcl = HCL_NULL;
 	hcl_vmprim_t vmprim;
 	hcl_tmr_t* tmr = HCL_NULL;
-	dummy_hcl_xtn_t* xtn;
+	server_hcl_xtn_t* xtn;
 	int pfd[2], fcv;
 	hcl_bitmask_t trait;
 
@@ -1639,7 +1639,7 @@ hcl_server_t* hcl_server_open (hcl_mmgr_t* mmgr, hcl_oow_t xtnsize, hcl_server_p
 	}
 #endif
 	
-	xtn = (dummy_hcl_xtn_t*)hcl_getxtn(hcl);
+	xtn = (server_hcl_xtn_t*)hcl_getxtn(hcl);
 	xtn->server = server;
 
 	HCL_MEMSET (server, 0, HCL_SIZEOF(*server) + xtnsize);

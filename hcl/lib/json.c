@@ -33,11 +33,11 @@
 
 #define HCL_JSON_TOKEN_NAME_ALIGN 64
 
-struct dummy_hcl_xtn_t
+struct json_hcl_xtn_t
 {
 	hcl_json_t* json;
 };
-typedef struct dummy_hcl_xtn_t dummy_hcl_xtn_t;
+typedef struct json_hcl_xtn_t json_hcl_xtn_t;
 
 
 typedef struct hcl_json_state_node_t hcl_json_state_node_t;
@@ -113,7 +113,7 @@ struct hcl_json_t
 
 static void log_write_for_dummy (hcl_t* hcl, hcl_bitmask_t mask, const hcl_ooch_t* msg, hcl_oow_t len)
 {
-	dummy_hcl_xtn_t* xtn = (dummy_hcl_xtn_t*)hcl_getxtn(hcl);
+	json_hcl_xtn_t* xtn = (json_hcl_xtn_t*)hcl_getxtn(hcl);
 	hcl_json_t* json;
 
 	json = xtn->json;
@@ -166,7 +166,7 @@ static int add_char_to_token (hcl_json_t* json, hcl_ooch_t ch)
 		hcl_oow_t newcapa;
 
 		newcapa = HCL_ALIGN_POW2(json->tok.len + 1, HCL_JSON_TOKEN_NAME_ALIGN);
-		tmp = hcl_json_reallocmem(json, json->tok.ptr, newcapa * HCL_SIZEOF(*tmp));
+		tmp = (hcl_ooch_t*)hcl_json_reallocmem(json, json->tok.ptr, newcapa * HCL_SIZEOF(*tmp));
 		if (!tmp) return -1;
 
 		json->tok_capa = newcapa;
@@ -221,7 +221,7 @@ static int push_state (hcl_json_t* json, hcl_json_state_t state)
 {
 	hcl_json_state_node_t* ss;
 
-	ss = hcl_json_callocmem(json, HCL_SIZEOF(*ss));
+	ss = (hcl_json_state_node_t*)hcl_json_callocmem(json, HCL_SIZEOF(*ss));
 	if (!ss) return -1;
 
 	ss->state = state;
@@ -889,7 +889,7 @@ hcl_json_t* hcl_json_open (hcl_mmgr_t* mmgr, hcl_oow_t xtnsize, hcl_json_prim_t*
 	hcl_json_t* json;
 	hcl_t* hcl;
 	hcl_vmprim_t vmprim;
-	dummy_hcl_xtn_t* xtn;
+	json_hcl_xtn_t* xtn;
 
 	json = (hcl_json_t*)HCL_MMGR_ALLOC(mmgr, HCL_SIZEOF(*json) + xtnsize);
 	if (!json) 
@@ -910,7 +910,7 @@ hcl_json_t* hcl_json_open (hcl_mmgr_t* mmgr, hcl_oow_t xtnsize, hcl_json_prim_t*
 		return HCL_NULL;
 	}
 
-	xtn = (dummy_hcl_xtn_t*)hcl_getxtn(hcl);
+	xtn = (json_hcl_xtn_t*)hcl_getxtn(hcl);
 	xtn->json = json;
 
 	HCL_MEMSET (json, 0, HCL_SIZEOF(*json) + xtnsize);

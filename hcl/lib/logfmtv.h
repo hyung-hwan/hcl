@@ -1009,7 +1009,7 @@ static int logfmtv (hcl_t* hcl, const fmtchar_t* fmt, hcl_fmtout_t* data, va_lis
 				#else
 					register int shift = i * HCL_SIZEOF(hcl_oow_t);
 					hcl_oow_t x = va_arg (ap, hcl_oow_t);
-					num |= (hcl_uintmax_t)x << (shift * 8);
+					num |= (hcl_uintmax_t)x << (shift * HCL_BITS_PER_BYTE);
 				#endif
 				}
 			#else
@@ -1053,7 +1053,7 @@ static int logfmtv (hcl_t* hcl, const fmtchar_t* fmt, hcl_fmtout_t* data, va_lis
 				#else
 					register int shift = i * HCL_SIZEOF(hcl_oow_t);
 					hcl_oow_t x = va_arg (ap, hcl_oow_t);
-					num |= (hcl_uintmax_t)x << (shift * 8);
+					num |= (hcl_uintmax_t)x << (shift * HCL_BITS_PER_BYTE);
 				#endif
 				}
 			#else

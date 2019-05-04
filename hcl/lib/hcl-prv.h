@@ -129,10 +129,10 @@
  *   2. the maximum number of bit shifts can be represented in the hcl_oow_t type.
  */
 #	define HCL_OBJ_SIZE_MAX ((hcl_oow_t)HCL_SMOOI_MAX)
-#	define HCL_OBJ_SIZE_BITS_MAX (HCL_OBJ_SIZE_MAX * 8)
+#	define HCL_OBJ_SIZE_BITS_MAX (HCL_OBJ_SIZE_MAX * HCL_BITS_PER_BYTE)
 #else
 #	define HCL_OBJ_SIZE_MAX ((hcl_oow_t)HCL_TYPE_MAX(hcl_oow_t))
-#	define HCL_OBJ_SIZE_BITS_MAX (HCL_OBJ_SIZE_MAX * 8)
+#	define HCL_OBJ_SIZE_BITS_MAX (HCL_OBJ_SIZE_MAX * HCL_BITS_PER_BYTE)
 #endif
 
 
@@ -835,10 +835,15 @@ int hcl_utf8_to_ucs (
 /* ========================================================================= */
 /* bigint.c                                                                  */
 /* ========================================================================= */
-int hcl_isint (
-	hcl_t*    hcl,
-	hcl_oop_t x
-);
+static HCL_INLINE int hcl_isbigint (hcl_t* hcl, hcl_oop_t x)
+{
+	return HCL_IS_BIGINT(hcl, x);
+}
+
+static HCL_INLINE int hcl_isint (hcl_t* hcl, hcl_oop_t x)
+{
+	return HCL_OOP_IS_SMOOI(x) || HCL_IS_BIGINT(hcl, x);
+}
 
 hcl_oop_t hcl_addints (
 	hcl_t*    hcl,

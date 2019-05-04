@@ -45,6 +45,10 @@
 #	error UNSUPPORTED SYSTEM
 #endif
 
+/* =========================================================================
+ * ARCHITECTURE/COMPILER TWEAKS
+ * ========================================================================= */
+
 #if defined(EMSCRIPTEN)
 #	if defined(HCL_SIZEOF___INT128)
 #		undef HCL_SIZEOF___INT128 
@@ -54,6 +58,20 @@
 		/* autoconf doesn't seem to match actual emscripten */
 #		undef HCL_SIZEOF_LONG
 #		define HCL_SIZEOF_LONG HCL_SIZEOF_INT
+#	endif
+#endif
+
+#if defined(__GNUC__) && defined(__arm__)  && !defined(__ARM_ARCH)
+#	if defined(__ARM_ARCH_8__)
+#		define __ARM_ARCH 8
+#	elif defined(__ARM_ARCH_7__)
+#		define __ARM_ARCH 7
+#	elif defined(__ARM_ARCH_6__)
+#		define __ARM_ARCH 6
+#	elif defined(__ARM_ARCH_5__)
+#		define __ARM_ARCH 5
+#	elif defined(__ARM_ARCH_4__)
+#		define __ARM_ARCH 4
 #	endif
 #endif
 
@@ -318,6 +336,13 @@
 #endif
 
 /* =========================================================================
+ * BASIC HARD-CODED DEFINES
+ * ========================================================================= */
+#define HCL_BITS_PER_BYTE (8)
+/* the maximum number of bch charaters to represent a single uch character */
+#define HCL_BCSIZE_MAX 6
+
+/* =========================================================================
  * BASIC HCL TYPES
  * ========================================================================= */
 
@@ -356,11 +381,15 @@ typedef hcl_uintptr_t           hcl_oow_t;
 typedef hcl_intptr_t            hcl_ooi_t;
 #define HCL_SIZEOF_OOW_T HCL_SIZEOF_UINTPTR_T
 #define HCL_SIZEOF_OOI_T HCL_SIZEOF_INTPTR_T
+#define HCL_OOW_BITS  (HCL_SIZEOF_OOW_T * HCL_BITS_PER_BYTE)
+#define HCL_OOI_BITS  (HCL_SIZEOF_OOI_T * HCL_BITS_PER_BYTE)
 
 typedef hcl_ushortptr_t         hcl_oohw_t; /* half word - half word */
 typedef hcl_shortptr_t          hcl_oohi_t; /* signed half word */
 #define HCL_SIZEOF_OOHW_T HCL_SIZEOF_USHORTPTR_T
 #define HCL_SIZEOF_OOHI_T HCL_SIZEOF_SHORTPTR_T
+#define HCL_OOHW_BITS  (HCL_SIZEOF_OOHW_T * HCL_BITS_PER_BYTE)
+#define HCL_OOHI_BITS  (HCL_SIZEOF_OOHI_T * HCL_BITS_PER_BYTE)
 
 struct hcl_ucs_t
 {
@@ -391,9 +420,6 @@ typedef struct hcl_bcs_t hcl_bcs_t;
 #	define HCL_OOCH_IS_BCH
 #	define HCL_SIZEOF_OOCH_T HCL_SIZEOF_BCH_T
 #endif
-
-/* the maximum number of bch charaters to represent a single uch character */
-#define HCL_BCSIZE_MAX 6
 
 /* =========================================================================
  * BASIC OOP ENCODING
@@ -608,11 +634,11 @@ struct hcl_ntime_t
 
 /* make a bit mask that can mask off low n bits */
 #define HCL_LBMASK(type,n) (~(~((type)0) << (n))) 
-#define HCL_LBMASK_SAFE(type,n) (((n) < HCL_SIZEOF(type) * 8)? HCL_LBMASK(type,n): ~(type)0)
+#define HCL_LBMASK_SAFE(type,n) (((n) < HCL_SIZEOF(type) * HCL_BITS_PER_BYTE)? HCL_LBMASK(type,n): ~(type)0)
 
 /* make a bit mask that can mask off hig n bits */
 #define HCL_HBMASK(type,n) (~(~((type)0) >> (n)))
-#define HCL_HBMASK_SAFE(type,n) (((n) < HCL_SIZEOF(type) * 8)? HCL_HBMASK(type,n): ~(type)0)
+#define HCL_HBMASK_SAFE(type,n) (((n) < HCL_SIZEOF(type) * HCL_BITS_PER_BYTE)? HCL_HBMASK(type,n): ~(type)0)
 
 /* get 'length' bits starting from the bit at the 'offset' */
 #define HCL_GETBITS(type,value,offset,length) \
@@ -639,7 +665,7 @@ struct hcl_ntime_t
  * \endcode
  */
 /*#define HCL_BITS_MAX(type,nbits) ((((type)1) << (nbits)) - 1)*/
-#define HCL_BITS_MAX(type,nbits) ((~(type)0) >> (HCL_SIZEOF(type) * 8 - (nbits)))
+#define HCL_BITS_MAX(type,nbits) ((~(type)0) >> (HCL_SIZEOF(type) * HCL_BITS_PER_BYTE - (nbits)))
 
 /* =========================================================================
  * MMGR
@@ -790,11 +816,11 @@ typedef struct hcl_t hcl_t;
 #define HCL_TYPE_IS_UNSIGNED(type) (((type)0) < ((type)-1))
 
 #define HCL_TYPE_SIGNED_MAX(type) \
-	((type)~((type)1 << ((type)HCL_SIZEOF(type) * 8 - 1)))
+	((type)~((type)1 << ((type)HCL_SIZEOF(type) * HCL_BITS_PER_BYTE - 1)))
 #define HCL_TYPE_UNSIGNED_MAX(type) ((type)(~(type)0))
 
 #define HCL_TYPE_SIGNED_MIN(type) \
-	((type)((type)1 << ((type)HCL_SIZEOF(type) * 8 - 1)))
+	((type)((type)1 << ((type)HCL_SIZEOF(type) * HCL_BITS_PER_BYTE - 1)))
 #define HCL_TYPE_UNSIGNED_MIN(type) ((type)0)
 
 #define HCL_TYPE_MAX(type) \

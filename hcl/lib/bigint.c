@@ -83,96 +83,13 @@ static const hcl_uint8_t debruijn_64[64] =
 #if defined(HCL_HAVE_UINT64_T)
 #	define LOG2_FOR_POW2_64(x) (debruijn_64[(hcl_uint64_t)((hcl_uint64_t)(x) * 0x022fdd63cc95386d) >> 58])
 #endif
-
-static HCL_INLINE int get_pos_of_msb_set_pow2 (hcl_oow_t x)
-{
-	/* the caller must ensure that x is power of 2. if x happens to be zero,
-	 * the return value is undefined as each method used may give different result. */
-#if defined(HCL_HAVE_BUILTIN_CTZLL) && (HCL_SIZEOF_OOW_T == HCL_SIZEOF_LONG_LONG)
-	return __builtin_ctzll(x); /* count the number of trailing zeros */
-#elif defined(HCL_HAVE_BUILTIN_CTZL) && (HCL_SIZEOF_OOW_T == HCL_SIZEOF_LONG)
-	return __builtin_ctzl(x); /* count the number of trailing zeros */
-#elif defined(HCL_HAVE_BUILTIN_CTZ) && (HCL_SIZEOF_OOW_T == HCL_SIZEOF_INT)
-	return __builtin_ctz(x); /* count the number of trailing zeros */
-#elif defined(__GNUC__) && (defined(__x86_64) || defined(__amd64) || defined(__i386) || defined(i386))
-	hcl_oow_t pos;
-	/* use the Bit Scan Forward instruction */
-#if 1
-	__asm__ volatile (
-		"bsf %1,%0\n\t"
-		: "=r"(pos) /* output */
-		: "r"(x) /* input */
-	);
-#else
-	__asm__ volatile (
-		"bsf %[X],%[EXP]\n\t"
-		: [EXP]"=r"(pos) /* output */
-		: [X]"r"(x) /* input */
-	);
-#endif
-	return (int)pos;
-#elif defined(__GNUC__) && defined(__arm__) && (defined(__ARM_ARCH_5__) || defined(__ARM_ARCH_6__) || defined(__ARM_ARCH_7__) || defined(__ARM_ARCH_8__))
-	hcl_oow_t n;
- 
-	/* CLZ is available in ARMv5T and above. there is no instruction to
-	 * count trailing zeros or something similar. using RBIT with CLZ
-	 * would be good in ARMv6T2 and above to avoid further calculation
-	 * afte CLZ */
-	__asm__ volatile (
-		"clz %0,%1\n\t"
-		: "=r"(n) /* output */
-		: "r"(x) /* input */
-	);
-	return (int)(HCL_OOW_BITS - n - 1); 
-	/* TODO: PPC - use cntlz, cntlzw, cntlzd, SPARC - use lzcnt, MIPS clz */
-#else
-	int pos = 0;
-	while (x >>= 1) pos++;
-	return pos;
-#endif
-}
- 
-static HCL_INLINE int get_pos_of_msb_set (hcl_oow_t x)
-{
-	/* x doesn't have to be power of 2. if x is zero, the result is undefined */
-#if defined(HCL_HAVE_BUILTIN_CLZLL) && (HCL_SIZEOF_OOW_T == HCL_SIZEOF_LONG_LONG)
-	return HCL_OOW_BITS - __builtin_clzll(x) - 1; /* count the number of leading zeros */
-#elif defined(HCL_HAVE_BUILTIN_CLZL) && (HCL_SIZEOF_OOW_T == HCL_SIZEOF_LONG)
-	return HCL_OOW_BITS - __builtin_clzl(x) - 1; /* count the number of leading zeros */
-#elif defined(HCL_HAVE_BUILTIN_CLZ) && (HCL_SIZEOF_OOW_T == HCL_SIZEOF_INT)
-	return HCL_OOW_BITS - __builtin_clz(x) - 1; /* count the number of leading zeros */
-#elif defined(__GNUC__) && (defined(__x86_64) || defined(__amd64) || defined(__i386) || defined(i386))
-	/* bit scan reverse. not all x86 CPUs have LZCNT. */
-	hcl_oow_t pos;
-	__asm__ volatile (
-		"bsr %1,%0\n\t"
-		: "=r"(pos) /* output */
-		: "r"(x) /* input */
-	);
-	return (int)pos;
-#elif defined(__GNUC__) && defined(__arm__) && (defined(__ARM_ARCH_5__) || defined(__ARM_ARCH_6__) || defined(__ARM_ARCH_7__) || defined(__ARM_ARCH_8__))
-	hcl_oow_t n;
-	__asm__ volatile (
-		"clz %0,%1\n\t"
-		: "=r"(n) /* output */
-		: "r"(x) /* input */
-	);
-	return (int)(HCL_OOW_BITS - n - 1); 
-	/* TODO: PPC - use cntlz, cntlzw, cntlzd, SPARC - use lzcnt, MIPS clz */
- 
-#else
-	int pos = 0;
-	while (x >>= 1) pos++;
-	return pos;
-#endif
-}
  
 #if defined(HCL_HAVE_UINT32_T) && (HCL_SIZEOF_OOW_T == HCL_SIZEOF_UINT32_T)
 #	define LOG2_FOR_POW2(x) LOG2_FOR_POW2_32(x)
 #elif defined(HCL_HAVE_UINT64_T) && (HCL_SIZEOF_OOW_T == HCL_SIZEOF_UINT64_T)
 #	define LOG2_FOR_POW2(x) LOG2_FOR_POW2_64(x)
 #else
-#	define LOG2_FOR_POW2(x) get_pos_of_msb_set_pow2(x)
+#	define LOG2_FOR_POW2(x) hcl_get_pos_of_msb_set_pow2(x)
 #endif
 
 
@@ -306,16 +223,6 @@ static int is_normalized_integer (hcl_t* hcl, hcl_oop_t oop)
 	return 0;
 }
 
-HCL_INLINE static int is_bigint (hcl_t* hcl, hcl_oop_t x)
-{
-	return HCL_IS_BIGINT(hcl, x);
-}
-
-HCL_INLINE int hcl_isint (hcl_t* hcl, hcl_oop_t x)
-{
-	return HCL_OOP_IS_SMOOI(x) || HCL_IS_BIGINT(hcl, x);
-}
-
 static HCL_INLINE int bigint_to_oow (hcl_t* hcl, hcl_oop_t num, hcl_oow_t* w)
 {
 	HCL_ASSERT (hcl, HCL_IS_BIGINT(hcl,num));
@@ -373,7 +280,7 @@ static HCL_INLINE int integer_to_oow (hcl_t* hcl, hcl_oop_t x, hcl_oow_t* w)
 		}
 	}
 
-	HCL_ASSERT (hcl, is_bigint(hcl, x));
+	HCL_ASSERT (hcl, hcl_isbigint(hcl, x));
 	return bigint_to_oow(hcl, x, w);
 }
 
@@ -396,7 +303,7 @@ int hcl_inttooow (hcl_t* hcl, hcl_oop_t x, hcl_oow_t* w)
 		}
 	}
 
-	if (is_bigint(hcl, x)) return bigint_to_oow(hcl, x, w);
+	if (hcl_isbigint(hcl, x)) return bigint_to_oow(hcl, x, w);
 
 	hcl_seterrbfmt (hcl, HCL_EINVAL, "parameter not integer - %O", x);
 	return 0; /* not convertable - too big, too small, or not integer */
@@ -440,7 +347,7 @@ static HCL_INLINE hcl_oop_t make_bigint_with_oow (hcl_t* hcl, hcl_oow_t w)
 	hcl_liw_t hw[2];
 	hw[0] = w /*& HCL_LBMASK(hcl_oow_t,HCL_LIW_BITS)*/;
 	hw[1] = w >> HCL_LIW_BITS;
-	return hcl_makebigint(hcl, HCL_BRAND_PBIGINT,  &hw, (hw[1] > 0? 2: 1));
+	return hcl_makebigint(hcl, HCL_BRAND_PBIGINT, hw, (hw[1] > 0? 2: 1));
 #else
 #	error UNSUPPORTED LIW BIT SIZE
 #endif
@@ -475,7 +382,7 @@ static HCL_INLINE hcl_oop_t make_bigint_with_ooi (hcl_t* hcl, hcl_ooi_t i)
 		w = i;
 		hw[0] = w /*& HCL_LBMASK(hcl_oow_t,HCL_LIW_BITS)*/;
 		hw[1] = w >> HCL_LIW_BITS;
-		return hcl_makebigint(hcl, HCL_BRAND_PBIGINT, &hw, (hw[1] > 0? 2: 1));
+		return hcl_makebigint(hcl, HCL_BRAND_PBIGINT, hw, (hw[1] > 0? 2: 1));
 	}
 	else
 	{
@@ -483,7 +390,7 @@ static HCL_INLINE hcl_oop_t make_bigint_with_ooi (hcl_t* hcl, hcl_ooi_t i)
 		w = -i;
 		hw[0] = w /*& HCL_LBMASK(hcl_oow_t,HCL_LIW_BITS)*/;
 		hw[1] = w >> HCL_LIW_BITS;
-		return hcl_makebigint(hcl, HCL_BRAND_NBIGINT, &hw, (hw[1] > 0? 2: 1));
+		return hcl_makebigint(hcl, HCL_BRAND_NBIGINT, hw, (hw[1] > 0? 2: 1));
 	}
 #else
 #	error UNSUPPORTED LIW BIT SIZE
@@ -1860,9 +1767,9 @@ static void divide_unsigned_array3 (hcl_t* hcl, const hcl_liw_t* x, hcl_oow_t xs
 #endif
  
 	y1 = y[ys - 1];
-	/*s = HCL_LIW_BITS - ((y1 == 0)? -1: get_pos_of_msb_set(y1)) - 1;*/
+	/*s = HCL_LIW_BITS - ((y1 == 0)? -1: hcl_get_pos_of_msb_set(y1)) - 1;*/
 	HCL_ASSERT (hcl, y1 > 0); /* the highest word can't be non-zero in the context where this function is called */
-	s = HCL_LIW_BITS - get_pos_of_msb_set(y1) - 1;
+	s = HCL_LIW_BITS - hcl_get_pos_of_msb_set(y1) - 1;
 	for (i = ys; i > 1; )
 	{
 		--i;
@@ -2152,7 +2059,7 @@ hcl_oop_t hcl_addints (hcl_t* hcl, hcl_oop_t x, hcl_oop_t y)
 
 		if (HCL_OOP_IS_SMOOI(x))
 		{
-			if (!is_bigint(hcl,y)) goto oops_einval;
+			if (!hcl_isbigint(hcl,y)) goto oops_einval;
 
 			v = HCL_OOP_TO_SMOOI(x);
 			if (v == 0) return clone_bigint (hcl, y, HCL_OBJ_GET_SIZE(y));
@@ -2164,7 +2071,7 @@ hcl_oop_t hcl_addints (hcl_t* hcl, hcl_oop_t x, hcl_oop_t y)
 		}
 		else if (HCL_OOP_IS_SMOOI(y))
 		{
-			if (!is_bigint(hcl,x)) goto oops_einval;
+			if (!hcl_isbigint(hcl,x)) goto oops_einval;
 
 			v = HCL_OOP_TO_SMOOI(y);
 			if (v == 0) return clone_bigint (hcl, x, HCL_OBJ_GET_SIZE(x));
@@ -2176,8 +2083,8 @@ hcl_oop_t hcl_addints (hcl_t* hcl, hcl_oop_t x, hcl_oop_t y)
 		}
 		else
 		{
-			if (!is_bigint(hcl,x)) goto oops_einval;
-			if (!is_bigint(hcl,y)) goto oops_einval;
+			if (!hcl_isbigint(hcl,x)) goto oops_einval;
+			if (!hcl_isbigint(hcl,y)) goto oops_einval;
 		}
 
 		if (HCL_OBJ_GET_FLAGS_BRAND(x) != HCL_OBJ_GET_FLAGS_BRAND(y))
@@ -2256,7 +2163,7 @@ hcl_oop_t hcl_subints (hcl_t* hcl, hcl_oop_t x, hcl_oop_t y)
 
 		if (HCL_OOP_IS_SMOOI(x))
 		{
-			if (!is_bigint(hcl,y)) goto oops_einval;
+			if (!hcl_isbigint(hcl,y)) goto oops_einval;
 
 			v = HCL_OOP_TO_SMOOI(x);
 			if (v == 0) 
@@ -2272,7 +2179,7 @@ hcl_oop_t hcl_subints (hcl_t* hcl, hcl_oop_t x, hcl_oop_t y)
 		}
 		else if (HCL_OOP_IS_SMOOI(y))
 		{
-			if (!is_bigint(hcl,x)) goto oops_einval;
+			if (!hcl_isbigint(hcl,x)) goto oops_einval;
 
 			v = HCL_OOP_TO_SMOOI(y);
 			if (v == 0) return clone_bigint (hcl, x, HCL_OBJ_GET_SIZE(x));
@@ -2284,8 +2191,8 @@ hcl_oop_t hcl_subints (hcl_t* hcl, hcl_oop_t x, hcl_oop_t y)
 		}
 		else
 		{
-			if (!is_bigint(hcl,x)) goto oops_einval;
-			if (!is_bigint(hcl,y)) goto oops_einval;
+			if (!hcl_isbigint(hcl,x)) goto oops_einval;
+			if (!hcl_isbigint(hcl,y)) goto oops_einval;
 		}
 
 		if (HCL_OBJ_GET_FLAGS_BRAND(x) != HCL_OBJ_GET_FLAGS_BRAND(y))
@@ -2369,7 +2276,7 @@ hcl_oop_t hcl_mulints (hcl_t* hcl, hcl_oop_t x, hcl_oop_t y)
 
 		if (HCL_OOP_IS_SMOOI(x))
 		{
-			if (!is_bigint(hcl,y)) goto oops_einval;
+			if (!hcl_isbigint(hcl,y)) goto oops_einval;
 
 			v = HCL_OOP_TO_SMOOI(x);
 			switch (v)
@@ -2389,7 +2296,7 @@ hcl_oop_t hcl_mulints (hcl_t* hcl, hcl_oop_t x, hcl_oop_t y)
 		}
 		else if (HCL_OOP_IS_SMOOI(y))
 		{
-			if (!is_bigint(hcl,x)) goto oops_einval;
+			if (!hcl_isbigint(hcl,x)) goto oops_einval;
 
 			v = HCL_OOP_TO_SMOOI(y);
 			switch (v)
@@ -2409,8 +2316,8 @@ hcl_oop_t hcl_mulints (hcl_t* hcl, hcl_oop_t x, hcl_oop_t y)
 		}
 		else
 		{
-			if (!is_bigint(hcl,x)) goto oops_einval;
-			if (!is_bigint(hcl,y)) goto oops_einval;
+			if (!hcl_isbigint(hcl,x)) goto oops_einval;
+			if (!hcl_isbigint(hcl,y)) goto oops_einval;
 		}
 
 	full_multiply:
@@ -2538,7 +2445,7 @@ hcl_oop_t hcl_divints (hcl_t* hcl, hcl_oop_t x, hcl_oop_t y, int modulo, hcl_oop
 		{
 			hcl_ooi_t xv;
  
-			if (!is_bigint(hcl,y)) goto oops_einval;
+			if (!hcl_isbigint(hcl,y)) goto oops_einval;
  
 			/* divide a small integer by a big integer. 
 			 * the dividend is guaranteed to be greater than the divisor
@@ -2565,7 +2472,7 @@ hcl_oop_t hcl_divints (hcl_t* hcl, hcl_oop_t x, hcl_oop_t y, int modulo, hcl_oop
 		{
 			hcl_ooi_t yv;
 
-			if (!is_bigint(hcl,x)) goto oops_einval;
+			if (!hcl_isbigint(hcl,x)) goto oops_einval;
 
 			/* divide a big integer by a small integer. */
 
@@ -2661,8 +2568,8 @@ hcl_oop_t hcl_divints (hcl_t* hcl, hcl_oop_t x, hcl_oop_t y, int modulo, hcl_oop
 		}
 		else
 		{
-			if (!is_bigint(hcl,x)) goto oops_einval;
-			if (!is_bigint(hcl,y)) goto oops_einval;
+			if (!hcl_isbigint(hcl,x)) goto oops_einval;
+			if (!hcl_isbigint(hcl,y)) goto oops_einval;
 		}
 	}
 
@@ -2752,7 +2659,7 @@ hcl_oop_t hcl_negateint (hcl_t* hcl, hcl_oop_t x)
 	}
 	else
 	{
-		if (!is_bigint(hcl, x)) goto oops_einval;
+		if (!hcl_isbigint(hcl, x)) goto oops_einval;
 		return clone_bigint_negated (hcl, x, HCL_OBJ_GET_SIZE(x));
 	}
 
@@ -2789,7 +2696,7 @@ hcl_oop_t hcl_bitatint (hcl_t* hcl, hcl_oop_t x, hcl_oop_t y)
 	}
 	else if (HCL_OOP_IS_SMOOI(x))
 	{
-		if (!is_bigint(hcl, y)) goto oops_einval;
+		if (!hcl_isbigint(hcl, y)) goto oops_einval;
 
 		if (HCL_IS_NBIGINT(hcl, y)) return HCL_SMOOI_TO_OOP(0);
 
@@ -2804,7 +2711,7 @@ hcl_oop_t hcl_bitatint (hcl_t* hcl, hcl_oop_t x, hcl_oop_t y)
 		hcl_ooi_t v;
 		hcl_oow_t wp, bp, xs;
 
-		if (!is_bigint(hcl, x)) goto oops_einval;
+		if (!hcl_isbigint(hcl, x)) goto oops_einval;
 		v = HCL_OOP_TO_SMOOI(y);
 
 		if (v < 0) return HCL_SMOOI_TO_OOP(0);
@@ -2845,7 +2752,7 @@ hcl_oop_t hcl_bitatint (hcl_t* hcl, hcl_oop_t x, hcl_oop_t y)
 		int sign;
 	#endif
 
-		if (!is_bigint(hcl, x) || !is_bigint(hcl, y)) goto oops_einval;
+		if (!hcl_isbigint(hcl, x) || !hcl_isbigint(hcl, y)) goto oops_einval;
 
 	#if defined(HCL_LIMIT_OBJ_SIZE)
 		if (HCL_IS_NBIGINT(hcl, y)) return HCL_SMOOI_TO_OOP(0);
@@ -2943,7 +2850,7 @@ hcl_oop_t hcl_bitandints (hcl_t* hcl, hcl_oop_t x, hcl_oop_t y)
 	{
 		hcl_ooi_t v;
 
-		if (!is_bigint(hcl, y)) goto oops_einval;
+		if (!hcl_isbigint(hcl, y)) goto oops_einval;
 
 		v = HCL_OOP_TO_SMOOI(x);
 		if (v == 0) return HCL_SMOOI_TO_OOP(0);
@@ -2959,7 +2866,7 @@ hcl_oop_t hcl_bitandints (hcl_t* hcl, hcl_oop_t x, hcl_oop_t y)
 	{
 		hcl_ooi_t v;
 
-		if (!is_bigint(hcl, x)) goto oops_einval;
+		if (!hcl_isbigint(hcl, x)) goto oops_einval;
 
 		v = HCL_OOP_TO_SMOOI(y);
 		if (v == 0) return HCL_SMOOI_TO_OOP(0);
@@ -2977,7 +2884,7 @@ hcl_oop_t hcl_bitandints (hcl_t* hcl, hcl_oop_t x, hcl_oop_t y)
 		hcl_oow_t i, xs, ys, zs, zalloc;
 		int negx, negy;
 
-		if (!is_bigint(hcl,x) || !is_bigint(hcl, y)) goto oops_einval;
+		if (!hcl_isbigint(hcl,x) || !hcl_isbigint(hcl, y)) goto oops_einval;
 
 	bigint_and_bigint:
 		xs = HCL_OBJ_GET_SIZE(x);
@@ -3156,7 +3063,7 @@ hcl_oop_t hcl_bitorints (hcl_t* hcl, hcl_oop_t x, hcl_oop_t y)
 	{
 		hcl_ooi_t v;
 
-		if (!is_bigint(hcl, y)) goto oops_einval;
+		if (!hcl_isbigint(hcl, y)) goto oops_einval;
 
 		v = HCL_OOP_TO_SMOOI(x);
 		if (v == 0) return clone_bigint(hcl, y, HCL_OBJ_GET_SIZE(y));
@@ -3172,7 +3079,7 @@ hcl_oop_t hcl_bitorints (hcl_t* hcl, hcl_oop_t x, hcl_oop_t y)
 	{
 		hcl_ooi_t v;
 
-		if (!is_bigint(hcl, x)) goto oops_einval;
+		if (!hcl_isbigint(hcl, x)) goto oops_einval;
 
 		v = HCL_OOP_TO_SMOOI(y);
 		if (v == 0) return clone_bigint(hcl, x, HCL_OBJ_GET_SIZE(x));
@@ -3190,7 +3097,7 @@ hcl_oop_t hcl_bitorints (hcl_t* hcl, hcl_oop_t x, hcl_oop_t y)
 		hcl_oow_t i, xs, ys, zs, zalloc;
 		int negx, negy;
 
-		if (!is_bigint(hcl,x) || !is_bigint(hcl, y)) goto oops_einval;
+		if (!hcl_isbigint(hcl,x) || !hcl_isbigint(hcl, y)) goto oops_einval;
 
 	bigint_and_bigint:
 		xs = HCL_OBJ_GET_SIZE(x);
@@ -3374,7 +3281,7 @@ hcl_oop_t hcl_bitxorints (hcl_t* hcl, hcl_oop_t x, hcl_oop_t y)
 	{
 		hcl_ooi_t v;
 
-		if (!is_bigint(hcl, y)) goto oops_einval;
+		if (!hcl_isbigint(hcl, y)) goto oops_einval;
 
 		v = HCL_OOP_TO_SMOOI(x);
 		if (v == 0) return clone_bigint(hcl, y, HCL_OBJ_GET_SIZE(y));
@@ -3390,7 +3297,7 @@ hcl_oop_t hcl_bitxorints (hcl_t* hcl, hcl_oop_t x, hcl_oop_t y)
 	{
 		hcl_ooi_t v;
 
-		if (!is_bigint(hcl, x)) goto oops_einval;
+		if (!hcl_isbigint(hcl, x)) goto oops_einval;
 
 		v = HCL_OOP_TO_SMOOI(y);
 		if (v == 0) return clone_bigint(hcl, x, HCL_OBJ_GET_SIZE(x));
@@ -3408,7 +3315,7 @@ hcl_oop_t hcl_bitxorints (hcl_t* hcl, hcl_oop_t x, hcl_oop_t y)
 		hcl_oow_t i, xs, ys, zs, zalloc;
 		int negx, negy;
 
-		if (!is_bigint(hcl,x) || !is_bigint(hcl, y)) goto oops_einval;
+		if (!hcl_isbigint(hcl,x) || !hcl_isbigint(hcl, y)) goto oops_einval;
 
 	bigint_and_bigint:
 		xs = HCL_OBJ_GET_SIZE(x);
@@ -3592,7 +3499,7 @@ hcl_oop_t hcl_bitinvint (hcl_t* hcl, hcl_oop_t x)
 		hcl_oow_t i, xs, zs, zalloc;
 		int negx;
 
-		if (!is_bigint(hcl,x)) goto oops_einval;
+		if (!hcl_isbigint(hcl,x)) goto oops_einval;
 
 		xs = HCL_OBJ_GET_SIZE(x);
 		negx = HCL_IS_NBIGINT(hcl, x);
@@ -4013,7 +3920,7 @@ hcl_oop_t hcl_bitshiftint (hcl_t* hcl, hcl_oop_t x, hcl_oop_t y)
 		{
 			hcl_ooi_t v;
 
-			if (!is_bigint(hcl,y)) goto oops_einval;
+			if (!hcl_isbigint(hcl,y)) goto oops_einval;
 
 			v = HCL_OOP_TO_SMOOI(x);
 			if (v == 0) return HCL_SMOOI_TO_OOP(0);
@@ -4038,7 +3945,7 @@ hcl_oop_t hcl_bitshiftint (hcl_t* hcl, hcl_oop_t x, hcl_oop_t y)
 		{
 			hcl_ooi_t v;
 
-			if (!is_bigint(hcl,x)) goto oops_einval;
+			if (!hcl_isbigint(hcl,x)) goto oops_einval;
 
 			v = HCL_OOP_TO_SMOOI(y);
 			if (v == 0) return clone_bigint (hcl, x, HCL_OBJ_GET_SIZE(x));
@@ -4063,7 +3970,7 @@ hcl_oop_t hcl_bitshiftint (hcl_t* hcl, hcl_oop_t x, hcl_oop_t y)
 		{
 			hcl_oop_t z;
 
-			if (!is_bigint(hcl,x) || !is_bigint(hcl, y)) goto oops_einval;
+			if (!hcl_isbigint(hcl,x) || !hcl_isbigint(hcl, y)) goto oops_einval;
 
 		bigint_and_bigint:
 			negx = HCL_IS_NBIGINT(hcl, x);
@@ -4215,34 +4122,8 @@ hcl_oop_t hcl_strtoint (hcl_t* hcl, const hcl_ooch_t* str, hcl_oow_t len, int ra
 		/* get log2(radix) in a fast way under the fact that
 		 * radix is a power of 2. the exponent acquired is
 		 * the number of bits that a digit of the given radix takes up */
-	#if defined(HCL_HAVE_BUILTIN_CTZ)
-		exp = __builtin_ctz(radix);
-
-	#elif defined(__GNUC__) && (defined(__x86_64) || defined(__amd64) || defined(__i386) || defined(i386))
-		/* use the Bit Scan Forward instruction */
-		__asm__ volatile (
-			"bsf %1,%0\n\t"
-			: "=r"(exp) /* output */
-			: "r"(radix) /* input */
-		);
-
-	#elif defined(USE_UGLY_CODE) && defined(__GNUC__) && defined(__arm__) && (defined(__ARM_ARCH_5__) || defined(__ARM_ARCH_6__) || defined(__ARM_ARCH_7__) || defined(__ARM_ARCH_8__))
-
-		/* CLZ is available in ARMv5T and above. there is no instruction to
-		 * count trailing zeros or something similar. using RBIT with CLZ
-		 * would be good in ARMv6T2 and above to avoid further calculation
-		 * afte CLZ */
-		__asm__ volatile (
-			"clz %0,%1\n\t"
-			: "=r"(exp) /* output */
-			: "r"(radix) /* input */
-		);
-		exp = (HCL_SIZEOF(exp) * 8) - exp - 1; 
-
-		/* TODO: PPC - use cntlz, cntlzw, cntlzd, SPARC - use lzcnt, MIPS clz */
-	#else
+		/*exp = LOG2_FOR_POW2(radix);*/
 		exp = _exp_tab[radix - 1];
-	#endif
 
 		/* bytes */
 		outlen = ((hcl_oow_t)(end - str) * exp + 7) / 8; 
@@ -4437,7 +4318,7 @@ hcl_oop_t hcl_eqints (hcl_t* hcl, hcl_oop_t x, hcl_oop_t y)
 	}
 	else 
 	{
-		if (!is_bigint(hcl, x) || !is_bigint(hcl, y)) goto oops_einval;
+		if (!hcl_isbigint(hcl, x) || !hcl_isbigint(hcl, y)) goto oops_einval;
 		return is_equal(hcl, x, y)? hcl->_true: hcl->_false;
 	}
 
@@ -4458,7 +4339,7 @@ hcl_oop_t hcl_neints (hcl_t* hcl, hcl_oop_t x, hcl_oop_t y)
 	}
 	else 
 	{
-		if (!is_bigint(hcl, x) || !is_bigint(hcl, y)) goto oops_einval;
+		if (!hcl_isbigint(hcl, x) || !hcl_isbigint(hcl, y)) goto oops_einval;
 		return !is_equal(hcl, x, y)? hcl->_true: hcl->_false;
 	}
 
@@ -4475,17 +4356,17 @@ hcl_oop_t hcl_gtints (hcl_t* hcl, hcl_oop_t x, hcl_oop_t y)
 	}
 	else if (HCL_OOP_IS_SMOOI(x))
 	{
-		if (!is_bigint(hcl, y)) goto oops_einval;
+		if (!hcl_isbigint(hcl, y)) goto oops_einval;
 		return (HCL_IS_NBIGINT(hcl, y))? hcl->_true: hcl->_false;
 	}
 	else if (HCL_OOP_IS_SMOOI(y)) 
 	{
-		if (!is_bigint(hcl, x)) goto oops_einval;
+		if (!hcl_isbigint(hcl, x)) goto oops_einval;
 		return (HCL_IS_PBIGINT(hcl, x))? hcl->_true: hcl->_false;
 	}
 	else 
 	{
-		if (!is_bigint(hcl, x) || !is_bigint(hcl, y)) goto oops_einval;
+		if (!hcl_isbigint(hcl, x) || !hcl_isbigint(hcl, y)) goto oops_einval;
 		return is_greater(hcl, x, y)? hcl->_true: hcl->_false;
 	}
 
@@ -4502,17 +4383,17 @@ hcl_oop_t hcl_geints (hcl_t* hcl, hcl_oop_t x, hcl_oop_t y)
 	}
 	else if (HCL_OOP_IS_SMOOI(x))
 	{
-		if (!is_bigint(hcl, y)) goto oops_einval;
+		if (!hcl_isbigint(hcl, y)) goto oops_einval;
 		return (HCL_IS_NBIGINT(hcl, y))? hcl->_true: hcl->_false;
 	}
 	else if (HCL_OOP_IS_SMOOI(y)) 
 	{
-		if (!is_bigint(hcl, x)) goto oops_einval;
+		if (!hcl_isbigint(hcl, x)) goto oops_einval;
 		return (HCL_IS_PBIGINT(hcl, x))? hcl->_true: hcl->_false;
 	}
 	else 
 	{
-		if (!is_bigint(hcl, x) || !is_bigint(hcl, y)) goto oops_einval;
+		if (!hcl_isbigint(hcl, x) || !hcl_isbigint(hcl, y)) goto oops_einval;
 		return (is_greater(hcl, x, y) || is_equal(hcl, x, y))? hcl->_true: hcl->_false;
 	}
 
@@ -4529,17 +4410,17 @@ hcl_oop_t hcl_ltints (hcl_t* hcl, hcl_oop_t x, hcl_oop_t y)
 	}
 	else if (HCL_OOP_IS_SMOOI(x))
 	{
-		if (!is_bigint(hcl, y)) goto oops_einval;
+		if (!hcl_isbigint(hcl, y)) goto oops_einval;
 		return (HCL_IS_PBIGINT(hcl, y))? hcl->_true: hcl->_false;
 	}
 	else if (HCL_OOP_IS_SMOOI(y)) 
 	{
-		if (!is_bigint(hcl, x)) goto oops_einval;
+		if (!hcl_isbigint(hcl, x)) goto oops_einval;
 		return (HCL_IS_NBIGINT(hcl, x))? hcl->_true: hcl->_false;
 	}
 	else 
 	{
-		if (!is_bigint(hcl, x) || !is_bigint(hcl, y)) goto oops_einval;
+		if (!hcl_isbigint(hcl, x) || !hcl_isbigint(hcl, y)) goto oops_einval;
 		return is_less(hcl, x, y)? hcl->_true: hcl->_false;
 	}
 
@@ -4556,17 +4437,17 @@ hcl_oop_t hcl_leints (hcl_t* hcl, hcl_oop_t x, hcl_oop_t y)
 	}
 	else if (HCL_OOP_IS_SMOOI(x))
 	{
-		if (!is_bigint(hcl, y)) goto oops_einval;
+		if (!hcl_isbigint(hcl, y)) goto oops_einval;
 		return (HCL_IS_PBIGINT(hcl, y))? hcl->_true: hcl->_false;
 	}
 	else if (HCL_OOP_IS_SMOOI(y)) 
 	{
-		if (!is_bigint(hcl, x)) goto oops_einval;
+		if (!hcl_isbigint(hcl, x)) goto oops_einval;
 		return (HCL_IS_NBIGINT(hcl, x))? hcl->_true: hcl->_false;
 	}
 	else 
 	{
-		if (!is_bigint(hcl, x) || !is_bigint(hcl, y)) goto oops_einval;
+		if (!hcl_isbigint(hcl, x) || !hcl_isbigint(hcl, y)) goto oops_einval;
 		return (is_less(hcl, x, y) || is_equal(hcl, x, y))? hcl->_true: hcl->_false;
 	}
 
