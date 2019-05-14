@@ -64,7 +64,6 @@ libhcl_la_SOURCES = \
 	hcl-utl.h \
 	hcl-prv.h \
 	bigint.c \
-	cb-impl.h \
 	comp.c \
 	debug.c \
 	decode.c \
@@ -103,13 +102,6 @@ libhcl_la_LIBADD += -lhcl-sys
 libhcl_la_DEPENDENCIES += $(abs_builddir)/../mod/libhcl-sys.la
 endif
 
-bin_PROGRAMS = hcl
-hcl_SOURCES = main.c cb-impl.c cb-impl.h
-hcl_CPPFLAGS = $(CPPFLAGS_ALL_COMMON) $(CPPFLAGS_PFMOD)
-hcl_LDFLAGS = $(LDFLAGS_ALL_COMMON)
-hcl_LDADD = $(LIBADD_LIB_COMMON) -lhcl
-hcl_DEPENDENCIES = libhcl.la
-
 if ENABLE_HCLEX
 pkglib_LTLIBRARIES += libhclex.la
 pkginclude_HEADERS += hcl-c.h hcl-s.h hcl-tmr.h hcl-xutl.h hcl-json.h
@@ -117,33 +109,13 @@ libhclex_la_SOURCES = \
 	tmr.c hcl-tmr.h \
 	xutl.c xutl-sa.h hcl-xutl.h \
 	json.c hcl-json.h \
+	cb-impl.h cb-impl.c \
 	hcl-s.c hcl-s.h \
 	hcl-c.c hcl-c.h
 libhclex_la_CPPFLAGS = $(CPPFLAGS_LIB_COMMON) $(CPPFLAGS_PFMOD)
 libhclex_la_LDFLAGS = $(LDFLAGS_LIB_COMMON)
 libhclex_la_LIBADD = $(LIBADD_LIB_COMMON) $(PTHREAD_LIBS) -lhcl
 libhclex_la_DEPENDENCIES = libhcl.la
-
-bin_PROGRAMS += hcls
-hcls_SOURCES = main-s.c cb-impl.c cb-impl.h
-hcls_CPPFLAGS = $(CPPFLAGS_ALL_COMMON)
-hcls_LDFLAGS = $(LDFLAGS_ALL_COMMON)
-hcls_LDADD = $(LIBADD_LIB_COMMON) $(PTHREAD_LIBS) -lhcl -lhclex
-hcls_DEPENDENCIES = libhclex.la
-
-bin_PROGRAMS += hclc
-hclc_SOURCES = main-c.c cb-impl.c cb-impl.h
-hclc_CPPFLAGS = $(CPPFLAGS_ALL_COMMON)
-hclc_LDFLAGS = $(LDFLAGS_ALL_COMMON)
-hclc_LDADD = $(LIBADD_LIB_COMMON) $(PTHREAD_LIBS) -lhcl -lhclex
-hclc_DEPENDENCIES = libhclex.la
-
-bin_PROGRAMS += hclj
-hclj_SOURCES = main-j.c cb-impl.c cb-impl.h
-hclj_CPPFLAGS = $(CPPFLAGS_ALL_COMMON)
-hclj_LDFLAGS = $(LDFLAGS_ALL_COMMON)
-hclj_LDADD = $(LIBADD_LIB_COMMON) $(PTHREAD_LIBS) -lhcl -lhclex
-hclj_DEPENDENCIES = libhclex.la
 endif
 
 

@@ -19,7 +19,7 @@
 extern "C" {
 #endif
 
-hcl_errnum_t hcl_vmprim_syserrstrb (
+HCL_EXPORT hcl_errnum_t hcl_vmprim_syserrstrb (
 	hcl_t*             hcl,
 	int                syserr_type,
 	int                syserr_code,
@@ -27,7 +27,7 @@ hcl_errnum_t hcl_vmprim_syserrstrb (
 	hcl_oow_t          len
 );
 
-void hcl_vmprim_assertfail (
+HCL_EXPORT void hcl_vmprim_assertfail (
 	hcl_t*             hcl,
 	const hcl_bch_t*   expr,
 	const hcl_bch_t*   file,
@@ -35,47 +35,47 @@ void hcl_vmprim_assertfail (
 );
 
 
-void* hcl_vmprim_alloc_heap (
+HCL_EXPORT void* hcl_vmprim_alloc_heap (
 	hcl_t*             hcl,
 	hcl_oow_t          size
 );
 
-void hcl_vmprim_free_heap (
+HCL_EXPORT void hcl_vmprim_free_heap (
 	hcl_t*             hcl,
 	void*              ptr
 );
 
-void hcl_vmprim_gettime (
+HCL_EXPORT void hcl_vmprim_gettime (
 	hcl_t*             hcl,
 	hcl_ntime_t*       now
 );
 
-void hcl_vmprim_sleep (
+HCL_EXPORT void hcl_vmprim_sleep (
 	hcl_t*             hcl,
 	const hcl_ntime_t* dur
 );
 
 
-void hcl_vmprim_dl_startup (
+HCL_EXPORT void hcl_vmprim_dl_startup (
 	hcl_t*             hcl
 );
 
-void hcl_vmprim_dl_cleanup (
+HCL_EXPORT void hcl_vmprim_dl_cleanup (
 	hcl_t*             hcl
 );
 
-void* hcl_vmprim_dl_open (
+HCL_EXPORT void* hcl_vmprim_dl_open (
 	hcl_t*             hcl, 
 	const hcl_ooch_t*  name,
 	int                flags
 );
 
-void hcl_vmprim_dl_close (
+HCL_EXPORT void hcl_vmprim_dl_close (
 	hcl_t*             hcl,
 	void*              handle
 );
 
-void* hcl_vmprim_dl_getsym (
+HCL_EXPORT void* hcl_vmprim_dl_getsym (
 	hcl_t*             hcl,
 	void*              handle,
 	const hcl_ooch_t*  name
