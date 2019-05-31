@@ -169,7 +169,7 @@ static hcl_pfrc_t pf_log (hcl_t* hcl, hcl_mod_t* mod, hcl_ooi_t nargs)
 
 static hcl_pfrc_t pf_logf (hcl_t* hcl, hcl_mod_t* mod, hcl_ooi_t nargs)
 {
-	if (hcl_logfmtst(hcl, nargs) <= -1)
+	if (hcl_logfmtcallstack(hcl, nargs) <= -1)
 	{
 		HCL_STACK_SETRETTOERRNUM (hcl, nargs);
 	}
@@ -184,7 +184,7 @@ static hcl_pfrc_t pf_logf (hcl_t* hcl, hcl_mod_t* mod, hcl_ooi_t nargs)
 
 static hcl_pfrc_t pf_printf (hcl_t* hcl, hcl_mod_t* mod, hcl_ooi_t nargs)
 {
-	if (hcl_printfmtst(hcl, nargs) <= -1)
+	if (hcl_prfmtcallstack(hcl, nargs) <= -1)
 	{
 		HCL_STACK_SETRETTOERRNUM (hcl, nargs);
 	}
@@ -199,7 +199,7 @@ static hcl_pfrc_t pf_printf (hcl_t* hcl, hcl_mod_t* mod, hcl_ooi_t nargs)
 
 static hcl_pfrc_t pf_sprintf (hcl_t* hcl, hcl_mod_t* mod, hcl_ooi_t nargs)
 {
-	if (hcl_sprintfmtst(hcl, nargs) <= -1)
+	if (hcl_strfmtcallstack(hcl, nargs) <= -1)
 	{
 		HCL_STACK_SETRETTOERRNUM (hcl, nargs);
 	}

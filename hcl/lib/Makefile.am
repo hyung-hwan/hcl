@@ -70,11 +70,10 @@ libhcl_la_SOURCES = \
 	dic.c \
 	err.c \
 	exec.c \
+	fmt.c \
 	gc.c \
 	hcl.c \
 	heap.c \
-	logfmtv.h \
-	logfmt.c \
 	number.c \
 	obj.c \
 	opt-impl.h \
@@ -103,19 +102,19 @@ libhcl_la_DEPENDENCIES += $(abs_builddir)/../mod/libhcl-sys.la
 endif
 
 if ENABLE_HCLEX
-pkglib_LTLIBRARIES += libhclex.la
+pkglib_LTLIBRARIES += libhclx.la
 pkginclude_HEADERS += hcl-c.h hcl-s.h hcl-tmr.h hcl-xutl.h hcl-json.h
-libhclex_la_SOURCES = \
+libhclx_la_SOURCES = \
 	tmr.c hcl-tmr.h \
 	xutl.c xutl-sa.h hcl-xutl.h \
 	json.c hcl-json.h \
 	cb-impl.h cb-impl.c \
 	hcl-s.c hcl-s.h \
 	hcl-c.c hcl-c.h
-libhclex_la_CPPFLAGS = $(CPPFLAGS_LIB_COMMON) $(CPPFLAGS_PFMOD)
-libhclex_la_LDFLAGS = $(LDFLAGS_LIB_COMMON)
-libhclex_la_LIBADD = $(LIBADD_LIB_COMMON) $(PTHREAD_LIBS) -lhcl
-libhclex_la_DEPENDENCIES = libhcl.la
+libhclx_la_CPPFLAGS = $(CPPFLAGS_LIB_COMMON) $(CPPFLAGS_PFMOD)
+libhclx_la_LDFLAGS = $(LDFLAGS_LIB_COMMON)
+libhclx_la_LIBADD = $(LIBADD_LIB_COMMON) $(PTHREAD_LIBS) -lhcl
+libhclx_la_DEPENDENCIES = libhcl.la
 endif
 
 

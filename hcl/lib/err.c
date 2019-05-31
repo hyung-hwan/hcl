@@ -191,6 +191,132 @@ void hcl_seterrnum (hcl_t* hcl, hcl_errnum_t errnum)
 	hcl->errmsg.len = 0; 
 }
 
+
+static int err_bcs (hcl_fmtout_t* fmtout, const hcl_bch_t* ptr, hcl_oow_t len)
+{
+	hcl_t* hcl = (hcl_t*)fmtout->ctx;
+	hcl_oow_t max;
+
+	max = HCL_COUNTOF(hcl->errmsg.buf) - hcl->errmsg.len - 1;
+
+#if defined(HCL_OOCH_IS_UCH)
+	if (max <= 0) return 1;
+	hcl_conv_bchars_to_uchars_with_cmgr (ptr, &len, &hcl->errmsg.buf[hcl->errmsg.len], &max, hcl->cmgr, 1);
+	hcl->errmsg.len += max;
+#else
+	if (len > max) len = max;
+	if (len <= 0) return 1;
+	HCL_MEMCPY (&hcl->errmsg.buf[hcl->errmsg.len], ptr, len * HCL_SIZEOF(*ptr));
+	hcl->errmsg.len += len;
+#endif
+
+	hcl->errmsg.buf[hcl->errmsg.len] = '\0';
+
+	return 1; /* success */
+}
+
+static int err_ucs (hcl_fmtout_t* fmtout, const hcl_uch_t* ptr, hcl_oow_t len)
+{
+	hcl_t* hcl = (hcl_t*)fmtout->ctx;
+	hcl_oow_t max;
+
+	max = HCL_COUNTOF(hcl->errmsg.buf) - hcl->errmsg.len - 1;
+
+#if defined(HCL_OOCH_IS_UCH)
+	if (len > max) len = max;
+	if (len <= 0) return 1;
+	HCL_MEMCPY (&hcl->errmsg.buf[hcl->errmsg.len], ptr, len * HCL_SIZEOF(*ptr));
+	hcl->errmsg.len += len;
+#else
+	if (max <= 0) return 1;
+	hcl_conv_uchars_to_bchars_with_cmgr (ptr, &len, &hcl->errmsg.buf[hcl->errmsg.len], &max, hcl->cmgr);
+	hcl->errmsg.len += max;
+#endif
+	hcl->errmsg.buf[hcl->errmsg.len] = '\0';
+	return 1; /* success */
+}
+
+void hcl_seterrbfmt (hcl_t* hcl, hcl_errnum_t errnum, const hcl_bch_t* fmt, ...)
+{
+	va_list ap;
+	hcl_fmtout_t fo;
+
+	if (hcl->shuterr) return;
+	hcl->errmsg.len = 0;
+
+	HCL_MEMSET (&fo, 0, HCL_SIZEOF(fo));
+	fo.putbcs = err_bcs;
+	fo.putucs = err_ucs;
+	fo.putobj = hcl_fmt_object_;
+	fo.ctx = hcl;
+
+	va_start (ap, fmt);
+	hcl_bfmt_outv (&fo, fmt, ap);
+	va_end (ap);
+
+	hcl->errnum = errnum;
+}
+
+void hcl_seterrufmt (hcl_t* hcl, hcl_errnum_t errnum, const hcl_uch_t* fmt, ...)
+{
+	va_list ap;
+	hcl_fmtout_t fo;
+
+	if (hcl->shuterr) return;
+	hcl->errmsg.len = 0;
+
+	HCL_MEMSET (&fo, 0, HCL_SIZEOF(fo));
+	fo.putbcs = err_bcs;
+	fo.putucs = err_ucs;
+	fo.putobj = hcl_fmt_object_;
+	fo.ctx = hcl;
+
+	va_start (ap, fmt);
+	hcl_ufmt_outv (&fo, fmt, ap);
+	va_end (ap);
+
+	hcl->errnum = errnum;
+}
+
+
+void hcl_seterrbfmtv (hcl_t* hcl, hcl_errnum_t errnum, const hcl_bch_t* fmt, va_list ap)
+{
+	hcl_fmtout_t fo;
+
+	if (hcl->shuterr) return;
+
+	hcl->errmsg.len = 0;
+
+	HCL_MEMSET (&fo, 0, HCL_SIZEOF(fo));
+	fo.putbcs = err_bcs;
+	fo.putucs = err_ucs;
+	fo.putobj = hcl_fmt_object_;
+	fo.ctx = hcl;
+
+	hcl_bfmt_outv (&fo, fmt, ap);
+	hcl->errnum = errnum;
+}
+
+void hcl_seterrufmtv (hcl_t* hcl, hcl_errnum_t errnum, const hcl_uch_t* fmt, va_list ap)
+{
+	hcl_fmtout_t fo;
+
+	if (hcl->shuterr) return;
+
+	hcl->errmsg.len = 0;
+
+	HCL_MEMSET (&fo, 0, HCL_SIZEOF(fo));
+	fo.putbcs = err_bcs;
+	fo.putucs = err_ucs;
+	fo.putobj = hcl_fmt_object_;
+	fo.ctx = hcl;
+
+	hcl_ufmt_outv (&fo, fmt, ap);
+	hcl->errnum = errnum;
+}
+
+
+
 void hcl_seterrwithsyserr (hcl_t* hcl, int syserr_type, int syserr_code)
 {
 	hcl_errnum_t errnum;

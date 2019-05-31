@@ -37,7 +37,7 @@
 /* ========================================================================== */
 
 typedef struct hcl_mod_t hcl_mod_t;
-typedef unsigned int hcl_bitmask_t;
+
 /* ========================================================================== */
 
 /**
@@ -1819,6 +1819,17 @@ HCL_EXPORT hcl_ooi_t hcl_logufmtv (
 #	define hcl_logoofmtv hcl_logbfmtv
 #endif
 
+HCL_EXPORT hcl_ooi_t hcl_prbfmt (
+	hcl_t*           hcl,
+	const hcl_bch_t* fmt,
+	...
+);
+
+HCL_EXPORT hcl_ooi_t hcl_prufmt (
+	hcl_t*           hcl,
+	const hcl_uch_t* fmt,
+	...
+);
 
 /* =========================================================================
  * OBJECT MANAGEMENT

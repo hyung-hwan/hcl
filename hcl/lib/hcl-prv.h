@@ -1094,26 +1094,24 @@ hcl_pfbase_t* hcl_querymod (
 );
 
 /* ========================================================================= */
-/* logfmt.c                                                                  */
+/* fmt.c                                                                  */
 /* ========================================================================= */
-int hcl_outfmtobj (
-	hcl_t*           hcl,
-	hcl_bitmask_t  mask,
-	hcl_oop_t        obj,
-	hcl_outbfmt_t    outbfmt
+int hcl_fmt_object_ (
+	hcl_fmtout_t* fmtout,
+	hcl_oop_t     oop
 );
 
-int hcl_printfmtst (
+int hcl_prfmtcallstack (
 	hcl_t*    hcl,
 	hcl_ooi_t nargs
 );
 
-int hcl_logfmtst (
+int hcl_logfmtcallstack (
 	hcl_t*    hcl,
 	hcl_ooi_t nargs
 );
 
-int hcl_sprintfmtst (
+int hcl_strfmtcallstack (
 	hcl_t*    hcl,
 	hcl_ooi_t nargs
 );

@@ -421,6 +421,8 @@ typedef struct hcl_bcs_t hcl_bcs_t;
 #	define HCL_SIZEOF_OOCH_T HCL_SIZEOF_BCH_T
 #endif
 
+typedef unsigned int hcl_bitmask_t;
+
 /* =========================================================================
  * BASIC OOP ENCODING
  * ========================================================================= */

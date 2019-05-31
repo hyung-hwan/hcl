@@ -113,12 +113,12 @@ static struct
 	{  12, { '#','<','S','E','M','A','P','H','O','R','E','>' } }
 };
 
-static HCL_INLINE int print_single_char (hcl_t* hcl, hcl_bitmask_t mask, hcl_ooch_t ch, hcl_outbfmt_t outbfmt)
+static HCL_INLINE int print_single_char (hcl_fmtout_t* fmtout, hcl_ooch_t ch)
 {
 	hcl_oochu_t chu = (hcl_oochu_t)ch;
 	if (chu == '\\' || chu == '\"')
 	{
-		if (outbfmt(hcl, mask, "\\%jc", chu) <= -1) return -1;
+		if (hcl_bfmt_out(fmtout, "\\%jc", chu) <= -1) return -1;
 	}
 #if defined(HCL_OOCH_IS_UCH)
 	else if (chu < ' ') 
@@ -164,7 +164,7 @@ static HCL_INLINE int print_single_char (hcl_t* hcl, hcl_bitmask_t mask, hcl_ooc
 		#if (HCL_SIZEOF_OOCH_T >= 4)
 			if (chu >= 0x10000u)
 			{
-				if (outbfmt(hcl, mask, "\\U%08X", chu) <= -1) return -1;
+				if (hcl_bfmt_out(fmtout, "\\U%08X", chu) <= -1) return -1;
 			}
 			else 
 		#endif
@@ -172,30 +172,31 @@ static HCL_INLINE int print_single_char (hcl_t* hcl, hcl_bitmask_t mask, hcl_ooc
 		#if (HCL_SIZEOF_OOCH_T >= 2)
 				if (chu >= 0x100u)
 				{
-					if (outbfmt(hcl, mask, "\\u%04X", chu) <= -1) return -1;
+					if (hcl_bfmt_out(fmtout, "\\u%04X", chu) <= -1) return -1;
 				}
 				else
 		#endif
 				{
-					if (outbfmt(hcl, mask, "\\x%02X", chu) <= -1) return -1;
+					if (hcl_bfmt_out(fmtout, "\\x%02X", chu) <= -1) return -1;
 				}
 			}
 		}
 		else
 		{
-			if (outbfmt(hcl, mask, "\\%jc", escaped) <= -1) return -1;
+			if (hcl_bfmt_out(fmtout, "\\%jc", escaped) <= -1) return -1;
 		}
 	}
 	else
 	{
-		if (outbfmt(hcl, mask, "%jc", ch) <= -1) return -1;
+		if (hcl_bfmt_out(fmtout, "%jc", ch) <= -1) return -1;
 	}
 
 	return 0;
 }
 
-static HCL_INLINE int outfmt_obj (hcl_t* hcl, hcl_bitmask_t mask, hcl_oop_t obj, hcl_outbfmt_t outbfmt)
+int hcl_fmt_object_ (hcl_fmtout_t* fmtout, hcl_oop_t obj)
 {
+	hcl_t* hcl = (hcl_t*)fmtout->ctx;
 	hcl_oop_t cur;
 	print_stack_t ps;
 	int brand;
@@ -226,29 +227,29 @@ static HCL_INLINE int outfmt_obj (hcl_t* hcl, hcl_bitmask_t mask, hcl_oop_t obj,
 		{ " ", ":" }  /* key value breaker */
 	};
 
-	json = !!(mask & HCL_LOG_PREFER_JSON);
+	json = !!(fmtout->mask & HCL_LOG_PREFER_JSON);
 
 next:
 	switch ((brand = HCL_BRANDOF(hcl, obj))) 
 	{
 		case HCL_BRAND_SMOOI:
-			if (outbfmt(hcl, mask, "%zd", HCL_OOP_TO_SMOOI(obj)) <= -1) return -1;
+			if (hcl_bfmt_out(fmtout, "%zd", HCL_OOP_TO_SMOOI(obj)) <= -1) return -1;
 			goto done;
 
 		case HCL_BRAND_SMPTR:
-			if (outbfmt(hcl, mask, "#p%zX", (hcl_oow_t)HCL_OOP_TO_SMPTR(obj)) <= -1) return -1;
+			if (hcl_bfmt_out(fmtout, "#p%zX", (hcl_oow_t)HCL_OOP_TO_SMPTR(obj)) <= -1) return -1;
 			goto done;
 
 		case HCL_BRAND_ERROR:
-			if (outbfmt(hcl, mask, "#e%zd", (hcl_ooi_t)HCL_OOP_TO_ERROR(obj)) <= -1) return -1;
+			if (hcl_bfmt_out(fmtout, "#e%zd", (hcl_ooi_t)HCL_OOP_TO_ERROR(obj)) <= -1) return -1;
 			goto done;
 
 		case HCL_BRAND_CHARACTER:
 		{
 			hcl_ooch_t ch = HCL_OOP_TO_CHAR(obj);
-			if (outbfmt(hcl, mask, "\'") <= -1 ||
-			    print_single_char(hcl, mask, ch, outbfmt) <= -1 ||
-			    outbfmt(hcl, mask, "\'") <= -1) return -1;
+			if (hcl_bfmt_out(fmtout, "\'") <= -1 ||
+			    print_single_char(fmtout, ch) <= -1 ||
+			    hcl_bfmt_out(fmtout, "\'") <= -1) return -1;
 			goto done;
 		}
 
@@ -276,7 +277,7 @@ next:
 			if (!tmp) return -1;
 
 			HCL_ASSERT (hcl, (hcl_oop_t)tmp == hcl->_nil); 
-			if (outbfmt(hcl, mask, "%.*js", hcl->inttostr.xbuf.len, hcl->inttostr.xbuf.ptr) <= -1) return -1;
+			if (hcl_bfmt_out(fmtout, "%.*js", hcl->inttostr.xbuf.len, hcl->inttostr.xbuf.ptr) <= -1) return -1;
 			break;
 		}
 
@@ -291,11 +292,11 @@ next:
 			{
 				if (scale == 0)
 				{
-					if (outbfmt(hcl, mask, "0.") <= -1) return -1;
+					if (hcl_bfmt_out(fmtout, "0.") <= -1) return -1;
 				}
 				else
 				{
-					if (outbfmt(hcl, mask, "0.%0*d", scale, 0) <= -1) return -1;
+					if (hcl_bfmt_out(fmtout, "0.%0*d", scale, 0) <= -1) return -1;
 				}
 			}
 			else 
@@ -313,13 +314,13 @@ next:
 				{
 					if (scale == len)
 					{
-						if (outbfmt(hcl, mask, "%.*js0.%.*js", 
+						if (hcl_bfmt_out(fmtout, "%.*js0.%.*js", 
 							adj, hcl->inttostr.xbuf.ptr,
 							len, &hcl->inttostr.xbuf.ptr[adj]) <= -1) return -1;
 					}
 					else
 					{
-						if (outbfmt(hcl, mask, "%.*js0.%0*d%.*js", 
+						if (hcl_bfmt_out(fmtout, "%.*js0.%0*d%.*js", 
 							adj, hcl->inttostr.xbuf.ptr,
 							scale - len, 0,
 							len, &hcl->inttostr.xbuf.ptr[adj]) <= -1) return -1;
@@ -329,7 +330,7 @@ next:
 				{
 					hcl_ooi_t ndigits;
 					ndigits = hcl->inttostr.xbuf.len - scale;
-					if (outbfmt(hcl, mask, "%.*js.%.*js", ndigits, hcl->inttostr.xbuf.ptr, scale, &hcl->inttostr.xbuf.ptr[ndigits]) <= -1) return -1;
+					if (hcl_bfmt_out(fmtout, "%.*js.%.*js", ndigits, hcl->inttostr.xbuf.ptr, scale, &hcl->inttostr.xbuf.ptr[ndigits]) <= -1) return -1;
 				}
 			}
 			break;
@@ -359,7 +360,7 @@ next:
 			/* Any needs for special action if SYNT(obj) is true?
 			 * I simply treat the syntax symbol as a normal symbol
 			 * for printing currently. */
-			if (outbfmt(hcl, mask, "%.*js", HCL_OBJ_GET_SIZE(obj), HCL_OBJ_GET_CHAR_SLOT(obj)) <= -1) return -1;
+			if (hcl_bfmt_out(fmtout, "%.*js", HCL_OBJ_GET_SIZE(obj), HCL_OBJ_GET_CHAR_SLOT(obj)) <= -1) return -1;
 			break;
 
 		case HCL_BRAND_STRING:
@@ -380,17 +381,17 @@ next:
 
 			if (escape)
 			{
-				if (outbfmt(hcl, mask, "\"") <= -1) return -1;
+				if (hcl_bfmt_out(fmtout, "\"") <= -1) return -1;
 				for (i = 0; i < HCL_OBJ_GET_SIZE(obj); i++)
 				{
 					ch = ((hcl_oop_char_t)obj)->slot[i];
-					if (print_single_char(hcl, mask, ch, outbfmt) <= -1) return -1;
+					if (print_single_char(fmtout, ch) <= -1) return -1;
 				}
-				if (outbfmt(hcl, mask, "\"") <= -1) return -1;
+				if (hcl_bfmt_out(fmtout, "\"") <= -1) return -1;
 			}
 			else
 			{
-				if (outbfmt(hcl, mask, "\"%.*js\"", HCL_OBJ_GET_SIZE(obj), HCL_OBJ_GET_CHAR_SLOT(obj)) <= -1) return -1;
+				if (hcl_bfmt_out(fmtout, "\"%.*js\"", HCL_OBJ_GET_SIZE(obj), HCL_OBJ_GET_CHAR_SLOT(obj)) <= -1) return -1;
 			}
 			break;
 		}
@@ -403,7 +404,7 @@ next:
 			 * request to output in the json format */
 
 			concode = HCL_OBJ_GET_FLAGS_SYNCODE(obj);
-			if (outbfmt(hcl, mask, opening_parens[concode][0]) <= -1) return -1;
+			if (hcl_bfmt_out(fmtout, opening_parens[concode][0]) <= -1) return -1;
 			cur = obj;
 
 			do
@@ -438,7 +439,7 @@ next:
 				if (!HCL_OOP_IS_POINTER(cur) || HCL_OBJ_GET_FLAGS_BRAND(cur) != HCL_BRAND_CONS) 
 				{
 					/* The CDR part does not point to a pair. */
-					if (outbfmt(hcl, mask, " . ") <= -1) return -1;
+					if (hcl_bfmt_out(fmtout, " . ") <= -1) return -1;
 
 					/* Push NIL so that the HCL_IS_NIL(hcl,p) test in 
 					 * the 'if' statement above breaks the loop
@@ -455,11 +456,11 @@ next:
 				}
 
 				/* The CDR part points to a pair. proceed to it */
-				if (outbfmt(hcl, mask, breakers[0][0]) <= -1) return -1;
+				if (hcl_bfmt_out(fmtout, breakers[0][0]) <= -1) return -1;
 			}
 			while (1);
 
-			if (outbfmt(hcl, mask, closing_parens[concode][0]) <= -1) return -1;
+			if (hcl_bfmt_out(fmtout, closing_parens[concode][0]) <= -1) return -1;
 			break;
 		}
 
@@ -467,11 +468,11 @@ next:
 		{
 			hcl_oow_t arridx;
 
-			if (outbfmt(hcl, mask, opening_parens[HCL_CONCODE_ARRAY][json]) <= -1) return -1;
+			if (hcl_bfmt_out(fmtout, opening_parens[HCL_CONCODE_ARRAY][json]) <= -1) return -1;
 
 			if (HCL_OBJ_GET_SIZE(obj) <= 0) 
 			{
-				if (outbfmt(hcl, mask, closing_parens[HCL_CONCODE_ARRAY][json]) <= -1) return -1;
+				if (hcl_bfmt_out(fmtout, closing_parens[HCL_CONCODE_ARRAY][json]) <= -1) return -1;
 				break;
 			}
 			arridx = 0;
@@ -499,7 +500,7 @@ next:
 				obj = ((hcl_oop_oop_t)obj)->slot[arridx];
 				if (arridx > 0) 
 				{
-					if (outbfmt(hcl, mask, breakers[0][json]) <= -1) return -1;
+					if (hcl_bfmt_out(fmtout, breakers[0][json]) <= -1) return -1;
 				}
 				/* Jump to the 'next' label so that the object 
 				 * pointed to by 'obj' is printed. Once it 
@@ -519,16 +520,16 @@ next:
 		case HCL_BRAND_BYTE_ARRAY:
 		{
 			hcl_oow_t i;
-			if (outbfmt(hcl, mask, opening_parens[HCL_CONCODE_BYTEARRAY][json]) <= -1) return -1;
+			if (hcl_bfmt_out(fmtout, opening_parens[HCL_CONCODE_BYTEARRAY][json]) <= -1) return -1;
 			if (HCL_OBJ_GET_SIZE(obj) > 0)
 			{
-				if (outbfmt(hcl, mask, "%d", ((hcl_oop_byte_t)obj)->slot[0]) <= -1) return -1;
+				if (hcl_bfmt_out(fmtout, "%d", ((hcl_oop_byte_t)obj)->slot[0]) <= -1) return -1;
 				for (i = 1; i < HCL_OBJ_GET_SIZE(obj); i++)
 				{
-					if (outbfmt(hcl, mask, "%hs%d", breakers[0][json], ((hcl_oop_byte_t)obj)->slot[i]) <= -1) return -1;
+					if (hcl_bfmt_out(fmtout, "%hs%d", breakers[0][json], ((hcl_oop_byte_t)obj)->slot[i]) <= -1) return -1;
 				}
 			}
-			if (outbfmt(hcl, mask, closing_parens[HCL_CONCODE_BYTEARRAY][json]) <= -1) return -1;
+			if (hcl_bfmt_out(fmtout, closing_parens[HCL_CONCODE_BYTEARRAY][json]) <= -1) return -1;
 			break;
 		}
 
@@ -537,13 +538,13 @@ next:
 			hcl_oow_t bucidx, bucsize, buctally;
 			hcl_oop_dic_t dic;
 
-			if (outbfmt(hcl, mask, opening_parens[HCL_CONCODE_DIC][json]) <= -1) return -1;
+			if (hcl_bfmt_out(fmtout, opening_parens[HCL_CONCODE_DIC][json]) <= -1) return -1;
 
 			dic = (hcl_oop_dic_t)obj;
 			HCL_ASSERT (hcl, HCL_OOP_IS_SMOOI(dic->tally));
 			if (HCL_OOP_TO_SMOOI(dic->tally) <= 0) 
 			{
-				if (outbfmt(hcl, mask, closing_parens[HCL_CONCODE_DIC][json]) <= -1) return -1;
+				if (hcl_bfmt_out(fmtout, closing_parens[HCL_CONCODE_DIC][json]) <= -1) return -1;
 				break;
 			}
 			bucidx = 0;
@@ -569,7 +570,7 @@ next:
 					if (bucidx >= bucsize)
 					{
 						/* done. scanned the entire bucket */
-						if (outbfmt(hcl, mask, closing_parens[HCL_CONCODE_DIC][json]) <= -1) return -1;
+						if (hcl_bfmt_out(fmtout, closing_parens[HCL_CONCODE_DIC][json]) <= -1) return -1;
 						break;
 					}
 
@@ -610,7 +611,7 @@ next:
 
 				if (buctally > 0) 
 				{
-					if (outbfmt(hcl, mask, breakers[buctally & 1][json]) <= -1) return -1;
+					if (hcl_bfmt_out(fmtout, breakers[buctally & 1][json]) <= -1) return -1;
 				}
 				
 				/* Jump to the 'next' label so that the object 
@@ -636,15 +637,15 @@ next:
 		{
 			hcl_oow_t i;
 
-			if (outbfmt(hcl, mask, "|") <= -1) return -1;
+			if (hcl_bfmt_out(fmtout, "|") <= -1) return -1;
 
 			for (i = 0; i < HCL_OBJ_GET_SIZE(obj); i++)
 			{
 				hcl_oop_t s;
 				s = ((hcl_oop_oop_t)obj)->slot[i];
-				if (outbfmt(hcl, mask, " %.*js", HCL_OBJ_GET_SIZE(s), HCL_OBJ_GET_CHAR_SLOT(s)) <= -1) return -1;
+				if (hcl_bfmt_out(fmtout, " %.*js", HCL_OBJ_GET_SIZE(s), HCL_OBJ_GET_CHAR_SLOT(s)) <= -1) return -1;
 			}
-			if (outbfmt(hcl, mask, " |") <= -1) return -1;
+			if (hcl_bfmt_out(fmtout, " |") <= -1) return -1;
 			break;
 		}
 
@@ -679,7 +680,7 @@ next:
 			return -1;
 
 		print_word:
-			if (outbfmt(hcl, mask, "%.*js", word[word_index].len, word[word_index].ptr) <= -1) return -1;
+			if (hcl_bfmt_out(fmtout, "%.*js", word[word_index].len, word[word_index].ptr) <= -1) return -1;
 			break;
 	}
 
@@ -697,14 +698,14 @@ done:
 				goto resume_array;
 
 			case PRINT_STACK_ARRAY_END:
-				if (outbfmt(hcl, mask, closing_parens[HCL_CONCODE_ARRAY][json]) <= -1) return -1;
+				if (hcl_bfmt_out(fmtout, closing_parens[HCL_CONCODE_ARRAY][json]) <= -1) return -1;
 				break;
 
 			case PRINT_STACK_DIC:
 				goto resume_dic;
 
 			case PRINT_STACK_DIC_END:
-				if (outbfmt(hcl, mask, closing_parens[HCL_CONCODE_DIC][json]) <= -1) return -1;
+				if (hcl_bfmt_out(fmtout, closing_parens[HCL_CONCODE_DIC][json]) <= -1) return -1;
 				break;
 
 			default:
@@ -716,6 +717,7 @@ done:
 	return 0;
 }
 
+#if 0
 int hcl_outfmtobj (hcl_t* hcl, hcl_bitmask_t mask, hcl_oop_t obj, hcl_outbfmt_t outbfmt)
 {
 	int n;
@@ -724,7 +726,7 @@ int hcl_outfmtobj (hcl_t* hcl, hcl_bitmask_t mask, hcl_oop_t obj, hcl_outbfmt_t 
 	HCL_ASSERT (hcl, hcl->p.s.size == 0); 
 
 	hcl->p.e = obj; /* remember the head of the object to print */
-	n = outfmt_obj(hcl, mask, obj, outbfmt);
+	n = hcl_proutbfmt(hcl, mask, obj);
 	hcl->p.e = hcl->_nil; /* reset what's remembered */
 
 	/* clear the printing stack if an error has occurred for GC not to keep
@@ -736,9 +738,11 @@ int hcl_outfmtobj (hcl_t* hcl, hcl_bitmask_t mask, hcl_oop_t obj, hcl_outbfmt_t 
 
 	return n;
 }
+#endif
 
 int hcl_print (hcl_t* hcl, hcl_oop_t obj)
 {
 	HCL_ASSERT (hcl, hcl->c->printer != HCL_NULL);
-	return hcl_outfmtobj (hcl, HCL_LOG_APP | HCL_LOG_FATAL, obj, hcl_proutbfmt);
+	/*return hcl_outfmtobj(hcl, HCL_LOG_APP | HCL_LOG_FATAL, obj);*/
+	return hcl_prbfmt(hcl, "%O", obj);
 }

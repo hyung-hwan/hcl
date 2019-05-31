@@ -28,6 +28,7 @@
 #define _HCL_UTL_H_
 
 #include "hcl-cmn.h"
+#include <stdarg.h>
 
 /* =========================================================================
  * DOUBLY LINKED LIST
@@ -286,6 +287,51 @@
 #define HCL_HASH_UCSTR(hv, ptr) HCL_HASH_VPTR(hv, ptr, const hcl_uch_t)
 #define HCL_HASH_MORE_UCSTR(hv, ptr) HCL_HASH_MORE_VPTR(hv, ptr, const hcl_uch_t)
 
+
+
+/* =========================================================================
+ * FORMATTED OUTPUT
+ * ========================================================================= */
+typedef struct hcl_fmtout_t hcl_fmtout_t;
+
+typedef int (*hcl_fmtout_putbcs_t) (
+	hcl_fmtout_t*     fmtout,
+	const hcl_bch_t*  ptr,
+	hcl_oow_t         len
+);
+
+typedef int (*hcl_fmtout_putucs_t) (
+	hcl_fmtout_t*     fmtout,
+	const hcl_uch_t*  ptr,
+	hcl_oow_t         len
+);
+
+typedef int (*hcl_fmtout_putobj_t) (
+	hcl_fmtout_t*     fmtout,
+	hcl_oop_t         obj
+);
+
+enum hcl_fmtout_fmt_type_t 
+{
+	HCL_FMTOUT_FMT_TYPE_BCH = 0,
+	HCL_FMTOUT_FMT_TYPE_UCH
+};
+typedef enum hcl_fmtout_fmt_type_t hcl_fmtout_fmt_type_t;
+
+
+struct hcl_fmtout_t
+{
+	hcl_oow_t             count; /* out */
+
+	hcl_fmtout_putbcs_t   putbcs; /* in */
+	hcl_fmtout_putucs_t   putucs; /* in */
+	hcl_fmtout_putobj_t   putobj; /* in - %O is not handled if it's not set. */
+	hcl_bitmask_t         mask;   /* in */
+	void*                 ctx;    /* in */
+
+	hcl_fmtout_fmt_type_t fmt_type;
+	const void*           fmt_str;
+};
 
 
 #if defined(__cplusplus)
@@ -684,6 +730,33 @@ HCL_EXPORT int hcl_ucwidth (
 	hcl_uch_t uc
 );
 
+/* =========================================================================
+ * FORMATTED OUTPUT
+ * ========================================================================= */
+HCL_EXPORT int hcl_bfmt_outv (
+	hcl_fmtout_t*    fmtout,
+	const hcl_bch_t* fmt,
+	va_list          ap
+);
+
+HCL_EXPORT int hcl_ufmt_outv (
+	hcl_fmtout_t*    fmtout,
+	const hcl_uch_t* fmt,
+	va_list          ap
+);
+
+
+HCL_EXPORT int hcl_bfmt_out (
+	hcl_fmtout_t*    fmtout,
+	const hcl_bch_t* fmt,
+	...
+);
+
+HCL_EXPORT int hcl_ufmt_out (
+	hcl_fmtout_t*    fmtout,
+	const hcl_uch_t* fmt,
+	...
+);
 
 /* =========================================================================
  * BIT SWAP

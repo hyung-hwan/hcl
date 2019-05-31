@@ -98,7 +98,7 @@ host_triplet = @host@
 @ENABLE_STATIC_MODULE_TRUE@	$(abs_builddir)/../mod/libhcl-dic.la \
 @ENABLE_STATIC_MODULE_TRUE@	$(abs_builddir)/../mod/libhcl-str.la \
 @ENABLE_STATIC_MODULE_TRUE@	$(abs_builddir)/../mod/libhcl-sys.la
-@ENABLE_HCLEX_TRUE@am__append_8 = libhclex.la
+@ENABLE_HCLEX_TRUE@am__append_8 = libhclx.la
 @ENABLE_HCLEX_TRUE@am__append_9 = hcl-c.h hcl-s.h hcl-tmr.h hcl-xutl.h hcl-json.h
 subdir = lib
 ACLOCAL_M4 = $(top_srcdir)/aclocal.m4
@@ -154,8 +154,8 @@ am__DEPENDENCIES_5 = $(am__DEPENDENCIES_1) $(am__DEPENDENCIES_2) \
 	$(am__DEPENDENCIES_3) $(am__DEPENDENCIES_4)
 am_libhcl_la_OBJECTS = libhcl_la-bigint.lo libhcl_la-comp.lo \
 	libhcl_la-debug.lo libhcl_la-decode.lo libhcl_la-dic.lo \
-	libhcl_la-err.lo libhcl_la-exec.lo libhcl_la-gc.lo \
-	libhcl_la-hcl.lo libhcl_la-heap.lo libhcl_la-logfmt.lo \
+	libhcl_la-err.lo libhcl_la-exec.lo libhcl_la-fmt.lo \
+	libhcl_la-gc.lo libhcl_la-hcl.lo libhcl_la-heap.lo \
 	libhcl_la-number.lo libhcl_la-obj.lo libhcl_la-opt.lo \
 	libhcl_la-prim.lo libhcl_la-print.lo libhcl_la-rbt.lo \
 	libhcl_la-read.lo libhcl_la-sym.lo libhcl_la-utf8.lo \
@@ -168,18 +168,18 @@ am__v_lt_1 =
 libhcl_la_LINK = $(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) \
 	$(LIBTOOLFLAGS) --mode=link $(CCLD) $(AM_CFLAGS) $(CFLAGS) \
 	$(libhcl_la_LDFLAGS) $(LDFLAGS) -o $@
-am__libhclex_la_SOURCES_DIST = tmr.c hcl-tmr.h xutl.c xutl-sa.h \
+am__libhclx_la_SOURCES_DIST = tmr.c hcl-tmr.h xutl.c xutl-sa.h \
 	hcl-xutl.h json.c hcl-json.h cb-impl.h cb-impl.c hcl-s.c \
 	hcl-s.h hcl-c.c hcl-c.h
-@ENABLE_HCLEX_TRUE@am_libhclex_la_OBJECTS = libhclex_la-tmr.lo \
-@ENABLE_HCLEX_TRUE@	libhclex_la-xutl.lo libhclex_la-json.lo \
-@ENABLE_HCLEX_TRUE@	libhclex_la-cb-impl.lo libhclex_la-hcl-s.lo \
-@ENABLE_HCLEX_TRUE@	libhclex_la-hcl-c.lo
-libhclex_la_OBJECTS = $(am_libhclex_la_OBJECTS)
-libhclex_la_LINK = $(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) \
+@ENABLE_HCLEX_TRUE@am_libhclx_la_OBJECTS = libhclx_la-tmr.lo \
+@ENABLE_HCLEX_TRUE@	libhclx_la-xutl.lo libhclx_la-json.lo \
+@ENABLE_HCLEX_TRUE@	libhclx_la-cb-impl.lo libhclx_la-hcl-s.lo \
+@ENABLE_HCLEX_TRUE@	libhclx_la-hcl-c.lo
+libhclx_la_OBJECTS = $(am_libhclx_la_OBJECTS)
+libhclx_la_LINK = $(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) \
 	$(LIBTOOLFLAGS) --mode=link $(CCLD) $(AM_CFLAGS) $(CFLAGS) \
-	$(libhclex_la_LDFLAGS) $(LDFLAGS) -o $@
-@ENABLE_HCLEX_TRUE@am_libhclex_la_rpath = -rpath $(pkglibdir)
+	$(libhclx_la_LDFLAGS) $(LDFLAGS) -o $@
+@ENABLE_HCLEX_TRUE@am_libhclx_la_rpath = -rpath $(pkglibdir)
 AM_V_P = $(am__v_P_@AM_V@)
 am__v_P_ = $(am__v_P_@AM_DEFAULT_V@)
 am__v_P_0 = false
@@ -214,8 +214,8 @@ AM_V_CCLD = $(am__v_CCLD_@AM_V@)
 am__v_CCLD_ = $(am__v_CCLD_@AM_DEFAULT_V@)
 am__v_CCLD_0 = @echo "  CCLD    " $@;
 am__v_CCLD_1 = 
-SOURCES = $(libhcl_la_SOURCES) $(libhclex_la_SOURCES)
-DIST_SOURCES = $(libhcl_la_SOURCES) $(am__libhclex_la_SOURCES_DIST)
+SOURCES = $(libhcl_la_SOURCES) $(libhclx_la_SOURCES)
+DIST_SOURCES = $(libhcl_la_SOURCES) $(am__libhclx_la_SOURCES_DIST)
 am__can_run_installinfo = \
   case $$AM_UPDATE_INFO_DIR in \
     n|no|NO) false;; \
@@ -444,11 +444,10 @@ libhcl_la_SOURCES = \
 	dic.c \
 	err.c \
 	exec.c \
+	fmt.c \
 	gc.c \
 	hcl.c \
 	heap.c \
-	logfmtv.h \
-	logfmt.c \
 	number.c \
 	obj.c \
 	opt-impl.h \
@@ -465,7 +464,7 @@ libhcl_la_CPPFLAGS = $(CPPFLAGS_LIB_COMMON)
 libhcl_la_LDFLAGS = $(LDFLAGS_LIB_COMMON)
 libhcl_la_LIBADD = $(LIBADD_LIB_COMMON) $(am__append_6)
 libhcl_la_DEPENDENCIES = $(am__append_7)
-@ENABLE_HCLEX_TRUE@libhclex_la_SOURCES = \
+@ENABLE_HCLEX_TRUE@libhclx_la_SOURCES = \
 @ENABLE_HCLEX_TRUE@	tmr.c hcl-tmr.h \
 @ENABLE_HCLEX_TRUE@	xutl.c xutl-sa.h hcl-xutl.h \
 @ENABLE_HCLEX_TRUE@	json.c hcl-json.h \
@@ -473,10 +472,10 @@ libhcl_la_DEPENDENCIES = $(am__append_7)
 @ENABLE_HCLEX_TRUE@	hcl-s.c hcl-s.h \
 @ENABLE_HCLEX_TRUE@	hcl-c.c hcl-c.h
 
-@ENABLE_HCLEX_TRUE@libhclex_la_CPPFLAGS = $(CPPFLAGS_LIB_COMMON) $(CPPFLAGS_PFMOD)
-@ENABLE_HCLEX_TRUE@libhclex_la_LDFLAGS = $(LDFLAGS_LIB_COMMON)
-@ENABLE_HCLEX_TRUE@libhclex_la_LIBADD = $(LIBADD_LIB_COMMON) $(PTHREAD_LIBS) -lhcl
-@ENABLE_HCLEX_TRUE@libhclex_la_DEPENDENCIES = libhcl.la
+@ENABLE_HCLEX_TRUE@libhclx_la_CPPFLAGS = $(CPPFLAGS_LIB_COMMON) $(CPPFLAGS_PFMOD)
+@ENABLE_HCLEX_TRUE@libhclx_la_LDFLAGS = $(LDFLAGS_LIB_COMMON)
+@ENABLE_HCLEX_TRUE@libhclx_la_LIBADD = $(LIBADD_LIB_COMMON) $(PTHREAD_LIBS) -lhcl
+@ENABLE_HCLEX_TRUE@libhclx_la_DEPENDENCIES = libhcl.la
 all: hcl-cfg.h
 	$(MAKE) $(AM_MAKEFLAGS) all-am
 
@@ -565,8 +564,8 @@ clean-pkglibLTLIBRARIES:
 libhcl.la: $(libhcl_la_OBJECTS) $(libhcl_la_DEPENDENCIES) $(EXTRA_libhcl_la_DEPENDENCIES) 
 	$(AM_V_CCLD)$(libhcl_la_LINK) -rpath $(pkglibdir) $(libhcl_la_OBJECTS) $(libhcl_la_LIBADD) $(LIBS)
 
-libhclex.la: $(libhclex_la_OBJECTS) $(libhclex_la_DEPENDENCIES) $(EXTRA_libhclex_la_DEPENDENCIES) 
-	$(AM_V_CCLD)$(libhclex_la_LINK) $(am_libhclex_la_rpath) $(libhclex_la_OBJECTS) $(libhclex_la_LIBADD) $(LIBS)
+libhclx.la: $(libhclx_la_OBJECTS) $(libhclx_la_DEPENDENCIES) $(EXTRA_libhclx_la_DEPENDENCIES) 
+	$(AM_V_CCLD)$(libhclx_la_LINK) $(am_libhclx_la_rpath) $(libhclx_la_OBJECTS) $(libhclx_la_LIBADD) $(LIBS)
 
 mostlyclean-compile:
 	-rm -f *.$(OBJEXT)
@@ -581,10 +580,10 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libhcl_la-dic.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libhcl_la-err.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libhcl_la-exec.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libhcl_la-fmt.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libhcl_la-gc.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libhcl_la-hcl.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libhcl_la-heap.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libhcl_la-logfmt.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libhcl_la-number.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libhcl_la-obj.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libhcl_la-opt.Plo@am__quote@
@@ -595,12 +594,12 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libhcl_la-sym.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libhcl_la-utf8.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libhcl_la-utl.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libhclex_la-cb-impl.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libhclex_la-hcl-c.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libhclex_la-hcl-s.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libhclex_la-json.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libhclex_la-tmr.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libhclex_la-xutl.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libhclx_la-cb-impl.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libhclx_la-hcl-c.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libhclx_la-hcl-s.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libhclx_la-json.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libhclx_la-tmr.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libhclx_la-xutl.Plo@am__quote@
 
 .c.o:
 @am__fastdepCC_TRUE@	$(AM_V_CC)depbase=`echo $@ | sed 's|[^/]*$$|$(DEPDIR)/&|;s|\.o$$||'`;\
@@ -675,6 +674,13 @@ libhcl_la-exec.lo: exec.c
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libhcl_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o libhcl_la-exec.lo `test -f 'exec.c' || echo '$(srcdir)/'`exec.c
 
+libhcl_la-fmt.lo: fmt.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libhcl_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT libhcl_la-fmt.lo -MD -MP -MF $(DEPDIR)/libhcl_la-fmt.Tpo -c -o libhcl_la-fmt.lo `test -f 'fmt.c' || echo '$(srcdir)/'`fmt.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/libhcl_la-fmt.Tpo $(DEPDIR)/libhcl_la-fmt.Plo
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='fmt.c' object='libhcl_la-fmt.lo' libtool=yes @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libhcl_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o libhcl_la-fmt.lo `test -f 'fmt.c' || echo '$(srcdir)/'`fmt.c
+
 libhcl_la-gc.lo: gc.c
 @am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libhcl_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT libhcl_la-gc.lo -MD -MP -MF $(DEPDIR)/libhcl_la-gc.Tpo -c -o libhcl_la-gc.lo `test -f 'gc.c' || echo '$(srcdir)/'`gc.c
 @am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/libhcl_la-gc.Tpo $(DEPDIR)/libhcl_la-gc.Plo
@@ -695,13 +701,6 @@ libhcl_la-heap.lo: heap.c
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='heap.c' object='libhcl_la-heap.lo' libtool=yes @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libhcl_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o libhcl_la-heap.lo `test -f 'heap.c' || echo '$(srcdir)/'`heap.c
-
-libhcl_la-logfmt.lo: logfmt.c
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libhcl_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT libhcl_la-logfmt.lo -MD -MP -MF $(DEPDIR)/libhcl_la-logfmt.Tpo -c -o libhcl_la-logfmt.lo `test -f 'logfmt.c' || echo '$(srcdir)/'`logfmt.c
-@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/libhcl_la-logfmt.Tpo $(DEPDIR)/libhcl_la-logfmt.Plo
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='logfmt.c' object='libhcl_la-logfmt.lo' libtool=yes @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libhcl_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o libhcl_la-logfmt.lo `test -f 'logfmt.c' || echo '$(srcdir)/'`logfmt.c
 
 libhcl_la-number.lo: number.c
 @am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libhcl_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT libhcl_la-number.lo -MD -MP -MF $(DEPDIR)/libhcl_la-number.Tpo -c -o libhcl_la-number.lo `test -f 'number.c' || echo '$(srcdir)/'`number.c
@@ -773,47 +772,47 @@ libhcl_la-utl.lo: utl.c
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libhcl_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o libhcl_la-utl.lo `test -f 'utl.c' || echo '$(srcdir)/'`utl.c
 
-libhclex_la-tmr.lo: tmr.c
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libhclex_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT libhclex_la-tmr.lo -MD -MP -MF $(DEPDIR)/libhclex_la-tmr.Tpo -c -o libhclex_la-tmr.lo `test -f 'tmr.c' || echo '$(srcdir)/'`tmr.c
-@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/libhclex_la-tmr.Tpo $(DEPDIR)/libhclex_la-tmr.Plo
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='tmr.c' object='libhclex_la-tmr.lo' libtool=yes @AMDEPBACKSLASH@
+libhclx_la-tmr.lo: tmr.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libhclx_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT libhclx_la-tmr.lo -MD -MP -MF $(DEPDIR)/libhclx_la-tmr.Tpo -c -o libhclx_la-tmr.lo `test -f 'tmr.c' || echo '$(srcdir)/'`tmr.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/libhclx_la-tmr.Tpo $(DEPDIR)/libhclx_la-tmr.Plo
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='tmr.c' object='libhclx_la-tmr.lo' libtool=yes @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libhclex_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o libhclex_la-tmr.lo `test -f 'tmr.c' || echo '$(srcdir)/'`tmr.c
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libhclx_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o libhclx_la-tmr.lo `test -f 'tmr.c' || echo '$(srcdir)/'`tmr.c
 
-libhclex_la-xutl.lo: xutl.c
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libhclex_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT libhclex_la-xutl.lo -MD -MP -MF $(DEPDIR)/libhclex_la-xutl.Tpo -c -o libhclex_la-xutl.lo `test -f 'xutl.c' || echo '$(srcdir)/'`xutl.c
-@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/libhclex_la-xutl.Tpo $(DEPDIR)/libhclex_la-xutl.Plo
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='xutl.c' object='libhclex_la-xutl.lo' libtool=yes @AMDEPBACKSLASH@
+libhclx_la-xutl.lo: xutl.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libhclx_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT libhclx_la-xutl.lo -MD -MP -MF $(DEPDIR)/libhclx_la-xutl.Tpo -c -o libhclx_la-xutl.lo `test -f 'xutl.c' || echo '$(srcdir)/'`xutl.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/libhclx_la-xutl.Tpo $(DEPDIR)/libhclx_la-xutl.Plo
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='xutl.c' object='libhclx_la-xutl.lo' libtool=yes @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libhclex_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o libhclex_la-xutl.lo `test -f 'xutl.c' || echo '$(srcdir)/'`xutl.c
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libhclx_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o libhclx_la-xutl.lo `test -f 'xutl.c' || echo '$(srcdir)/'`xutl.c
 
-libhclex_la-json.lo: json.c
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libhclex_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT libhclex_la-json.lo -MD -MP -MF $(DEPDIR)/libhclex_la-json.Tpo -c -o libhclex_la-json.lo `test -f 'json.c' || echo '$(srcdir)/'`json.c
-@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/libhclex_la-json.Tpo $(DEPDIR)/libhclex_la-json.Plo
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='json.c' object='libhclex_la-json.lo' libtool=yes @AMDEPBACKSLASH@
+libhclx_la-json.lo: json.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libhclx_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT libhclx_la-json.lo -MD -MP -MF $(DEPDIR)/libhclx_la-json.Tpo -c -o libhclx_la-json.lo `test -f 'json.c' || echo '$(srcdir)/'`json.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/libhclx_la-json.Tpo $(DEPDIR)/libhclx_la-json.Plo
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='json.c' object='libhclx_la-json.lo' libtool=yes @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libhclex_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o libhclex_la-json.lo `test -f 'json.c' || echo '$(srcdir)/'`json.c
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libhclx_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o libhclx_la-json.lo `test -f 'json.c' || echo '$(srcdir)/'`json.c
 
-libhclex_la-cb-impl.lo: cb-impl.c
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libhclex_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT libhclex_la-cb-impl.lo -MD -MP -MF $(DEPDIR)/libhclex_la-cb-impl.Tpo -c -o libhclex_la-cb-impl.lo `test -f 'cb-impl.c' || echo '$(srcdir)/'`cb-impl.c
-@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/libhclex_la-cb-impl.Tpo $(DEPDIR)/libhclex_la-cb-impl.Plo
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='cb-impl.c' object='libhclex_la-cb-impl.lo' libtool=yes @AMDEPBACKSLASH@
+libhclx_la-cb-impl.lo: cb-impl.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libhclx_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT libhclx_la-cb-impl.lo -MD -MP -MF $(DEPDIR)/libhclx_la-cb-impl.Tpo -c -o libhclx_la-cb-impl.lo `test -f 'cb-impl.c' || echo '$(srcdir)/'`cb-impl.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/libhclx_la-cb-impl.Tpo $(DEPDIR)/libhclx_la-cb-impl.Plo
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='cb-impl.c' object='libhclx_la-cb-impl.lo' libtool=yes @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libhclex_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o libhclex_la-cb-impl.lo `test -f 'cb-impl.c' || echo '$(srcdir)/'`cb-impl.c
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libhclx_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o libhclx_la-cb-impl.lo `test -f 'cb-impl.c' || echo '$(srcdir)/'`cb-impl.c
 
-libhclex_la-hcl-s.lo: hcl-s.c
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libhclex_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT libhclex_la-hcl-s.lo -MD -MP -MF $(DEPDIR)/libhclex_la-hcl-s.Tpo -c -o libhclex_la-hcl-s.lo `test -f 'hcl-s.c' || echo '$(srcdir)/'`hcl-s.c
-@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/libhclex_la-hcl-s.Tpo $(DEPDIR)/libhclex_la-hcl-s.Plo
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='hcl-s.c' object='libhclex_la-hcl-s.lo' libtool=yes @AMDEPBACKSLASH@
+libhclx_la-hcl-s.lo: hcl-s.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libhclx_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT libhclx_la-hcl-s.lo -MD -MP -MF $(DEPDIR)/libhclx_la-hcl-s.Tpo -c -o libhclx_la-hcl-s.lo `test -f 'hcl-s.c' || echo '$(srcdir)/'`hcl-s.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/libhclx_la-hcl-s.Tpo $(DEPDIR)/libhclx_la-hcl-s.Plo
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='hcl-s.c' object='libhclx_la-hcl-s.lo' libtool=yes @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libhclex_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o libhclex_la-hcl-s.lo `test -f 'hcl-s.c' || echo '$(srcdir)/'`hcl-s.c
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libhclx_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o libhclx_la-hcl-s.lo `test -f 'hcl-s.c' || echo '$(srcdir)/'`hcl-s.c
 
-libhclex_la-hcl-c.lo: hcl-c.c
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libhclex_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT libhclex_la-hcl-c.lo -MD -MP -MF $(DEPDIR)/libhclex_la-hcl-c.Tpo -c -o libhclex_la-hcl-c.lo `test -f 'hcl-c.c' || echo '$(srcdir)/'`hcl-c.c
-@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/libhclex_la-hcl-c.Tpo $(DEPDIR)/libhclex_la-hcl-c.Plo
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='hcl-c.c' object='libhclex_la-hcl-c.lo' libtool=yes @AMDEPBACKSLASH@
+libhclx_la-hcl-c.lo: hcl-c.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libhclx_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT libhclx_la-hcl-c.lo -MD -MP -MF $(DEPDIR)/libhclx_la-hcl-c.Tpo -c -o libhclx_la-hcl-c.lo `test -f 'hcl-c.c' || echo '$(srcdir)/'`hcl-c.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/libhclx_la-hcl-c.Tpo $(DEPDIR)/libhclx_la-hcl-c.Plo
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='hcl-c.c' object='libhclx_la-hcl-c.lo' libtool=yes @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libhclex_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o libhclex_la-hcl-c.lo `test -f 'hcl-c.c' || echo '$(srcdir)/'`hcl-c.c
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libhclx_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o libhclx_la-hcl-c.lo `test -f 'hcl-c.c' || echo '$(srcdir)/'`hcl-c.c
 
 mostlyclean-libtool:
 	-rm -f *.lo

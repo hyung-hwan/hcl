@@ -1290,7 +1290,7 @@ static void show_server_workers (hcl_server_proto_t* proto)
 	for (w = server->worker_list[HCL_SERVER_WORKER_STATE_ALIVE].head; w; w = w->next_worker)
 	{
 		/* TODO: implement this better... */
-		hcl_proutbfmt (proto->hcl, 0, "%zu %d %d\n", w->wid, w->sck, 1000);
+		hcl_prbfmt (proto->hcl, "%zu %d %d\n", w->wid, w->sck, 1000);
 	}
 	pthread_mutex_unlock (&server->worker_mutex);
 }

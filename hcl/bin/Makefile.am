@@ -32,27 +32,27 @@ hcl_DEPENDENCIES = ../lib/libhcl.la
 
 if ENABLE_HCLEX
 
-## cb-impl.c is included in libhclex.
+## cb-impl.c is included in libhclx.
 ## so ../lib/cb-impl.h and ../lib/cb-impl.c are not listed as sources
 
 bin_PROGRAMS += hcls
 hcls_SOURCES = main-s.c
 hcls_CPPFLAGS = $(CPPFLAGS_ALL_COMMON)
 hcls_LDFLAGS = $(LDFLAGS_ALL_COMMON)
-hcls_LDADD = $(LIBADD_LIB_COMMON) $(PTHREAD_LIBS) -lhcl -lhclex
-hcls_DEPENDENCIES = ../lib/libhclex.la
+hcls_LDADD = $(LIBADD_LIB_COMMON) $(PTHREAD_LIBS) -lhclx
+hcls_DEPENDENCIES = ../lib/libhclx.la
 
 bin_PROGRAMS += hclc
 hclc_SOURCES = main-c.c
 hclc_CPPFLAGS = $(CPPFLAGS_ALL_COMMON)
 hclc_LDFLAGS = $(LDFLAGS_ALL_COMMON)
-hclc_LDADD = $(LIBADD_LIB_COMMON) $(PTHREAD_LIBS) -lhcl -lhclex
-hclc_DEPENDENCIES = ../lib/libhclex.la
+hclc_LDADD = $(LIBADD_LIB_COMMON) $(PTHREAD_LIBS) -lhclx
+hclc_DEPENDENCIES = ../lib/libhclx.la
 
 bin_PROGRAMS += hclj
 hclj_SOURCES = main-j.c
 hclj_CPPFLAGS = $(CPPFLAGS_ALL_COMMON)
 hclj_LDFLAGS = $(LDFLAGS_ALL_COMMON)
-hclj_LDADD = $(LIBADD_LIB_COMMON) $(PTHREAD_LIBS) -lhcl -lhclex
-hclj_DEPENDENCIES = ../lib/libhclex.la
+hclj_LDADD = $(LIBADD_LIB_COMMON) $(PTHREAD_LIBS) -lhclx
+hclj_DEPENDENCIES = ../lib/libhclx.la
 endif
