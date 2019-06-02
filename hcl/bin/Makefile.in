@@ -91,7 +91,7 @@ host_triplet = @host@
 @ENABLE_LIBLTDL_TRUE@am__append_1 = $(LTDL_LIBS)
 @ENABLE_LIBLTDL_FALSE@am__append_2 = $(DL_LIBS)
 bin_PROGRAMS = hcl$(EXEEXT) $(am__EXEEXT_1)
-@ENABLE_HCLEX_TRUE@am__append_3 = hcls hclc hclj
+@ENABLE_HCLX_TRUE@am__append_3 = hcls hclc hclj
 subdir = bin
 ACLOCAL_M4 = $(top_srcdir)/aclocal.m4
 am__aclocal_m4_deps = $(top_srcdir)/m4/ax_check_sign.m4 \
@@ -107,8 +107,8 @@ mkinstalldirs = $(install_sh) -d
 CONFIG_HEADER = $(top_builddir)/lib/hcl-cfg.h
 CONFIG_CLEAN_FILES =
 CONFIG_CLEAN_VPATH_FILES =
-@ENABLE_HCLEX_TRUE@am__EXEEXT_1 = hcls$(EXEEXT) hclc$(EXEEXT) \
-@ENABLE_HCLEX_TRUE@	hclj$(EXEEXT)
+@ENABLE_HCLX_TRUE@am__EXEEXT_1 = hcls$(EXEEXT) hclc$(EXEEXT) \
+@ENABLE_HCLX_TRUE@	hclj$(EXEEXT)
 am__installdirs = "$(DESTDIR)$(bindir)"
 PROGRAMS = $(bin_PROGRAMS)
 am__dirstamp = $(am__leading_dot)dirstamp
@@ -127,19 +127,19 @@ hcl_LINK = $(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) \
 	$(LIBTOOLFLAGS) --mode=link $(CCLD) $(AM_CFLAGS) $(CFLAGS) \
 	$(hcl_LDFLAGS) $(LDFLAGS) -o $@
 am__hclc_SOURCES_DIST = main-c.c
-@ENABLE_HCLEX_TRUE@am_hclc_OBJECTS = hclc-main-c.$(OBJEXT)
+@ENABLE_HCLX_TRUE@am_hclc_OBJECTS = hclc-main-c.$(OBJEXT)
 hclc_OBJECTS = $(am_hclc_OBJECTS)
 hclc_LINK = $(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) \
 	$(LIBTOOLFLAGS) --mode=link $(CCLD) $(AM_CFLAGS) $(CFLAGS) \
 	$(hclc_LDFLAGS) $(LDFLAGS) -o $@
 am__hclj_SOURCES_DIST = main-j.c
-@ENABLE_HCLEX_TRUE@am_hclj_OBJECTS = hclj-main-j.$(OBJEXT)
+@ENABLE_HCLX_TRUE@am_hclj_OBJECTS = hclj-main-j.$(OBJEXT)
 hclj_OBJECTS = $(am_hclj_OBJECTS)
 hclj_LINK = $(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) \
 	$(LIBTOOLFLAGS) --mode=link $(CCLD) $(AM_CFLAGS) $(CFLAGS) \
 	$(hclj_LDFLAGS) $(LDFLAGS) -o $@
 am__hcls_SOURCES_DIST = main-s.c
-@ENABLE_HCLEX_TRUE@am_hcls_OBJECTS = hcls-main-s.$(OBJEXT)
+@ENABLE_HCLX_TRUE@am_hcls_OBJECTS = hcls-main-s.$(OBJEXT)
 hcls_OBJECTS = $(am_hcls_OBJECTS)
 hcls_LINK = $(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) \
 	$(LIBTOOLFLAGS) --mode=link $(CCLD) $(AM_CFLAGS) $(CFLAGS) \
@@ -352,6 +352,7 @@ pdfdir = @pdfdir@
 prefix = @prefix@
 program_transform_name = @program_transform_name@
 psdir = @psdir@
+runstatedir = @runstatedir@
 sbindir = @sbindir@
 sharedstatedir = @sharedstatedir@
 srcdir = @srcdir@
@@ -381,21 +382,21 @@ hcl_CPPFLAGS = $(CPPFLAGS_ALL_COMMON) $(CPPFLAGS_PFMOD)
 hcl_LDFLAGS = $(LDFLAGS_ALL_COMMON)
 hcl_LDADD = $(LIBADD_LIB_COMMON) -lhcl
 hcl_DEPENDENCIES = ../lib/libhcl.la
-@ENABLE_HCLEX_TRUE@hcls_SOURCES = main-s.c
-@ENABLE_HCLEX_TRUE@hcls_CPPFLAGS = $(CPPFLAGS_ALL_COMMON)
-@ENABLE_HCLEX_TRUE@hcls_LDFLAGS = $(LDFLAGS_ALL_COMMON)
-@ENABLE_HCLEX_TRUE@hcls_LDADD = $(LIBADD_LIB_COMMON) $(PTHREAD_LIBS) -lhclx
-@ENABLE_HCLEX_TRUE@hcls_DEPENDENCIES = ../lib/libhclx.la
-@ENABLE_HCLEX_TRUE@hclc_SOURCES = main-c.c
-@ENABLE_HCLEX_TRUE@hclc_CPPFLAGS = $(CPPFLAGS_ALL_COMMON)
-@ENABLE_HCLEX_TRUE@hclc_LDFLAGS = $(LDFLAGS_ALL_COMMON)
-@ENABLE_HCLEX_TRUE@hclc_LDADD = $(LIBADD_LIB_COMMON) $(PTHREAD_LIBS) -lhclx
-@ENABLE_HCLEX_TRUE@hclc_DEPENDENCIES = ../lib/libhclx.la
-@ENABLE_HCLEX_TRUE@hclj_SOURCES = main-j.c
-@ENABLE_HCLEX_TRUE@hclj_CPPFLAGS = $(CPPFLAGS_ALL_COMMON)
-@ENABLE_HCLEX_TRUE@hclj_LDFLAGS = $(LDFLAGS_ALL_COMMON)
-@ENABLE_HCLEX_TRUE@hclj_LDADD = $(LIBADD_LIB_COMMON) $(PTHREAD_LIBS) -lhclx
-@ENABLE_HCLEX_TRUE@hclj_DEPENDENCIES = ../lib/libhclx.la
+@ENABLE_HCLX_TRUE@hcls_SOURCES = main-s.c
+@ENABLE_HCLX_TRUE@hcls_CPPFLAGS = $(CPPFLAGS_ALL_COMMON)
+@ENABLE_HCLX_TRUE@hcls_LDFLAGS = $(LDFLAGS_ALL_COMMON)
+@ENABLE_HCLX_TRUE@hcls_LDADD = $(LIBADD_LIB_COMMON) $(PTHREAD_LIBS) -lhclx
+@ENABLE_HCLX_TRUE@hcls_DEPENDENCIES = ../lib/libhclx.la
+@ENABLE_HCLX_TRUE@hclc_SOURCES = main-c.c
+@ENABLE_HCLX_TRUE@hclc_CPPFLAGS = $(CPPFLAGS_ALL_COMMON)
+@ENABLE_HCLX_TRUE@hclc_LDFLAGS = $(LDFLAGS_ALL_COMMON)
+@ENABLE_HCLX_TRUE@hclc_LDADD = $(LIBADD_LIB_COMMON) $(PTHREAD_LIBS) -lhclx
+@ENABLE_HCLX_TRUE@hclc_DEPENDENCIES = ../lib/libhclx.la
+@ENABLE_HCLX_TRUE@hclj_SOURCES = main-j.c
+@ENABLE_HCLX_TRUE@hclj_CPPFLAGS = $(CPPFLAGS_ALL_COMMON)
+@ENABLE_HCLX_TRUE@hclj_LDFLAGS = $(LDFLAGS_ALL_COMMON)
+@ENABLE_HCLX_TRUE@hclj_LDADD = $(LIBADD_LIB_COMMON) $(PTHREAD_LIBS) -lhclx
+@ENABLE_HCLX_TRUE@hclj_DEPENDENCIES = ../lib/libhclx.la
 all: all-am
 
 .SUFFIXES:

@@ -98,8 +98,8 @@ host_triplet = @host@
 @ENABLE_STATIC_MODULE_TRUE@	$(abs_builddir)/../mod/libhcl-dic.la \
 @ENABLE_STATIC_MODULE_TRUE@	$(abs_builddir)/../mod/libhcl-str.la \
 @ENABLE_STATIC_MODULE_TRUE@	$(abs_builddir)/../mod/libhcl-sys.la
-@ENABLE_HCLEX_TRUE@am__append_8 = libhclx.la
-@ENABLE_HCLEX_TRUE@am__append_9 = hcl-c.h hcl-s.h hcl-tmr.h hcl-xutl.h hcl-json.h
+@ENABLE_HCLX_TRUE@am__append_8 = libhclx.la
+@ENABLE_HCLX_TRUE@am__append_9 = hcl-c.h hcl-s.h hcl-tmr.h hcl-xutl.h hcl-json.h
 subdir = lib
 ACLOCAL_M4 = $(top_srcdir)/aclocal.m4
 am__aclocal_m4_deps = $(top_srcdir)/m4/ax_check_sign.m4 \
@@ -171,15 +171,15 @@ libhcl_la_LINK = $(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) \
 am__libhclx_la_SOURCES_DIST = tmr.c hcl-tmr.h xutl.c xutl-sa.h \
 	hcl-xutl.h json.c hcl-json.h cb-impl.h cb-impl.c hcl-s.c \
 	hcl-s.h hcl-c.c hcl-c.h
-@ENABLE_HCLEX_TRUE@am_libhclx_la_OBJECTS = libhclx_la-tmr.lo \
-@ENABLE_HCLEX_TRUE@	libhclx_la-xutl.lo libhclx_la-json.lo \
-@ENABLE_HCLEX_TRUE@	libhclx_la-cb-impl.lo libhclx_la-hcl-s.lo \
-@ENABLE_HCLEX_TRUE@	libhclx_la-hcl-c.lo
+@ENABLE_HCLX_TRUE@am_libhclx_la_OBJECTS = libhclx_la-tmr.lo \
+@ENABLE_HCLX_TRUE@	libhclx_la-xutl.lo libhclx_la-json.lo \
+@ENABLE_HCLX_TRUE@	libhclx_la-cb-impl.lo libhclx_la-hcl-s.lo \
+@ENABLE_HCLX_TRUE@	libhclx_la-hcl-c.lo
 libhclx_la_OBJECTS = $(am_libhclx_la_OBJECTS)
 libhclx_la_LINK = $(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) \
 	$(LIBTOOLFLAGS) --mode=link $(CCLD) $(AM_CFLAGS) $(CFLAGS) \
 	$(libhclx_la_LDFLAGS) $(LDFLAGS) -o $@
-@ENABLE_HCLEX_TRUE@am_libhclx_la_rpath = -rpath $(pkglibdir)
+@ENABLE_HCLX_TRUE@am_libhclx_la_rpath = -rpath $(pkglibdir)
 AM_V_P = $(am__v_P_@AM_V@)
 am__v_P_ = $(am__v_P_@AM_DEFAULT_V@)
 am__v_P_0 = false
@@ -393,6 +393,7 @@ pdfdir = @pdfdir@
 prefix = @prefix@
 program_transform_name = @program_transform_name@
 psdir = @psdir@
+runstatedir = @runstatedir@
 sbindir = @sbindir@
 sharedstatedir = @sharedstatedir@
 srcdir = @srcdir@
@@ -464,18 +465,18 @@ libhcl_la_CPPFLAGS = $(CPPFLAGS_LIB_COMMON)
 libhcl_la_LDFLAGS = $(LDFLAGS_LIB_COMMON)
 libhcl_la_LIBADD = $(LIBADD_LIB_COMMON) $(am__append_6)
 libhcl_la_DEPENDENCIES = $(am__append_7)
-@ENABLE_HCLEX_TRUE@libhclx_la_SOURCES = \
-@ENABLE_HCLEX_TRUE@	tmr.c hcl-tmr.h \
-@ENABLE_HCLEX_TRUE@	xutl.c xutl-sa.h hcl-xutl.h \
-@ENABLE_HCLEX_TRUE@	json.c hcl-json.h \
-@ENABLE_HCLEX_TRUE@	cb-impl.h cb-impl.c \
-@ENABLE_HCLEX_TRUE@	hcl-s.c hcl-s.h \
-@ENABLE_HCLEX_TRUE@	hcl-c.c hcl-c.h
+@ENABLE_HCLX_TRUE@libhclx_la_SOURCES = \
+@ENABLE_HCLX_TRUE@	tmr.c hcl-tmr.h \
+@ENABLE_HCLX_TRUE@	xutl.c xutl-sa.h hcl-xutl.h \
+@ENABLE_HCLX_TRUE@	json.c hcl-json.h \
+@ENABLE_HCLX_TRUE@	cb-impl.h cb-impl.c \
+@ENABLE_HCLX_TRUE@	hcl-s.c hcl-s.h \
+@ENABLE_HCLX_TRUE@	hcl-c.c hcl-c.h
 
-@ENABLE_HCLEX_TRUE@libhclx_la_CPPFLAGS = $(CPPFLAGS_LIB_COMMON) $(CPPFLAGS_PFMOD)
-@ENABLE_HCLEX_TRUE@libhclx_la_LDFLAGS = $(LDFLAGS_LIB_COMMON)
-@ENABLE_HCLEX_TRUE@libhclx_la_LIBADD = $(LIBADD_LIB_COMMON) $(PTHREAD_LIBS) -lhcl
-@ENABLE_HCLEX_TRUE@libhclx_la_DEPENDENCIES = libhcl.la
+@ENABLE_HCLX_TRUE@libhclx_la_CPPFLAGS = $(CPPFLAGS_LIB_COMMON) $(CPPFLAGS_PFMOD)
+@ENABLE_HCLX_TRUE@libhclx_la_LDFLAGS = $(LDFLAGS_LIB_COMMON)
+@ENABLE_HCLX_TRUE@libhclx_la_LIBADD = $(LIBADD_LIB_COMMON) $(PTHREAD_LIBS) -lhcl
+@ENABLE_HCLX_TRUE@libhclx_la_DEPENDENCIES = libhcl.la
 all: hcl-cfg.h
 	$(MAKE) $(AM_MAKEFLAGS) all-am
 

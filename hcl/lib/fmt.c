@@ -1634,7 +1634,6 @@ hcl_ooi_t hcl_logufmt (hcl_t* hcl, hcl_bitmask_t mask, const hcl_uch_t* fmt, ...
 static int print_bcs (hcl_fmtout_t* fmtout, const hcl_bch_t* ptr, hcl_oow_t len)
 {
 	hcl_t* hcl = (hcl_t*)fmtout->ctx;
-	
 
 #if defined(HCL_OOCH_IS_UCH)
 	hcl_oow_t ucslen, bcslen;
@@ -1687,7 +1686,6 @@ static int print_bcs (hcl_fmtout_t* fmtout, const hcl_bch_t* ptr, hcl_oow_t len)
 static int print_ucs (hcl_fmtout_t* fmtout, const hcl_uch_t* ptr, hcl_oow_t len)
 {
 	hcl_t* hcl = (hcl_t*)fmtout->ctx;
-	
 
 #if defined(HCL_OOCH_IS_UCH)
 	hcl_uch_t* optr;
@@ -1716,7 +1714,7 @@ static int print_ucs (hcl_fmtout_t* fmtout, const hcl_uch_t* ptr, hcl_oow_t len)
 		hcl_conv_uchars_to_bchars_with_cmgr(ptr, &ucslen, bcsbuf, &bcslen, hcl->cmgr);
 
 		bcsptr = bcsbuf;
-		while (ucslen > 0)
+		while (bcslen > 0)
 		{
 			hcl->c->outarg.ptr = bcsptr;
 			hcl->c->outarg.len = bcslen;
