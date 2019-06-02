@@ -2316,6 +2316,10 @@ static HCL_INLINE int format_stack_args (hcl_fmtout_t* fmtout, hcl_ooi_t nargs, 
 			break;
 		}
 
+	#if !defined(HCL_OOCH_IS_UCH)
+		case 'w': /* the string object is not in the unicode encoding */
+		case 'W': /* treat w/W like k/K */
+	#endif
 		case 'k':
 		case 'K':
 		{
@@ -2368,7 +2372,13 @@ static HCL_INLINE int format_stack_args (hcl_fmtout_t* fmtout, hcl_ooi_t nargs, 
 						else
 						{
 							hcl_bch_t xbuf[3];
-							hcl_byte_to_bcstr (*bsp, xbuf, HCL_COUNTOF(xbuf), (16 | (ch == 'k'? HCL_BYTE_TO_BCSTR_LOWERCASE: 0)), '0');
+							int flagged_radix = 16;
+						#if defined(HCL_OOCH_IS_UCH)
+							if (ch == 'k') flagged_radix |= HCL_BYTE_TO_BCSTR_LOWERCASE;
+						#else
+							if (ch == 'k' || ch == 'w') flagged_radix |= HCL_BYTE_TO_BCSTR_LOWERCASE;
+						#endif
+							hcl_byte_to_bcstr (*bsp, xbuf, HCL_COUNTOF(xbuf), flagged_radix, '0');
 							if (lm_flag & (LF_H | LF_L)) PUT_BCS (fmtout, "\\x", 2);
 							PUT_BCS (fmtout, xbuf, 2);
 						}
@@ -2384,6 +2394,7 @@ static HCL_INLINE int format_stack_args (hcl_fmtout_t* fmtout, hcl_ooi_t nargs, 
 			break;
 		}
 
+	#if defined(HCL_OOCH_IS_UCH)
 		case 'w':
 		case 'W':
 		{
@@ -2450,6 +2461,7 @@ static HCL_INLINE int format_stack_args (hcl_fmtout_t* fmtout, hcl_ooi_t nargs, 
 			if ((flagc & FLAGC_LEFTADJ) && width > 0) PUT_OOCH (fmtout, padc, width);
 			break;
 		}
+	#endif
 
 		case 'O': /* object - ignore precision, width, adjustment */
 			GET_NEXT_ARG_TO (hcl, nargs, &arg_state, arg);
