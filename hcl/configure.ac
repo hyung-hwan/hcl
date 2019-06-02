@@ -693,13 +693,13 @@ then
 fi
 AM_CONDITIONAL(ENABLE_LIBUNWIND, test "x${enable_libunwind_is}" = "xyes")
 
-dnl ===== enable-hclex =====
-AC_ARG_ENABLE([hclex],
-	[AS_HELP_STRING([--enable-hclex],[build libhclex(default. no)])],
-	enable_hclex_is=$enableval,
-	enable_hclex_is=no
+dnl ===== enable-hclx =====
+AC_ARG_ENABLE([hclx],
+	[AS_HELP_STRING([--enable-hclx],[build libhclx(default. no)])],
+	enable_hclx_is=$enableval,
+	enable_hclx_is=no
 )
-AM_CONDITIONAL(ENABLE_HCLEX, test "x${enable_hclex_is}" = "xyes")
+AM_CONDITIONAL(ENABLE_HCLX, test "x${enable_hclx_is}" = "xyes")
 
 AC_SUBST(HCL_SIZEOF_WCHAR_T, $ac_cv_sizeof_wchar_t)
 AC_SUBST(HCL_SIZEOF_CHAR16_T, $ac_cv_sizeof_char16_t)

@@ -30,7 +30,7 @@ hcl_LDFLAGS = $(LDFLAGS_ALL_COMMON)
 hcl_LDADD = $(LIBADD_LIB_COMMON) -lhcl
 hcl_DEPENDENCIES = ../lib/libhcl.la
 
-if ENABLE_HCLEX
+if ENABLE_HCLX
 
 ## cb-impl.c is included in libhclx.
 ## so ../lib/cb-impl.h and ../lib/cb-impl.c are not listed as sources

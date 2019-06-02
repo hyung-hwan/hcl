@@ -1646,9 +1646,6 @@ static int print_bcs (hcl_fmtout_t* fmtout, const hcl_bch_t* ptr, hcl_oow_t len)
 		ucslen = HCL_COUNTOF(ucsbuf);
 		hcl_conv_bchars_to_uchars_with_cmgr(ptr, &bcslen, ucsbuf, &ucslen, hcl->cmgr, 1);
 
-		hcl->c->outarg.ptr = ucsbuf;
-		hcl->c->outarg.len = ucslen;
-
 		ucsptr = ucsbuf;
 		while (ucslen > 0)
 		{
@@ -1690,9 +1687,11 @@ static int print_bcs (hcl_fmtout_t* fmtout, const hcl_bch_t* ptr, hcl_oow_t len)
 static int print_ucs (hcl_fmtout_t* fmtout, const hcl_uch_t* ptr, hcl_oow_t len)
 {
 	hcl_t* hcl = (hcl_t*)fmtout->ctx;
-	hcl_uch_t* optr;
+	
 
 #if defined(HCL_OOCH_IS_UCH)
+	hcl_uch_t* optr;
+
 	optr = (hcl_uch_t*)ptr;
 	while (len > 0)
 	{
@@ -1707,17 +1706,41 @@ static int print_ucs (hcl_fmtout_t* fmtout, const hcl_uch_t* ptr, hcl_oow_t len)
 		len -= hcl->c->outarg.xlen;
 	}
 #else
-	/* TODO: */
+	hcl_oow_t bcslen, ucslen;
+	hcl_ooch_t bcsbuf[64], * bcsptr;
+
+	while (len > 0)
+	{
+		ucslen = len;
+		bcslen = HCL_COUNTOF(bcsbuf);
+		hcl_conv_uchars_to_bchars_with_cmgr(ptr, &ucslen, bcsbuf, &bcslen, hcl->cmgr);
+
+		bcsptr = bcsbuf;
+		while (ucslen > 0)
+		{
+			hcl->c->outarg.ptr = bcsptr;
+			hcl->c->outarg.len = bcslen;
+
+			if (hcl->c->printer(hcl, HCL_IO_WRITE, &hcl->c->outarg) <= -1) return -1;
+			if (hcl->c->outarg.xlen <= 0) return 0; /* end of stream. but not failure */
+
+			HCL_ASSERT (hcl, hcl->c->outarg.xlen <= len);
+			bcsptr += hcl->c->outarg.xlen;
+			bcslen -= hcl->c->outarg.xlen;
+		}
+
+		ptr += ucslen;
+		len -= ucslen;
+	}
 #endif
 
 	return 1; /* success */
 }
 
 
-hcl_ooi_t hcl_prbfmt (hcl_t* hcl, const hcl_bch_t* fmt, ...)
+hcl_ooi_t hcl_prbfmtv (hcl_t* hcl, const hcl_bch_t* fmt, va_list ap)
 {
 	int x;
-	va_list ap;
 	hcl_fmtout_t fo;
 
 	HCL_MEMSET (&fo, 0, HCL_SIZEOF(fo));
@@ -1725,21 +1748,31 @@ hcl_ooi_t hcl_prbfmt (hcl_t* hcl, const hcl_bch_t* fmt, ...)
 	fo.fmt_str = fmt;
 	fo.ctx = hcl;
 	fo.mask = 0;
-	fo.putbcs = log_bcs;
-	fo.putucs = log_ucs;
+	fo.putbcs = print_bcs;
+	fo.putucs = print_ucs;
 	fo.putobj = hcl_fmt_object_;
 
-	va_start (ap, fmt);
 	x = fmt_outv(&fo, ap);
-	va_end (ap);
 
 	return (x <= -1)? -1: fo.count;
 }
 
-hcl_ooi_t hcl_prufmt (hcl_t* hcl, const hcl_uch_t* fmt, ...)
+hcl_ooi_t hcl_prbfmt (hcl_t* hcl, const hcl_bch_t* fmt, ...)
+{
+	hcl_ooi_t x;
+	va_list ap;
+
+	va_start (ap, fmt);
+	x = hcl_prbfmtv(hcl, fmt, ap);
+	va_end (ap);
+
+	return x;
+}
+
+hcl_ooi_t hcl_prufmtv (hcl_t* hcl, const hcl_uch_t* fmt, va_list ap)
 {
 	int x;
-	va_list ap;
+	
 	hcl_fmtout_t fo;
 
 	HCL_MEMSET (&fo, 0, HCL_SIZEOF(fo));
@@ -1747,17 +1780,26 @@ hcl_ooi_t hcl_prufmt (hcl_t* hcl, const hcl_uch_t* fmt, ...)
 	fo.fmt_str = fmt;
 	fo.ctx = hcl;
 	fo.mask = 0;
-	fo.putbcs = log_bcs;
-	fo.putucs = log_ucs;
+	fo.putbcs = print_bcs;
+	fo.putucs = print_ucs;
 	fo.putobj = hcl_fmt_object_;
 
-	va_start (ap, fmt);
 	x = fmt_outv(&fo, ap);
-	va_end (ap);
 
 	return (x <= -1)? -1: fo.count;
 }
 
+hcl_ooi_t hcl_prufmt (hcl_t* hcl, const hcl_uch_t* fmt, ...)
+{
+	hcl_ooi_t x;
+	va_list ap;
+
+	va_start (ap, fmt);
+	x = hcl_prufmtv(hcl, fmt, ap);
+	va_end (ap);
+
+	return x;
+}
 
 /* --------------------------------------------------------------------------
  * SUPPORT FOR FORMATTED OUTPUT TO BE USED BY BUILTIN PRIMITIVE FUNCTIONS

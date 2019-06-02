@@ -101,7 +101,7 @@ libhcl_la_LIBADD += -lhcl-sys
 libhcl_la_DEPENDENCIES += $(abs_builddir)/../mod/libhcl-sys.la
 endif
 
-if ENABLE_HCLEX
+if ENABLE_HCLX
 pkglib_LTLIBRARIES += libhclx.la
 pkginclude_HEADERS += hcl-c.h hcl-s.h hcl-tmr.h hcl-xutl.h hcl-json.h
 libhclx_la_SOURCES = \

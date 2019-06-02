@@ -651,8 +651,8 @@ HCL_SIZEOF_LONG_LONG
 HCL_SIZEOF_CHAR32_T
 HCL_SIZEOF_CHAR16_T
 HCL_SIZEOF_WCHAR_T
-ENABLE_HCLEX_FALSE
-ENABLE_HCLEX_TRUE
+ENABLE_HCLX_FALSE
+ENABLE_HCLX_TRUE
 ENABLE_LIBUNWIND_FALSE
 ENABLE_LIBUNWIND_TRUE
 ENABLE_LIBLTDL_FALSE
@@ -824,7 +824,7 @@ enable_dynamic_module
 enable_static_module
 enable_libltdl
 enable_libunwind
-enable_hclex
+enable_hclx
 '
       ac_precious_vars='build_alias
 host_alias
@@ -1482,7 +1482,7 @@ Optional Features:
                           library(default. no)
   --enable-libltdl        use libltdl(default. no)
   --enable-libunwind      use libunwind(default. no)
-  --enable-hclex          build libhclex(default. no)
+  --enable-hclx           build libhclx(default. no)
 
 Optional Packages:
   --with-PACKAGE[=ARG]    use PACKAGE [ARG=yes]
@@ -21256,20 +21256,20 @@ else
 fi
 
 
-# Check whether --enable-hclex was given.
-if test "${enable_hclex+set}" = set; then :
-  enableval=$enable_hclex; enable_hclex_is=$enableval
+# Check whether --enable-hclx was given.
+if test "${enable_hclx+set}" = set; then :
+  enableval=$enable_hclx; enable_hclx_is=$enableval
 else
-  enable_hclex_is=no
+  enable_hclx_is=no
 
 fi
 
- if test "x${enable_hclex_is}" = "xyes"; then
-  ENABLE_HCLEX_TRUE=
-  ENABLE_HCLEX_FALSE='#'
+ if test "x${enable_hclx_is}" = "xyes"; then
+  ENABLE_HCLX_TRUE=
+  ENABLE_HCLX_FALSE='#'
 else
-  ENABLE_HCLEX_TRUE='#'
-  ENABLE_HCLEX_FALSE=
+  ENABLE_HCLX_TRUE='#'
+  ENABLE_HCLX_FALSE=
 fi
 
 
@@ -21479,8 +21479,8 @@ if test -z "${ENABLE_LIBUNWIND_TRUE}" && test -z "${ENABLE_LIBUNWIND_FALSE}"; th
   as_fn_error $? "conditional \"ENABLE_LIBUNWIND\" was never defined.
 Usually this means the macro was only invoked conditionally." "$LINENO" 5
 fi
-if test -z "${ENABLE_HCLEX_TRUE}" && test -z "${ENABLE_HCLEX_FALSE}"; then
-  as_fn_error $? "conditional \"ENABLE_HCLEX\" was never defined.
+if test -z "${ENABLE_HCLX_TRUE}" && test -z "${ENABLE_HCLX_FALSE}"; then
+  as_fn_error $? "conditional \"ENABLE_HCLX\" was never defined.
 Usually this means the macro was only invoked conditionally." "$LINENO" 5
 fi
 

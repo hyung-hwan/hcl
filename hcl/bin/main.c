@@ -1150,6 +1150,7 @@ int main (int argc, char* argv[])
 	 * -- instead of returning -1 immediately. --*/
 	set_signal (SIGINT, handle_sigint);
 
+hcl_prbfmt (hcl, "this is good %s %10hs %hs\n", "whole new world. 1234567890 from this point onward, any failure leasd to jumping to oops label",  "as이거 좋은거잖아dkfjsdakfjsadklfjasd", "1111");
 	while (1)
 	{
 		hcl_oop_t obj;

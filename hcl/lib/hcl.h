@@ -1825,12 +1825,31 @@ HCL_EXPORT hcl_ooi_t hcl_prbfmt (
 	...
 );
 
+HCL_EXPORT hcl_ooi_t hcl_prbfmtv (
+	hcl_t*           hcl,
+	const hcl_bch_t* fmt,
+	va_list          ap
+);
+
 HCL_EXPORT hcl_ooi_t hcl_prufmt (
 	hcl_t*           hcl,
 	const hcl_uch_t* fmt,
 	...
 );
 
+HCL_EXPORT hcl_ooi_t hcl_prufmtv (
+	hcl_t*           hcl,
+	const hcl_uch_t* fmt,
+	va_list          ap
+);
+
+#if defined(HCL_OOCH_IS_UCH)
+#	define hcl_proofmt hcl_prufmt
+#	define hcl_proofmtv hcl_prufmtv
+#else
+#	define hcl_proofmt hcl_prbfmt
+#	define hcl_proofmtv hcl_prbfmtv
+#endif
 /* =========================================================================
  * OBJECT MANAGEMENT
  * ========================================================================= */
