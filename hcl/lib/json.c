@@ -178,28 +178,6 @@ static int add_char_to_token (hcl_json_t* json, hcl_ooch_t ch)
 	return 0;
 }
 
-static HCL_INLINE int is_token (hcl_json_t* json, const hcl_bch_t* str)
-{
-	return hcl_comp_oochars_bcstr(json->tok.ptr, json->tok.len, str) == 0;
-} 
-
-static HCL_INLINE int is_token_integer (hcl_json_t* json, hcl_oow_t* value)
-{
-	hcl_oow_t i;
-	hcl_oow_t v = 0;
-
-	if (json->tok.len <= 0) return 0;
-
-	for (i = 0; i < json->tok.len; i++)
-	{
-		if (!is_digitchar(json->tok.ptr[i])) return 0;
-		v = v * 10 + (json->tok.ptr[i] - '0');
-	}
-
-	*value = v;
-	return 1;
-} 
-
 static HCL_INLINE hcl_ooch_t unescape (hcl_ooch_t c)
 {
 	switch (c)
