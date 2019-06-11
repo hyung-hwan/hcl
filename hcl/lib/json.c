@@ -178,6 +178,29 @@ static int add_char_to_token (hcl_json_t* json, hcl_ooch_t ch)
 	return 0;
 }
 
+static int add_chars_to_token (hcl_json_t* json, const hcl_ooch_t* ptr, hcl_oow_t len)
+{
+	hcl_oow_t i;
+	
+	if (json->tok_capa - json->tok.len > len)
+	{
+		hcl_ooch_t* tmp;
+		hcl_oow_t newcapa;
+
+		newcapa = HCL_ALIGN_POW2(json->tok.len + len + 1, HCL_JSON_TOKEN_NAME_ALIGN);
+		tmp = (hcl_ooch_t*)hcl_json_reallocmem(json, json->tok.ptr, newcapa * HCL_SIZEOF(*tmp));
+		if (!tmp) return -1;
+
+		json->tok_capa = newcapa - 1;
+		json->tok.ptr = tmp;
+	}
+
+	for (i = 0; i < len; i++)  
+		json->tok.ptr[json->tok.len++] = ptr[i];
+	json->tok.ptr[json->tok.len] = '\0';
+	return 0;
+}
+
 static HCL_INLINE hcl_ooch_t unescape (hcl_ooch_t c)
 {
 	switch (c)
@@ -296,30 +319,24 @@ static int handle_string_value_char (hcl_json_t* json, hcl_ooci_t c)
 		{
 			ret = 0;
 		add_sv_acc:
-		#if defined(HCL_OOCH_IS_BCH)
+		#if defined(HCL_OOCH_IS_UCH)
+			if (add_char_to_token(json, json->state_stack->u.sv.acc) <= -1) return -1;
+		#else
 			/* convert the character to utf8 */
 			{
 				hcl_bch_t bcsbuf[HCL_BCSIZE_MAX];
-				hcl_oow_t ucslen, bcslen;
+				hcl_oow_t n;
 
-				ucslen = 1;
-				bcslen = HCL_COUNTOF(bcsbuf);
-				if (hcl_conv_uchars_to_bchars_with_cmgr(&json->state_stack->u.sv.acc, &ucslen, bcsbuf, &bcslen, hcl_json_getcmgr(json)) <= -1)
+				n = json->cmgr->uctobc(json->state_stack->u.sv.acc, bcsbuf, HCL_COUNTOF(bcsbuf));
+				if (n == 0 || n > QSE_COUNTOF(bcsbuf))
 				{
+					/* illegal character or buffer to small */
 					hcl_json_seterrbfmt (json, HCL_EECERR, "unable to convert %jc", json->state_stack->u.sv.acc);
 					return -1;
 				}
-				else
-				{
-					hcl_oow_t i;
-					for (i = 0; i < bcslen; i++)
-					{
-						if (add_char_to_token(json, bcsbuf[i]) <= -1) return -1;
-					}
-				}
+
+				if (add_chars_to_token(json, bcsbuf, n) <= -1) return -1;
 			}
-		#else
-			if (add_char_to_token(json, json->state_stack->u.sv.acc) <= -1) return -1;
 		#endif
 			json->state_stack->u.sv.escaped = 0;
 		}
@@ -740,7 +757,7 @@ static int handle_char_in_dic (hcl_json_t* json, hcl_ooci_t c)
 
 /* ========================================================================= */
 
-static int handle_char (hcl_json_t* json, hcl_ooci_t c, hcl_oow_t nbytes)
+static int handle_char (hcl_json_t* json, hcl_ooci_t c)
 {
 	int x;
 
@@ -813,41 +830,35 @@ static int feed_json_data (hcl_json_t* json, const hcl_bch_t* data, hcl_oow_t le
 	while (ptr < end)
 	{
 		hcl_ooci_t c;
-		hcl_oow_t bcslen;
 
 	#if defined(HCL_OOCH_IS_UCH)
-		hcl_oow_t ucslen;
 		hcl_ooch_t uc;
-		int n;
+		hcl_oow_t bcslen;
+		hcl_oow_t n;
 
 		bcslen = end - ptr;
-		ucslen = 1;
-
-		n = hcl_conv_bchars_to_uchars_with_cmgr(ptr, &bcslen, &uc, &ucslen, json->cmgr, 0);
-		if (n <= -1)
+		n = json->cmgr->bctouc(ptr, bcslen, &uc);
+		if (n == 0)
 		{
-			if (n == -3)
-			{
-				/* incomplete sequence */
-				*xlen = ptr - data;
-				return 0; /* feed more for incomplete sequence */
-			}
-
-			/* advance 1 byte without proper conversion */
+			/* invalid sequence */
 			uc = *ptr;
-			bcslen = 1;
+			n = 1;
+		}
+		else if (n > bcslen)
+		{
+			/* incomplete sequence */
+			*xlen = bcslen; /* need at lease this much */
+			return 0; /* feed more for incomplete sequence */
 		}
 
-		ptr += bcslen;
+		ptr += n;
 		c = uc;
 	#else
-		bcslen = 1;
 		c = *ptr++;
 	#endif
 
-
 		/* handle a signle character */
-		if (handle_char(json, c, bcslen) <= -1) goto oops;
+		if (handle_char(json, c) <= -1) goto oops;
 	}
 
 	*xlen = ptr - data;
