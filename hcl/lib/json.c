@@ -165,11 +165,11 @@ static int add_char_to_token (hcl_json_t* json, hcl_ooch_t ch)
 		hcl_ooch_t* tmp;
 		hcl_oow_t newcapa;
 
-		newcapa = HCL_ALIGN_POW2(json->tok.len + 1, HCL_JSON_TOKEN_NAME_ALIGN);
+		newcapa = HCL_ALIGN_POW2(json->tok.len + 2, HCL_JSON_TOKEN_NAME_ALIGN);  /* +2 here because of -1 when setting newcapa */
 		tmp = (hcl_ooch_t*)hcl_json_reallocmem(json, json->tok.ptr, newcapa * HCL_SIZEOF(*tmp));
 		if (!tmp) return -1;
 
-		json->tok_capa = newcapa;
+		json->tok_capa = newcapa - 1; /* -1 to secure space for terminating null */
 		json->tok.ptr = tmp;
 	}
 
