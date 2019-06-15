@@ -328,7 +328,7 @@ static int handle_string_value_char (hcl_json_t* json, hcl_ooci_t c)
 				hcl_oow_t n;
 
 				n = json->cmgr->uctobc(json->state_stack->u.sv.acc, bcsbuf, HCL_COUNTOF(bcsbuf));
-				if (n == 0 || n > QSE_COUNTOF(bcsbuf))
+				if (n == 0 || n > HCL_COUNTOF(bcsbuf))
 				{
 					/* illegal character or buffer to small */
 					hcl_json_seterrbfmt (json, HCL_EECERR, "unable to convert %jc", json->state_stack->u.sv.acc);
@@ -847,7 +847,7 @@ static int feed_json_data (hcl_json_t* json, const hcl_bch_t* data, hcl_oow_t le
 		else if (n > bcslen)
 		{
 			/* incomplete sequence */
-			*xlen = bcslen; /* need at lease this much */
+			*xlen = ptr - data; 
 			return 0; /* feed more for incomplete sequence */
 		}
 
