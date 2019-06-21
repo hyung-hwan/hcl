@@ -48,8 +48,10 @@ typedef enum hcl_client_reply_attr_type_t hcl_client_reply_attr_type_t;
 
 struct hcl_client_t
 {
-	hcl_mmgr_t* mmgr;
-	hcl_cmgr_t* cmgr;
+	hcl_oow_t   _instsize;
+	hcl_mmgr_t* _mmgr;
+	hcl_cmgr_t* _cmgr;
+
 	hcl_client_prim_t prim;
 	hcl_t* dummy_hcl;
 
@@ -758,7 +760,7 @@ static int feed_reply_data (hcl_client_t* client, const hcl_bch_t* data, hcl_oow
 			bcslen = end - ptr;
 			ucslen = 1;
 
-			n = hcl_conv_bchars_to_uchars_with_cmgr(ptr, &bcslen, &uc, &ucslen, client->cmgr, 0);
+			n = hcl_conv_bchars_to_uchars_with_cmgr(ptr, &bcslen, &uc, &ucslen, hcl_client_getcmgr(client), 0);
 			if (n <= -1)
 			{
 				if (n == -3)
@@ -825,8 +827,9 @@ hcl_client_t* hcl_client_open (hcl_mmgr_t* mmgr, hcl_oow_t xtnsize, hcl_client_p
 	xtn->client = client;
 
 	HCL_MEMSET (client, 0, HCL_SIZEOF(*client) + xtnsize);
-	client->mmgr = mmgr;
-	client->cmgr = hcl_get_utf8_cmgr();
+	client->_instsize = HCL_SIZEOF(*client);
+	client->_mmgr = mmgr;
+	client->_cmgr = hcl_get_utf8_cmgr();
 	client->prim = *prim;
 	client->dummy_hcl = hcl;
 
@@ -836,7 +839,7 @@ hcl_client_t* hcl_client_open (hcl_mmgr_t* mmgr, hcl_oow_t xtnsize, hcl_client_p
 	 * such as getting system time or logging. so the heap size doesn't 
 	 * need to be changed from the tiny value set above. */
 	hcl_setoption (client->dummy_hcl, HCL_LOG_MASK, &client->cfg.logmask);
-	hcl_setcmgr (client->dummy_hcl, client->cmgr);
+	hcl_setcmgr (client->dummy_hcl, client->_cmgr);
 
 	return client;
 }
@@ -846,7 +849,7 @@ void hcl_client_close (hcl_client_t* client)
 	if (client->rep.tok.ptr) hcl_client_freemem (client, client->rep.tok.ptr);
 	if (client->rep.last_attr_key.ptr) hcl_client_freemem (client, client->rep.last_attr_key.ptr);
 	hcl_close (client->dummy_hcl);
-	HCL_MMGR_FREE (client->mmgr, client);
+	HCL_MMGR_FREE (client->_mmgr, client);
 }
 
 int hcl_client_setoption (hcl_client_t* client, hcl_client_option_t id, const void* value)
@@ -894,22 +897,22 @@ int hcl_client_getoption (hcl_client_t* client, hcl_client_option_t id, void* va
 
 void* hcl_client_getxtn (hcl_client_t* client)
 {
-	return (void*)(client + 1);
+	return (void*)((hcl_uint8_t*)client + client->_instsize);
 }
 
 hcl_mmgr_t* hcl_client_getmmgr (hcl_client_t* client)
 {
-	return client->mmgr;
+	return client->_mmgr;
 }
 
 hcl_cmgr_t* hcl_client_getcmgr (hcl_client_t* client)
 {
-	return client->cmgr;
+	return client->_cmgr;
 }
 
 void hcl_client_setcmgr (hcl_client_t* client, hcl_cmgr_t* cmgr)
 {
-	client->cmgr = cmgr;
+	client->_cmgr = cmgr;
 }
 
 hcl_errnum_t hcl_client_geterrnum (hcl_client_t* client)
@@ -987,7 +990,7 @@ void* hcl_client_allocmem (hcl_client_t* client, hcl_oow_t size)
 {
 	void* ptr;
 
-	ptr = HCL_MMGR_ALLOC(client->mmgr, size);
+	ptr = HCL_MMGR_ALLOC(client->_mmgr, size);
 	if (!ptr) hcl_client_seterrnum (client, HCL_ESYSMEM);
 	return ptr;
 }
@@ -996,7 +999,7 @@ void* hcl_client_callocmem (hcl_client_t* client, hcl_oow_t size)
 {
 	void* ptr;
 
-	ptr = HCL_MMGR_ALLOC(client->mmgr, size);
+	ptr = HCL_MMGR_ALLOC(client->_mmgr, size);
 	if (!ptr) hcl_client_seterrnum (client, HCL_ESYSMEM);
 	else HCL_MEMSET (ptr, 0, size);
 	return ptr;
@@ -1004,14 +1007,14 @@ void* hcl_client_callocmem (hcl_client_t* client, hcl_oow_t size)
 
 void* hcl_client_reallocmem (hcl_client_t* client, void* ptr, hcl_oow_t size)
 {
-	ptr = HCL_MMGR_REALLOC(client->mmgr, ptr, size);
+	ptr = HCL_MMGR_REALLOC(client->_mmgr, ptr, size);
 	if (!ptr) hcl_client_seterrnum (client, HCL_ESYSMEM);
 	return ptr;
 }
 
 void hcl_client_freemem (hcl_client_t* client, void* ptr)
 {
-	HCL_MMGR_FREE (client->mmgr, ptr);
+	HCL_MMGR_FREE (client->_mmgr, ptr);
 }
 
 /* ========================================================================= */

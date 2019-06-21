@@ -2398,7 +2398,7 @@ void hcl_detachio (hcl_t* hcl)
 
 				prev = hcl->c->curinp->includer;
 				HCL_ASSERT (hcl, hcl->c->curinp->name != HCL_NULL);
-				HCL_MMGR_FREE (hcl->mmgr, hcl->c->curinp);
+				hcl_freemem (hcl, hcl->c->curinp);
 				hcl->c->curinp = prev;
 			}
 

@@ -282,8 +282,9 @@ struct hcl_server_listener_t
 
 struct hcl_server_t
 {
-	hcl_mmgr_t*  mmgr;
-	hcl_cmgr_t*  cmgr;
+	hcl_oow_t    _instsize;
+	hcl_mmgr_t*  _mmgr;
+	hcl_cmgr_t*  _cmgr;
 	hcl_server_prim_t prim;
 
 	/* [NOTE]
@@ -735,7 +736,7 @@ hcl_server_proto_t* hcl_server_proto_open (hcl_oow_t xtnsize, hcl_server_worker_
 	proto->worker = worker;
 	proto->exec_runtime_event_index = HCL_TMR_INVALID_INDEX;
 
-	proto->hcl = hcl_open(proto->worker->server->mmgr, HCL_SIZEOF(*xtn), worker->server->cfg.actor_heap_size, &vmprim, HCL_NULL);
+	proto->hcl = hcl_open(hcl_server_getmmgr(proto->worker->server), HCL_SIZEOF(*xtn), worker->server->cfg.actor_heap_size, &vmprim, HCL_NULL);
 	if (!proto->hcl) goto oops;
 
 	xtn = (worker_hcl_xtn_t*)hcl_getxtn(proto->hcl);
@@ -743,7 +744,7 @@ hcl_server_proto_t* hcl_server_proto_open (hcl_oow_t xtnsize, hcl_server_worker_
 
 	hcl_setoption (proto->hcl, HCL_MOD_INCTX, &proto->worker->server->cfg.module_inctx);
 	hcl_setoption (proto->hcl, HCL_LOG_MASK, &proto->worker->server->cfg.logmask);
-	hcl_setcmgr (proto->hcl, proto->worker->server->cmgr);
+	hcl_setcmgr (proto->hcl, hcl_server_getcmgr(proto->worker->server));
 
 	hcl_getoption (proto->hcl, HCL_TRAIT, &trait);
 #if defined(HCL_BUILD_DEBUG)
@@ -1643,8 +1644,9 @@ hcl_server_t* hcl_server_open (hcl_mmgr_t* mmgr, hcl_oow_t xtnsize, hcl_server_p
 	xtn->server = server;
 
 	HCL_MEMSET (server, 0, HCL_SIZEOF(*server) + xtnsize);
-	server->mmgr = mmgr;
-	server->cmgr = hcl_get_utf8_cmgr();
+	server->_instsize = HCL_SIZEOF(*server);
+	server->_mmgr = mmgr;
+	server->_cmgr = hcl_get_utf8_cmgr();
 	server->prim = *prim;
 	server->dummy_hcl = hcl;
 	server->tmr = tmr;
@@ -1672,7 +1674,7 @@ hcl_server_t* hcl_server_open (hcl_mmgr_t* mmgr, hcl_oow_t xtnsize, hcl_server_p
 	 * such as getting system time or logging. so the heap size doesn't 
 	 * need to be changed from the tiny value set above. */
 	hcl_setoption (server->dummy_hcl, HCL_LOG_MASK, &server->cfg.logmask);
-	hcl_setcmgr (server->dummy_hcl, server->cmgr);
+	hcl_setcmgr (server->dummy_hcl, hcl_server_getcmgr(server));
 	hcl_getoption (server->dummy_hcl, HCL_TRAIT, &trait);
 #if defined(HCL_BUILD_DEBUG)
 	if (server->cfg.trait & HCL_SERVER_TRAIT_DEBUG_GC) trait |= HCL_DEBUG_GC;
@@ -1715,7 +1717,7 @@ void hcl_server_close (hcl_server_t* server)
 	hcl_tmr_close (server->tmr);
 	hcl_close (server->dummy_hcl);
 
-	HCL_MMGR_FREE (server->mmgr, server);
+	HCL_MMGR_FREE (server->_mmgr, server);
 }
 
 static HCL_INLINE int prepare_to_acquire_wid (hcl_server_t* server)
@@ -2454,22 +2456,22 @@ int hcl_server_getoption (hcl_server_t* server, hcl_server_option_t id, void* va
 
 void* hcl_server_getxtn (hcl_server_t* server)
 {
-	return (void*)(server + 1);
+	return (void*)((hcl_uint8_t*)server + server->_instsize);
 }
 
 hcl_mmgr_t* hcl_server_getmmgr (hcl_server_t* server)
 {
-	return server->mmgr;
+	return server->_mmgr;
 }
 
 hcl_cmgr_t* hcl_server_getcmgr (hcl_server_t* server)
 {
-	return server->cmgr;
+	return server->_cmgr;
 }
 
 void hcl_server_setcmgr (hcl_server_t* server, hcl_cmgr_t* cmgr)
 {
-	server->cmgr = cmgr;
+	server->_cmgr = cmgr;
 }
 
 hcl_errnum_t hcl_server_geterrnum (hcl_server_t* server)
@@ -2528,7 +2530,7 @@ void* hcl_server_allocmem (hcl_server_t* server, hcl_oow_t size)
 {
 	void* ptr;
 
-	ptr = HCL_MMGR_ALLOC(server->mmgr, size);
+	ptr = HCL_MMGR_ALLOC(server->_mmgr, size);
 	if (!ptr) hcl_server_seterrnum (server, HCL_ESYSMEM);
 	return ptr;
 }
@@ -2537,7 +2539,7 @@ void* hcl_server_callocmem (hcl_server_t* server, hcl_oow_t size)
 {
 	void* ptr;
 
-	ptr = HCL_MMGR_ALLOC(server->mmgr, size);
+	ptr = HCL_MMGR_ALLOC(server->_mmgr, size);
 	if (!ptr) hcl_server_seterrnum (server, HCL_ESYSMEM);
 	else HCL_MEMSET (ptr, 0, size);
 	return ptr;
@@ -2545,12 +2547,12 @@ void* hcl_server_callocmem (hcl_server_t* server, hcl_oow_t size)
 
 void* hcl_server_reallocmem (hcl_server_t* server, void* ptr, hcl_oow_t size)
 {
-	ptr = HCL_MMGR_REALLOC(server->mmgr, ptr, size);
+	ptr = HCL_MMGR_REALLOC(server->_mmgr, ptr, size);
 	if (!ptr) hcl_server_seterrnum (server, HCL_ESYSMEM);
 	return ptr;
 }
 
 void hcl_server_freemem (hcl_server_t* server, void* ptr)
 {
-	HCL_MMGR_FREE (server->mmgr, ptr);
+	HCL_MMGR_FREE (server->_mmgr, ptr);
 }

@@ -67,7 +67,7 @@ HCL_INLINE hcl_rbt_pair_t* hcl_rbt_allocpair (
 	if (kcop == HCL_RBT_COPIER_INLINE) as += HCL_ALIGN_POW2(KTOB(rbt,klen), HCL_SIZEOF_VOID_P);
 	if (vcop == HCL_RBT_COPIER_INLINE) as += VTOB(rbt,vlen);
 
-	pair = (hcl_rbt_pair_t*) HCL_MMGR_ALLOC (rbt->hcl->mmgr, as);
+	pair = (hcl_rbt_pair_t*) HCL_MMGR_ALLOC (hcl_getmmgr(rbt->hcl), as);
 	if (pair == HCL_NULL) return HCL_NULL;
 
 	pair->color = HCL_RBT_RED;
@@ -90,7 +90,7 @@ HCL_INLINE hcl_rbt_pair_t* hcl_rbt_allocpair (
 		KPTR(pair) = kcop (rbt, kptr, klen);
 		if (KPTR(pair) == HCL_NULL)
 		{
-			HCL_MMGR_FREE (rbt->hcl->mmgr, pair);
+			hcl_freemem (rbt->hcl, pair);
 			return HCL_NULL;
 		}
 	}
@@ -114,7 +114,7 @@ HCL_INLINE hcl_rbt_pair_t* hcl_rbt_allocpair (
 		{
 			if (rbt->style->freeer[HCL_RBT_KEY] != HCL_NULL)
 				rbt->style->freeer[HCL_RBT_KEY] (rbt, KPTR(pair), KLEN(pair));
-			HCL_MMGR_FREE (rbt->hcl->mmgr, pair);
+			hcl_freemem (rbt->hcl, pair);
 			return HCL_NULL;
 		}
 	}
@@ -128,7 +128,7 @@ HCL_INLINE void hcl_rbt_freepair (hcl_rbt_t* rbt, hcl_rbt_pair_t* pair)
 		rbt->style->freeer[HCL_RBT_KEY] (rbt, KPTR(pair), KLEN(pair));
 	if (rbt->style->freeer[HCL_RBT_VAL] != HCL_NULL)
 		rbt->style->freeer[HCL_RBT_VAL] (rbt, VPTR(pair), VLEN(pair));
-	HCL_MMGR_FREE (rbt->hcl->mmgr, pair);
+	hcl_freemem (rbt->hcl, pair);
 }
 
 static hcl_rbt_style_t style[] =
@@ -195,12 +195,12 @@ hcl_rbt_t* hcl_rbt_open (hcl_t* hcl, hcl_oow_t xtnsize, int kscale, int vscale)
 {
 	hcl_rbt_t* rbt;
 
-	rbt = (hcl_rbt_t*) HCL_MMGR_ALLOC (hcl->mmgr, HCL_SIZEOF(hcl_rbt_t) + xtnsize);
-	if (rbt == HCL_NULL) return HCL_NULL;
+	rbt = (hcl_rbt_t*)hcl_allocmem(hcl, HCL_SIZEOF(hcl_rbt_t) + xtnsize);
+	if (!rbt) return HCL_NULL;
 
-	if (hcl_rbt_init (rbt, hcl, kscale, vscale) <= -1)
+	if (hcl_rbt_init(rbt, hcl, kscale, vscale) <= -1)
 	{
-		HCL_MMGR_FREE (hcl->mmgr, rbt);
+		hcl_freemem (hcl, rbt);
 		return HCL_NULL;
 	}
 
@@ -211,7 +211,7 @@ hcl_rbt_t* hcl_rbt_open (hcl_t* hcl, hcl_oow_t xtnsize, int kscale, int vscale)
 void hcl_rbt_close (hcl_rbt_t* rbt)
 {
 	hcl_rbt_fini (rbt);
-	HCL_MMGR_FREE (rbt->hcl->mmgr, rbt);
+	hcl_freemem (rbt->hcl, rbt);
 }
 
 int hcl_rbt_init (hcl_rbt_t* rbt, hcl_t* hcl, int kscale, int vscale)

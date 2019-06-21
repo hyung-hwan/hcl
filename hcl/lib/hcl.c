@@ -53,7 +53,7 @@ hcl_t* hcl_open (hcl_mmgr_t* mmgr, hcl_oow_t xtnsize, hcl_oow_t heapsize, const 
 void hcl_close (hcl_t* hcl)
 {
 	hcl_fini (hcl);
-	HCL_MMGR_FREE (hcl->mmgr, hcl);
+	HCL_MMGR_FREE (hcl_getmmgr(hcl), hcl);
 }
 
 static void fill_bigint_tables (hcl_t* hcl)
@@ -85,12 +85,12 @@ static void fill_bigint_tables (hcl_t* hcl)
 
 static void* alloc_heap (hcl_t* hcl, hcl_oow_t size)
 {
-	return HCL_MMGR_ALLOC(hcl->mmgr, size);
+	return hcl_allocmem(hcl, size);
 }
 
 static void free_heap (hcl_t* hcl, void* ptr)
 {
-	HCL_MMGR_FREE(hcl->mmgr, ptr);
+	hcl_freemem (hcl, ptr);
 }
 
 int hcl_init (hcl_t* hcl, hcl_mmgr_t* mmgr, hcl_oow_t heapsz, const hcl_vmprim_t* vmprim)
@@ -112,8 +112,9 @@ int hcl_init (hcl_t* hcl, hcl_mmgr_t* mmgr, hcl_oow_t heapsz, const hcl_vmprim_t
 #endif
 
 	HCL_MEMSET (hcl, 0, HCL_SIZEOF(*hcl));
-	hcl->mmgr = mmgr;
-	hcl->cmgr = hcl_get_utf8_cmgr();
+	hcl->_instsize = HCL_SIZEOF(*hcl);
+	hcl->_mmgr = mmgr;
+	hcl->_cmgr = hcl_get_utf8_cmgr();
 	hcl->vmprim = *vmprim;
 	if (!hcl->vmprim.alloc_heap) hcl->vmprim.alloc_heap = alloc_heap;
 	if (!hcl->vmprim.free_heap) hcl->vmprim.free_heap = free_heap;
@@ -475,7 +476,7 @@ void* hcl_allocmem (hcl_t* hcl, hcl_oow_t size)
 {
 	void* ptr;
 
-	ptr = HCL_MMGR_ALLOC (hcl->mmgr, size);
+	ptr = HCL_MMGR_ALLOC (hcl_getmmgr(hcl), size);
 	if (!ptr) hcl_seterrnum (hcl, HCL_ESYSMEM);
 	return ptr;
 }
@@ -484,7 +485,7 @@ void* hcl_callocmem (hcl_t* hcl, hcl_oow_t size)
 {
 	void* ptr;
 
-	ptr = HCL_MMGR_ALLOC (hcl->mmgr, size);
+	ptr = HCL_MMGR_ALLOC (hcl_getmmgr(hcl), size);
 	if (!ptr) hcl_seterrnum (hcl, HCL_ESYSMEM);
 	else HCL_MEMSET (ptr, 0, size);
 	return ptr;
@@ -492,14 +493,14 @@ void* hcl_callocmem (hcl_t* hcl, hcl_oow_t size)
 
 void* hcl_reallocmem (hcl_t* hcl, void* ptr, hcl_oow_t size)
 {
-	ptr = HCL_MMGR_REALLOC (hcl->mmgr, ptr, size);
+	ptr = HCL_MMGR_REALLOC (hcl_getmmgr(hcl), ptr, size);
 	if (!ptr) hcl_seterrnum (hcl, HCL_ESYSMEM);
 	return ptr;
 }
 
 void hcl_freemem (hcl_t* hcl, void* ptr)
 {
-	HCL_MMGR_FREE (hcl->mmgr, ptr);
+	HCL_MMGR_FREE (hcl_getmmgr(hcl), ptr);
 }
 
 

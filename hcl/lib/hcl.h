@@ -1071,8 +1071,9 @@ typedef struct hcl_compiler_t hcl_compiler_t;
 
 struct hcl_t
 {
-	hcl_mmgr_t*  mmgr;
-	hcl_cmgr_t*  cmgr;
+	hcl_oow_t    _instsize;
+	hcl_mmgr_t*  _mmgr;
+	hcl_cmgr_t*  _cmgr;
 
 	hcl_errnum_t errnum;
 	struct
@@ -1433,20 +1434,19 @@ HCL_EXPORT void hcl_setinloc (
 );
 
 #if defined(HCL_HAVE_INLINE)
-	static HCL_INLINE hcl_mmgr_t* hcl_getmmgr (hcl_t* hcl) { return hcl->mmgr; }
-	static HCL_INLINE void* hcl_getxtn (hcl_t* hcl) { return (void*)(hcl + 1); }
+	static HCL_INLINE hcl_mmgr_t* hcl_getmmgr (hcl_t* hcl) { return hcl->_mmgr; }
+	static HCL_INLINE void* hcl_getxtn (hcl_t* hcl) { return (void*)((hcl_uint8_t*)hcl + hcl->_instsize); }
 
-	static HCL_INLINE hcl_cmgr_t* hcl_getcmgr (hcl_t* hcl) { return hcl->cmgr; }
-	static HCL_INLINE void hcl_setcmgr (hcl_t* hcl, hcl_cmgr_t* cmgr) { hcl->cmgr = cmgr; }
+	static HCL_INLINE hcl_cmgr_t* hcl_getcmgr (hcl_t* hcl) { return hcl->_cmgr; }
+	static HCL_INLINE void hcl_setcmgr (hcl_t* hcl, hcl_cmgr_t* cmgr) { hcl->_cmgr = cmgr; }
 
 	static HCL_INLINE hcl_errnum_t hcl_geterrnum (hcl_t* hcl) { return hcl->errnum; }
-	
 #else
-#	define hcl_getmmgr(hcl) (((hcl_t*)(hcl))->mmgr)
-#	define hcl_getxtn(hcl) ((void*)((hcl_t*)(hcl) + 1))
+#	define hcl_getmmgr(hcl) (((hcl_t*)(hcl))->_mmgr)
+#	define hcl_getxtn(hcl) ((void*)((hcl_uint8_t*)hcl + ((hcl_t*)hcl)->_instsize))
 
-#	define hcl_getcmgr(hcl) (((hcl_t*)(hcl))->cmgr)
-#	define hcl_setcmgr(hcl,mgr) (((hcl_t*)(hcl))->cmgr = (mgr))
+#	define hcl_getcmgr(hcl) (((hcl_t*)(hcl))->_cmgr)
+#	define hcl_setcmgr(hcl,cmgr) (((hcl_t*)(hcl))->_cmgr = (cmgr))
 
 #	define hcl_geterrnum(hcl) (((hcl_t*)(hcl))->errnum)
 #endif
