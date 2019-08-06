@@ -799,6 +799,12 @@ typedef struct hcl_t hcl_t;
 #	undef HCL_HAVE_INLINE
 #endif
 
+#if defined(__GNUC__) && (__GNUC__ > 2 || (__GNUC__ == 2 && __GNUC_MINOR__ > 4))
+#	define HCL_UNUSED __attribute__((__unused__))
+#else
+#	define HCL_UNUSED
+#endif
+
 /**
  * The HCL_TYPE_IS_SIGNED() macro determines if a type is signed.
  * \code
@@ -1011,5 +1017,20 @@ typedef struct hcl_t hcl_t;
 #	define HCL_UNLIKELY(x) (x)
 #endif
 
+/* =========================================================================
+ * STATIC ASSERTION
+ * =========================================================================*/
+#define HCL_STATIC_JOIN_INNER(x, y) x ## y
+#define HCL_STATIC_JOIN(x, y) HCL_STATIC_JOIN_INNER(x, y)
+
+#if defined(__STDC_VERSION__) && (__STDC_VERSION__ >= 201112L)
+#	define HCL_STATIC_ASSERT(expr)  _Static_assert (expr, "invalid assertion")
+#elif defined(__cplusplus) && (__cplusplus >= 201103L)
+#	define HCL_STATIC_ASSERT(expr) static_assert (expr, "invalid assertion")
+#else
+#	define HCL_STATIC_ASSERT(expr) typedef char HCL_STATIC_JOIN(HCL_STATIC_ASSERT_T_, __LINE__)[(expr)? 1: -1] HCL_UNUSED
+#endif
+
+#define HCL_STATIC_ASSERT_EXPR(expr) ((void)HCL_SIZEOF(char[(expr)? 1: -1]))
 
 #endif
