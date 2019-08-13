@@ -446,6 +446,28 @@ struct hcl_obj_word_t
 #define HCL_OBJ_GET_BYTE_SLOT(oop)     (((hcl_oop_byte_t)(oop))->slot)
 #define HCL_OBJ_GET_HALFWORD_SLOT(oop) (((hcl_oop_halfword_t)(oop))->slot)
 #define HCL_OBJ_GET_WORD_SLOT(oop)     (((hcl_oop_word_t)(oop))->slot)
+#define HCL_OBJ_GET_LIWORD_SLOT(oop)   (((hcl_oop_liword_t)(oop))->slot)
+
+#define HCL_OBJ_GET_OOP_PTR(oop,idx)      (&(((hcl_oop_oop_t)(oop))->slot)[idx])
+#define HCL_OBJ_GET_CHAR_PTR(oop,idx)     (&(((hcl_oop_char_t)(oop))->slot)[idx])
+#define HCL_OBJ_GET_BYTE_PTR(oop,idx)     (&(((hcl_oop_byte_t)(oop))->slot)[idx])
+#define HCL_OBJ_GET_HALFWORD_PTR(oop,idx) (&(((hcl_oop_halfword_t)(oop))->slot)[idx])
+#define HCL_OBJ_GET_WORD_PTR(oop,idx)     (&(((hcl_oop_word_t)(oop))->slot)[idx])
+#define HCL_OBJ_GET_LIWORD_PTR(oop,idx)   (&(((hcl_oop_liword_t)(oop))->slot)[idx])
+
+#define HCL_OBJ_GET_OOP_VAL(oop,idx)      ((((hcl_oop_oop_t)(oop))->slot)[idx])
+#define HCL_OBJ_GET_CHAR_VAL(oop,idx)     ((((hcl_oop_char_t)(oop))->slot)[idx])
+#define HCL_OBJ_GET_BYTE_VAL(oop,idx)     ((((hcl_oop_byte_t)(oop))->slot)[idx])
+#define HCL_OBJ_GET_HALFWORD_VAL(oop,idx) ((((hcl_oop_halfword_t)(oop))->slot)[idx])
+#define HCL_OBJ_GET_WORD_VAL(oop,idx)     ((((hcl_oop_word_t)(oop))->slot)[idx])
+#define HCL_OBJ_GET_LIWORD_VAL(oop,idx)   ((((hcl_oop_liword_t)(oop))->slot)[idx])
+
+#define HCL_OBJ_SET_OOP_VAL(oop,idx,val)      ((((hcl_oop_oop_t)(oop))->slot)[idx] = (val)) /* [NOTE] HCL_STORE_OOP() */
+#define HCL_OBJ_SET_CHAR_VAL(oop,idx,val)     ((((hcl_oop_char_t)(oop))->slot)[idx] = (val))
+#define HCL_OBJ_SET_BYTE_VAL(oop,idx,val)     ((((hcl_oop_byte_t)(oop))->slot)[idx] = (val))
+#define HCL_OBJ_SET_HALFWORD_VAL(oop,idx,val) ((((hcl_oop_halfword_t)(oop))->slot)[idx] = (val))
+#define HCL_OBJ_SET_WORD_VAL(oop,idx,val)     ((((hcl_oop_word_t)(oop))->slot)[idx] = (val))
+#define HCL_OBJ_SET_LIWORD_VAL(oop,idx,val)   ((((hcl_oop_liword_t)(oop))->slot)[idx] = (val))
 
 typedef struct hcl_trailer_t hcl_trailer_t;
 struct hcl_trailer_t
@@ -1953,17 +1975,28 @@ HCL_EXPORT hcl_oop_t hcl_makebigint (
 	hcl_oow_t        len
 );
 
-HCL_EXPORT int hcl_inttooow (
-	hcl_t*     hcl,
-	hcl_oop_t  x,
-	hcl_oow_t* w
-);
+#if (HCL_SIZEOF_UINTMAX_T == HCL_SIZEOF_OOW_T)
+#	define hcl_inttouintmax hcl_inttooow
+#	define hcl_inttointmax hcl_inttoooi
+#	define hcl_uintmaxtoint hcl_oowtoint
+#	define hcl_intmaxtoint hcl_ooitoint
+#else
 
 HCL_EXPORT hcl_oop_t hcl_oowtoint (
 	hcl_t*     hcl,
 	hcl_oow_t  w
 );
 
+HCL_EXPORT hcl_oop_t hcl_ooitoint (
+	hcl_t*    hcl,
+	hcl_ooi_t i
+);
+
+HCL_EXPORT int hcl_inttooow (
+	hcl_t*     hcl,
+	hcl_oop_t  x,
+	hcl_oow_t* w
+);
 
 HCL_EXPORT int hcl_inttoooi (
 	hcl_t*     hcl,
@@ -1971,10 +2004,28 @@ HCL_EXPORT int hcl_inttoooi (
 	hcl_ooi_t* i
 );
 
-HCL_EXPORT hcl_oop_t hcl_ooitoint (
-	hcl_t*    hcl,
-	hcl_ooi_t i
+HCL_EXPORT hcl_oop_t hcl_intmaxtoint (
+	hcl_t*       hcl,
+	hcl_intmax_t i
 );
+
+HCL_EXPORT hcl_oop_t hcl_uintmaxtoint (
+	hcl_t*        hcl,
+	hcl_uintmax_t i
+);
+
+HCL_EXPORT int hcl_inttouintmax (
+	hcl_t*         hcl,
+	hcl_oop_t      x,
+	hcl_uintmax_t* w
+);
+
+HCL_EXPORT int hcl_inttointmax (
+	hcl_t*        hcl,
+	hcl_oop_t     x,
+	hcl_intmax_t* i
+);
+#endif
 
 /* =========================================================================
  * CONS OBJECT UTILITIES

@@ -338,6 +338,124 @@ int hcl_inttoooi (hcl_t* hcl, hcl_oop_t x, hcl_ooi_t* i)
 	return n;
 }
 
+
+
+#if (HCL_SIZEOF_UINTMAX_T == HCL_SIZEOF_OOW_T)
+
+	/* do nothing. required macros are defined in hcl.h */
+
+#elif (HCL_SIZEOF_UINTMAX_T == HCL_SIZEOF_OOW_T * 2)
+static HCL_INLINE int bigint_to_uintmax (hcl_t* hcl, hcl_oop_t num, hcl_uintmax_t* w)
+{
+	HCL_ASSERT (hcl, HCL_OOP_IS_POINTER(num));
+	HCL_ASSERT (hcl, HCL_IS_PBIGINT(hcl, num) || HCL_IS_NBIGINT(hcl, num));
+
+#if (HCL_LIW_BITS == HCL_OOW_BITS)
+	HCL_ASSERT (hcl, HCL_OBJ_GET_SIZE(num) >= 1);
+
+	switch (HCL_OBJ_GET_SIZE(num))
+	{
+		case 1:
+			*w = (hcl_uintmax_t)HCL_OBJ_GET_WORD_VAL(num, 0);
+			goto done;
+
+		case 2:
+			*w = ((hcl_uintmax_t)HCL_OBJ_GET_WORD_VAL(num, 0) << HCL_LIW_BITS) | HCL_OBJ_GET_WORD_VAL(num, 1);
+			goto done;
+
+		default:
+			goto oops_range;
+	}
+
+#elif (HCL_LIW_BITS == HCL_OOHW_BITS)
+	HCL_ASSERT (hcl, HCL_OBJ_GET_SIZE(num) >= 2);
+	switch (HCL_OBJ_GET_SIZE(num))
+	{
+		case 2:
+			*w = ((hcl_uintmax_t)HCL_OBJ_GET_HALFWORD_VAL(num, 0) << HCL_LIW_BITS) | HCL_OBJ_GET_HALFWORD_VAL(num, 1);
+			goto done;
+
+		case 4:
+			*w = ((hcl_uintmax_t)HCL_OBJ_GET_HALFWORD_VAL(num, 0) << HCL_LIW_BITS * 3) | 
+			     ((hcl_uintmax_t)HCL_OBJ_GET_HALFWORD_VAL(num, 1) << HCL_LIW_BITS * 2) |
+			     ((hcl_uintmax_t)HCL_OBJ_GET_HALFWORD_VAL(num, 2) << HCL_LIW_BITS * 1) |
+			     HCL_OBJ_GET_HALFWORD_VAL(num, 3);
+			goto done;
+
+		default:
+			goto oops_range;
+	}
+#else
+#	error UNSUPPORTED LIW BIT SIZE
+#endif
+
+done:
+	return (HCL_IS_NBIGINT(hcl, num))? -1: 1;
+
+oops_range:
+	hcl_seterrnum (hcl, HCL_ERANGE);
+	return 0; /* not convertable */
+}
+
+int hcl_inttouintmax (hcl_t* hcl, hcl_oop_t x, hcl_uintmax_t* w)
+{
+	if (HCL_OOP_IS_SMOOI(x))
+	{
+		hcl_ooi_t v;
+
+		v = HCL_OOP_TO_SMOOI(x);
+		if (v < 0)
+		{
+			*w = -v;
+			return -1; /* negative number negated - kind of an error */
+		}
+		else
+		{
+			*w = v;
+			return 1; /* zero or positive number */
+		}
+	}
+
+	if (hcl_isbigint(hcl, x)) return bigint_to_uintmax(hcl, x, w);
+
+	hcl_seterrbfmt (hcl, HCL_EINVAL, "not an integer - %O", x);
+	return 0; /* not convertable - too big, too small, or not an integer */
+}
+
+int hcl_inttointmax (hcl_t* hcl, hcl_oop_t x, hcl_intmax_t* i)
+{
+	hcl_uintmax_t w;
+	int n;
+
+	n = hcl_inttouintmax(hcl, x, &w);
+	if (n < 0) 
+	{
+		HCL_STATIC_ASSERT (HCL_TYPE_MAX(hcl_intmax_t) + HCL_TYPE_MIN(hcl_intmax_t) == -1); /* assume 2's complement */
+		if (w > (hcl_uintmax_t)HCL_TYPE_MAX(hcl_intmax_t) + 1)
+		{
+			hcl_seterrnum (hcl, HCL_ERANGE); /* not convertable. number too small */
+			return 0;
+		}
+		*i = -w;
+	}
+	else if (n > 0) 
+	{
+		if (w > HCL_TYPE_MAX(hcl_intmax_t)) 
+		{
+			hcl_seterrnum (hcl, HCL_ERANGE); /* not convertable. number too big */
+			return 0;
+		}
+		*i = w;
+	}
+
+	return n;
+}
+
+#else
+#	error UNSUPPORTED UINTMAX SIZE
+#endif
+
+
 static HCL_INLINE hcl_oop_t make_bigint_with_oow (hcl_t* hcl, hcl_oow_t w)
 {
 #if (HCL_LIW_BITS == HCL_OOW_BITS)
@@ -358,7 +476,7 @@ static HCL_INLINE hcl_oop_t make_bigint_with_ooi (hcl_t* hcl, hcl_ooi_t i)
 #if (HCL_LIW_BITS == HCL_OOW_BITS)
 	hcl_oow_t w;
 
-	HCL_ASSERT (hcl, HCL_SIZEOF(hcl_oow_t) == HCL_SIZEOF(hcl_liw_t));
+	HCL_STATIC_ASSERT (hcl, HCL_SIZEOF(hcl_oow_t) == HCL_SIZEOF(hcl_liw_t));
 	if (i >= 0)
 	{
 		w = i;
@@ -366,17 +484,14 @@ static HCL_INLINE hcl_oop_t make_bigint_with_ooi (hcl_t* hcl, hcl_ooi_t i)
 	}
 	else
 	{
-		/* The caller must ensure that i is greater than the smallest value
-		 * that hcl_ooi_t can represent. otherwise, the absolute value 
-		 * cannot be held in hcl_ooi_t. */
-		HCL_ASSERT (hcl, i > HCL_TYPE_MIN(hcl_ooi_t));
-		w = -i;
+		w = (i == HCL_TYPE_MIN(hcl_ooi_t))? ((hcl_oow_t)HCL_TYPE_MAX(hcl_ooi_t) + 1): -i;
 		return hcl_makebigint(hcl, HCL_BRAND_NBIGINT, &w, 1);
 	}
 #elif (HCL_LIW_BITS == HCL_OOHW_BITS)
 	hcl_liw_t hw[2];
 	hcl_oow_t w;
 
+	HCL_STATIC_ASSERT (HCL_SIZEOF(hcl_oohw_t) == HCL_SIZEOF(hcl_liw_t));
 	if (i >= 0)
 	{
 		w = i;
@@ -386,8 +501,8 @@ static HCL_INLINE hcl_oop_t make_bigint_with_ooi (hcl_t* hcl, hcl_ooi_t i)
 	}
 	else
 	{
-		HCL_ASSERT (hcl, i > HCL_TYPE_MIN(hcl_ooi_t));
 		w = -i;
+		w = (i == HCL_TYPE_MIN(hcl_ooi_t))? ((hcl_oow_t)HCL_TYPE_MAX(hcl_ooi_t) + 1): -i;
 		hw[0] = w /*& HCL_LBMASK(hcl_oow_t,HCL_LIW_BITS)*/;
 		hw[1] = w >> HCL_LIW_BITS;
 		return hcl_makebigint(hcl, HCL_BRAND_NBIGINT, hw, (hw[1] > 0? 2: 1));
@@ -404,7 +519,7 @@ static HCL_INLINE hcl_oop_t make_bloated_bigint_with_ooi (hcl_t* hcl, hcl_ooi_t 
 	hcl_oop_t z;
 
 	HCL_ASSERT (hcl, extra <= HCL_OBJ_SIZE_MAX - 1); 
-	HCL_ASSERT (hcl, HCL_SIZEOF(hcl_oow_t) == HCL_SIZEOF(hcl_liw_t));
+	HCL_STATIC_ASSERT (hcl, HCL_SIZEOF(hcl_oow_t) == HCL_SIZEOF(hcl_liw_t));
 	if (i >= 0)
 	{
 		w = i;
@@ -412,13 +527,12 @@ static HCL_INLINE hcl_oop_t make_bloated_bigint_with_ooi (hcl_t* hcl, hcl_ooi_t 
 	}
 	else
 	{
-		HCL_ASSERT (hcl, i > HCL_TYPE_MIN(hcl_ooi_t));
-		w = -i;
+		w = (i == HCL_TYPE_MIN(hcl_ooi_t))? ((hcl_oow_t)HCL_TYPE_MAX(hcl_ooi_t) + 1): -i;
 		z = hcl_makebigint(hcl, HCL_BRAND_NBIGINT, HCL_NULL, 1 + extra);
 	}
 
 	if (!z) return HCL_NULL;
-	((hcl_oop_liword_t)z)->slot[0] = w;
+	HCL_OBJ_SET_LIWORD_VAL (z, 0, w);
 	return z;
 
 #elif (HCL_LIW_BITS == HCL_OOHW_BITS)
@@ -436,16 +550,15 @@ static HCL_INLINE hcl_oop_t make_bloated_bigint_with_ooi (hcl_t* hcl, hcl_ooi_t 
 	}
 	else
 	{
-		HCL_ASSERT (hcl, i > HCL_TYPE_MIN(hcl_ooi_t));
-		w = -i;
+		w = (i == HCL_TYPE_MIN(hcl_ooi_t))? ((hcl_oow_t)HCL_TYPE_MAX(hcl_ooi_t) + 1): -i;
 		hw[0] = w /*& HCL_LBMASK(hcl_oow_t,HCL_LIW_BITS)*/;
 		hw[1] = w >> HCL_LIW_BITS;
 		z = hcl_makebigint(hcl, HCL_BRAND_NBIGINT, HCL_NULL, (hw[1] > 0? 2: 1) + extra);
 	}
 
 	if (!z) return HCL_NULL;
-	((hcl_oop_liword_t)z)->slot[0] = hw[0];
-	if (hw[1] > 0) ((hcl_oop_liword_t)z)->slot[1] = hw[1];
+	HCL_OBJ_SET_LIWORD_VAL (z, 0, hw[0]);
+	if (hw[1] > 0) HCL_OBJ_SET_LIWORD_VAL (z, 1, hw[1]);
 	return z;
 #else
 #	error UNSUPPORTED LIW BIT SIZE
@@ -457,12 +570,23 @@ static HCL_INLINE hcl_oop_t make_bigint_with_intmax (hcl_t* hcl, hcl_intmax_t v)
 	hcl_oow_t len;
 	hcl_liw_t buf[HCL_SIZEOF_INTMAX_T / HCL_SIZEOF_LIW_T];
 	hcl_uintmax_t ui;
+	int brand;
 
 	/* this is not a generic function. it can't handle v 
 	 * if it's HCL_TYPE_MIN(hcl_intmax_t) */
 	HCL_ASSERT (hcl, v > HCL_TYPE_MIN(hcl_intmax_t));
 
-	ui = (v >= 0)? v: -v;
+	if (v >= 0)
+	{
+		ui = v;
+		brand = HCL_BRAND_PBIGINT;
+	}
+	else
+	{
+		ui = (v == HCL_TYPE_MIN(hcl_intmax_t))? ((hcl_uintmax_t)HCL_TYPE_MAX(hcl_intmax_t) + 1): -v;
+		brand = HCL_BRAND_NBIGINT;
+	}
+
 	len = 0;
 	do
 	{
@@ -471,7 +595,23 @@ static HCL_INLINE hcl_oop_t make_bigint_with_intmax (hcl_t* hcl, hcl_intmax_t v)
 	}
 	while (ui > 0);
 
-	return hcl_makebigint(hcl, ((v >= 0)? HCL_BRAND_PBIGINT: HCL_BRAND_NBIGINT), buf, len);
+	return hcl_makebigint(hcl, brand, buf, len);
+}
+
+static HCL_INLINE hcl_oop_t make_bigint_with_uintmax (hcl_t* hcl, hcl_uintmax_t ui)
+{
+	hcl_oow_t len;
+	hcl_liw_t buf[HCL_SIZEOF_INTMAX_T / HCL_SIZEOF_LIW_T];
+
+	len = 0;
+	do
+	{
+		buf[len++] = (hcl_liw_t)ui;
+		ui = ui >> HCL_LIW_BITS;
+	}
+	while (ui > 0);
+
+	return hcl_makebigint(hcl, HCL_BRAND_PBIGINT, buf, len);
 }
 
 hcl_oop_t hcl_oowtoint (hcl_t* hcl, hcl_oow_t w)
@@ -497,6 +637,30 @@ hcl_oop_t hcl_ooitoint (hcl_t* hcl, hcl_ooi_t i)
 	else
 	{
 		return make_bigint_with_ooi (hcl, i);
+	}
+}
+
+hcl_oop_t hcl_intmaxtoint (hcl_t* hcl, hcl_intmax_t i)
+{
+	if (HCL_IN_SMOOI_RANGE(i))
+	{
+		return HCL_SMOOI_TO_OOP(i);
+	}
+	else
+	{
+		return make_bigint_with_intmax(hcl, i);
+	}
+}
+
+hcl_oop_t hcl_uintmaxtoint (hcl_t* hcl, hcl_uintmax_t i)
+{
+	if (HCL_IN_SMOOI_RANGE(i))
+	{
+		return HCL_SMOOI_TO_OOP(i);
+	}
+	else
+	{
+		return make_bigint_with_uintmax(hcl, i);
 	}
 }
 
@@ -3534,9 +3698,9 @@ hcl_oop_t hcl_bitinvint (hcl_t* hcl, hcl_oop_t x)
 			carry = 1;
 			for (i = 0; i < xs; i++)
 			{
-				w = (hcl_lidw_t)((hcl_liw_t)~((hcl_oop_liword_t)x)->slot[i]) + carry;
+				w = (hcl_lidw_t)((hcl_liw_t)~HCL_OBJ_GET_LIWORD_VAL(x, i)) + carry;
 				carry = w >> HCL_LIW_BITS;
-				((hcl_oop_liword_t)z)->slot[i] = ~(hcl_liw_t)w;
+				HCL_OBJ_SET_LIWORD_VAL (z, i, ~(hcl_liw_t)w);
 			}
 			HCL_ASSERT (hcl, carry == 0);
 		}
@@ -3547,28 +3711,28 @@ hcl_oop_t hcl_bitinvint (hcl_t* hcl, hcl_oop_t x)
 		#if 0
 			for (i = 0; i < xs; i++)
 			{
-				((hcl_oop_liword_t)z)->slot[i] = ~((hcl_oop_liword_t)x)->slot[i];
+				HCL_OBJ_SET_LIWORD_VAL (z, i, ~HCL_OBJ_GET_LIWORD_VAL(x, i));
 			}
 
-			((hcl_oop_liword_t)z)->slot[zs] = ~(hcl_liw_t)0;
+			HCL_OBJ_SET_LIWORD_VAL (z, zs, ~(hcl_liw_t)0);
 			carry = 1;
 			for (i = 0; i <= zs; i++)
 			{
-				w = (hcl_lidw_t)((hcl_liw_t)~((hcl_oop_liword_t)z)->slot[i]) + carry;
+				w = (hcl_lidw_t)((hcl_liw_t)~HCL_OBJ_GET_LIWORD_VAL(z, i)) + carry;
 				carry = w >> HCL_LIW_BITS;
-				((hcl_oop_liword_t)z)->slot[i] = (hcl_liw_t)w;
+				HCL_OBJ_SET_LIWORD_VAL (z, i, (hcl_liw_t)w);
 			}
 			HCL_ASSERT (hcl, carry == 0);
 		#else
 			carry = 1;
 			for (i = 0; i < xs; i++)
 			{
-				w = (hcl_lidw_t)(((hcl_oop_liword_t)x)->slot[i]) + carry;
+				w = (hcl_lidw_t)(HCL_OBJ_GET_LIWORD_VAL(x, i)) + carry;
 				carry = w >> HCL_LIW_BITS;
-				((hcl_oop_liword_t)z)->slot[i] = (hcl_liw_t)w;
+				HCL_OBJ_SET_LIWORD_VAL (z, i, (hcl_liw_t)w);
 			}
 			HCL_ASSERT (hcl, i == zs);
-			((hcl_oop_liword_t)z)->slot[i] = (hcl_liw_t)carry;
+			HCL_OBJ_SET_LIWORD_VAL (z, i, (hcl_liw_t)carry);
 			HCL_ASSERT (hcl, (carry >> HCL_LIW_BITS) == 0);
 		#endif
 
@@ -3605,7 +3769,7 @@ static HCL_INLINE hcl_oop_t rshift_negative_bigint (hcl_t* hcl, hcl_oop_t x, hcl
 	{
 		w = (hcl_lidw_t)((hcl_liw_t)~((hcl_oop_liword_t)x)->slot[i]) + carry;
 		carry = w >> HCL_LIW_BITS;
-		((hcl_oop_liword_t)z)->slot[i] = ~(hcl_liw_t)w;
+		HCL_OBJ_SET_LIWORD_VAL (z, i, ~(hcl_liw_t)w);
 	}
 	HCL_ASSERT (hcl, carry == 0);
 
@@ -3616,16 +3780,17 @@ static HCL_INLINE hcl_oop_t rshift_negative_bigint (hcl_t* hcl, hcl_oop_t x, hcl
 #if 0
 	for (i = 0; i < xs; i++)
 	{
-		((hcl_oop_liword_t)z)->slot[i] = ~((hcl_oop_liword_t)z)->slot[i];
+		HCL_OBJ_SET_LIWORD_VAL (z, i, ~HCL_OBJ_GET_LIWORD_VAL(z, i));
 	}
-	((hcl_oop_liword_t)z)->slot[xs] = ~(hcl_liw_t)0;
+	HCL_OBJ_SET_LIWORD_VAL (z, xs, ~(hcl_liw_t)0);
+
 
 	carry = 1;
 	for (i = 0; i <= xs; i++)
 	{
 		w = (hcl_lidw_t)((hcl_liw_t)~((hcl_oop_liword_t)z)->slot[i]) + carry;
 		carry = w >> HCL_LIW_BITS;
-		((hcl_oop_liword_t)z)->slot[i] = (hcl_liw_t)w;
+		HCL_OBJ_SET_LIWORD_VAL (z, i, (hcl_liw_t)w);
 	}
 	HCL_ASSERT (hcl, carry == 0);
 #else
@@ -3636,7 +3801,7 @@ static HCL_INLINE hcl_oop_t rshift_negative_bigint (hcl_t* hcl, hcl_oop_t x, hcl
 		carry = w >> HCL_LIW_BITS;
 		((hcl_oop_liword_t)z)->slot[i] = (hcl_liw_t)w;
 	}
-	((hcl_oop_liword_t)z)->slot[i] = (hcl_liw_t)carry;
+	HCL_OBJ_SET_LIWORD_VAL (z, i, (hcl_liw_t)carry);
 	HCL_ASSERT (hcl, (carry >> HCL_LIW_BITS) == 0);
 #endif
 
@@ -3750,7 +3915,7 @@ static HCL_INLINE hcl_oop_t rshift_positive_bigint_and_normalize (hcl_t* hcl, hc
 	{
 		rshift_unsigned_array (((hcl_oop_liword_t)z)->slot, zs, shift);
 		if (count_effective (((hcl_oop_liword_t)z)->slot, zs) == 1 &&
-		    ((hcl_oop_liword_t)z)->slot[0] == 0) 
+		    HCL_OBJ_GET_LIWORD_VAL(z, 0) == 0) 
 		{
 			/* if z is 0, i don't have to go on */
 			break;
