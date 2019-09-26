@@ -610,6 +610,7 @@ struct hcl_ntime_t
 
 #define HCL_SIZEOF(x) (sizeof(x))
 #define HCL_COUNTOF(x) (sizeof(x) / sizeof((x)[0]))
+#define HCL_BITSOF(x) (sizeof(x) * HCL_BITS_PER_BYTE)
 
 /**
  * The HCL_OFFSETOF() macro returns the offset of a field from the beginning
@@ -636,11 +637,11 @@ struct hcl_ntime_t
 
 /* make a bit mask that can mask off low n bits */
 #define HCL_LBMASK(type,n) (~(~((type)0) << (n))) 
-#define HCL_LBMASK_SAFE(type,n) (((n) < HCL_SIZEOF(type) * HCL_BITS_PER_BYTE)? HCL_LBMASK(type,n): ~(type)0)
+#define HCL_LBMASK_SAFE(type,n) (((n) < HCL_BITSOF(type))? HCL_LBMASK(type,n): ~(type)0)
 
 /* make a bit mask that can mask off hig n bits */
 #define HCL_HBMASK(type,n) (~(~((type)0) >> (n)))
-#define HCL_HBMASK_SAFE(type,n) (((n) < HCL_SIZEOF(type) * HCL_BITS_PER_BYTE)? HCL_HBMASK(type,n): ~(type)0)
+#define HCL_HBMASK_SAFE(type,n) (((n) < HCL_BITSOF(type))? HCL_HBMASK(type,n): ~(type)0)
 
 /* get 'length' bits starting from the bit at the 'offset' */
 #define HCL_GETBITS(type,value,offset,length) \
@@ -667,7 +668,7 @@ struct hcl_ntime_t
  * \endcode
  */
 /*#define HCL_BITS_MAX(type,nbits) ((((type)1) << (nbits)) - 1)*/
-#define HCL_BITS_MAX(type,nbits) ((~(type)0) >> (HCL_SIZEOF(type) * HCL_BITS_PER_BYTE - (nbits)))
+#define HCL_BITS_MAX(type,nbits) ((~(type)0) >> (HCL_BITSOF(type) - (nbits)))
 
 /* =========================================================================
  * MMGR
@@ -824,11 +825,11 @@ typedef struct hcl_t hcl_t;
 #define HCL_TYPE_IS_UNSIGNED(type) (((type)0) < ((type)-1))
 
 #define HCL_TYPE_SIGNED_MAX(type) \
-	((type)~((type)1 << ((type)HCL_SIZEOF(type) * HCL_BITS_PER_BYTE - 1)))
+	((type)~((type)1 << ((type)HCL_BITSOF(type) - 1)))
 #define HCL_TYPE_UNSIGNED_MAX(type) ((type)(~(type)0))
 
 #define HCL_TYPE_SIGNED_MIN(type) \
-	((type)((type)1 << ((type)HCL_SIZEOF(type) * HCL_BITS_PER_BYTE - 1)))
+	((type)((type)1 << ((type)HCL_BITSOF(type) - 1)))
 #define HCL_TYPE_UNSIGNED_MIN(type) ((type)0)
 
 #define HCL_TYPE_MAX(type) \
