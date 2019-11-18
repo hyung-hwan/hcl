@@ -186,7 +186,7 @@ static hcl_rbt_style_t style[] =
 	}
 };
 
-const hcl_rbt_style_t* hcl_getrbtstyle (hcl_rbt_style_kind_t kind)
+const hcl_rbt_style_t* hcl_get_rbt_style (hcl_rbt_style_kind_t kind)
 {
 	return &style[kind];
 }

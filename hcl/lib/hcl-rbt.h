@@ -54,7 +54,7 @@
  *   int i;
  * 
  *   s1 = hcl_rbt_open (HCL_MMGR_GETDFL(), 0, 1, 1); // error handling skipped
- *   hcl_rbt_setstyle (s1, hcl_getrbtstyle(HCL_RBT_STYLE_INLINE_COPIERS));
+ *   hcl_rbt_setstyle (s1, hcl_get_rbt_style(HCL_RBT_STYLE_INLINE_COPIERS));
  * 
  *   for (i = 0; i < 20; i++)
  *   {
@@ -285,10 +285,10 @@ extern "C" {
 #endif
 
 /**
- * The hcl_getrbtstyle() functions returns a predefined callback set for
+ * The hcl_get_rbt_style() functions returns a predefined callback set for
  * pair manipulation.
  */
-HCL_EXPORT const hcl_rbt_style_t* hcl_getrbtstyle (
+HCL_EXPORT const hcl_rbt_style_t* hcl_get_rbt_style (
 	hcl_rbt_style_kind_t kind
 );
 

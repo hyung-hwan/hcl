@@ -139,7 +139,7 @@ int hcl_init (hcl_t* hcl, hcl_mmgr_t* mmgr, hcl_oow_t heapsz, const hcl_vmprim_t
 
 	if (hcl_rbt_init(&hcl->modtab, hcl, HCL_SIZEOF(hcl_ooch_t), 1) <= -1) goto oops;
 	modtab_inited = 1;
-	hcl_rbt_setstyle(&hcl->modtab, hcl_getrbtstyle(HCL_RBT_STYLE_INLINE_COPIERS));
+	hcl_rbt_setstyle(&hcl->modtab, hcl_get_rbt_style(HCL_RBT_STYLE_INLINE_COPIERS));
 
 	fill_bigint_tables (hcl);
 
