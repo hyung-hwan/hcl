@@ -348,6 +348,7 @@
 
 typedef char                    hcl_bch_t;
 typedef int                     hcl_bci_t;
+typedef unsigned int            hcl_bcu_t;
 typedef unsigned char           hcl_bchu_t; /* unsigned version of hcl_bch_t for inner working */
 #define HCL_SIZEOF_BCH_T HCL_SIZEOF_CHAR
 #define HCL_SIZEOF_BCI_T HCL_SIZEOF_INT
@@ -372,6 +373,7 @@ typedef unsigned char           hcl_bchu_t; /* unsigned version of hcl_bch_t for
 #endif
 
 typedef hcl_int32_t             hcl_uci_t;
+typedef hcl_uint32_t            hcl_ucu_t;
 #define HCL_SIZEOF_UCI_T 4
 
 typedef hcl_uint8_t             hcl_oob_t;
@@ -409,6 +411,7 @@ typedef struct hcl_bcs_t hcl_bcs_t;
 	typedef hcl_uch_t               hcl_ooch_t;
 	typedef hcl_uchu_t              hcl_oochu_t;
 	typedef hcl_uci_t               hcl_ooci_t;
+	typedef hcl_ucu_t               hcl_oocu_t;
 	typedef hcl_ucs_t               hcl_oocs_t;
 #	define HCL_OOCH_IS_UCH
 #	define HCL_SIZEOF_OOCH_T HCL_SIZEOF_UCH_T
@@ -416,6 +419,7 @@ typedef struct hcl_bcs_t hcl_bcs_t;
 	typedef hcl_bch_t               hcl_ooch_t;
 	typedef hcl_bchu_t              hcl_oochu_t;
 	typedef hcl_bci_t               hcl_ooci_t;
+	typedef hcl_bcu_t               hcl_oocu_t;
 	typedef hcl_bcs_t               hcl_oocs_t;
 #	define HCL_OOCH_IS_BCH
 #	define HCL_SIZEOF_OOCH_T HCL_SIZEOF_BCH_T
