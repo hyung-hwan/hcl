@@ -1190,8 +1190,8 @@ static int fmt_outv (hcl_fmtout_t* fmtout, va_list ap)
 			nbufp = sprintn(nbuf, num, base, &tmp);
 			if ((flagc & FLAGC_SHARP) && num != 0) 
 			{
-				if (base == 2 || base == 8) tmp += 2;
-				else if (base == 16) tmp += 3;
+				/* #b #o #x */
+				if (base == 2 || base == 8 || base == 16) tmp += 2;
 			}
 			if (neg) tmp++;
 			else if (flagc & FLAGC_SIGN) tmp++;
@@ -1218,19 +1218,18 @@ static int fmt_outv (hcl_fmtout_t* fmtout, va_list ap)
 			{
 				if (base == 2) 
 				{
-					PUT_OOCH (fmtout, '2', 1);
-					PUT_OOCH (fmtout, 'r', 1);
+					PUT_OOCH (fmtout, '#', 1);
+					PUT_OOCH (fmtout, 'b', 1);
 				}
 				if (base == 8) 
 				{
-					PUT_OOCH (fmtout, '8', 1);
-					PUT_OOCH (fmtout, 'r', 1);
+					PUT_OOCH (fmtout, '#', 1);
+					PUT_OOCH (fmtout, 'o', 1);
 				} 
 				else if (base == 16) 
 				{
-					PUT_OOCH (fmtout, '1', 1);
-					PUT_OOCH (fmtout, '6', 1);
-					PUT_OOCH (fmtout, 'r', 1);
+					PUT_OOCH (fmtout, '#', 1);
+					PUT_OOCH (fmtout, 'x', 1);
 				}
 			}
 
@@ -2523,6 +2522,7 @@ static HCL_INLINE int format_stack_args (hcl_fmtout_t* fmtout, hcl_ooi_t nargs, 
 
 			if ((flagc & FLAGC_SHARP) && arg != HCL_SMOOI_TO_OOP(0)) 
 			{
+				/* #b #o #x */
 				if (radix == 2 || radix == 8 || radix == 16) extra += 2;
 			}
 			if (neg) extra++;
@@ -2549,19 +2549,18 @@ static HCL_INLINE int format_stack_args (hcl_fmtout_t* fmtout, hcl_ooi_t nargs, 
 			{
 				if (radix == 2) 
 				{
-					PUT_OOCH (fmtout, '2', 1);
-					PUT_OOCH (fmtout, 'r', 1);
+					PUT_OOCH (fmtout, '#', 1);
+					PUT_OOCH (fmtout, 'b', 1);
 				}
 				if (radix == 8) 
 				{
-					PUT_OOCH (fmtout, '8', 1);
-					PUT_OOCH (fmtout, 'r', 1);
+					PUT_OOCH (fmtout, '#', 1);
+					PUT_OOCH (fmtout, 'o', 1);
 				} 
 				else if (radix == 16) 
 				{
-					PUT_OOCH (fmtout, '1', 1);
-					PUT_OOCH (fmtout, '6', 1);
-					PUT_OOCH (fmtout, 'r', 1);
+					PUT_OOCH (fmtout, '#', 1);
+					PUT_OOCH (fmtout, 'x', 1);
 				}
 			}
 
