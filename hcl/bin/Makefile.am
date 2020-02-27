@@ -27,7 +27,7 @@ bin_PROGRAMS = hcl
 hcl_SOURCES = main.c ../lib/cb-impl.h ../lib/cb-impl.c
 hcl_CPPFLAGS = $(CPPFLAGS_ALL_COMMON) $(CPPFLAGS_PFMOD)
 hcl_LDFLAGS = $(LDFLAGS_ALL_COMMON)
-hcl_LDADD = $(LIBADD_LIB_COMMON) -lhcl
+hcl_LDADD = -lhcl $(LIBADD_LIB_COMMON)
 hcl_DEPENDENCIES = ../lib/libhcl.la
 
 if ENABLE_HCLX
@@ -39,20 +39,20 @@ bin_PROGRAMS += hcls
 hcls_SOURCES = main-s.c
 hcls_CPPFLAGS = $(CPPFLAGS_ALL_COMMON)
 hcls_LDFLAGS = $(LDFLAGS_ALL_COMMON)
-hcls_LDADD = $(LIBADD_LIB_COMMON) $(PTHREAD_LIBS) -lhclx
+hcls_LDADD = -lhclx $(LIBADD_LIB_COMMON) $(PTHREAD_LIBS)
 hcls_DEPENDENCIES = ../lib/libhclx.la
 
 bin_PROGRAMS += hclc
 hclc_SOURCES = main-c.c
 hclc_CPPFLAGS = $(CPPFLAGS_ALL_COMMON)
 hclc_LDFLAGS = $(LDFLAGS_ALL_COMMON)
-hclc_LDADD = $(LIBADD_LIB_COMMON) $(PTHREAD_LIBS) -lhclx
+hclc_LDADD = -lhclx $(LIBADD_LIB_COMMON) $(PTHREAD_LIBS)
 hclc_DEPENDENCIES = ../lib/libhclx.la
 
 bin_PROGRAMS += hclj
 hclj_SOURCES = main-j.c
 hclj_CPPFLAGS = $(CPPFLAGS_ALL_COMMON)
 hclj_LDFLAGS = $(LDFLAGS_ALL_COMMON)
-hclj_LDADD = $(LIBADD_LIB_COMMON) $(PTHREAD_LIBS) -lhclx
+hclj_LDADD = -lhclx $(LIBADD_LIB_COMMON) $(PTHREAD_LIBS)
 hclj_DEPENDENCIES = ../lib/libhclx.la
 endif
