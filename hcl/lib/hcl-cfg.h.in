@@ -39,9 +39,6 @@
 /* Define to 1 if you have the `cosq' function. */
 #undef HAVE_COSQ
 
-/* Define if c++ supports namespace std. */
-#undef HAVE_CXX_NAMESPACE_STD
-
 /* Define to 1 if you have the <dirent.h> header file. */
 #undef HAVE_DIRENT_H
 
@@ -285,8 +282,8 @@
 /* link modules statically into the main library */
 #undef HCL_ENABLE_STATIC_MODULE
 
-/* Use the unicode character type as the default character type */
-#undef HCL_ENABLE_UNICODE
+/* Use the wide-character type as the default character type */
+#undef HCL_ENABLE_WIDE_CHAR
 
 /* Big Endian */
 #undef HCL_ENDIAN_BIG
@@ -417,8 +414,8 @@
 /* Define if socklen_t is signed */
 #undef HCL_SOCKLEN_T_IS_SIGNED
 
-/* Unicode character type size */
-#undef HCL_UNICODE_SIZE
+/* Wide-character type size */
+#undef HCL_WIDE_CHAR_SIZE
 
 /* Define to the sub-directory where libtool stores uninstalled libraries. */
 #undef LT_OBJDIR

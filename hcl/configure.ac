@@ -20,15 +20,6 @@ dnl m4_ifdef([AM_SILENT_RULES], [AM_SILENT_RULES([yes])])
 dnl determine a C compiler to use
 AC_PROG_CC
 
-dnl determine a C++ compiler to use
-AC_PROG_CXX
-
-dnl check if the C++ compiler exists in PATH
-AC_CHECK_PROG(HAVE_CXX, $CXX, yes, no)
-
-dnl check if the C++ compiler supports namespace
-AX_CXX_NAMESPACE_STD
-
 dnl determine some key programs
 AC_PROG_INSTALL
 AC_PROG_EGREP
@@ -48,21 +39,11 @@ then
 	fi
 fi
 
-if test "$ac_test_CXXFLAGS" != "set"
-then
-	if test "$GCC" = "yes"
-	then
-		CXXFLAGS="$CXXFLAGS -Wall"
-	fi
-fi
-
 dnl indicate the existence of config.h
 CFLAGS="$CFLAGS -DHCL_HAVE_CFG_H"
-CXXFLAGS="$CXXFLAGS -DHCL_HAVE_CFG_H"
 
 dnl make visible the 64-bit interface to the file system
 CFLAGS="$CFLAGS -D_LARGEFILE64_SOURCE"
-CXXFLAGS="$CXXFLAGS -D_LARGEFILE64_SOURCE"
 
 dnl define the WIN32 conditional if necessary
 case "$host" in
@@ -562,41 +543,39 @@ AC_ARG_ENABLE([debug], [AS_HELP_STRING([--enable-debug],[build the library in th
 if test "$enable_debug_is" = "yes"
 then
 	[CFLAGS="$CFLAGS -g -D_DEBUG -UNDEBUG -U_FORTIFY_SOURCE"]
-	[CXXFLAGS="$CXXFLAGS -g -D_DEBUG -UNDEBUG -U_FORTIFY_SOURCE"]
 	AC_DEFINE([HCL_BUILD_DEBUG],[1],[build release/debug])
 	AC_SUBST(BUILD_MODE, "debug")
 else
 	[CFLAGS="$CFLAGS -DNDEBUG -U_DEBUG -U_FORTIFY_SOURCE"]
-	[CXXFLAGS="$CXXFLAGS -DNDEBUG -U_DEBUG -U_FORTIFY_SOURCE"]
 	AC_DEFINE([HCL_BUILD_RELEASE],[1],[build release/debug])
 	AC_SUBST(BUILD_MODE, "release")
 fi
 
-AC_ARG_ENABLE([unicode], 
-	[AS_HELP_STRING([--enable-unicode],[Use the unicode character type as the default character type. one of yes, no, yes:2, yes:4, no:2, no:4 (default. yes)])],
-	enable_unicode=$enableval,
-	enable_unicode=yes
+AC_ARG_ENABLE([wide-char], 
+	[AS_HELP_STRING([--enable-wide-char],[Use the wide-character type as the default character type. one of yes, no, yes:2, yes:4, no:2, no:4 (default. yes)])],
+	enable_wide_char=$enableval,
+	enable_wide_char=yes
 )
-if test "${enable_unicode}" = "yes:4"
+if test "${enable_wide_char}" = "yes:4"
 then
-	AC_DEFINE([HCL_UNICODE_SIZE],[4],[Unicode character type size])
-	AC_DEFINE([HCL_ENABLE_UNICODE],[1],[Use the unicode character type as the default character type])
-elif test "${enable_unicode}" = "yes:2"
+	AC_DEFINE([HCL_WIDE_CHAR_SIZE],[4],[Wide-character type size])
+	AC_DEFINE([HCL_ENABLE_WIDE_CHAR],[1],[Use the wide-character type as the default character type])
+elif test "${enable_wide_char}" = "yes:2"
 then
-	AC_DEFINE([HCL_UNICODE_SIZE],[2],[Unicode character type size])
-	AC_DEFINE([HCL_ENABLE_UNICODE],[1],[Use the unicode character type as the default character type])
-elif test "${enable_unicode}" = "yes"
+	AC_DEFINE([HCL_WIDE_CHAR_SIZE],[2],[Wide-character type size])
+	AC_DEFINE([HCL_ENABLE_WIDE_CHAR],[1],[Use the wide-character type as the default character type])
+elif test "${enable_wide_char}" = "yes"
 then
-	AC_DEFINE([HCL_UNICODE_SIZE],[1],[Unicode character type size])
-	AC_DEFINE([HCL_ENABLE_UNICODE],[1],[Use the unicode character type as the default character type])
-elif test "${enable_unicode}" = "no:4"
+	AC_DEFINE([HCL_WIDE_CHAR_SIZE],[1],[Wide-character type size])
+	AC_DEFINE([HCL_ENABLE_WIDE_CHAR],[1],[Use the wide-character type as the default character type])
+elif test "${enable_wide_char}" = "no:4"
 then
-	AC_DEFINE([HCL_UNICODE_SIZE],[4],[Unicode character type size])
-elif test "${enable_unicode}" = "no:2"
+	AC_DEFINE([HCL_WIDE_CHAR_SIZE],[4],[Wide-character type size])
+elif test "${enable_wide_char}" = "no:2"
 then
-	AC_DEFINE([HCL_UNICODE_SIZE],[2],[Unicode character type size])
+	AC_DEFINE([HCL_WIDE_CHAR_SIZE],[2],[Wide-character type size])
 else
-	AC_DEFINE([HCL_UNICODE_SIZE],[1],[Unicode character type size])
+	AC_DEFINE([HCL_WIDE_CHAR_SIZE],[1],[Wide-character type size])
 fi
 
 AC_ARG_ENABLE([full-liw],
@@ -608,21 +587,6 @@ if test "${enable_full_liw}" = "yes"
 then
 	AC_DEFINE([HCL_ENABLE_FULL_LIW],[1],[Use a full word as a large integer word])
 fi
-
-
-AC_ARG_ENABLE([cxx], 
-	[AS_HELP_STRING([--enable-cxx],[build the library for C++ if a C++ compiler is available (default. yes)])],
-	enable_cxx_is=$enableval,
-	enable_cxx_is=yes
-)
-
-dnl disable c++ if no c++ compiler was found
-test "${HAVE_CXX}" = "yes" || enable_cxx_is="no"
-dnl disable c++ if the compiler is too old.
-test "${ax_cv_cxx_have_std_namespace}" = "yes" || enable_cxx_is="no"
-
-AM_CONDITIONAL(ENABLE_CXX, test "${enable_cxx_is}" = "yes" )
-
 
 dnl ===== enable-dynamic-module =====
 AC_ARG_ENABLE([dynamic-module],
@@ -735,8 +699,6 @@ echo "  Build mode : ${BUILD_MODE}"
 echo "  Source directory: ${srcdir}"
 echo "  Installation directory: ${prefix}"
 echo "  C compiler: ${CC} ${CFLAGS}"
-echo "  C++ compiler: ${CXX} ${CXXFLAGS}"
-echo "  C++ support: ${enable_cxx_is}"
 echo "  Math library: ${LIBM}"
 echo "-------------------------------------------------------------------------"
 ]

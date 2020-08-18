@@ -353,7 +353,7 @@ typedef unsigned char           hcl_bchu_t; /* unsigned version of hcl_bch_t for
 #define HCL_SIZEOF_BCH_T HCL_SIZEOF_CHAR
 #define HCL_SIZEOF_BCI_T HCL_SIZEOF_INT
 
-#if defined(HCL_UNICODE_SIZE) && (HCL_UNICODE_SIZE >= 4)
+#if defined(HCL_WIDE_CHAR_SIZE) && (HCL_WIDE_CHAR_SIZE >= 4)
 #	if defined(__GNUC__) && defined(__CHAR32_TYPE__)
 	typedef __CHAR32_TYPE__    hcl_uch_t;
 #	else
@@ -407,7 +407,7 @@ struct hcl_bcs_t
 };
 typedef struct hcl_bcs_t hcl_bcs_t;
 
-#if defined(HCL_ENABLE_UNICODE)
+#if defined(HCL_ENABLE_WIDE_CHAR)
 	typedef hcl_uch_t               hcl_ooch_t;
 	typedef hcl_uchu_t              hcl_oochu_t;
 	typedef hcl_uci_t               hcl_ooci_t;
