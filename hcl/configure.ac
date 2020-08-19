@@ -665,21 +665,7 @@ AC_ARG_ENABLE([hclx],
 )
 AM_CONDITIONAL(ENABLE_HCLX, test "x${enable_hclx_is}" = "xyes")
 
-AC_SUBST(HCL_SIZEOF_WCHAR_T, $ac_cv_sizeof_wchar_t)
-AC_SUBST(HCL_SIZEOF_CHAR16_T, $ac_cv_sizeof_char16_t)
-AC_SUBST(HCL_SIZEOF_CHAR32_T, $ac_cv_sizeof_char32_t)
-AC_SUBST(HCL_SIZEOF_LONG_LONG, $ac_cv_sizeof_long_long)
-AC_SUBST(HCL_SIZEOF_LONG, $ac_cv_sizeof_long)
-AC_SUBST(HCL_SIZEOF_INT, $ac_cv_sizeof_int)
-AC_SUBST(HCL_SIZEOF_SHORT, $ac_cv_sizeof_short)
-AC_SUBST(HCL_SIZEOF_CHAR, $ac_cv_sizeof_char)
-AC_SUBST(HCL_SIZEOF_VOID_P, $ac_cv_sizeof_void_p)
-AC_SUBST(HCL_SIZEOF_FLOAT, $ac_cv_sizeof_float)
-AC_SUBST(HCL_SIZEOF_DOUBLE, $ac_cv_sizeof_double)
-AC_SUBST(HCL_SIZEOF_LONG_DOUBLE, $ac_cv_sizeof_long_double)
-AC_SUBST(HCL_SIZEOF_OFF_T, $ac_cv_sizeof_off_t)
-AC_SUBST(HCL_SIZEOF_OFF64_T, $ac_cv_sizeof_off64_t)
-
+dnl ====  subsititution of some key items ====
 AC_SUBST(HCL_PROJECT_AUTHOR, "${PACKAGE_BUGREPORT}")
 AC_SUBST(HCL_PROJECT_URL, "${PACKAGE_URL}")
 
