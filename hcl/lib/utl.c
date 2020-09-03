@@ -925,3 +925,113 @@ hcl_bch_t* hcl_dupbchars (hcl_t* hcl, const hcl_bch_t* bcs, hcl_oow_t bcslen)
 	return ptr;
 }
 
+/* ----------------------------------------------------------------------- */
+
+void hcl_add_ntime (hcl_ntime_t* z, const hcl_ntime_t* x, const hcl_ntime_t* y)
+{
+	hcl_ntime_sec_t xs, ys;
+	hcl_ntime_nsec_t ns;
+
+	/*HCL_ASSERT (x->nsec >= 0 && x->nsec < HCL_NSECS_PER_SEC);
+	HCL_ASSERT (y->nsec >= 0 && y->nsec < HCL_NSECS_PER_SEC);*/
+
+	ns = x->nsec + y->nsec;
+	if (ns >= HCL_NSECS_PER_SEC)
+	{
+		ns = ns - HCL_NSECS_PER_SEC;
+		if (x->sec == HCL_TYPE_MAX(hcl_ntime_sec_t))
+		{
+			if (y->sec >= 0) goto overflow;
+			xs = x->sec;
+			ys = y->sec + 1; /* this won't overflow */
+		}
+		else
+		{
+			xs = x->sec + 1; /* this won't overflow */
+			ys = y->sec;
+		}
+	}
+	else
+	{
+		xs = x->sec;
+		ys = y->sec;
+	}
+
+	if ((ys >= 1 && xs > HCL_TYPE_MAX(hcl_ntime_sec_t) - ys) ||
+	    (ys <= -1 && xs < HCL_TYPE_MIN(hcl_ntime_sec_t) - ys))
+	{
+		if (xs >= 0)
+		{
+		overflow:
+			xs = HCL_TYPE_MAX(hcl_ntime_sec_t);
+			ns = HCL_NSECS_PER_SEC - 1;
+		}
+		else
+		{
+			xs = HCL_TYPE_MIN(hcl_ntime_sec_t);
+			ns = 0;
+		}
+	}
+	else
+	{
+		xs = xs + ys;
+	}
+
+	z->sec = xs;
+	z->nsec = ns;
+}
+
+void hcl_sub_ntime (hcl_ntime_t* z, const hcl_ntime_t* x, const hcl_ntime_t* y)
+{
+	hcl_ntime_sec_t xs, ys;
+	hcl_ntime_nsec_t ns;
+
+	/*HCL_ASSERT (x->nsec >= 0 && x->nsec < HCL_NSECS_PER_SEC);
+	HCL_ASSERT (y->nsec >= 0 && y->nsec < HCL_NSECS_PER_SEC);*/
+
+	ns = x->nsec - y->nsec;
+	if (ns < 0)
+	{
+		ns = ns + HCL_NSECS_PER_SEC;
+		if (x->sec == HCL_TYPE_MIN(hcl_ntime_sec_t))
+		{
+			if (y->sec <= 0) goto underflow;
+			xs = x->sec;
+			ys = y->sec - 1; /* this won't underflow */
+		}
+		else
+		{
+			xs = x->sec - 1; /* this won't underflow */
+			ys = y->sec;
+		}
+	}
+	else
+	{
+		xs = x->sec;
+		ys = y->sec;
+	}
+
+	if ((ys >= 1 && xs < HCL_TYPE_MIN(hcl_ntime_sec_t) + ys) ||
+	    (ys <= -1 && xs > HCL_TYPE_MAX(hcl_ntime_sec_t) + ys))
+	{
+		if (xs >= 0)
+		{
+			xs = HCL_TYPE_MAX(hcl_ntime_sec_t);
+			ns = HCL_NSECS_PER_SEC - 1;
+		}
+		else
+		{
+		underflow:
+			xs = HCL_TYPE_MIN(hcl_ntime_sec_t);
+			ns = 0;
+		}
+	} 
+	else
+	{
+		xs = xs - ys;
+	}
+
+	z->sec = xs;
+	z->nsec = ns;
+}
+

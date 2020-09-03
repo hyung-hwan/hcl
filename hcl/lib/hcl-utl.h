@@ -759,6 +759,34 @@ HCL_EXPORT int hcl_ufmt_out (
 );
 
 /* =========================================================================
+ * TIME CALCULATION WITH OVERFLOW/UNDERFLOW DETECTION
+ * ========================================================================= */
+
+/** 
+ * The hcl_add_ntime() function adds two time structures pointed to by \a x and \a y
+ * and stores the result in the structure pointed to by \a z. If it detects overflow/
+ * underflow, it stores the largest/least possible value respectively.
+ * You may use the HCL_ADD_NTIME() macro if overflow/underflow check isn't needed.
+ */
+HCL_EXPORT void hcl_add_ntime (
+	hcl_ntime_t*       z, 
+	const hcl_ntime_t* x,
+	const hcl_ntime_t* y
+);
+
+/** 
+ * The hcl_sub_ntime() function subtracts the time value \a y from the time value \a x
+ * and stores the result in the structure pointed to by \a z. If it detects overflow/
+ * underflow, it stores the largest/least possible value respectively.
+ * You may use the HCL_SUB_NTIME() macro if overflow/underflow check isn't needed.
+ */
+HCL_EXPORT void hcl_sub_ntime (
+	hcl_ntime_t*       z,
+	const hcl_ntime_t* x,
+	const hcl_ntime_t* y
+);
+
+/* =========================================================================
  * BIT SWAP
  * ========================================================================= */
 #if defined(HCL_HAVE_INLINE)

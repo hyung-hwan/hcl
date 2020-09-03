@@ -564,11 +564,18 @@ typedef struct hcl_obj_t*          hcl_oop_t;
 #define HCL_SEC_TO_USEC(sec) ((sec) * HCL_USECS_PER_SEC)
 #define HCL_USEC_TO_SEC(usec) ((usec) / HCL_USECS_PER_SEC)
 
+#if defined(HCL_SIZEOF_INT64_T) && (HCL_SIZEOF_INT64_T > 0)
+typedef hcl_int64_t hcl_ntime_sec_t;
+#else
+typedef hcl_int32_t hcl_ntime_sec_t;
+#endif
+typedef hcl_int32_t hcl_ntime_nsec_t;
+
 typedef struct hcl_ntime_t hcl_ntime_t;
 struct hcl_ntime_t
 {
-	hcl_intptr_t  sec;
-	hcl_int32_t   nsec; /* nanoseconds */
+	hcl_ntime_sec_t  sec;
+	hcl_ntime_nsec_t   nsec; /* nanoseconds */
 };
 
 #define HCL_INIT_NTIME(c,s,ns) (((c)->sec = (s)), ((c)->nsec = (ns)))
