@@ -2277,6 +2277,26 @@ static int execute (hcl_t* hcl)
 				HCL_ASSERT (hcl, b1 >= 0);
 				HCL_ASSERT (hcl, b2 >= b1);
 
+
+
+#if 0
+/* the MAKE_BLOCK instruction is followed by the long JUMP_FORWARD_X instruction.
+ * i can decode the instruction and get the size of instructions
+ * of the block context */
+{
+
+	hcl_oow_t joff;
+	HCL_ASSERT (hcl, hcl->code.bc.arr->slot[hcl->ip] == HCL_CODE_JUMP_FORWARD_X);
+	joff = hcl->code.bc.arr->slot[hcl->ip + 1];
+#if (HCL_BCODE_LONG_PARAM_SIZE == 2)
+	joff = (joff << 8) | hcl->code.bc.arr->slot[hcl->ip + 2];
+#endif
+
+HCL_DEBUG1(hcl, "****  MAKE BLOCK joff = %zu\n", joff);
+}
+#endif
+
+
 				/* the block context object created here is used as a base
 				 * object for block context activation. activate_context()
 				 * clones a block context and activates the cloned context.

@@ -164,7 +164,7 @@ static int emit_byte_instruction (hcl_t* hcl, hcl_oob_t bc)
 	/* the context object has the ip field. it should be representable
 	 * in a small integer. for simplicity, limit the total byte code length
 	 * to fit in a small integer. because 'ip' points to the next instruction
-	 * to execute, he upper bound should be (max - 1) so that i stays
+	 * to execute, the upper bound should be (max - 1) so that 'ip' stays
 	 * at the max when incremented */
 	if (hcl->code.bc.len == HCL_SMOOI_MAX - 1)
 	{
@@ -179,7 +179,7 @@ static int emit_byte_instruction (hcl_t* hcl, hcl_oob_t bc)
 		hcl_oow_t newcapa;
 
 		newcapa = HCL_ALIGN(capa + 1, HCL_BC_BUFFER_ALIGN);
-		tmp = hcl_remakengcbytearray (hcl, (hcl_oop_t)hcl->code.bc.arr, newcapa);
+		tmp = hcl_remakengcbytearray(hcl, (hcl_oop_t)hcl->code.bc.arr, newcapa);
 		if (!tmp) return -1;
 
 		hcl->code.bc.arr = (hcl_oop_byte_t)tmp;
@@ -414,16 +414,16 @@ static int emit_push_literal (hcl_t* hcl, hcl_oop_t obj)
 		switch (i)
 		{
 			case -1:
-				return emit_byte_instruction (hcl, HCL_CODE_PUSH_NEGONE);
+				return emit_byte_instruction(hcl, HCL_CODE_PUSH_NEGONE);
 
 			case 0:
-				return emit_byte_instruction (hcl, HCL_CODE_PUSH_ZERO);
+				return emit_byte_instruction(hcl, HCL_CODE_PUSH_ZERO);
 
 			case 1:
-				return emit_byte_instruction (hcl, HCL_CODE_PUSH_ONE);
+				return emit_byte_instruction(hcl, HCL_CODE_PUSH_ONE);
 
 			case 2:
-				return emit_byte_instruction (hcl, HCL_CODE_PUSH_TWO);
+				return emit_byte_instruction(hcl, HCL_CODE_PUSH_TWO);
 		}
 
 		if (i >= 0 && i <= MAX_CODE_PARAM)
@@ -993,7 +993,7 @@ static int compile_lambda (hcl_t* hcl, hcl_oop_t src, int defun)
 					return -1;
 				}
 
-				if (add_temporary_variable (hcl, ((hcl_oop_oop_t)dcl)->slot[i], tv_dup_start) <= -1) 
+				if (add_temporary_variable(hcl, ((hcl_oop_oop_t)dcl)->slot[i], tv_dup_start) <= -1) 
 				{
 					if (hcl->errnum == HCL_EEXIST)
 					{
@@ -1026,19 +1026,19 @@ static int compile_lambda (hcl_t* hcl, hcl_oop_t src, int defun)
 		return -1;
 	}
 	hcl->c->blk.depth++;
-	if (store_temporary_variable_count_for_block (hcl, hcl->c->tv.size) <= -1) return -1;
+	if (store_temporary_variable_count_for_block(hcl, hcl->c->tv.size) <= -1) return -1;
 
 	/* use the accumulated number of temporaries so far when generating
 	 * the make_block instruction. at context activation time, the actual 
 	 * count of temporaries for this block is derived by subtracting the 
 	 * count of temporaries in the home context */
-	if (emit_double_param_instruction (hcl, HCL_CODE_MAKE_BLOCK, nargs, hcl->c->tv.size/*ntmprs*/) <= -1) return -1;
+	if (emit_double_param_instruction(hcl, HCL_CODE_MAKE_BLOCK, nargs, hcl->c->tv.size/*ntmprs*/) <= -1) return -1;
 
 	HCL_ASSERT (hcl, hcl->code.bc.len < HCL_SMOOI_MAX);  /* guaranteed in emit_byte_instruction() */
 	jump_inst_pos = hcl->code.bc.len;
 	/* specifying MAX_CODE_JUMP causes emit_single_param_instruction() to 
 	 * produce the long jump instruction (BCODE_JUMP_FORWARD_X) */
-	if (emit_single_param_instruction (hcl, HCL_CODE_JUMP_FORWARD_0, MAX_CODE_JUMP) <= -1) return -1;
+	if (emit_single_param_instruction(hcl, HCL_CODE_JUMP_FORWARD_0, MAX_CODE_JUMP) <= -1) return -1;
 
 	SWITCH_TOP_CFRAME (hcl, COP_COMPILE_OBJECT_LIST, obj);
 
@@ -1221,7 +1221,7 @@ static int compile_do (hcl_t* hcl, hcl_oop_t src)
 static int compile_while (hcl_t* hcl, hcl_oop_t src, int next_cop)
 {
 	/* (while (xxxx) ... ) 
-      * (until (xxxx) ... ) */
+	 * (until (xxxx) ... ) */
 	hcl_oop_t obj, cond;
 	hcl_oow_t cond_pos;
 	hcl_cframe_t* cf;
@@ -1264,7 +1264,7 @@ static int compile_while (hcl_t* hcl, hcl_oop_t src, int next_cop)
 
 static int compile_cons_array_expression (hcl_t* hcl, hcl_oop_t obj)
 {
-	/* #[ ] */
+	/* [ ] */
 	hcl_ooi_t nargs;
 	hcl_cframe_t* cf;
 
@@ -1295,7 +1295,7 @@ static int compile_cons_array_expression (hcl_t* hcl, hcl_oop_t obj)
 
 static int compile_cons_bytearray_expression (hcl_t* hcl, hcl_oop_t obj)
 {
-	/* #[ ] */
+	/* #[ ] - e.g. #[1, 2, 3] or #[ 1 2 3 ] */
 	hcl_ooi_t nargs;
 	hcl_cframe_t* cf;
 
@@ -1326,7 +1326,7 @@ static int compile_cons_bytearray_expression (hcl_t* hcl, hcl_oop_t obj)
 
 static int compile_cons_dic_expression (hcl_t* hcl, hcl_oop_t obj)
 {
-	/* #{ } */
+	/* { } - e.g. {1:2, 3:4,"abc":def, "hwaddr":"00:00:00:01"} or { 1 2 3 4 } */
 	hcl_ooi_t nargs;
 	hcl_cframe_t* cf;
 
@@ -1629,7 +1629,7 @@ static int compile_object (hcl_t* hcl)
 					break;
 
 				case HCL_CONCODE_BYTEARRAY:
-					if (compile_cons_bytearray_expression (hcl, cf->operand) <= -1) return -1;
+					if (compile_cons_bytearray_expression(hcl, cf->operand) <= -1) return -1;
 					break;
 
 				case HCL_CONCODE_DIC:
@@ -1638,7 +1638,7 @@ static int compile_object (hcl_t* hcl)
 
 				/* TODO: QLIST? */
 				default:
-					if (compile_cons_xlist_expression (hcl, cf->operand) <= -1) return -1;
+					if (compile_cons_xlist_expression(hcl, cf->operand) <= -1) return -1;
 					break;
 			}
 			break;
