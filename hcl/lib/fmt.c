@@ -880,6 +880,17 @@ static int fmt_outv (hcl_fmtout_t* fmtout, va_list ap)
 			break;
 		}
 
+		case 'J':
+		{
+			hcl_bitmask_t tmp;
+			if (!fmtout->putobj) goto invalid_format;
+			tmp = fmtout->mask;
+			fmtout->mask |= HCL_LOG_PREFER_JSON;
+			if (fmtout->putobj(fmtout, va_arg(ap, hcl_oop_t)) <= -1) goto oops;
+			fmtout->mask = tmp;
+			break;
+		}
+
 #if 0
 		case 'e':
 		case 'E':
@@ -2466,6 +2477,18 @@ static HCL_INLINE int format_stack_args (hcl_fmtout_t* fmtout, hcl_ooi_t nargs, 
 			GET_NEXT_ARG_TO (hcl, nargs, &arg_state, arg);
 			if (fmtout->putobj(fmtout, arg) <= -1) goto oops;
 			break;
+
+		case 'J':
+		{
+			hcl_bitmask_t tmp;
+			GET_NEXT_ARG_TO (hcl, nargs, &arg_state, arg);
+			tmp = fmtout->mask;
+			fmtout->mask |= HCL_LOG_PREFER_JSON;
+			if (fmtout->putobj(fmtout, arg) <= -1) goto oops;
+			fmtout->mask = tmp;
+			break;
+		}
+
 
 		print_integer:
 		{
