@@ -89,7 +89,7 @@ static HCL_INLINE const char* proc_state_to_string (int state)
 
 #define FETCH_BYTE_CODE(hcl) ((hcl)->code.bc.arr->slot[(hcl)->ip++])
 #define FETCH_BYTE_CODE_TO(hcl, v_oow) (v_oow = FETCH_BYTE_CODE(hcl))
-#if (HCL_BCODE_LONG_PARAM_SIZE == 2)
+#if (HCL_HCL_CODE_LONG_PARAM_SIZE == 2)
 #	define FETCH_PARAM_CODE_TO(hcl, v_oow) \
 		do { \
 			v_oow = FETCH_BYTE_CODE(hcl); \
@@ -1411,17 +1411,17 @@ static int execute (hcl_t* hcl)
 			/* ------------------------------------------------- */
 
 #if 0
-			case BCODE_PUSH_INSTVAR_X:
+			case HCL_CODE_PUSH_INSTVAR_X:
 				FETCH_PARAM_CODE_TO (hcl, b1);
 				goto push_instvar;
-			case BCODE_PUSH_INSTVAR_0:
-			case BCODE_PUSH_INSTVAR_1:
-			case BCODE_PUSH_INSTVAR_2:
-			case BCODE_PUSH_INSTVAR_3:
-			case BCODE_PUSH_INSTVAR_4:
-			case BCODE_PUSH_INSTVAR_5:
-			case BCODE_PUSH_INSTVAR_6:
-			case BCODE_PUSH_INSTVAR_7:
+			case HCL_CODE_PUSH_INSTVAR_0:
+			case HCL_CODE_PUSH_INSTVAR_1:
+			case HCL_CODE_PUSH_INSTVAR_2:
+			case HCL_CODE_PUSH_INSTVAR_3:
+			case HCL_CODE_PUSH_INSTVAR_4:
+			case HCL_CODE_PUSH_INSTVAR_5:
+			case HCL_CODE_PUSH_INSTVAR_6:
+			case HCL_CODE_PUSH_INSTVAR_7:
 				b1 = bcode & 0x7; /* low 3 bits */
 			push_instvar:
 				LOG_INST_1 (hcl, "push_instvar %zu", b1);
@@ -1431,17 +1431,17 @@ static int execute (hcl_t* hcl)
 
 			/* ------------------------------------------------- */
 
-			case BCODE_STORE_INTO_INSTVAR_X:
+			case HCL_CODE_STORE_INTO_INSTVAR_X:
 				FETCH_PARAM_CODE_TO (hcl, b1);
 				goto store_instvar;
-			case BCODE_STORE_INTO_INSTVAR_0:
-			case BCODE_STORE_INTO_INSTVAR_1:
-			case BCODE_STORE_INTO_INSTVAR_2:
-			case BCODE_STORE_INTO_INSTVAR_3:
-			case BCODE_STORE_INTO_INSTVAR_4:
-			case BCODE_STORE_INTO_INSTVAR_5:
-			case BCODE_STORE_INTO_INSTVAR_6:
-			case BCODE_STORE_INTO_INSTVAR_7:
+			case HCL_CODE_STORE_INTO_INSTVAR_0:
+			case HCL_CODE_STORE_INTO_INSTVAR_1:
+			case HCL_CODE_STORE_INTO_INSTVAR_2:
+			case HCL_CODE_STORE_INTO_INSTVAR_3:
+			case HCL_CODE_STORE_INTO_INSTVAR_4:
+			case HCL_CODE_STORE_INTO_INSTVAR_5:
+			case HCL_CODE_STORE_INTO_INSTVAR_6:
+			case HCL_CODE_STORE_INTO_INSTVAR_7:
 				b1 = bcode & 0x7; /* low 3 bits */
 			store_instvar:
 				LOG_INST_1 (hcl, "store_into_instvar %zu", b1);
@@ -1450,17 +1450,17 @@ static int execute (hcl_t* hcl)
 				break;
 
 			/* ------------------------------------------------- */
-			case BCODE_POP_INTO_INSTVAR_X:
+			case HCL_CODE_POP_INTO_INSTVAR_X:
 				FETCH_PARAM_CODE_TO (hcl, b1);
 				goto pop_into_instvar;
-			case BCODE_POP_INTO_INSTVAR_0:
-			case BCODE_POP_INTO_INSTVAR_1:
-			case BCODE_POP_INTO_INSTVAR_2:
-			case BCODE_POP_INTO_INSTVAR_3:
-			case BCODE_POP_INTO_INSTVAR_4:
-			case BCODE_POP_INTO_INSTVAR_5:
-			case BCODE_POP_INTO_INSTVAR_6:
-			case BCODE_POP_INTO_INSTVAR_7:
+			case HCL_CODE_POP_INTO_INSTVAR_0:
+			case HCL_CODE_POP_INTO_INSTVAR_1:
+			case HCL_CODE_POP_INTO_INSTVAR_2:
+			case HCL_CODE_POP_INTO_INSTVAR_3:
+			case HCL_CODE_POP_INTO_INSTVAR_4:
+			case HCL_CODE_POP_INTO_INSTVAR_5:
+			case HCL_CODE_POP_INTO_INSTVAR_6:
+			case HCL_CODE_POP_INTO_INSTVAR_7:
 				b1 = bcode & 0x7; /* low 3 bits */
 			pop_into_instvar:
 				LOG_INST_1 (hcl, "pop_into_instvar %zu", b1);
@@ -1473,7 +1473,7 @@ static int execute (hcl_t* hcl)
 			/* ------------------------------------------------- */
 			case HCL_CODE_PUSH_TEMPVAR_X:
 			case HCL_CODE_STORE_INTO_TEMPVAR_X:
-			case BCODE_POP_INTO_TEMPVAR_X:
+			case HCL_CODE_POP_INTO_TEMPVAR_X:
 				FETCH_PARAM_CODE_TO (hcl, b1);
 				goto handle_tempvar;
 
@@ -1493,14 +1493,14 @@ static int execute (hcl_t* hcl)
 			case HCL_CODE_STORE_INTO_TEMPVAR_5:
 			case HCL_CODE_STORE_INTO_TEMPVAR_6:
 			case HCL_CODE_STORE_INTO_TEMPVAR_7:
-			case BCODE_POP_INTO_TEMPVAR_0:
-			case BCODE_POP_INTO_TEMPVAR_1:
-			case BCODE_POP_INTO_TEMPVAR_2:
-			case BCODE_POP_INTO_TEMPVAR_3:
-			case BCODE_POP_INTO_TEMPVAR_4:
-			case BCODE_POP_INTO_TEMPVAR_5:
-			case BCODE_POP_INTO_TEMPVAR_6:
-			case BCODE_POP_INTO_TEMPVAR_7:
+			case HCL_CODE_POP_INTO_TEMPVAR_0:
+			case HCL_CODE_POP_INTO_TEMPVAR_1:
+			case HCL_CODE_POP_INTO_TEMPVAR_2:
+			case HCL_CODE_POP_INTO_TEMPVAR_3:
+			case HCL_CODE_POP_INTO_TEMPVAR_4:
+			case HCL_CODE_POP_INTO_TEMPVAR_5:
+			case HCL_CODE_POP_INTO_TEMPVAR_6:
+			case HCL_CODE_POP_INTO_TEMPVAR_7:
 			{
 				hcl_oop_context_t ctx;
 				hcl_ooi_t bx;
@@ -1590,7 +1590,7 @@ static int execute (hcl_t* hcl)
 			case HCL_CODE_PUSH_LITERAL_X2:
 				FETCH_PARAM_CODE_TO (hcl, b1);
 				FETCH_PARAM_CODE_TO (hcl, b2);
-		#if (HCL_BCODE_LONG_PARAM_SIZE == 2)
+		#if (HCL_HCL_CODE_LONG_PARAM_SIZE == 2)
 				b1 = (b1 << 16) | b2;
 		#else
 				b1 = (b1 << 8) | b2;
@@ -1618,7 +1618,7 @@ static int execute (hcl_t* hcl)
 			/* ------------------------------------------------- */
 			case HCL_CODE_PUSH_OBJECT_X:
 			case HCL_CODE_STORE_INTO_OBJECT_X:
-			case BCODE_POP_INTO_OBJECT_X:
+			case HCL_CODE_POP_INTO_OBJECT_X:
 				FETCH_PARAM_CODE_TO (hcl, b1);
 				goto handle_object;
 
@@ -1630,10 +1630,10 @@ static int execute (hcl_t* hcl)
 			case HCL_CODE_STORE_INTO_OBJECT_1:
 			case HCL_CODE_STORE_INTO_OBJECT_2:
 			case HCL_CODE_STORE_INTO_OBJECT_3:
-			case BCODE_POP_INTO_OBJECT_0:
-			case BCODE_POP_INTO_OBJECT_1:
-			case BCODE_POP_INTO_OBJECT_2:
-			case BCODE_POP_INTO_OBJECT_3:
+			case HCL_CODE_POP_INTO_OBJECT_0:
+			case HCL_CODE_POP_INTO_OBJECT_1:
+			case HCL_CODE_POP_INTO_OBJECT_2:
+			case HCL_CODE_POP_INTO_OBJECT_3:
 			{
 				hcl_oop_cons_t ass;
 
@@ -1781,7 +1781,7 @@ static int execute (hcl_t* hcl)
 
 			case HCL_CODE_PUSH_CTXTEMPVAR_X:
 			case HCL_CODE_STORE_INTO_CTXTEMPVAR_X:
-			case BCODE_POP_INTO_CTXTEMPVAR_X:
+			case HCL_CODE_POP_INTO_CTXTEMPVAR_X:
 				FETCH_PARAM_CODE_TO (hcl, b1);
 				FETCH_PARAM_CODE_TO (hcl, b2);
 				goto handle_ctxtempvar;
@@ -1793,10 +1793,10 @@ static int execute (hcl_t* hcl)
 			case HCL_CODE_STORE_INTO_CTXTEMPVAR_1:
 			case HCL_CODE_STORE_INTO_CTXTEMPVAR_2:
 			case HCL_CODE_STORE_INTO_CTXTEMPVAR_3:
-			case BCODE_POP_INTO_CTXTEMPVAR_0:
-			case BCODE_POP_INTO_CTXTEMPVAR_1:
-			case BCODE_POP_INTO_CTXTEMPVAR_2:
-			case BCODE_POP_INTO_CTXTEMPVAR_3:
+			case HCL_CODE_POP_INTO_CTXTEMPVAR_0:
+			case HCL_CODE_POP_INTO_CTXTEMPVAR_1:
+			case HCL_CODE_POP_INTO_CTXTEMPVAR_2:
+			case HCL_CODE_POP_INTO_CTXTEMPVAR_3:
 			{
 				hcl_ooi_t i;
 				hcl_oop_context_t ctx;
@@ -1840,25 +1840,25 @@ static int execute (hcl_t* hcl)
 			}
 			/* -------------------------------------------------------- */
 
-			case BCODE_PUSH_OBJVAR_X:
-			case BCODE_STORE_INTO_OBJVAR_X:
-			case BCODE_POP_INTO_OBJVAR_X:
+			case HCL_CODE_PUSH_OBJVAR_X:
+			case HCL_CODE_STORE_INTO_OBJVAR_X:
+			case HCL_CODE_POP_INTO_OBJVAR_X:
 				FETCH_PARAM_CODE_TO (hcl, b1);
 				FETCH_PARAM_CODE_TO (hcl, b2);
 				goto handle_objvar;
 
-			case BCODE_PUSH_OBJVAR_0:
-			case BCODE_PUSH_OBJVAR_1:
-			case BCODE_PUSH_OBJVAR_2:
-			case BCODE_PUSH_OBJVAR_3:
-			case BCODE_STORE_INTO_OBJVAR_0:
-			case BCODE_STORE_INTO_OBJVAR_1:
-			case BCODE_STORE_INTO_OBJVAR_2:
-			case BCODE_STORE_INTO_OBJVAR_3:
-			case BCODE_POP_INTO_OBJVAR_0:
-			case BCODE_POP_INTO_OBJVAR_1:
-			case BCODE_POP_INTO_OBJVAR_2:
-			case BCODE_POP_INTO_OBJVAR_3:
+			case HCL_CODE_PUSH_OBJVAR_0:
+			case HCL_CODE_PUSH_OBJVAR_1:
+			case HCL_CODE_PUSH_OBJVAR_2:
+			case HCL_CODE_PUSH_OBJVAR_3:
+			case HCL_CODE_STORE_INTO_OBJVAR_0:
+			case HCL_CODE_STORE_INTO_OBJVAR_1:
+			case HCL_CODE_STORE_INTO_OBJVAR_2:
+			case HCL_CODE_STORE_INTO_OBJVAR_3:
+			case HCL_CODE_POP_INTO_OBJVAR_0:
+			case HCL_CODE_POP_INTO_OBJVAR_1:
+			case HCL_CODE_POP_INTO_OBJVAR_2:
+			case HCL_CODE_POP_INTO_OBJVAR_3:
 			{
 				hcl_oop_oop_t t;
 
@@ -1900,22 +1900,22 @@ static int execute (hcl_t* hcl)
 
 			/* -------------------------------------------------------- */
 #if 0
-			case BCODE_SEND_MESSAGE_X:
-			case BCODE_SEND_MESSAGE_TO_SUPER_X:
+			case HCL_CODE_SEND_MESSAGE_X:
+			case HCL_CODE_SEND_MESSAGE_TO_SUPER_X:
 				/* b1 -> number of arguments 
 				 * b2 -> selector index stored in the literal frame */
 				FETCH_PARAM_CODE_TO (hcl, b1);
 				FETCH_PARAM_CODE_TO (hcl, b2);
 				goto handle_send_message;
 
-			case BCODE_SEND_MESSAGE_0:
-			case BCODE_SEND_MESSAGE_1:
-			case BCODE_SEND_MESSAGE_2:
-			case BCODE_SEND_MESSAGE_3:
-			case BCODE_SEND_MESSAGE_TO_SUPER_0:
-			case BCODE_SEND_MESSAGE_TO_SUPER_1:
-			case BCODE_SEND_MESSAGE_TO_SUPER_2:
-			case BCODE_SEND_MESSAGE_TO_SUPER_3:
+			case HCL_CODE_SEND_MESSAGE_0:
+			case HCL_CODE_SEND_MESSAGE_1:
+			case HCL_CODE_SEND_MESSAGE_2:
+			case HCL_CODE_SEND_MESSAGE_3:
+			case HCL_CODE_SEND_MESSAGE_TO_SUPER_0:
+			case HCL_CODE_SEND_MESSAGE_TO_SUPER_1:
+			case HCL_CODE_SEND_MESSAGE_TO_SUPER_2:
+			case HCL_CODE_SEND_MESSAGE_TO_SUPER_3:
 			{
 				hcl_oop_char_t selector;
 
@@ -1934,7 +1934,7 @@ static int execute (hcl_t* hcl)
 #endif
 			/* -------------------------------------------------------- */
 
-			case BCODE_PUSH_RECEIVER:
+			case HCL_CODE_PUSH_RECEIVER:
 				LOG_INST_0 (hcl, "push_receiver");
 				HCL_STACK_PUSH (hcl, hcl->active_context->origin->receiver_or_source);
 				break;
@@ -1954,12 +1954,12 @@ static int execute (hcl_t* hcl)
 				HCL_STACK_PUSH (hcl, hcl->_false);
 				break;
 
-			case BCODE_PUSH_CONTEXT:
+			case HCL_CODE_PUSH_CONTEXT:
 				LOG_INST_0 (hcl, "push_context");
 				HCL_STACK_PUSH (hcl, (hcl_oop_t)hcl->active_context);
 				break;
 
-			case BCODE_PUSH_PROCESS:
+			case HCL_CODE_PUSH_PROCESS:
 				LOG_INST_0 (hcl, "push_process");
 				HCL_STACK_PUSH (hcl, (hcl_oop_t)hcl->processor->active);
 				break;
@@ -2098,7 +2098,7 @@ static int execute (hcl_t* hcl)
 
 			/* -------------------------------------------------------- */
 
-			case BCODE_DUP_STACKTOP:
+			case HCL_CODE_DUP_STACKTOP:
 			{
 				hcl_oop_t t;
 				LOG_INST_0 (hcl, "dup_stacktop");
@@ -2120,13 +2120,13 @@ static int execute (hcl_t* hcl)
 				HCL_STACK_POP (hcl);
 				break;
 
-			case BCODE_RETURN_STACKTOP:
+			case HCL_CODE_RETURN_STACKTOP:
 				LOG_INST_0 (hcl, "return_stacktop");
 				return_value = HCL_STACK_GETTOP(hcl);
 				HCL_STACK_POP (hcl);
 				goto handle_return;
 
-			case BCODE_RETURN_RECEIVER:
+			case HCL_CODE_RETURN_RECEIVER:
 				LOG_INST_0 (hcl, "return_receiver");
 				return_value = hcl->active_context->origin->receiver_or_source;
 
@@ -2288,7 +2288,7 @@ static int execute (hcl_t* hcl)
 	hcl_oow_t joff;
 	HCL_ASSERT (hcl, hcl->code.bc.arr->slot[hcl->ip] == HCL_CODE_JUMP_FORWARD_X);
 	joff = hcl->code.bc.arr->slot[hcl->ip + 1];
-#if (HCL_BCODE_LONG_PARAM_SIZE == 2)
+#if (HCL_HCL_CODE_LONG_PARAM_SIZE == 2)
 	joff = (joff << 8) | hcl->code.bc.arr->slot[hcl->ip + 2];
 #endif
 
@@ -2307,9 +2307,9 @@ HCL_DEBUG1(hcl, "****  MAKE BLOCK joff = %zu\n", joff);
 
 				/* the long forward jump instruction has the format of 
 				 *   11000100 KKKKKKKK or 11000100 KKKKKKKK KKKKKKKK 
-				 * depending on HCL_BCODE_LONG_PARAM_SIZE. change 'ip' to point to
+				 * depending on HCL_HCL_CODE_LONG_PARAM_SIZE. change 'ip' to point to
 				 * the instruction after the jump. */
-				blkctx->ip = HCL_SMOOI_TO_OOP(hcl->ip + HCL_BCODE_LONG_PARAM_SIZE + 1);
+				blkctx->ip = HCL_SMOOI_TO_OOP(hcl->ip + HCL_HCL_CODE_LONG_PARAM_SIZE + 1);
 				/* stack pointer below the bottom. this base block context
 				 * has an empty stack anyway. */
 				blkctx->sp = HCL_SMOOI_TO_OOP(-1);
@@ -2331,7 +2331,7 @@ HCL_DEBUG1(hcl, "****  MAKE BLOCK joff = %zu\n", joff);
 				break;
 			}
 
-			case BCODE_SEND_BLOCK_COPY:
+			case HCL_CODE_SEND_BLOCK_COPY:
 			{
 				hcl_ooi_t nargs, ntmprs;
 				hcl_oop_context_t rctx;
@@ -2375,8 +2375,8 @@ HCL_DEBUG1(hcl, "****  MAKE BLOCK joff = %zu\n", joff);
 				 *  blkctx->home is set here to the active context.
 				 *  it's redundant to have them pushed to the stack
 				 *  though it is to emulate the message sending of
-				 *  blockCopy:withNtmprs:. BCODE_MAKE_BLOCK has been
-				 *  added to replace BCODE_SEND_BLOCK_COPY and pusing
+				 *  blockCopy:withNtmprs:. HCL_CODE_MAKE_BLOCK has been
+				 *  added to replace HCL_CODE_SEND_BLOCK_COPY and pusing
 				 *  arguments to the stack.
 				 *
 				 *  blkctx->origin is set here by copying the origin
@@ -2385,9 +2385,9 @@ HCL_DEBUG1(hcl, "****  MAKE BLOCK joff = %zu\n", joff);
 
 				/* the extended jump instruction has the format of 
 				 *   0000XXXX KKKKKKKK or 0000XXXX KKKKKKKK KKKKKKKK 
-				 * depending on HCL_BCODE_LONG_PARAM_SIZE. change 'ip' to point to
+				 * depending on HCL_HCL_CODE_LONG_PARAM_SIZE. change 'ip' to point to
 				 * the instruction after the jump. */
-				blkctx->ip = HCL_SMOOI_TO_OOP(hcl->ip + HCL_BCODE_LONG_PARAM_SIZE + 1);
+				blkctx->ip = HCL_SMOOI_TO_OOP(hcl->ip + HCL_HCL_CODE_LONG_PARAM_SIZE + 1);
 				blkctx->sp = HCL_SMOOI_TO_OOP(-1);
 				/* the number of arguments for a block context is local to the block */
 				blkctx->method_or_nargs = HCL_SMOOI_TO_OOP(nargs);

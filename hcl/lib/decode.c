@@ -44,7 +44,7 @@
 
 #define FETCH_BYTE_CODE(hcl) (cdptr[ip++])
 #define FETCH_BYTE_CODE_TO(hcl,v_ooi) (v_ooi = FETCH_BYTE_CODE(hcl))
-#if (HCL_BCODE_LONG_PARAM_SIZE == 2)
+#if (HCL_HCL_CODE_LONG_PARAM_SIZE == 2)
 #	define FETCH_PARAM_CODE_TO(hcl,v_ooi) \
 		do { \
 			v_ooi = FETCH_BYTE_CODE(hcl); \
@@ -85,17 +85,17 @@ int hcl_decode (hcl_t* hcl, hcl_oow_t start, hcl_oow_t end)
 
 		switch (bcode)
 		{
-			case BCODE_PUSH_INSTVAR_X:
+			case HCL_CODE_PUSH_INSTVAR_X:
 				FETCH_PARAM_CODE_TO (hcl, b1);
 				goto push_instvar;
-			case BCODE_PUSH_INSTVAR_0:
-			case BCODE_PUSH_INSTVAR_1:
-			case BCODE_PUSH_INSTVAR_2:
-			case BCODE_PUSH_INSTVAR_3:
-			case BCODE_PUSH_INSTVAR_4:
-			case BCODE_PUSH_INSTVAR_5:
-			case BCODE_PUSH_INSTVAR_6:
-			case BCODE_PUSH_INSTVAR_7:
+			case HCL_CODE_PUSH_INSTVAR_0:
+			case HCL_CODE_PUSH_INSTVAR_1:
+			case HCL_CODE_PUSH_INSTVAR_2:
+			case HCL_CODE_PUSH_INSTVAR_3:
+			case HCL_CODE_PUSH_INSTVAR_4:
+			case HCL_CODE_PUSH_INSTVAR_5:
+			case HCL_CODE_PUSH_INSTVAR_6:
+			case HCL_CODE_PUSH_INSTVAR_7:
 				b1 = bcode & 0x7; /* low 3 bits */
 			push_instvar:
 				LOG_INST_1 (hcl, "push_instvar %zu", b1);
@@ -103,33 +103,33 @@ int hcl_decode (hcl_t* hcl, hcl_oow_t start, hcl_oow_t end)
 
 			/* ------------------------------------------------- */
 
-			case BCODE_STORE_INTO_INSTVAR_X:
+			case HCL_CODE_STORE_INTO_INSTVAR_X:
 				FETCH_PARAM_CODE_TO (hcl, b1);
 				goto store_instvar;
-			case BCODE_STORE_INTO_INSTVAR_0:
-			case BCODE_STORE_INTO_INSTVAR_1:
-			case BCODE_STORE_INTO_INSTVAR_2:
-			case BCODE_STORE_INTO_INSTVAR_3:
-			case BCODE_STORE_INTO_INSTVAR_4:
-			case BCODE_STORE_INTO_INSTVAR_5:
-			case BCODE_STORE_INTO_INSTVAR_6:
-			case BCODE_STORE_INTO_INSTVAR_7:
+			case HCL_CODE_STORE_INTO_INSTVAR_0:
+			case HCL_CODE_STORE_INTO_INSTVAR_1:
+			case HCL_CODE_STORE_INTO_INSTVAR_2:
+			case HCL_CODE_STORE_INTO_INSTVAR_3:
+			case HCL_CODE_STORE_INTO_INSTVAR_4:
+			case HCL_CODE_STORE_INTO_INSTVAR_5:
+			case HCL_CODE_STORE_INTO_INSTVAR_6:
+			case HCL_CODE_STORE_INTO_INSTVAR_7:
 				b1 = bcode & 0x7; /* low 3 bits */
 			store_instvar:
 				LOG_INST_1 (hcl, "store_into_instvar %zu", b1);
 				break;
 
-			case BCODE_POP_INTO_INSTVAR_X:
+			case HCL_CODE_POP_INTO_INSTVAR_X:
 				FETCH_PARAM_CODE_TO (hcl, b1);
 				goto pop_into_instvar;
-			case BCODE_POP_INTO_INSTVAR_0:
-			case BCODE_POP_INTO_INSTVAR_1:
-			case BCODE_POP_INTO_INSTVAR_2:
-			case BCODE_POP_INTO_INSTVAR_3:
-			case BCODE_POP_INTO_INSTVAR_4:
-			case BCODE_POP_INTO_INSTVAR_5:
-			case BCODE_POP_INTO_INSTVAR_6:
-			case BCODE_POP_INTO_INSTVAR_7:
+			case HCL_CODE_POP_INTO_INSTVAR_0:
+			case HCL_CODE_POP_INTO_INSTVAR_1:
+			case HCL_CODE_POP_INTO_INSTVAR_2:
+			case HCL_CODE_POP_INTO_INSTVAR_3:
+			case HCL_CODE_POP_INTO_INSTVAR_4:
+			case HCL_CODE_POP_INTO_INSTVAR_5:
+			case HCL_CODE_POP_INTO_INSTVAR_6:
+			case HCL_CODE_POP_INTO_INSTVAR_7:
 				b1 = bcode & 0x7; /* low 3 bits */
 			pop_into_instvar:
 				LOG_INST_1 (hcl, "pop_into_instvar %zu", b1);
@@ -138,7 +138,7 @@ int hcl_decode (hcl_t* hcl, hcl_oow_t start, hcl_oow_t end)
 			/* ------------------------------------------------- */
 			case HCL_CODE_PUSH_TEMPVAR_X:
 			case HCL_CODE_STORE_INTO_TEMPVAR_X:
-			case BCODE_POP_INTO_TEMPVAR_X:
+			case HCL_CODE_POP_INTO_TEMPVAR_X:
 				FETCH_PARAM_CODE_TO (hcl, b1);
 				goto handle_tempvar;
 
@@ -158,14 +158,14 @@ int hcl_decode (hcl_t* hcl, hcl_oow_t start, hcl_oow_t end)
 			case HCL_CODE_STORE_INTO_TEMPVAR_5:
 			case HCL_CODE_STORE_INTO_TEMPVAR_6:
 			case HCL_CODE_STORE_INTO_TEMPVAR_7:
-			case BCODE_POP_INTO_TEMPVAR_0:
-			case BCODE_POP_INTO_TEMPVAR_1:
-			case BCODE_POP_INTO_TEMPVAR_2:
-			case BCODE_POP_INTO_TEMPVAR_3:
-			case BCODE_POP_INTO_TEMPVAR_4:
-			case BCODE_POP_INTO_TEMPVAR_5:
-			case BCODE_POP_INTO_TEMPVAR_6:
-			case BCODE_POP_INTO_TEMPVAR_7:
+			case HCL_CODE_POP_INTO_TEMPVAR_0:
+			case HCL_CODE_POP_INTO_TEMPVAR_1:
+			case HCL_CODE_POP_INTO_TEMPVAR_2:
+			case HCL_CODE_POP_INTO_TEMPVAR_3:
+			case HCL_CODE_POP_INTO_TEMPVAR_4:
+			case HCL_CODE_POP_INTO_TEMPVAR_5:
+			case HCL_CODE_POP_INTO_TEMPVAR_6:
+			case HCL_CODE_POP_INTO_TEMPVAR_7:
 				b1 = bcode & 0x7; /* low 3 bits */
 			handle_tempvar:
 
@@ -193,7 +193,7 @@ int hcl_decode (hcl_t* hcl, hcl_oow_t start, hcl_oow_t end)
 			case HCL_CODE_PUSH_LITERAL_X2:
 				FETCH_PARAM_CODE_TO (hcl, b1);
 				FETCH_PARAM_CODE_TO (hcl, b2);
-		#if (HCL_BCODE_LONG_PARAM_SIZE == 2)
+		#if (HCL_HCL_CODE_LONG_PARAM_SIZE == 2)
 				b1 = (b1 << 16) | b2;
 		#else
 				b1 = (b1 << 8) | b2;
@@ -220,7 +220,7 @@ int hcl_decode (hcl_t* hcl, hcl_oow_t start, hcl_oow_t end)
 			/* ------------------------------------------------- */
 			case HCL_CODE_PUSH_OBJECT_X:
 			case HCL_CODE_STORE_INTO_OBJECT_X:
-			case BCODE_POP_INTO_OBJECT_X:
+			case HCL_CODE_POP_INTO_OBJECT_X:
 				FETCH_PARAM_CODE_TO (hcl, b1);
 				goto handle_object;
 
@@ -232,10 +232,10 @@ int hcl_decode (hcl_t* hcl, hcl_oow_t start, hcl_oow_t end)
 			case HCL_CODE_STORE_INTO_OBJECT_1:
 			case HCL_CODE_STORE_INTO_OBJECT_2:
 			case HCL_CODE_STORE_INTO_OBJECT_3:
-			case BCODE_POP_INTO_OBJECT_0:
-			case BCODE_POP_INTO_OBJECT_1:
-			case BCODE_POP_INTO_OBJECT_2:
-			case BCODE_POP_INTO_OBJECT_3:
+			case HCL_CODE_POP_INTO_OBJECT_0:
+			case HCL_CODE_POP_INTO_OBJECT_1:
+			case HCL_CODE_POP_INTO_OBJECT_2:
+			case HCL_CODE_POP_INTO_OBJECT_3:
 				b1 = bcode & 0x3; /* low 2 bits */
 			handle_object:
 				if ((bcode >> 3) & 1)
@@ -331,7 +331,7 @@ int hcl_decode (hcl_t* hcl, hcl_oow_t start, hcl_oow_t end)
 
 			case HCL_CODE_PUSH_CTXTEMPVAR_X:
 			case HCL_CODE_STORE_INTO_CTXTEMPVAR_X:
-			case BCODE_POP_INTO_CTXTEMPVAR_X:
+			case HCL_CODE_POP_INTO_CTXTEMPVAR_X:
 				FETCH_PARAM_CODE_TO (hcl, b1);
 				FETCH_PARAM_CODE_TO (hcl, b2);
 				goto handle_ctxtempvar;
@@ -343,10 +343,10 @@ int hcl_decode (hcl_t* hcl, hcl_oow_t start, hcl_oow_t end)
 			case HCL_CODE_STORE_INTO_CTXTEMPVAR_1:
 			case HCL_CODE_STORE_INTO_CTXTEMPVAR_2:
 			case HCL_CODE_STORE_INTO_CTXTEMPVAR_3:
-			case BCODE_POP_INTO_CTXTEMPVAR_0:
-			case BCODE_POP_INTO_CTXTEMPVAR_1:
-			case BCODE_POP_INTO_CTXTEMPVAR_2:
-			case BCODE_POP_INTO_CTXTEMPVAR_3:
+			case HCL_CODE_POP_INTO_CTXTEMPVAR_0:
+			case HCL_CODE_POP_INTO_CTXTEMPVAR_1:
+			case HCL_CODE_POP_INTO_CTXTEMPVAR_2:
+			case HCL_CODE_POP_INTO_CTXTEMPVAR_3:
 				b1 = bcode & 0x3; /* low 2 bits */
 				FETCH_BYTE_CODE_TO (hcl, b2);
 
@@ -373,25 +373,25 @@ int hcl_decode (hcl_t* hcl, hcl_oow_t start, hcl_oow_t end)
 				break;
 			/* -------------------------------------------------------- */
 
-			case BCODE_PUSH_OBJVAR_X:
-			case BCODE_STORE_INTO_OBJVAR_X:
-			case BCODE_POP_INTO_OBJVAR_X:
+			case HCL_CODE_PUSH_OBJVAR_X:
+			case HCL_CODE_STORE_INTO_OBJVAR_X:
+			case HCL_CODE_POP_INTO_OBJVAR_X:
 				FETCH_PARAM_CODE_TO (hcl, b1);
 				FETCH_PARAM_CODE_TO (hcl, b2);
 				goto handle_objvar;
 
-			case BCODE_PUSH_OBJVAR_0:
-			case BCODE_PUSH_OBJVAR_1:
-			case BCODE_PUSH_OBJVAR_2:
-			case BCODE_PUSH_OBJVAR_3:
-			case BCODE_STORE_INTO_OBJVAR_0:
-			case BCODE_STORE_INTO_OBJVAR_1:
-			case BCODE_STORE_INTO_OBJVAR_2:
-			case BCODE_STORE_INTO_OBJVAR_3:
-			case BCODE_POP_INTO_OBJVAR_0:
-			case BCODE_POP_INTO_OBJVAR_1:
-			case BCODE_POP_INTO_OBJVAR_2:
-			case BCODE_POP_INTO_OBJVAR_3:
+			case HCL_CODE_PUSH_OBJVAR_0:
+			case HCL_CODE_PUSH_OBJVAR_1:
+			case HCL_CODE_PUSH_OBJVAR_2:
+			case HCL_CODE_PUSH_OBJVAR_3:
+			case HCL_CODE_STORE_INTO_OBJVAR_0:
+			case HCL_CODE_STORE_INTO_OBJVAR_1:
+			case HCL_CODE_STORE_INTO_OBJVAR_2:
+			case HCL_CODE_STORE_INTO_OBJVAR_3:
+			case HCL_CODE_POP_INTO_OBJVAR_0:
+			case HCL_CODE_POP_INTO_OBJVAR_1:
+			case HCL_CODE_POP_INTO_OBJVAR_2:
+			case HCL_CODE_POP_INTO_OBJVAR_3:
 				/* b1 -> variable index to the object indicated by b2.
 				 * b2 -> object index stored in the literal frame. */
 				b1 = bcode & 0x3; /* low 2 bits */
@@ -418,22 +418,22 @@ int hcl_decode (hcl_t* hcl, hcl_oow_t start, hcl_oow_t end)
 				break;
 
 			/* -------------------------------------------------------- */
-			case BCODE_SEND_MESSAGE_X:
-			case BCODE_SEND_MESSAGE_TO_SUPER_X:
+			case HCL_CODE_SEND_MESSAGE_X:
+			case HCL_CODE_SEND_MESSAGE_TO_SUPER_X:
 				/* b1 -> number of arguments 
 				 * b2 -> selector index stored in the literal frame */
 				FETCH_PARAM_CODE_TO (hcl, b1);
 				FETCH_PARAM_CODE_TO (hcl, b2);
 				goto handle_send_message;
 
-			case BCODE_SEND_MESSAGE_0:
-			case BCODE_SEND_MESSAGE_1:
-			case BCODE_SEND_MESSAGE_2:
-			case BCODE_SEND_MESSAGE_3:
-			case BCODE_SEND_MESSAGE_TO_SUPER_0:
-			case BCODE_SEND_MESSAGE_TO_SUPER_1:
-			case BCODE_SEND_MESSAGE_TO_SUPER_2:
-			case BCODE_SEND_MESSAGE_TO_SUPER_3:
+			case HCL_CODE_SEND_MESSAGE_0:
+			case HCL_CODE_SEND_MESSAGE_1:
+			case HCL_CODE_SEND_MESSAGE_2:
+			case HCL_CODE_SEND_MESSAGE_3:
+			case HCL_CODE_SEND_MESSAGE_TO_SUPER_0:
+			case HCL_CODE_SEND_MESSAGE_TO_SUPER_1:
+			case HCL_CODE_SEND_MESSAGE_TO_SUPER_2:
+			case HCL_CODE_SEND_MESSAGE_TO_SUPER_3:
 				b1 = bcode & 0x3; /* low 2 bits */
 				FETCH_BYTE_CODE_TO (hcl, b2);
 
@@ -443,7 +443,7 @@ int hcl_decode (hcl_t* hcl, hcl_oow_t start, hcl_oow_t end)
 
 			/* -------------------------------------------------------- */
 
-			case BCODE_PUSH_RECEIVER:
+			case HCL_CODE_PUSH_RECEIVER:
 				LOG_INST_0 (hcl, "push_receiver");
 				break;
 
@@ -459,11 +459,11 @@ int hcl_decode (hcl_t* hcl, hcl_oow_t start, hcl_oow_t end)
 				LOG_INST_0 (hcl, "push_false");
 				break;
 
-			case BCODE_PUSH_CONTEXT:
+			case HCL_CODE_PUSH_CONTEXT:
 				LOG_INST_0 (hcl, "push_context");
 				break;
 
-			case BCODE_PUSH_PROCESS:
+			case HCL_CODE_PUSH_PROCESS:
 				LOG_INST_0 (hcl, "push_process");
 				break;
 
@@ -530,7 +530,7 @@ int hcl_decode (hcl_t* hcl, hcl_oow_t start, hcl_oow_t end)
 
 			/* -------------------------------------------------------- */
 
-			case BCODE_DUP_STACKTOP:
+			case HCL_CODE_DUP_STACKTOP:
 				LOG_INST_0 (hcl, "dup_stacktop");
 				break;
 
@@ -538,11 +538,11 @@ int hcl_decode (hcl_t* hcl, hcl_oow_t start, hcl_oow_t end)
 				LOG_INST_0 (hcl, "pop_stacktop");
 				break;
 
-			case BCODE_RETURN_STACKTOP:
+			case HCL_CODE_RETURN_STACKTOP:
 				LOG_INST_0 (hcl, "return_stacktop");
 				break;
 
-			case BCODE_RETURN_RECEIVER:
+			case HCL_CODE_RETURN_RECEIVER:
 				LOG_INST_0 (hcl, "return_receiver");
 				break;
 
@@ -562,7 +562,7 @@ int hcl_decode (hcl_t* hcl, hcl_oow_t start, hcl_oow_t end)
 				HCL_ASSERT (hcl, b2 >= b1);
 				break;
 
-			case BCODE_SEND_BLOCK_COPY:
+			case HCL_CODE_SEND_BLOCK_COPY:
 				LOG_INST_0 (hcl, "send_block_copy");
 				break;
 

@@ -31,7 +31,7 @@
 #include "hcl-utl.h"
 
 /* you can define this to either 1 or 2 */
-#define HCL_BCODE_LONG_PARAM_SIZE 2
+#define HCL_HCL_CODE_LONG_PARAM_SIZE 2
 
 /* this is useful for debugging. hcl_gc() can be called 
  * while hcl has not been fully initialized when this is defined*/
@@ -312,7 +312,7 @@ struct hcl_compiler_t
 #endif
 
 
-#if defined(HCL_BCODE_LONG_PARAM_SIZE) && (HCL_BCODE_LONG_PARAM_SIZE == 1)
+#if defined(HCL_HCL_CODE_LONG_PARAM_SIZE) && (HCL_HCL_CODE_LONG_PARAM_SIZE == 1)
 #	define MAX_CODE_INDEX               (0xFFu)
 #	define MAX_CODE_NTMPRS              (0xFFu)
 #	define MAX_CODE_NARGS               (0xFFu)
@@ -321,7 +321,7 @@ struct hcl_compiler_t
 #	define MAX_CODE_JUMP                (0xFFu)
 #	define MAX_CODE_PARAM               (0xFFu)
 #	define MAX_CODE_PARAM2              (0xFFFFu)
-#elif defined(HCL_BCODE_LONG_PARAM_SIZE) && (HCL_BCODE_LONG_PARAM_SIZE == 2)
+#elif defined(HCL_HCL_CODE_LONG_PARAM_SIZE) && (HCL_HCL_CODE_LONG_PARAM_SIZE == 2)
 #	define MAX_CODE_INDEX               (0xFFFFu)
 #	define MAX_CODE_NTMPRS              (0xFFFFu)
 #	define MAX_CODE_NARGS               (0xFFFFu)
@@ -331,7 +331,7 @@ struct hcl_compiler_t
 #	define MAX_CODE_PARAM               (0xFFFFu)
 #	define MAX_CODE_PARAM2              (0xFFFFFFFFu)
 #else
-#	error Unsupported HCL_BCODE_LONG_PARAM_SIZE
+#	error Unsupported HCL_HCL_CODE_LONG_PARAM_SIZE
 #endif
 
 
@@ -402,75 +402,75 @@ SHORT INSTRUCTION CODE                                        LONG INSTRUCTION C
 
 enum hcl_bcode_t
 {
-	BCODE_STORE_INTO_INSTVAR_0     = 0x00,
-	BCODE_STORE_INTO_INSTVAR_1     = 0x01,
-	BCODE_STORE_INTO_INSTVAR_2     = 0x02,
-	BCODE_STORE_INTO_INSTVAR_3     = 0x03,
+	HCL_CODE_STORE_INTO_INSTVAR_0     = 0x00,
+	HCL_CODE_STORE_INTO_INSTVAR_1     = 0x01,
+	HCL_CODE_STORE_INTO_INSTVAR_2     = 0x02,
+	HCL_CODE_STORE_INTO_INSTVAR_3     = 0x03,
 
-	BCODE_STORE_INTO_INSTVAR_4     = 0x04,
-	BCODE_STORE_INTO_INSTVAR_5     = 0x05,
-	BCODE_STORE_INTO_INSTVAR_6     = 0x06,
-	BCODE_STORE_INTO_INSTVAR_7     = 0x07,
+	HCL_CODE_STORE_INTO_INSTVAR_4     = 0x04,
+	HCL_CODE_STORE_INTO_INSTVAR_5     = 0x05,
+	HCL_CODE_STORE_INTO_INSTVAR_6     = 0x06,
+	HCL_CODE_STORE_INTO_INSTVAR_7     = 0x07,
 
-	BCODE_POP_INTO_INSTVAR_0       = 0x08,
-	BCODE_POP_INTO_INSTVAR_1       = 0x09,
-	BCODE_POP_INTO_INSTVAR_2       = 0x0A,
-	BCODE_POP_INTO_INSTVAR_3       = 0x0B,
+	HCL_CODE_POP_INTO_INSTVAR_0       = 0x08,
+	HCL_CODE_POP_INTO_INSTVAR_1       = 0x09,
+	HCL_CODE_POP_INTO_INSTVAR_2       = 0x0A,
+	HCL_CODE_POP_INTO_INSTVAR_3       = 0x0B,
 
-	BCODE_POP_INTO_INSTVAR_4       = 0x0C,
-	BCODE_POP_INTO_INSTVAR_5       = 0x0D,
-	BCODE_POP_INTO_INSTVAR_6       = 0x0E,
-	BCODE_POP_INTO_INSTVAR_7       = 0x0F,
+	HCL_CODE_POP_INTO_INSTVAR_4       = 0x0C,
+	HCL_CODE_POP_INTO_INSTVAR_5       = 0x0D,
+	HCL_CODE_POP_INTO_INSTVAR_6       = 0x0E,
+	HCL_CODE_POP_INTO_INSTVAR_7       = 0x0F,
 
-	BCODE_PUSH_INSTVAR_0           = 0x10,
-	BCODE_PUSH_INSTVAR_1           = 0x11,
-	BCODE_PUSH_INSTVAR_2           = 0x12,
-	BCODE_PUSH_INSTVAR_3           = 0x13,
+	HCL_CODE_PUSH_INSTVAR_0           = 0x10,
+	HCL_CODE_PUSH_INSTVAR_1           = 0x11,
+	HCL_CODE_PUSH_INSTVAR_2           = 0x12,
+	HCL_CODE_PUSH_INSTVAR_3           = 0x13,
 
-	BCODE_PUSH_INSTVAR_4           = 0x14,
-	BCODE_PUSH_INSTVAR_5           = 0x15,
-	BCODE_PUSH_INSTVAR_6           = 0x16,
-	BCODE_PUSH_INSTVAR_7           = 0x17,
+	HCL_CODE_PUSH_INSTVAR_4           = 0x14,
+	HCL_CODE_PUSH_INSTVAR_5           = 0x15,
+	HCL_CODE_PUSH_INSTVAR_6           = 0x16,
+	HCL_CODE_PUSH_INSTVAR_7           = 0x17,
 
-	HCL_CODE_PUSH_TEMPVAR_0        = 0x18,
-	HCL_CODE_PUSH_TEMPVAR_1        = 0x19,
-	HCL_CODE_PUSH_TEMPVAR_2        = 0x1A,
-	HCL_CODE_PUSH_TEMPVAR_3        = 0x1B,
+	HCL_CODE_PUSH_TEMPVAR_0           = 0x18,
+	HCL_CODE_PUSH_TEMPVAR_1           = 0x19,
+	HCL_CODE_PUSH_TEMPVAR_2           = 0x1A,
+	HCL_CODE_PUSH_TEMPVAR_3           = 0x1B,
 
-	HCL_CODE_PUSH_TEMPVAR_4        = 0x1C,
-	HCL_CODE_PUSH_TEMPVAR_5        = 0x1D,
-	HCL_CODE_PUSH_TEMPVAR_6        = 0x1E,
-	HCL_CODE_PUSH_TEMPVAR_7        = 0x1F,
+	HCL_CODE_PUSH_TEMPVAR_4           = 0x1C,
+	HCL_CODE_PUSH_TEMPVAR_5           = 0x1D,
+	HCL_CODE_PUSH_TEMPVAR_6           = 0x1E,
+	HCL_CODE_PUSH_TEMPVAR_7           = 0x1F,
 
-	HCL_CODE_STORE_INTO_TEMPVAR_0  = 0x20,
-	HCL_CODE_STORE_INTO_TEMPVAR_1  = 0x21,
-	HCL_CODE_STORE_INTO_TEMPVAR_2  = 0x22,
-	HCL_CODE_STORE_INTO_TEMPVAR_3  = 0x23,
+	HCL_CODE_STORE_INTO_TEMPVAR_0     = 0x20,
+	HCL_CODE_STORE_INTO_TEMPVAR_1     = 0x21,
+	HCL_CODE_STORE_INTO_TEMPVAR_2     = 0x22,
+	HCL_CODE_STORE_INTO_TEMPVAR_3     = 0x23,
 
-	HCL_CODE_STORE_INTO_TEMPVAR_4  = 0x24,
-	HCL_CODE_STORE_INTO_TEMPVAR_5  = 0x25,
-	HCL_CODE_STORE_INTO_TEMPVAR_6  = 0x26,
-	HCL_CODE_STORE_INTO_TEMPVAR_7  = 0x27,
+	HCL_CODE_STORE_INTO_TEMPVAR_4     = 0x24,
+	HCL_CODE_STORE_INTO_TEMPVAR_5     = 0x25,
+	HCL_CODE_STORE_INTO_TEMPVAR_6     = 0x26,
+	HCL_CODE_STORE_INTO_TEMPVAR_7     = 0x27,
 
-	BCODE_POP_INTO_TEMPVAR_0       = 0x28,
-	BCODE_POP_INTO_TEMPVAR_1       = 0x29,
-	BCODE_POP_INTO_TEMPVAR_2       = 0x2A,
-	BCODE_POP_INTO_TEMPVAR_3       = 0x2B,
+	HCL_CODE_POP_INTO_TEMPVAR_0       = 0x28,
+	HCL_CODE_POP_INTO_TEMPVAR_1       = 0x29,
+	HCL_CODE_POP_INTO_TEMPVAR_2       = 0x2A,
+	HCL_CODE_POP_INTO_TEMPVAR_3       = 0x2B,
 
-	BCODE_POP_INTO_TEMPVAR_4       = 0x2C,
-	BCODE_POP_INTO_TEMPVAR_5       = 0x2D,
-	BCODE_POP_INTO_TEMPVAR_6       = 0x2E,
-	BCODE_POP_INTO_TEMPVAR_7       = 0x2F,
+	HCL_CODE_POP_INTO_TEMPVAR_4       = 0x2C,
+	HCL_CODE_POP_INTO_TEMPVAR_5       = 0x2D,
+	HCL_CODE_POP_INTO_TEMPVAR_6       = 0x2E,
+	HCL_CODE_POP_INTO_TEMPVAR_7       = 0x2F,
 
-	HCL_CODE_PUSH_LITERAL_0        = 0x30,
-	HCL_CODE_PUSH_LITERAL_1        = 0x31,
-	HCL_CODE_PUSH_LITERAL_2        = 0x32,
-	HCL_CODE_PUSH_LITERAL_3        = 0x33,
+	HCL_CODE_PUSH_LITERAL_0           = 0x30,
+	HCL_CODE_PUSH_LITERAL_1           = 0x31,
+	HCL_CODE_PUSH_LITERAL_2           = 0x32,
+	HCL_CODE_PUSH_LITERAL_3           = 0x33,
 
-	HCL_CODE_PUSH_LITERAL_4        = 0x34,
-	HCL_CODE_PUSH_LITERAL_5        = 0x35,
-	HCL_CODE_PUSH_LITERAL_6        = 0x36,
-	HCL_CODE_PUSH_LITERAL_7        = 0x37,
+	HCL_CODE_PUSH_LITERAL_4           = 0x34,
+	HCL_CODE_PUSH_LITERAL_5           = 0x35,
+	HCL_CODE_PUSH_LITERAL_6           = 0x36,
+	HCL_CODE_PUSH_LITERAL_7           = 0x37,
 
 	/* -------------------------------------- */
 
@@ -479,10 +479,10 @@ enum hcl_bcode_t
 	HCL_CODE_STORE_INTO_OBJECT_2      = 0x3A,
 	HCL_CODE_STORE_INTO_OBJECT_3      = 0x3B,
 
-	BCODE_POP_INTO_OBJECT_0           = 0x3C,
-	BCODE_POP_INTO_OBJECT_1           = 0x3D,
-	BCODE_POP_INTO_OBJECT_2           = 0x3E,
-	BCODE_POP_INTO_OBJECT_3           = 0x3F,
+	HCL_CODE_POP_INTO_OBJECT_0        = 0x3C,
+	HCL_CODE_POP_INTO_OBJECT_1        = 0x3D,
+	HCL_CODE_POP_INTO_OBJECT_2        = 0x3E,
+	HCL_CODE_POP_INTO_OBJECT_3        = 0x3F,
 
 	HCL_CODE_PUSH_OBJECT_0            = 0x40,
 	HCL_CODE_PUSH_OBJECT_1            = 0x41,
@@ -500,15 +500,15 @@ enum hcl_bcode_t
 	HCL_CODE_JUMP_BACKWARD_3          = 0x4B, /* 75 */
 
 #if 0
-	BCODE_JUMP_BACKWARD_IF_FALSE_0 = 0x4C, /* 76 */
-	BCODE_JUMP_BACKWARD_IF_FALSE_1 = 0x4D, /* 77 */
-	BCODE_JUMP_BACKWARD_IF_FALSE_2 = 0x4E, /* 78 */
-	BCODE_JUMP_BACKWARD_IF_FALSE_3 = 0x4F, /* 79 */
+	HCL_CODE_JUMP_BACKWARD_IF_FALSE_0 = 0x4C, /* 76 */
+	HCL_CODE_JUMP_BACKWARD_IF_FALSE_1 = 0x4D, /* 77 */
+	HCL_CODE_JUMP_BACKWARD_IF_FALSE_2 = 0x4E, /* 78 */
+	HCL_CODE_JUMP_BACKWARD_IF_FALSE_3 = 0x4F, /* 79 */
 
-	BCODE_JUMP_BACKWARD_IF_TRUE_0  = 0x50, /* 80 */
-	BCODE_JUMP_BACKWARD_IF_TRUE_1  = 0x51, /* 81 */
-	BCODE_JUMP_BACKWARD_IF_TRUE_2  = 0x52, /* 82 */
-	BCODE_JUMP_BACKWARD_IF_TRUE_3  = 0x53, /* 83 */
+	HCL_CODE_JUMP_BACKWARD_IF_TRUE_0  = 0x50, /* 80 */
+	HCL_CODE_JUMP_BACKWARD_IF_TRUE_1  = 0x51, /* 81 */
+	HCL_CODE_JUMP_BACKWARD_IF_TRUE_2  = 0x52, /* 82 */
+	HCL_CODE_JUMP_BACKWARD_IF_TRUE_3  = 0x53, /* 83 */
 #endif
 
 	HCL_CODE_CALL_0                   = 0x54, /* 84 */
@@ -521,65 +521,65 @@ enum hcl_bcode_t
 	HCL_CODE_STORE_INTO_CTXTEMPVAR_2  = 0x5A, /* 90 */
 	HCL_CODE_STORE_INTO_CTXTEMPVAR_3  = 0x5B, /* 91 */
 
-	BCODE_POP_INTO_CTXTEMPVAR_0       = 0x5C, /* 92 */
-	BCODE_POP_INTO_CTXTEMPVAR_1       = 0x5D, /* 93 */
-	BCODE_POP_INTO_CTXTEMPVAR_2       = 0x5E, /* 94 */
-	BCODE_POP_INTO_CTXTEMPVAR_3       = 0x5F, /* 95 */
+	HCL_CODE_POP_INTO_CTXTEMPVAR_0    = 0x5C, /* 92 */
+	HCL_CODE_POP_INTO_CTXTEMPVAR_1    = 0x5D, /* 93 */
+	HCL_CODE_POP_INTO_CTXTEMPVAR_2    = 0x5E, /* 94 */
+	HCL_CODE_POP_INTO_CTXTEMPVAR_3    = 0x5F, /* 95 */
 
 	HCL_CODE_PUSH_CTXTEMPVAR_0        = 0x60, /* 96 */
 	HCL_CODE_PUSH_CTXTEMPVAR_1        = 0x61, /* 97 */
 	HCL_CODE_PUSH_CTXTEMPVAR_2        = 0x62, /* 98 */
 	HCL_CODE_PUSH_CTXTEMPVAR_3        = 0x63, /* 99 */
 
-	BCODE_PUSH_OBJVAR_0               = 0x64,
-	BCODE_PUSH_OBJVAR_1               = 0x65,
-	BCODE_PUSH_OBJVAR_2               = 0x66,
-	BCODE_PUSH_OBJVAR_3               = 0x67,
+	HCL_CODE_PUSH_OBJVAR_0            = 0x64,
+	HCL_CODE_PUSH_OBJVAR_1            = 0x65,
+	HCL_CODE_PUSH_OBJVAR_2            = 0x66,
+	HCL_CODE_PUSH_OBJVAR_3            = 0x67,
 
-	BCODE_STORE_INTO_OBJVAR_0         = 0x68,
-	BCODE_STORE_INTO_OBJVAR_1         = 0x69,
-	BCODE_STORE_INTO_OBJVAR_2         = 0x6A,
-	BCODE_STORE_INTO_OBJVAR_3         = 0x6B,
+	HCL_CODE_STORE_INTO_OBJVAR_0      = 0x68,
+	HCL_CODE_STORE_INTO_OBJVAR_1      = 0x69,
+	HCL_CODE_STORE_INTO_OBJVAR_2      = 0x6A,
+	HCL_CODE_STORE_INTO_OBJVAR_3      = 0x6B,
 
-	BCODE_POP_INTO_OBJVAR_0           = 0x6C,
-	BCODE_POP_INTO_OBJVAR_1           = 0x6D,
-	BCODE_POP_INTO_OBJVAR_2           = 0x6E,
-	BCODE_POP_INTO_OBJVAR_3           = 0x6F,
+	HCL_CODE_POP_INTO_OBJVAR_0        = 0x6C,
+	HCL_CODE_POP_INTO_OBJVAR_1        = 0x6D,
+	HCL_CODE_POP_INTO_OBJVAR_2        = 0x6E,
+	HCL_CODE_POP_INTO_OBJVAR_3        = 0x6F,
 
-	BCODE_SEND_MESSAGE_0              = 0x70,
-	BCODE_SEND_MESSAGE_1              = 0x71,
-	BCODE_SEND_MESSAGE_2              = 0x72,
-	BCODE_SEND_MESSAGE_3              = 0x73,
+	HCL_CODE_SEND_MESSAGE_0           = 0x70,
+	HCL_CODE_SEND_MESSAGE_1           = 0x71,
+	HCL_CODE_SEND_MESSAGE_2           = 0x72,
+	HCL_CODE_SEND_MESSAGE_3           = 0x73,
 
-	BCODE_SEND_MESSAGE_TO_SUPER_0     = 0x74,
-	BCODE_SEND_MESSAGE_TO_SUPER_1     = 0x75,
-	BCODE_SEND_MESSAGE_TO_SUPER_2     = 0x76,
-	BCODE_SEND_MESSAGE_TO_SUPER_3     = 0x77,
+	HCL_CODE_SEND_MESSAGE_TO_SUPER_0  = 0x74,
+	HCL_CODE_SEND_MESSAGE_TO_SUPER_1  = 0x75,
+	HCL_CODE_SEND_MESSAGE_TO_SUPER_2  = 0x76,
+	HCL_CODE_SEND_MESSAGE_TO_SUPER_3  = 0x77,
 
 	/* UNUSED 0x78 - 0x7F */
 
-	BCODE_STORE_INTO_INSTVAR_X        = 0x80, /* 128 */
+	HCL_CODE_STORE_INTO_INSTVAR_X     = 0x80, /* 128 */
 
 
-	BCODE_PUSH_RECEIVER               = 0x81, /* 129 */
+	HCL_CODE_PUSH_RECEIVER            = 0x81, /* 129 */
 	HCL_CODE_PUSH_NIL                 = 0x82, /* 130 */
 	HCL_CODE_PUSH_TRUE                = 0x83, /* 131 */
 	HCL_CODE_PUSH_FALSE               = 0x84, /* 132 */
-	BCODE_PUSH_CONTEXT                = 0x85, /* 133 */
-	BCODE_PUSH_PROCESS                = 0x86, /* 134 */
+	HCL_CODE_PUSH_CONTEXT             = 0x85, /* 133 */
+	HCL_CODE_PUSH_PROCESS             = 0x86, /* 134 */
 	/* UNUSED135 */
 
-	BCODE_POP_INTO_INSTVAR_X          = 0x88, /* 136 ## */
+	HCL_CODE_POP_INTO_INSTVAR_X       = 0x88, /* 136 ## */
 
 	HCL_CODE_PUSH_NEGONE              = 0x89, /* 137 */
 	HCL_CODE_PUSH_ZERO                = 0x8A, /* 138 */
 	HCL_CODE_PUSH_ONE                 = 0x8B, /* 139 */
 	HCL_CODE_PUSH_TWO                 = 0x8C, /* 140 */
 
-	BCODE_PUSH_INSTVAR_X              = 0x90, /* 144 ## */
+	HCL_CODE_PUSH_INSTVAR_X           = 0x90, /* 144 ## */
 	HCL_CODE_PUSH_TEMPVAR_X           = 0x98, /* 152 ## */
 	HCL_CODE_STORE_INTO_TEMPVAR_X     = 0xA0, /* 160 ## */
-	BCODE_POP_INTO_TEMPVAR_X          = 0xA8, /* 168 ## */
+	HCL_CODE_POP_INTO_TEMPVAR_X       = 0xA8, /* 168 ## */
 
 	HCL_CODE_PUSH_LITERAL_X           = 0xB0, /* 176 ## */
 	HCL_CODE_PUSH_LITERAL_X2          = 0xB1, /* 177 */
@@ -589,7 +589,7 @@ enum hcl_bcode_t
 	HCL_CODE_PUSH_CHARLIT             = 0xB4, /* 180 */
 
 	HCL_CODE_STORE_INTO_OBJECT_X      = 0xB8, /* 184 ## */
-	BCODE_POP_INTO_OBJECT_X           = 0xBC, /* 188 ## */
+	HCL_CODE_POP_INTO_OBJECT_X        = 0xBC, /* 188 ## */
 	HCL_CODE_PUSH_OBJECT_X            = 0xC0, /* 192 ## */
 
 	HCL_CODE_JUMP_FORWARD_X           = 0xC4, /* 196 ## */
@@ -606,38 +606,38 @@ enum hcl_bcode_t
 	HCL_CODE_CALL_X                   = 0xD4, /* 212 */
 
 	HCL_CODE_STORE_INTO_CTXTEMPVAR_X  = 0xD8, /* 216 ## */
-	BCODE_POP_INTO_CTXTEMPVAR_X       = 0xDC, /* 220 ## */
+	HCL_CODE_POP_INTO_CTXTEMPVAR_X    = 0xDC, /* 220 ## */
 	HCL_CODE_PUSH_CTXTEMPVAR_X        = 0xE0, /* 224 ## */
 
-	BCODE_PUSH_OBJVAR_X               = 0xE4, /* 228 ## */
-	BCODE_STORE_INTO_OBJVAR_X         = 0xE8, /* 232 ## */
-	BCODE_POP_INTO_OBJVAR_X           = 0xEC, /* 236 ## */
+	HCL_CODE_PUSH_OBJVAR_X            = 0xE4, /* 228 ## */
+	HCL_CODE_STORE_INTO_OBJVAR_X      = 0xE8, /* 232 ## */
+	HCL_CODE_POP_INTO_OBJVAR_X        = 0xEC, /* 236 ## */
 
 	/* UNUSED 237 */
 	HCL_CODE_MAKE_BYTEARRAY           = 0xEE, /* 238 */
 	HCL_CODE_POP_INTO_BYTEARRAY       = 0xEF, /* 239 */
 
-	BCODE_SEND_MESSAGE_X              = 0xF0, /* 240 ## */
+	HCL_CODE_SEND_MESSAGE_X           = 0xF0, /* 240 ## */
 
 	/* UNUSED 241 */
 
 	HCL_CODE_MAKE_DIC                 = 0xF2, /* 242 */
 	HCL_CODE_POP_INTO_DIC             = 0xF3, /* 243 */
-	BCODE_SEND_MESSAGE_TO_SUPER_X     = 0xF4, /* 244 ## */
+	HCL_CODE_SEND_MESSAGE_TO_SUPER_X  = 0xF4, /* 244 ## */
 
 	/* -------------------------------------- */
 
 	HCL_CODE_MAKE_ARRAY               = 0xF5, /* 245 */
 	HCL_CODE_POP_INTO_ARRAY           = 0xF6, /* 246 */
 
-	BCODE_DUP_STACKTOP                = 0xF7,
+	HCL_CODE_DUP_STACKTOP             = 0xF7,
 	HCL_CODE_POP_STACKTOP             = 0xF8,
-	BCODE_RETURN_STACKTOP             = 0xF9, /* ^something */
-	BCODE_RETURN_RECEIVER             = 0xFA, /* ^self */
+	HCL_CODE_RETURN_STACKTOP          = 0xF9, /* ^something */
+	HCL_CODE_RETURN_RECEIVER          = 0xFA, /* ^self */
 	HCL_CODE_RETURN_FROM_BLOCK        = 0xFB, /* return the stack top from a block */
 	/* UNUSED 252 */
 	HCL_CODE_MAKE_BLOCK               = 0xFD, /* 253 */
-	BCODE_SEND_BLOCK_COPY             = 0xFE, /* 254 */
+	HCL_CODE_SEND_BLOCK_COPY          = 0xFE, /* 254 */
 	HCL_CODE_NOOP                     = 0xFF  /* 255 */
 };
 
