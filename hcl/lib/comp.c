@@ -41,6 +41,103 @@ enum
 #define EMIT_SINGLE_PARAM_INSTRUCTION(hcl,code) \
 	do { if (emit_byte_instruction(hcl,code) <= -1) return -1; } while(0)
 
+/* --------------------------------------------
+
+// literal frame is not fully a stack
+// new literal frame => current litera count + 1
+// back one new literal frame => current literal frame index - 1
+
+                                                     <--- code/literal frame #0
+(defun plus(x y)                                     <--- code/literal frame #1
+	(printf "plus %d %d\n" x y)
+	(defun minus(x y)                               <--- code/literal frame #2
+		(printf "minus %d %d\n" x y)              
+		(- x y)
+	)
+	(+ x y)                                         <--- code/literal frame #1
+)
+                                                     <--- code/literal frame #0
+
+(defun dummy(q)                                      <--- code/literal frame #3
+	(printf "%s\n" q)
+)
+                                                     <--- code/literal frame #0
+
+(plus 10 20)
+    <---- minus is now available
+
+(minus 10 1)
+
+//
+// characeter 'A'
+// "string"
+// B"byte string"
+// array ---> #[   ] or [ ] ? constant or not?  dynamic???
+// hash table - dictionary  ---> #{   } or { } <--- ambuguity with blocks...
+// the rest must be manipulated with code...
+
+------------------------------ */
+
+static int acquire_ccl (hcl_t* hcl)
+{
+	hcl_ccl_t* ccl;
+
+	if (hcl->ccl.len >= hcl->ccl.capa)
+	{
+		hcl_ccl_t* tmp;
+
+		tmp = hcl_reallocmem(hcl, hcl->ccl.ptr, hcl->ccl.capa + 32);
+		if (HCL_UNLIKELY(!tmp)) return -1;
+
+		hcl->ccl.capa += 32;
+	}
+
+	ccl = &hcl->ccl.ptr[hcl->ccl.len];
+	HCL_MEMSET (ccl, 0, SIZEOF(*ccl));
+	ccl->pindex = hcl->ccl.index;
+	hcl->ccl.index = hcl->ccl.len++;
+	return 0;
+}
+
+static int release_ccl (hcl_t* hcl)
+{
+	hcl->ccl.index = hcl->ccl.ptr[hcl->ccl.index].pindex;
+}
+
+static void destroy_ccls (hcl_t* hcl)
+{
+	while (hcl->ccl.len > 0)
+	{
+		hcl_ccl_t* ccl = &hcl->ccl.ptr[--hcl->ccl.len];
+
+		if (ccl->bc.ptr) 
+		{
+			hcl_freemem (hcl, ccl->bc.ptr);
+			ccl->bc.ptr = HCL_NULL;
+			ccl->bc.capa = 0;
+			ccl->bc.len = 0;
+		}
+
+		if (ccl->lit.ptr)
+		{
+			while (ccl->lit.len > 0)
+			{
+				hcl_clv_t* clv = &ccl->lit.ptr[--ccl->lit.len];
+				hcl_freemem (hcl, clv);
+			}
+			hcl_freemem (hcl, ccl->lit.ptr);
+			ccl->lit.ptr = HCL_NULL;
+			ccl->lit.capa = 0;
+			ccl->lit.len = 0;
+		}
+	}
+
+	hcl_freemem (hcl, hcl->ccl.ptr);
+	hcl->ccl.ptr = HCL_NULL;
+	hcl->ccl.capa = 0;
+	hcl->ccl.len = 0;
+	hcl->ccl.index = 0;
+}
 
 static int add_literal (hcl_t* hcl, hcl_oop_t obj, hcl_oow_t* index)
 {
@@ -1582,6 +1679,7 @@ static HCL_INLINE int compile_symbol (hcl_t* hcl, hcl_oop_t obj)
 			if (!cons) return -1;
 		}
 
+		/* add the entire cons pair to the literal frame */
 		if (add_literal(hcl, cons, &index) <= -1 ||
 		    emit_single_param_instruction(hcl, HCL_CODE_PUSH_OBJECT_0, index) <= -1) return -1;
 

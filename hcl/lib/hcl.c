@@ -93,42 +93,6 @@ static void free_heap (hcl_t* hcl, void* ptr)
 	hcl_freemem (hcl, ptr);
 }
 
-static int push_code_container (hcl_t* hcl)
-{
-	hcl_code_container_t* cc;
-
-	cc = hcl_callocmem(hcl, HCL_SIZEOF(*cc));
-	if (HCL_UNLIKELY(!cc)) return -1;
-
-	cc->_par = hcl->ccstk;
-	hcl->ccstk = cc;
-
-	return 0;
-}
-
-static void pop_code_container (hcl_t* hcl)
-{
-	hcl_code_container_t* cc = hcl->ccstk;
-
-	if (cc->bc.arr)
-	{
-		hcl_freengcobj (hcl, (hcl_oop_t)cc->bc.arr);
-		cc->bc.arr = HCL_NULL;
-		cc->bc.len = 0;
-	}
-
-	if (cc->lit.arr)
-	{
-		hcl_freengcobj (hcl, (hcl_oop_t)cc->lit.arr);
-		cc->lit.arr = HCL_NULL;
-		cc->lit.len = 0;
-	}
-
-	hcl->ccstk = cc->_par;
-	hcl_freemem (hcl, cc);
-}
-
-
 int hcl_init (hcl_t* hcl, hcl_mmgr_t* mmgr, hcl_oow_t heapsz, const hcl_vmprim_t* vmprim)
 {
 	int modtab_inited = 0;
@@ -196,14 +160,10 @@ int hcl_init (hcl_t* hcl, hcl_mmgr_t* mmgr, hcl_oow_t heapsz, const hcl_vmprim_t
 	hcl->newheap = hcl_makeheap(hcl, heapsz);
 	if (HCL_UNLIKELY(!hcl->newheap)) goto oops;
 
-	n = push_code_container(hcl);
-	if (HCL_UNLIKELY(n <= -1)) goto oops;
-
 	if (hcl->vmprim.dl_startup) hcl->vmprim.dl_startup (hcl);
 	return 0;
 
 oops:
-	if (hcl->ccstk) pop_code_container(hcl);
 	if (hcl->newheap) hcl_killheap (hcl, hcl->newheap);
 	if (hcl->curheap) hcl_killheap (hcl, hcl->curheap);
 	if (hcl->permheap) hcl_killheap (hcl, hcl->permheap);
@@ -295,8 +255,6 @@ void hcl_fini (hcl_t* hcl)
 		hcl->code.lit.len = 0;
 	}
 
-	while (hcl->ccstk) pop_code_container(hcl);
-
 	if (hcl->p.s.ptr)
 	{
 		hcl_freemem (hcl, hcl->p.s.ptr);
@@ -363,12 +321,6 @@ void hcl_reset (hcl_t* hcl)
 	/* zap the byte code buffer and the literal frame */
 	hcl->code.bc.len = 0;
 	hcl->code.lit.len = 0;
-
-	/* keep the base container */
-	HCL_ASSERT (hcl, hcl->ccstk != HCL_NULL);
-	while (hcl->ccstk->_par) pop_code_container(hcl);
-	hcl->ccstk->bc.len = 0;
-	hcl->ccstk->lit.len = 0;
 
 	/* clean up object memory */
 	hcl_gc (hcl);
