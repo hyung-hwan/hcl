@@ -2216,7 +2216,7 @@ static int execute (hcl_t* hcl)
 						/* the stack contains the final return value so the stack pointer must be 0. */
 						HCL_ASSERT (hcl, hcl->sp == 0); 
 
-						if (hcl->option.trait & HCL_AWAIT_PROCS)
+						if (hcl->option.trait & HCL_TRAIT_AWAIT_PROCS)
 							terminate_process (hcl, hcl->processor->active);
 						else
 							goto done;
@@ -2280,6 +2280,9 @@ static int execute (hcl_t* hcl)
 
 
 #if 0
+				if (hcl->option.trait & HCL_TRAIT_INTERACTIVE)
+				{
+
 /* the MAKE_BLOCK instruction is followed by the long JUMP_FORWARD_X instruction.
  * i can decode the instruction and get the size of instructions
  * of the block context */
@@ -2294,6 +2297,8 @@ static int execute (hcl_t* hcl)
 
 HCL_DEBUG1(hcl, "****  MAKE BLOCK joff = %zu\n", joff);
 }
+
+				}
 #endif
 
 

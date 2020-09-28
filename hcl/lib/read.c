@@ -2262,11 +2262,11 @@ static void fini_compiler (hcl_t* hcl)
 			hcl->c->tv.capa = 0;
 		}
 
-		if (hcl->c->blk.tmprcnt)
+		if (hcl->c->blk.info)
 		{
-			hcl_freemem (hcl, hcl->c->blk.tmprcnt);
-			hcl->c->blk.tmprcnt = HCL_NULL;
-			hcl->c->blk.tmprcnt_capa = 0;
+			hcl_freemem (hcl, hcl->c->blk.info);
+			hcl->c->blk.info = HCL_NULL;
+			hcl->c->blk.info_capa = 0;
 			hcl->c->blk.depth = -1;
 		}
 

@@ -822,7 +822,7 @@ static int handle_dbgopt (hcl_t* hcl, const hcl_bch_t* str)
 
 		cm = hcl_find_bchar_in_bcstr(flt, ',');
 		len = cm? (cm - flt): hcl_count_bcstr(flt);
-		if (hcl_comp_bchars_bcstr (flt, len, "gc") == 0)  dbgopt |= HCL_DEBUG_GC;
+		if (hcl_comp_bchars_bcstr (flt, len, "gc") == 0)  dbgopt |= HCL_TRAIT_DEBUG_GC;
 		else if (hcl_comp_bchars_bcstr (flt, len, "bigint") == 0)  dbgopt |= HCL_DEBUG_BIGINT;
 		else
 		{
@@ -1082,8 +1082,8 @@ int main (int argc, char* argv[])
 	{
 		hcl_bitmask_t trait = 0;
 
-		/*trait |= HCL_NOGC;*/
-		trait |= HCL_AWAIT_PROCS;
+		/*trait |= HCL_TRAIT_NOGC;*/
+		trait |= HCL_TRAIT_AWAIT_PROCS;
 		hcl_setoption (hcl, HCL_TRAIT, &trait);
 
 		/* disable GC logs */
@@ -1159,6 +1159,14 @@ hcl_prufmt (hcl, fmt, ustr, 0x6789);
 hcl_logufmt (hcl, HCL_LOG_WARN, fmt, ustr, 0x6789);
 }
 #endif
+
+	if (xtn->reader_istty)
+	{
+		hcl_bitmask_t trait;
+		hcl_getoption (hcl, HCL_TRAIT, &trait);
+		trait |= HCL_TRAIT_INTERACTIVE;
+		hcl_setoption (hcl, HCL_TRAIT, &trait);
+	}
 
 	while (1)
 	{

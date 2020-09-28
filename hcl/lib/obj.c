@@ -31,11 +31,11 @@ void* hcl_allocbytes (hcl_t* hcl, hcl_oow_t size)
 	hcl_uint8_t* ptr;
 
 #if defined(HCL_BUILD_DEBUG)
-	if ((hcl->option.trait & HCL_DEBUG_GC) && !(hcl->option.trait & HCL_NOGC)) hcl_gc (hcl);
+	if ((hcl->option.trait & HCL_TRAIT_DEBUG_GC) && !(hcl->option.trait & HCL_TRAIT_NOGC)) hcl_gc (hcl);
 #endif
 
 	ptr = (hcl_uint8_t*)hcl_allocheapmem(hcl, hcl->curheap, size);
-	if (!ptr && hcl->errnum == HCL_EOOMEM && !(hcl->option.trait & HCL_NOGC))
+	if (!ptr && hcl->errnum == HCL_EOOMEM && !(hcl->option.trait & HCL_TRAIT_NOGC))
 	{
 		hcl_gc (hcl);
 		HCL_LOG4 (hcl, HCL_LOG_GC | HCL_LOG_INFO,

@@ -228,6 +228,13 @@ struct hcl_cframe_t
 
 typedef struct hcl_cframe_t hcl_cframe_t;
 
+struct hcl_blk_info_t
+{
+	hcl_oow_t tmprcnt;
+	hcl_oow_t litbase;
+};
+typedef struct hcl_blk_info_t hcl_blk_info_t;
+
 struct hcl_compiler_t
 {
 	/* output handler */
@@ -305,8 +312,8 @@ struct hcl_compiler_t
 	struct
 	{
 		hcl_ooi_t depth;
-		hcl_oow_t* tmprcnt;
-		hcl_oow_t  tmprcnt_capa;
+		hcl_blk_info_t* info;
+		hcl_oow_t  info_capa;
 	} blk; /* lambda block */
 };
 #endif

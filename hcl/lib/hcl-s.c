@@ -748,7 +748,7 @@ hcl_server_proto_t* hcl_server_proto_open (hcl_oow_t xtnsize, hcl_server_worker_
 
 	hcl_getoption (proto->hcl, HCL_TRAIT, &trait);
 #if defined(HCL_BUILD_DEBUG)
-	if (proto->worker->server->cfg.trait & HCL_SERVER_TRAIT_DEBUG_GC) trait |= HCL_DEBUG_GC;
+	if (proto->worker->server->cfg.trait & HCL_SERVER_TRAIT_DEBUG_GC) trait |= HCL_TRAIT_DEBUG_GC;
 	if (proto->worker->server->cfg.trait & HCL_SERVER_TRAIT_DEBUG_BIGINT) trait |= HCL_DEBUG_BIGINT;
 #endif
 	hcl_setoption (proto->hcl, HCL_TRAIT, &trait);
@@ -1677,7 +1677,7 @@ hcl_server_t* hcl_server_open (hcl_mmgr_t* mmgr, hcl_oow_t xtnsize, hcl_server_p
 	hcl_setcmgr (server->dummy_hcl, hcl_server_getcmgr(server));
 	hcl_getoption (server->dummy_hcl, HCL_TRAIT, &trait);
 #if defined(HCL_BUILD_DEBUG)
-	if (server->cfg.trait & HCL_SERVER_TRAIT_DEBUG_GC) trait |= HCL_DEBUG_GC;
+	if (server->cfg.trait & HCL_SERVER_TRAIT_DEBUG_GC) trait |= HCL_TRAIT_DEBUG_GC;
 	if (server->cfg.trait & HCL_SERVER_TRAIT_DEBUG_BIGINT) trait |= HCL_DEBUG_BIGINT;
 #endif
 	hcl_setoption (server->dummy_hcl, HCL_TRAIT, &trait);
@@ -2357,7 +2357,7 @@ int hcl_server_setoption (hcl_server_t* server, hcl_server_option_t id, const vo
 
 				hcl_getoption (server->dummy_hcl, HCL_TRAIT, &trait);
 			#if defined(HCL_BUILD_DEBUG)
-				if (server->cfg.trait & HCL_SERVER_TRAIT_DEBUG_GC) trait |= HCL_DEBUG_GC;
+				if (server->cfg.trait & HCL_SERVER_TRAIT_DEBUG_GC) trait |= HCL_TRAIT_DEBUG_GC;
 				if (server->cfg.trait & HCL_SERVER_TRAIT_DEBUG_BIGINT) trait |= HCL_DEBUG_BIGINT;
 			#endif
 				hcl_setoption (server->dummy_hcl, HCL_TRAIT, &trait);

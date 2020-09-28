@@ -33,7 +33,7 @@ enum
 };
 
 #define TV_BUFFER_ALIGN 256
-#define BLK_TMPRCNT_BUFFER_ALIGN 128
+#define BLK_INFO_BUFFER_ALIGN 128
 
 #define EMIT_BYTE_INSTRUCTION(hcl,code) \
 	do { if (emit_byte_instruction(hcl,code) <= -1) return -1; } while(0)
@@ -43,31 +43,26 @@ enum
 
 /* --------------------------------------------
 
-// literal frame is not fully a stack
-// new literal frame => current litera count + 1
-// back one new literal frame => current literal frame index - 1
-
-                                                     <--- code/literal frame #0
-(defun plus(x y)                                     <--- code/literal frame #1
+                                                     
+(defun plus(x y) 
 	(printf "plus %d %d\n" x y)
-	(defun minus(x y)                               <--- code/literal frame #2
+	(defun minus(x y)
 		(printf "minus %d %d\n" x y)              
 		(- x y)
 	)
-	(+ x y)                                         <--- code/literal frame #1
+	(+ x y)
 )
-                                                     <--- code/literal frame #0
 
-(defun dummy(q)                                      <--- code/literal frame #3
+(defun dummy(q)
 	(printf "%s\n" q)
 )
-                                                     <--- code/literal frame #0
 
 (plus 10 20)
     <---- minus is now available
 
 (minus 10 1)
-
+ 
+literals -->
 //
 // characeter 'A'
 // "string"
@@ -77,67 +72,6 @@ enum
 // the rest must be manipulated with code...
 
 ------------------------------ */
-
-static int acquire_ccl (hcl_t* hcl)
-{
-	hcl_ccl_t* ccl;
-
-	if (hcl->ccl.len >= hcl->ccl.capa)
-	{
-		hcl_ccl_t* tmp;
-
-		tmp = hcl_reallocmem(hcl, hcl->ccl.ptr, hcl->ccl.capa + 32);
-		if (HCL_UNLIKELY(!tmp)) return -1;
-
-		hcl->ccl.capa += 32;
-	}
-
-	ccl = &hcl->ccl.ptr[hcl->ccl.len];
-	HCL_MEMSET (ccl, 0, SIZEOF(*ccl));
-	ccl->pindex = hcl->ccl.index;
-	hcl->ccl.index = hcl->ccl.len++;
-	return 0;
-}
-
-static int release_ccl (hcl_t* hcl)
-{
-	hcl->ccl.index = hcl->ccl.ptr[hcl->ccl.index].pindex;
-}
-
-static void destroy_ccls (hcl_t* hcl)
-{
-	while (hcl->ccl.len > 0)
-	{
-		hcl_ccl_t* ccl = &hcl->ccl.ptr[--hcl->ccl.len];
-
-		if (ccl->bc.ptr) 
-		{
-			hcl_freemem (hcl, ccl->bc.ptr);
-			ccl->bc.ptr = HCL_NULL;
-			ccl->bc.capa = 0;
-			ccl->bc.len = 0;
-		}
-
-		if (ccl->lit.ptr)
-		{
-			while (ccl->lit.len > 0)
-			{
-				hcl_clv_t* clv = &ccl->lit.ptr[--ccl->lit.len];
-				hcl_freemem (hcl, clv);
-			}
-			hcl_freemem (hcl, ccl->lit.ptr);
-			ccl->lit.ptr = HCL_NULL;
-			ccl->lit.capa = 0;
-			ccl->lit.len = 0;
-		}
-	}
-
-	hcl_freemem (hcl, hcl->ccl.ptr);
-	hcl->ccl.ptr = HCL_NULL;
-	hcl->ccl.capa = 0;
-	hcl->ccl.len = 0;
-	hcl->ccl.index = 0;
-}
 
 static int add_literal (hcl_t* hcl, hcl_oop_t obj, hcl_oow_t* index)
 {
@@ -168,6 +102,8 @@ static int add_literal (hcl_t* hcl, hcl_oop_t obj, hcl_oow_t* index)
 	}
 
 	*index = hcl->code.lit.len;
+	if (hcl->option.trait & HCL_TRAIT_INTERACTIVE) *index -= hcl->c->blk.info[hcl->c->blk.depth].litbase;
+
 	((hcl_oop_oop_t)hcl->code.lit.arr)->slot[hcl->code.lit.len++] = obj;
 	return 0;
 }
@@ -225,24 +161,25 @@ static int find_temporary_variable_backward (hcl_t* hcl, hcl_oop_t name, hcl_oow
 	return -1;
 }
 
-static int store_temporary_variable_count_for_block (hcl_t* hcl, hcl_oow_t tmpr_count)
+static int store_temporary_variable_count_for_block (hcl_t* hcl, hcl_oow_t tmpr_count, hcl_oow_t lit_base)
 {
 	HCL_ASSERT (hcl, hcl->c->blk.depth >= 0);
 
-	if (hcl->c->blk.depth >= hcl->c->blk.tmprcnt_capa)
+	if (hcl->c->blk.depth >= hcl->c->blk.info_capa)
 	{
-		hcl_oow_t* tmp;
+		hcl_blk_info_t* tmp;
 		hcl_oow_t newcapa;
 
-		newcapa = HCL_ALIGN (hcl->c->blk.depth + 1, BLK_TMPRCNT_BUFFER_ALIGN);
-		tmp = (hcl_oow_t*)hcl_reallocmem (hcl, hcl->c->blk.tmprcnt, newcapa * HCL_SIZEOF(*tmp));
+		newcapa = HCL_ALIGN (hcl->c->blk.depth + 1, BLK_INFO_BUFFER_ALIGN);
+		tmp = (hcl_oow_t*)hcl_reallocmem (hcl, hcl->c->blk.info, newcapa * HCL_SIZEOF(*tmp));
 		if (!tmp) return -1;
 
-		hcl->c->blk.tmprcnt_capa = newcapa;
-		hcl->c->blk.tmprcnt = tmp;
+		hcl->c->blk.info_capa = newcapa;
+		hcl->c->blk.info = tmp;
 	}
 
-	hcl->c->blk.tmprcnt[hcl->c->blk.depth] = tmpr_count;
+	hcl->c->blk.info[hcl->c->blk.depth].tmprcnt = tmpr_count;
+	hcl->c->blk.info[hcl->c->blk.depth].litbase = lit_base;
 	return 0;
 }
 
@@ -1123,7 +1060,7 @@ static int compile_lambda (hcl_t* hcl, hcl_oop_t src, int defun)
 		return -1;
 	}
 	hcl->c->blk.depth++;
-	if (store_temporary_variable_count_for_block(hcl, hcl->c->tv.size) <= -1) return -1;
+	if (store_temporary_variable_count_for_block(hcl, hcl->c->tv.size, hcl->code.lit.len) <= -1) return -1;
 
 	/* use the accumulated number of temporaries so far when generating
 	 * the make_block instruction. at context activation time, the actual 
@@ -1627,14 +1564,14 @@ static int emit_indexed_variable_access (hcl_t* hcl, hcl_oow_t index, hcl_oob_t 
 
 		/* if a temporary variable is accessed inside a block,
 		 * use a special instruction to indicate it */
-		HCL_ASSERT (hcl, index < hcl->c->blk.tmprcnt[hcl->c->blk.depth]);
+		HCL_ASSERT (hcl, index < hcl->c->blk.info[hcl->c->blk.depth].tmprcnt);
 		for (i = hcl->c->blk.depth; i > 0; i--) /* excluded the top level -- TODO: change this code depending on global variable handling */
 		{
-			if (index >= hcl->c->blk.tmprcnt[i - 1])
+			if (index >= hcl->c->blk.info[i - 1].tmprcnt)
 			{
 				hcl_oow_t ctx_offset, index_in_ctx;
 				ctx_offset = hcl->c->blk.depth - i;
-				index_in_ctx = index - hcl->c->blk.tmprcnt[i - 1];
+				index_in_ctx = index - hcl->c->blk.info[i - 1].tmprcnt;
 				/* ctx_offset 0 means the current context.
 				 *            1 means current->home.
 				 *            2 means current->home->home. 
@@ -2564,7 +2501,7 @@ static HCL_INLINE int emit_lambda (hcl_t* hcl)
 	jip = HCL_OOP_TO_SMOOI(cf->operand);
 
 	hcl->c->blk.depth--;
-	hcl->c->tv.size = hcl->c->blk.tmprcnt[hcl->c->blk.depth];
+	hcl->c->tv.size = hcl->c->blk.info[hcl->c->blk.depth].tmprcnt;
 
 	/* HCL_CODE_LONG_PARAM_SIZE + 1 => size of the long JUMP_FORWARD instruction */
 	block_code_size = hcl->code.bc.len - jip - (HCL_HCL_CODE_LONG_PARAM_SIZE + 1);
@@ -2682,7 +2619,7 @@ int hcl_compile (hcl_t* hcl, hcl_oop_t obj)
 
 /* TODO: in case i implement all global variables as block arguments at the top level...what should i do? */
 	hcl->c->blk.depth++;
-	if (store_temporary_variable_count_for_block(hcl, hcl->c->tv.size) <= -1) return -1;
+	if (store_temporary_variable_count_for_block(hcl, hcl->c->tv.size, 0) <= -1) return -1;
 
 	PUSH_CFRAME (hcl, COP_COMPILE_OBJECT, obj);
 

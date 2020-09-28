@@ -183,16 +183,18 @@ typedef enum hcl_option_dflval_t hcl_option_dflval_t;
 enum hcl_trait_t
 {
 #if defined(HCL_BUILD_DEBUG)
-	HCL_DEBUG_GC     = (1u << 0),
+	HCL_TRAIT_DEBUG_GC     = (1u << 0),
 	HCL_DEBUG_BIGINT = (1u << 1),
 #endif
 
+	HCL_TRAIT_INTERACTIVE = (1u << 7),
+
 	/* perform no garbage collection when the heap is full. 
 	 * you still can use hcl_gc() explicitly. */
-	HCL_NOGC = (1u << 8),
+	HCL_TRAIT_NOGC = (1u << 8),
 
 	/* wait for running process when exiting from the main method */
-	HCL_AWAIT_PROCS = (1u << 9)
+	HCL_TRAIT_AWAIT_PROCS = (1u << 9)
 };
 typedef enum hcl_trait_t hcl_trait_t;
 
@@ -1091,35 +1093,6 @@ typedef struct hcl_compiler_t hcl_compiler_t;
 
 #define HCL_ERRMSG_CAPA (2048)
 
-typedef struct hcl_clv_t hcl_clv_t;
-struct hcl_clv_t /* literal value in compiler */
-{
-
-	int       type; /* int, string, byte string, character, etc */
-	hcl_oow_t size;
-	/* data is placed here */
-};
-
-typedef struct hcl_ccl_t hcl_ccl_t;
-struct hcl_ccl_t /* code and literal in compiler */
-{
-	struct
-	{
-		hcl_uint8_t* ptr;
-		hcl_oow_t capa;
-		hcl_oow_t len;
-	} bc;
-
-	struct
-	{
-		hcl_clv_t* ptr;
-		hcl_oow_t capa;
-		hcl_oow_t len;
-	} lit;
-
-	hcl_oow_t pindex;
-};
-
 struct hcl_t
 {
 	hcl_oow_t    _instsize;
@@ -1269,14 +1242,6 @@ struct hcl_t
 			hcl_oow_t len;
 		} xbuf; /* buffer to support sprintf */
 	} sprintf;
-
-	struct
-	{
-		hcl_ccl_t* ptr;
-		hcl_oow_t capa;
-		hcl_oow_t len;
-		hcl_oow_t index;
-	} ccl;
 
 	struct
 	{
@@ -1598,7 +1563,7 @@ HCL_EXPORT void hcl_deregcb (
 
 /**
  * The hcl_gc() function performs garbage collection.
- * It is not affected by #HCL_NOGC.
+ * It is not affected by #HCL_TRAIT_NOGC.
  */
 HCL_EXPORT void hcl_gc (
 	hcl_t* hcl
