@@ -512,23 +512,6 @@ struct hcl_fpdec_t
 	hcl_oop_t scale; /* smooi, positive */
 };
 
-#define HCL_FUNCTION_NAMED_INSTVARS 3   /* this excludes literal frames and byte codes */
-typedef struct hcl_function_t hcl_function_t;
-typedef struct hcl_function_t* hcl_oop_function_t;
-struct hcl_function_t
-{
-	HCL_OBJ_HEADER;
-
-	hcl_oop_t ntmprs; /* smooi */
-	hcl_oop_t nargs;  /* smooi */
-	hcl_oop_t home; /* home function. nil for the initial function */
-
-	/* == variable indexed part == */
-	hcl_oop_t literal_frame[1]; /* it stores literals. it may not exist */
-
-	/* after the literal frame comes the actual byte code */
-};
-
 /* the first byte after the main payload is the trailer size
  * the code bytes are placed after the trailer size.
  *
@@ -538,9 +521,28 @@ struct hcl_function_t
 #define HCL_FUNCTION_GET_CODE_BYTE(m) HCL_OBJ_GET_TRAILER_BYTE(m)
 #define HCL_FUNCTION_GET_CODE_SIZE(m) HCL_OBJ_GET_TRAILER_SIZE(m)
 
+#define HCL_FUNCTION_NAMED_INSTVARS 3   /* this excludes literal frames and byte codes */
+typedef struct hcl_function_t hcl_function_t;
+typedef struct hcl_function_t* hcl_oop_function_t;
+
 #define HCL_CONTEXT_NAMED_INSTVARS 8
 typedef struct hcl_context_t hcl_context_t;
 typedef struct hcl_context_t* hcl_oop_context_t;
+
+struct hcl_function_t
+{
+	HCL_OBJ_HEADER;
+
+	hcl_oop_t ntmprs; /* smooi */
+	hcl_oop_t nargs;  /* smooi */
+	hcl_oop_context_t home; /* home context. nil for the initial function */
+
+	/* == variable indexed part == */
+	hcl_oop_t literal_frame[1]; /* it stores literals. it may not exist */
+
+	/* after the literal frame comes the actual byte code */
+};
+
 struct hcl_context_t
 {
 	HCL_OBJ_HEADER;
@@ -550,7 +552,7 @@ struct hcl_context_t
 	 * is activated as a result of normal message sending and a block
 	 * context is activated when it is sent 'value'. it's set to
 	 * nil if a block context created hasn't received 'value'. */
-	hcl_oop_context_t  sender;
+	hcl_oop_context_t  sender; /* context or nil */
 
 	/* SmallInteger, instruction pointer */
 	hcl_oop_t          ip;
@@ -577,7 +579,7 @@ struct hcl_context_t
 	 * moment the block context was created. that is, it points to 
 	 * a method context where the base block has been defined. 
 	 * an activated block context copies this field from the base block context. */
-	hcl_oop_t          home;
+	hcl_oop_context_t home; /* context or nil */
 
 	/* it points to the method context created of the method defining the code
 	 * of this context. a method context points to itself. a block context
@@ -597,7 +599,6 @@ struct hcl_context_t
 	/* variable indexed part */
 	hcl_oop_t          slot[1]; /* stack */
 };
-
 
 #define HCL_PROCESS_NAMED_INSTVARS 8 /* TODO: RENAME THIS TO SOMETHING ELSE */
 typedef struct hcl_process_t hcl_process_t;

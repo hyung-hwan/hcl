@@ -174,7 +174,7 @@ static HCL_INLINE hcl_oop_t make_function (hcl_t* hcl, hcl_oow_t lfsize, const h
 	return hcl_allocoopobjwithtrailer(hcl, HCL_BRAND_FUNCTION, HCL_FUNCTION_NAMED_INSTVARS + lfsize, bptr, blen);
 }
 
-static HCL_INLINE void fill_function_data (hcl_t* hcl, hcl_oop_function_t func, hcl_ooi_t nargs, hcl_ooi_t ntmprs, hcl_oop_t homectx, const hcl_oop_t* lfptr, hcl_oow_t lfsize)
+static HCL_INLINE void fill_function_data (hcl_t* hcl, hcl_oop_function_t func, hcl_ooi_t nargs, hcl_ooi_t ntmprs, hcl_oop_context_t homectx, const hcl_oop_t* lfptr, hcl_oow_t lfsize)
 {
 	/* Although this function could be integrated into make_function(),
 	 * this function has been separated from make_function() to make GC handling simpler */
@@ -976,7 +976,7 @@ static int __activate_context (hcl_t* hcl, hcl_oop_context_t rcv_blkctx, hcl_ooi
 
 	HCL_STACK_POPS (hcl, nargs + 1); /* pop arguments and receiver */
 
-	HCL_ASSERT (hcl, (rcv_blkctx == hcl->initial_context && blkctx->home == hcl->_nil) || blkctx->home != hcl->_nil);
+	HCL_ASSERT (hcl, (rcv_blkctx == hcl->initial_context && (hcl_oop_t)blkctx->home == hcl->_nil) || (hcl_oop_t)blkctx->home != hcl->_nil);
 	blkctx->sp = HCL_SMOOI_TO_OOP(-1); /* not important at all */
 	blkctx->sender = hcl->active_context;
 
@@ -1054,7 +1054,7 @@ static int __activate_function (hcl_t* hcl, hcl_oop_function_t rcv_func, hcl_ooi
 
 	HCL_STACK_POPS (hcl, nargs + 1); /* pop arguments and receiver */
 
-	HCL_ASSERT (hcl, blkctx->home != hcl->_nil);
+	HCL_ASSERT (hcl, (hcl_oop_t)blkctx->home != hcl->_nil);
 	blkctx->sp = HCL_SMOOI_TO_OOP(-1); /* not important at all */
 	blkctx->sender = hcl->active_context;
 
@@ -1065,9 +1065,10 @@ static int __activate_function (hcl_t* hcl, hcl_oop_function_t rcv_func, hcl_ooi
 static HCL_INLINE int activate_function (hcl_t* hcl, hcl_ooi_t nargs)
 {
 	int x;
-	hcl_oop_context_t rcv, blkctx;
+	hcl_oop_function_t rcv;
+	hcl_oop_context_t blkctx;
 
-	rcv = (hcl_oop_context_t)HCL_STACK_GETRCV(hcl, nargs);
+	rcv = (hcl_oop_function_t)HCL_STACK_GETRCV(hcl, nargs);
 	HCL_ASSERT (hcl, HCL_IS_FUNCTION(hcl, rcv));
 
 	x = __activate_function(hcl, rcv, nargs, &blkctx);
@@ -1307,28 +1308,25 @@ static int start_initial_process_and_context (hcl_t* hcl, hcl_ooi_t initial_ip)
 	hcl_oop_context_t ctx;
 	hcl_oop_process_t proc;
 
-	/* create a fake initial context over the initial function */
+	/* create the initial context over the initial function */
 	ctx = (hcl_oop_context_t)make_context(hcl, 0); /* no temporary variables */
 	if (!ctx) return -1;
 
-	/* the initial context starts the life of the entire VM
-	 * and is not really worked on except that it is used to call the
-	 * initial method. so it doesn't really require any extra stack space. */
-/* TODO: verify this theory of mine. */
 	hcl->ip = initial_ip;
 	hcl->sp = -1;
 
 	ctx->ip = HCL_SMOOI_TO_OOP(initial_ip);
 	ctx->sp = HCL_SMOOI_TO_OOP(-1); /* pointer to -1 below the bottom */
-	/*ctx->nargs = (hcl_oop_t)mth;*/ /* fake. help SWITCH_ACTIVE_CONTEXT() not fail. */
 	ctx->nargs = HCL_SMOOI_TO_OOP(0);
 	ctx->ntmprs = HCL_SMOOI_TO_OOP(0);
 	ctx->origin = hcl->initial_function;
 	ctx->home = hcl->initial_function->home; /* this should be nil */
-	HCL_ASSERT (hcl, ctx->home == hcl->_nil);
+	ctx->sender = (hcl_oop_context_t)hcl->_nil;
+	ctx->receiver_or_base = hcl->initial_function;
+	HCL_ASSERT (hcl, (hcl_oop_t)ctx->home == hcl->_nil);
 
 	/* [NOTE]
-	 *  the receiver field and the sender field of ctx are nils.
+	 *  the sender field of the initial context is nil.
 	 *  especially, the fact that the sender field is nil is used by 
 	 *  the main execution loop for breaking out of the loop */
 
@@ -1355,8 +1353,9 @@ static int start_initial_process_and_context (hcl_t* hcl, hcl_ooi_t initial_ip)
 
 	HCL_ASSERT (hcl, proc == hcl->processor->active);
 	hcl->initial_context = proc->initial_context;
+	HCL_ASSERT (hcl, hcl->initial_context == hcl->active_context);
 
-	return activate_context(hcl, 0);
+	return 0;
 }
 
 /* ------------------------------------------------------------------------- */
@@ -1879,7 +1878,7 @@ static int execute (hcl_t* hcl)
 					ctx = (hcl_oop_context_t)ctx->home;
 					/* the initial context has nil in the home field. 
 					 * the loop must not reach beyond the initial context */
-					HCL_ASSERT (hcl, ctx != hcl->_nil);
+					HCL_ASSERT (hcl, (hcl_oop_t)ctx != hcl->_nil);
 				}
 
 				if ((bcode >> 3) & 1)
@@ -2499,7 +2498,7 @@ hcl_oop_t hcl_execute (hcl_t* hcl)
 	if (HCL_UNLIKELY(!func)) return HCL_NULL;
 
 	/* pass nil for the home context of the initial function */
-	fill_function_data (hcl, func, 0, 0, hcl->_nil, hcl->code.lit.arr->slot, hcl->code.lit.len);
+	fill_function_data (hcl, func, 0, 0, (hcl_oop_context_t)hcl->_nil, hcl->code.lit.arr->slot, hcl->code.lit.len);
 
 	hcl->initial_function = func;
 //////////////////////////////////////////////////////////////////////////////////////////////
