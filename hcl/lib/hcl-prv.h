@@ -42,12 +42,6 @@
 #define HCL_KARATSUBA_CUTOFF 32
 #define HCL_KARATSUBA_CUTOFF_DEBUG 3
 
-/* define this to allow an pointer(OOP) object to have trailing bytes 
- * this is used to embed bytes codes into the back of a compile method
- * object instead of putting in in a separate byte array. */
-#define HCL_USE_OBJECT_TRAILER
-
-
 #if defined(HCL_BUILD_DEBUG)
 #define HCL_DEBUG_LEXER 1
 #define HCL_DEBUG_VM_PROCESSOR 1
@@ -715,7 +709,6 @@ hcl_oop_t hcl_allocoopobj (
 	hcl_oow_t size
 );
 
-#if defined(HCL_USE_OBJECT_TRAILER)
 hcl_oop_t hcl_allocoopobjwithtrailer (
 	hcl_t*           hcl,
 	int              brand,
@@ -723,7 +716,6 @@ hcl_oop_t hcl_allocoopobjwithtrailer (
 	const hcl_oob_t* tptr,
 	hcl_oow_t        tlen
 );
-#endif
 
 hcl_oop_t hcl_alloccharobj (
 	hcl_t*            hcl,

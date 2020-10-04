@@ -92,7 +92,6 @@ hcl_oop_t hcl_allocoopobj (hcl_t* hcl, int brand, hcl_oow_t size)
 	return alloc_oop_array(hcl, brand, size, 0);
 }
 
-#if defined(HCL_USE_OBJECT_TRAILER)
 hcl_oop_t hcl_allocoopobjwithtrailer (hcl_t* hcl, int brand, hcl_oow_t size, const hcl_oob_t* bptr, hcl_oow_t blen)
 {
 	hcl_oop_oop_t hdr;
@@ -104,7 +103,7 @@ hcl_oop_t hcl_allocoopobjwithtrailer (hcl_t* hcl, int brand, hcl_oow_t size, con
 	nbytes_aligned = HCL_ALIGN(nbytes, HCL_SIZEOF(hcl_oop_t)); 
 
 	hdr = (hcl_oop_oop_t)hcl_allocbytes(hcl, HCL_SIZEOF(hcl_obj_t) + nbytes_aligned);
-	if (!hdr) return HCL_NULL;
+	if (HCL_UNLIKELY(!hdr)) return HCL_NULL;
 
 	hdr->_flags = HCL_OBJ_MAKE_FLAGS(HCL_OBJ_TYPE_OOP, HCL_SIZEOF(hcl_oop_t), 0, 0, 0, 0, 1, 0);
 	HCL_OBJ_SET_SIZE (hdr, size);
@@ -127,7 +126,6 @@ hcl_oop_t hcl_allocoopobjwithtrailer (hcl_t* hcl, int brand, hcl_oow_t size, con
 
 	return (hcl_oop_t)hdr;
 }
-#endif
 
 static HCL_INLINE hcl_oop_t alloc_numeric_array (hcl_t* hcl, int brand, const void* ptr, hcl_oow_t len, hcl_obj_type_t type, hcl_oow_t unit, int extra, int ngc)
 {

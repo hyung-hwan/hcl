@@ -64,7 +64,6 @@ static HCL_INLINE const char* proc_state_to_string (int state)
 	(HCL_OOP_TO_SMOOI((x)->heap_ftime_sec) == HCL_OOP_TO_SMOOI((y)->heap_ftime_sec) && HCL_OOP_TO_SMOOI((x)->heap_ftime_nsec) < HCL_OOP_TO_SMOOI((y)->heap_ftime_nsec)) \
 )
 
-
 #define LOAD_IP(hcl, v_ctx) ((hcl)->ip = HCL_OOP_TO_SMOOI((v_ctx)->ip))
 #define STORE_IP(hcl, v_ctx) ((v_ctx)->ip = HCL_SMOOI_TO_OOP((hcl)->ip))
 
@@ -1356,6 +1355,7 @@ static int start_initial_process_and_context (hcl_t* hcl, hcl_ooi_t initial_ip)
 
 	HCL_ASSERT (hcl, proc == hcl->processor->active);
 	hcl->initial_context = proc->initial_context;
+
 	return activate_context(hcl, 0);
 }
 
@@ -1671,7 +1671,8 @@ static int execute (hcl_t* hcl)
 				b1 = bcode & 0x7; /* low 3 bits */
 			push_literal:
 				LOG_INST_1 (hcl, "push_literal @%zu", b1);
-				HCL_STACK_PUSH (hcl, hcl->active_function->literal_frame[b1]);
+				//HCL_STACK_PUSH (hcl, hcl->active_function->literal_frame[b1]);
+				HCL_STACK_PUSH (hcl, hcl->code.lit.arr->slot[b1]);
 				break;
 
 			/* ------------------------------------------------- */
@@ -1698,6 +1699,7 @@ static int execute (hcl_t* hcl)
 
 				b1 = bcode & 0x3; /* low 2 bits */
 			handle_object:
+				/*ass = hcl->code.lit.arr->slot[b1];*/
 				ass = (hcl_oop_cons_t)hcl->active_function->literal_frame[b1];
 				HCL_ASSERT (hcl, HCL_IS_CONS(hcl, ass));
 
@@ -1935,6 +1937,7 @@ static int execute (hcl_t* hcl)
 				FETCH_BYTE_CODE_TO (hcl, b2);
 
 			handle_objvar:
+				/*t = hcl->code.lit.arr->slot[b2];*/
 				t = (hcl_oop_oop_t)hcl->active_function->literal_frame[b2];
 				HCL_ASSERT (hcl, HCL_OBJ_GET_FLAGS_TYPE(t) == HCL_OBJ_TYPE_OOP);
 				HCL_ASSERT (hcl, b1 < HCL_OBJ_GET_SIZE(t));

@@ -120,7 +120,6 @@ static HCL_INLINE hcl_oow_t get_payload_bytes (hcl_t* hcl, hcl_oop_t oop)
 {
 	hcl_oow_t nbytes_aligned;
 
-#if defined(HCL_USE_OBJECT_TRAILER)
 	if (HCL_OBJ_GET_FLAGS_TRAILER(oop))
 	{
 		hcl_oow_t nbytes;
@@ -146,12 +145,9 @@ static HCL_INLINE hcl_oow_t get_payload_bytes (hcl_t* hcl, hcl_oop_t oop)
 	}
 	else
 	{
-#endif
 		/* calculate the payload size in bytes */
 		nbytes_aligned = HCL_ALIGN(HCL_OBJ_BYTESOF(oop), HCL_SIZEOF(hcl_oop_t));
-#if defined(HCL_USE_OBJECT_TRAILER)
 	}
-#endif
 
 	return nbytes_aligned;
 }
@@ -214,32 +210,16 @@ static hcl_uint8_t* scan_new_heap (hcl_t* hcl, hcl_uint8_t* ptr)
 	{
 		hcl_oow_t i;
 		hcl_oow_t nbytes_aligned;
-		hcl_oop_t oop;
+		hcl_oop_t oop, tmp;
 
 		oop = (hcl_oop_t)ptr;
+		HCL_ASSERT (hcl, HCL_OOP_IS_POINTER(oop));
 
-	#if defined(HCL_USE_OBJECT_TRAILER)
-		if (HCL_OBJ_GET_FLAGS_TRAILER(oop))
-		{
-			hcl_oow_t nbytes;
+		nbytes_aligned = get_payload_bytes(hcl, oop);
 
-			HCL_ASSERT (hcl, HCL_OBJ_GET_FLAGS_TYPE(oop) == HCL_OBJ_TYPE_OOP);
-			HCL_ASSERT (hcl, HCL_OBJ_GET_FLAGS_UNIT(oop) == HCL_SIZEOF(hcl_oow_t));
-			HCL_ASSERT (hcl, HCL_OBJ_GET_FLAGS_EXTRA(oop) == 0); /* no 'extra' for an OOP object */
+		tmp = hcl_moveoop(hcl, HCL_OBJ_GET_CLASS(oop));
+		HCL_OBJ_SET_CLASS (oop, tmp);
 
-			nbytes = HCL_OBJ_BYTESOF(oop) + HCL_SIZEOF(hcl_oow_t) + \
-			         (hcl_oow_t)((hcl_oop_oop_t)oop)->slot[HCL_OBJ_GET_SIZE(oop)];
-			nbytes_aligned = HCL_ALIGN (nbytes, HCL_SIZEOF(hcl_oop_t));
-		}
-		else
-		{
-	#endif
-			nbytes_aligned = HCL_ALIGN (HCL_OBJ_BYTESOF(oop), HCL_SIZEOF(hcl_oop_t));
-	#if defined(HCL_USE_OBJECT_TRAILER)
-		}
-	#endif
-
-		HCL_OBJ_SET_CLASS (oop, hcl_moveoop(hcl, HCL_OBJ_GET_CLASS(oop)));
 		if (HCL_OBJ_GET_FLAGS_TYPE(oop) == HCL_OBJ_TYPE_OOP)
 		{
 			hcl_oop_oop_t xtmp;
@@ -308,9 +288,9 @@ void hcl_gc (hcl_t* hcl)
 	old_nil = hcl->_nil;
 
 	/* move _nil and the root object table */
-	hcl->_nil               = hcl_moveoop(hcl, hcl->_nil);
-	hcl->_true              = hcl_moveoop(hcl, hcl->_true);
-	hcl->_false             = hcl_moveoop(hcl, hcl->_false);
+	hcl->_nil = hcl_moveoop(hcl, hcl->_nil);
+	hcl->_true = hcl_moveoop(hcl, hcl->_true);
+	hcl->_false = hcl_moveoop(hcl, hcl->_false);
 
 	for (i = 0; i < HCL_COUNTOF(syminfo); i++)
 	{
@@ -356,6 +336,8 @@ void hcl_gc (hcl_t* hcl)
 		hcl->active_context = (hcl_oop_context_t)hcl_moveoop(hcl, (hcl_oop_t)hcl->active_context);
 	if (hcl->initial_function)
 		hcl->initial_function = (hcl_oop_function_t)hcl_moveoop(hcl, (hcl_oop_t)hcl->initial_function);
+	if (hcl->active_function)
+		hcl->active_function = (hcl_oop_function_t)hcl_moveoop(hcl, (hcl_oop_t)hcl->active_function);
 
 	if (hcl->last_retv) hcl->last_retv = hcl_moveoop(hcl, hcl->last_retv);
 
