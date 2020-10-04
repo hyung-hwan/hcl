@@ -116,7 +116,6 @@ static void compact_symbol_table (hcl_t* hcl, hcl_oop_t _nil)
 	hcl->symtab->tally = HCL_SMOOI_TO_OOP(tally);
 }
 
-
 static HCL_INLINE hcl_oow_t get_payload_bytes (hcl_t* hcl, hcl_oop_t oop)
 {
 	hcl_oow_t nbytes_aligned;
@@ -142,15 +141,14 @@ static HCL_INLINE hcl_oow_t get_payload_bytes (hcl_t* hcl, hcl_oop_t oop)
 		HCL_ASSERT (hcl, HCL_OBJ_GET_FLAGS_UNIT(oop) == HCL_SIZEOF(hcl_oow_t));
 		HCL_ASSERT (hcl, HCL_OBJ_GET_FLAGS_EXTRA(oop) == 0); /* no 'extra' for an OOP object */
 
-		nbytes = HCL_OBJ_BYTESOF(oop) + HCL_SIZEOF(hcl_oow_t) + \
-		         (hcl_oow_t)((hcl_oop_oop_t)oop)->slot[HCL_OBJ_GET_SIZE(oop)];
-		nbytes_aligned = HCL_ALIGN (nbytes, HCL_SIZEOF(hcl_oop_t));
+		nbytes = HCL_OBJ_BYTESOF(oop) + HCL_SIZEOF(hcl_oow_t) + HCL_OBJ_GET_TRAILER_SIZE(oop);
+		nbytes_aligned = HCL_ALIGN(nbytes, HCL_SIZEOF(hcl_oop_t));
 	}
 	else
 	{
 #endif
 		/* calculate the payload size in bytes */
-		nbytes_aligned = HCL_ALIGN (HCL_OBJ_BYTESOF(oop), HCL_SIZEOF(hcl_oop_t));
+		nbytes_aligned = HCL_ALIGN(HCL_OBJ_BYTESOF(oop), HCL_SIZEOF(hcl_oop_t));
 #if defined(HCL_USE_OBJECT_TRAILER)
 	}
 #endif
@@ -180,10 +178,10 @@ hcl_oop_t hcl_moveoop (hcl_t* hcl, hcl_oop_t oop)
 		hcl_oow_t nbytes_aligned;
 		hcl_oop_t tmp;
 
-		nbytes_aligned = get_payload_bytes (hcl, oop);
+		nbytes_aligned = get_payload_bytes(hcl, oop);
 
 		/* allocate space in the new heap */
-		tmp = (hcl_oop_t)hcl_allocheapmem (hcl, hcl->newheap, HCL_SIZEOF(hcl_obj_t) + nbytes_aligned);
+		tmp = (hcl_oop_t)hcl_allocheapmem(hcl, hcl->newheap, HCL_SIZEOF(hcl_obj_t) + nbytes_aligned);
 
 		/* allocation here must not fail because
 		 * i'm allocating the new space in a new heap for 
@@ -326,6 +324,7 @@ void hcl_gc (hcl_t* hcl)
 	hcl->processor = (hcl_oop_process_scheduler_t)hcl_moveoop(hcl, (hcl_oop_t)hcl->processor);
 	hcl->nil_process = (hcl_oop_process_t)hcl_moveoop(hcl, (hcl_oop_t)hcl->nil_process);
 
+	
 	for (i = 0; i < hcl->code.lit.len; i++)
 	{
 		/* the literal array ia a NGC object. but the literal objects 
@@ -334,7 +333,7 @@ void hcl_gc (hcl_t* hcl)
 			hcl_moveoop(hcl, ((hcl_oop_oop_t)hcl->code.lit.arr)->slot[i]);
 	}
 
-	hcl->p.e = hcl_moveoop (hcl, hcl->p.e);
+	hcl->p.e = hcl_moveoop(hcl, hcl->p.e);
 
 	for (i = 0; i < hcl->sem_list_count; i++)
 	{
@@ -355,6 +354,8 @@ void hcl_gc (hcl_t* hcl)
 		hcl->initial_context = (hcl_oop_context_t)hcl_moveoop(hcl, (hcl_oop_t)hcl->initial_context);
 	if (hcl->active_context)
 		hcl->active_context = (hcl_oop_context_t)hcl_moveoop(hcl, (hcl_oop_t)hcl->active_context);
+	if (hcl->initial_function)
+		hcl->initial_function = (hcl_oop_function_t)hcl_moveoop(hcl, (hcl_oop_t)hcl->initial_function);
 
 	if (hcl->last_retv) hcl->last_retv = hcl_moveoop(hcl, hcl->last_retv);
 
@@ -374,7 +375,7 @@ void hcl_gc (hcl_t* hcl)
 	compact_symbol_table (hcl, old_nil);
 
 	/* move the symbol table itself */
-	hcl->symtab = (hcl_oop_dic_t)hcl_moveoop (hcl, (hcl_oop_t)hcl->symtab);
+	hcl->symtab = (hcl_oop_dic_t)hcl_moveoop(hcl, (hcl_oop_t)hcl->symtab);
 
 	/* scan the new heap again from the end position of
 	 * the previous scan to move referenced objects by 
@@ -390,7 +391,6 @@ void hcl_gc (hcl_t* hcl)
 	tmp = hcl->curheap;
 	hcl->curheap = hcl->newheap;
 	hcl->newheap = tmp;
-
 
 /*
 	if (hcl->symtab && HCL_LOG_ENABLED(hcl, HCL_LOG_GC | HCL_LOG_DEBUG))
@@ -409,6 +409,8 @@ void hcl_gc (hcl_t* hcl)
 		HCL_LOG0 (hcl, HCL_LOG_GC | HCL_LOG_DEBUG, "--------------------------------------------\n");
 	}
 */
+
+	if (hcl->active_function) hcl->active_code = HCL_FUNCTION_GET_CODE_BYTE(hcl->active_function);  /* update hcl->active_code */
 
 /* TODO: include some gc statstics like number of live objects, gc performance, etc */
 	HCL_LOG4 (hcl, HCL_LOG_GC | HCL_LOG_INFO, 

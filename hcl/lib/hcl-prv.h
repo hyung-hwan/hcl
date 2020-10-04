@@ -37,14 +37,6 @@
  * while hcl has not been fully initialized when this is defined*/
 #define HCL_SUPPORT_GC_DURING_IGNITION
 
-/* define this to generate XXXX_CTXTEMVAR instructions */
-#define HCL_USE_CTXTEMPVAR
-
-/* define this to use the MAKE_BLOCK instruction instead of
- * PUSH_CONTEXT, PUSH_INTLIT, PUSH_INTLIT, SEND_BLOCK_COPY */
-#define HCL_USE_MAKE_BLOCK
-
-
 /* define this to enable karatsuba multiplication in bigint */
 #define HCL_ENABLE_KARATSUBA
 #define HCL_KARATSUBA_CUTOFF 32
@@ -642,9 +634,10 @@ enum hcl_bcode_t
 	HCL_CODE_RETURN_STACKTOP          = 0xF9, /* ^something */
 	HCL_CODE_RETURN_RECEIVER          = 0xFA, /* ^self */
 	HCL_CODE_RETURN_FROM_BLOCK        = 0xFB, /* return the stack top from a block */
-	/* UNUSED 252 */
+
+	HCL_CODE_MAKE_FUNCTION                = 0xFC, /* 252 */
 	HCL_CODE_MAKE_BLOCK               = 0xFD, /* 253 */
-	HCL_CODE_SEND_BLOCK_COPY          = 0xFE, /* 254 */
+	/* UNUSED 254 */
 	HCL_CODE_NOOP                     = 0xFF  /* 255 */
 };
 
@@ -725,6 +718,7 @@ hcl_oop_t hcl_allocoopobj (
 #if defined(HCL_USE_OBJECT_TRAILER)
 hcl_oop_t hcl_allocoopobjwithtrailer (
 	hcl_t*           hcl,
+	int              brand,
 	hcl_oow_t        size,
 	const hcl_oob_t* tptr,
 	hcl_oow_t        tlen

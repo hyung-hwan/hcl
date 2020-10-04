@@ -478,6 +478,10 @@ struct hcl_trailer_t
 	hcl_oob_t slot[1];
 };
 
+#define HCL_OBJ_GET_TRAILER_BYTE(oop) ((hcl_oob_t*)&((hcl_oop_oop_t)oop)->slot[HCL_OBJ_GET_SIZE(oop) + 1])
+#define HCL_OBJ_GET_TRAILER_SIZE(oop) ((hcl_oow_t)((hcl_oop_oop_t)oop)->slot[HCL_OBJ_GET_SIZE(oop)])
+
+
 #define HCL_CONS_NAMED_INSTVARS 2
 typedef struct hcl_cons_t hcl_cons_t;
 typedef struct hcl_cons_t* hcl_oop_cons_t;
@@ -508,6 +512,32 @@ struct hcl_fpdec_t
 	hcl_oop_t scale; /* smooi, positive */
 };
 
+#define HCL_FUNCTION_NAMED_INSTVARS 3   /* this excludes literal frames and byte codes */
+typedef struct hcl_function_t hcl_function_t;
+typedef struct hcl_function_t* hcl_oop_function_t;
+struct hcl_function_t
+{
+	HCL_OBJ_HEADER;
+
+	hcl_oop_t ntmprs; /* smooi */
+	hcl_oop_t nargs;  /* smooi */
+	hcl_oop_t home; /* home function. nil for the initial function */
+
+	/* == variable indexed part == */
+	hcl_oop_t literal_frame[1]; /* it stores literals. it may not exist */
+
+	/* after the literal frame comes the actual byte code */
+};
+
+/* the first byte after the main payload is the trailer size
+ * the code bytes are placed after the trailer size.
+ *
+ * code bytes -> ((hcl_oob_t*)&((hcl_oop_oop_t)m)->slot[HCL_OBJ_GET_SIZE(m) + 1]) or
+ *               ((hcl_oob_t*)&((hcl_oop_function_t)m)->literal_frame[HCL_OBJ_GET_SIZE(m) + 1 - HCL_METHOD_NAMED_INSTVARS])
+ * size -> ((hcl_oow_t)((hcl_oop_oop_t)m)->slot[HCL_OBJ_GET_SIZE(m)])*/
+#define HCL_FUNCTION_GET_CODE_BYTE(m) HCL_OBJ_GET_TRAILER_BYTE(m)
+#define HCL_FUNCTION_GET_CODE_SIZE(m) HCL_OBJ_GET_TRAILER_SIZE(m)
+
 #define HCL_CONTEXT_NAMED_INSTVARS 8
 typedef struct hcl_context_t hcl_context_t;
 typedef struct hcl_context_t* hcl_oop_context_t;
@@ -530,34 +560,38 @@ struct hcl_context_t
 	 * of the active process before it gets activated. */
 	hcl_oop_t          sp;
 
-	/* SmallInteger. Number of temporaries.
-	 * For a block context, it's inclusive of the temporaries
-	 * defined its 'home'. */
+	/* SmallInteger. Number of temporaries. Includes arguments as well */
 	hcl_oop_t          ntmprs;
 
-	/* CompiledMethod for a method context, 
-	 * SmallInteger for a block context */
-	hcl_oop_t          method_or_nargs;
+	/* SmallInteger. Number of arguments */
+	hcl_oop_t          nargs;
 
 	/* it points to the receiver of the message for a method context.
 	 * a base block context(created but not yet activated) has nil in this 
 	 * field. if a block context is activated by 'value', it points 
 	 * to the block context object used as a base for shallow-copy. */
-	hcl_oop_t          receiver_or_source;
+	hcl_oop_t          receiver_or_base; /* when used as a base, it's either a context or a function */
 
 	/* it is set to nil for a method context.
 	 * for a block context, it points to the active context at the 
 	 * moment the block context was created. that is, it points to 
 	 * a method context where the base block has been defined. 
-	 * an activated block context copies this field from the source. */
+	 * an activated block context copies this field from the base block context. */
 	hcl_oop_t          home;
 
-	/* when a method context is created, it is set to itself. no change is
-	 * made when the method context is activated. when a block context is 
+	/* it points to the method context created of the method defining the code
+	 * of this context. a method context points to itself. a block context
+	 * points to the method context where it is created. another block context
+	 * created within the block context also points to the same method context.
+	 *   ctx->origin: method context
+	 *   ctx->origin->receiver_or_base: actual function containing byte codes pertaining to ctx.
+	 *
+	 * when a method context is created, it is set to itself. no change is
+	 * made when the method context is activated. when a base block context is 
 	 * created (when MAKE_BLOCK or BLOCK_COPY is executed), it is set to the
-	 * origin of the active context. when the block context is shallow-copied
+	 * origin of the active context. when the base block context is shallow-copied
 	 * for activation (when it is sent 'value'), it is set to the origin of
-	 * the source block context. */
+	 * the base block context. */
 	hcl_oop_context_t  origin; 
 
 	/* variable indexed part */
@@ -1197,8 +1231,11 @@ struct hcl_t
 	int tagged_brands[16];
 
 	/* == EXECUTION REGISTERS == */
+	hcl_oop_function_t initial_function;
 	hcl_oop_context_t initial_context; /* fake initial context */
 	hcl_oop_context_t active_context;
+	hcl_oop_function_t active_function;
+	hcl_oob_t* active_code;
 	hcl_ooi_t sp;
 	hcl_ooi_t ip;
 	int proc_switched; /* TODO: this is temporary. implement something else to skip immediate context switching */
@@ -1346,6 +1383,7 @@ enum hcl_brand_t
 	HCL_BRAND_CFRAME,/* compiler frame */
 	HCL_BRAND_PRIM,
 
+	HCL_BRAND_FUNCTION,
 	HCL_BRAND_CONTEXT,
 	HCL_BRAND_PROCESS,
 	HCL_BRAND_PROCESS_SCHEDULER,
@@ -1389,6 +1427,7 @@ typedef enum hcl_concode_t hcl_concode_t;
 #define HCL_IS_SYMBOL(hcl,v) (HCL_OOP_IS_POINTER(v) && HCL_OBJ_GET_FLAGS_BRAND(v) == HCL_BRAND_SYMBOL)
 #define HCL_IS_SYMBOL_ARRAY(hcl,v) (HCL_OOP_IS_POINTER(v) && HCL_OBJ_GET_FLAGS_BRAND(v) == HCL_BRAND_SYMBOL_ARRAY)
 #define HCL_IS_CONTEXT(hcl,v) (HCL_OOP_IS_POINTER(v) && HCL_OBJ_GET_FLAGS_BRAND(v) == HCL_BRAND_CONTEXT)
+#define HCL_IS_FUNCTION(hcl,v) (HCL_OOP_IS_POINTER(v) && HCL_OBJ_GET_FLAGS_BRAND(v) == HCL_BRAND_FUNCTION)
 #define HCL_IS_PROCESS(hcl,v) (HCL_OOP_IS_POINTER(v) && HCL_OBJ_GET_FLAGS_BRAND(v) == HCL_BRAND_PROCESS)
 #define HCL_IS_CONS(hcl,v) (HCL_OOP_IS_POINTER(v) && HCL_OBJ_GET_FLAGS_BRAND(v) == HCL_BRAND_CONS)
 #define HCL_IS_CONS_CONCODED(hcl,v,concode) (HCL_IS_CONS(hcl,v) && HCL_OBJ_GET_FLAGS_SYNCODE(v) == (concode))

@@ -363,7 +363,7 @@ hcl_oop_t hcl_makedic (hcl_t* hcl, hcl_oow_t inisize)
 {
 	hcl_oop_dic_t obj;
 
-	obj = (hcl_oop_dic_t)hcl_allocoopobj (hcl, HCL_BRAND_DIC, 2);
+	obj = (hcl_oop_dic_t)hcl_allocoopobj(hcl, HCL_BRAND_DIC, 2);
 	if (obj)
 	{
 		hcl_oop_oop_t bucket;

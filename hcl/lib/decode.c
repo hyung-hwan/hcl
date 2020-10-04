@@ -35,11 +35,13 @@
 #	define LOG_INST_1(hcl,fmt,a1)
 #	define LOG_INST_2(hcl,fmt,a1,a2)
 #	define LOG_INST_3(hcl,fmt,a1,a2,a3)
+#	define LOG_INST_4(hcl,fmt,a1,a2,a3,a4)
 #else
 #	define LOG_INST_0(hcl,fmt) HCL_LOG1(hcl, DECODE_LOG_MASK, " %06zd " fmt "\n", fetched_instruction_pointer)
 #	define LOG_INST_1(hcl,fmt,a1) HCL_LOG2(hcl, DECODE_LOG_MASK, " %06zd " fmt "\n", fetched_instruction_pointer, a1)
 #	define LOG_INST_2(hcl,fmt,a1,a2) HCL_LOG3(hcl, DECODE_LOG_MASK, " %06zd " fmt "\n", fetched_instruction_pointer, a1, a2)
 #	define LOG_INST_3(hcl,fmt,a1,a2,a3) HCL_LOG4(hcl, DECODE_LOG_MASK, " %06zd " fmt "\n", fetched_instruction_pointer, a1, a2, a3)
+#	define LOG_INST_4(hcl,fmt,a1,a2,a3,a4) HCL_LOG5(hcl, DECODE_LOG_MASK, " %06zd " fmt "\n", fetched_instruction_pointer, a1, a2, a3, a4)
 #endif
 
 #define FETCH_BYTE_CODE(hcl) (cdptr[ip++])
@@ -59,7 +61,7 @@ int hcl_decode (hcl_t* hcl, hcl_oow_t start, hcl_oow_t end)
 {
 	hcl_oob_t bcode, * cdptr;
 	hcl_ooi_t ip = start, fetched_instruction_pointer;
-	hcl_oow_t b1, b2;
+	hcl_oow_t b1, b2, b3, b4;
 
 	/* the instruction at the offset 'end' is not decoded.
 	 * decoding offset range is from start to end - 1. */
@@ -550,6 +552,23 @@ int hcl_decode (hcl_t* hcl, hcl_oow_t start, hcl_oow_t end)
 				LOG_INST_0 (hcl, "return_from_block");
 				break;
 
+			case HCL_CODE_MAKE_FUNCTION:
+				/* b1 - number of block arguments
+				 * b2 - number of block temporaries
+				 * b3 - base literal frame start
+				 * b4 - base literal frame end */
+				FETCH_PARAM_CODE_TO (hcl, b1);
+				FETCH_PARAM_CODE_TO (hcl, b2);
+				FETCH_PARAM_CODE_TO (hcl, b3);
+				FETCH_PARAM_CODE_TO (hcl, b4);
+
+				LOG_INST_4 (hcl, "make_function %zu %zu %zu %zu", b1, b2, b3, b4);
+
+				HCL_ASSERT (hcl, b1 >= 0);
+				HCL_ASSERT (hcl, b2 >= b1);
+				HCL_ASSERT (hcl, b4 >= b3);
+				break;
+
 			case HCL_CODE_MAKE_BLOCK:
 				/* b1 - number of block arguments
 				 * b2 - number of block temporaries */
@@ -560,10 +579,6 @@ int hcl_decode (hcl_t* hcl, hcl_oow_t start, hcl_oow_t end)
 
 				HCL_ASSERT (hcl, b1 >= 0);
 				HCL_ASSERT (hcl, b2 >= b1);
-				break;
-
-			case HCL_CODE_SEND_BLOCK_COPY:
-				LOG_INST_0 (hcl, "send_block_copy");
 				break;
 
 			case HCL_CODE_NOOP:
@@ -578,6 +593,7 @@ int hcl_decode (hcl_t* hcl, hcl_oow_t start, hcl_oow_t end)
 		}
 	}
 
+// TODO: this needs changes... */
 	/* print literal frame contents */
 	for (ip = 0; ip < hcl->code.lit.len; ip++)
 	{

@@ -1062,11 +1062,7 @@ static int compile_lambda (hcl_t* hcl, hcl_oop_t src, int defun)
 	hcl->c->blk.depth++;
 	if (store_temporary_variable_count_for_block(hcl, hcl->c->tv.size, hcl->code.lit.len) <= -1) return -1;
 
-	/* use the accumulated number of temporaries so far when generating
-	 * the make_block instruction. at context activation time, the actual 
-	 * count of temporaries for this block is derived by subtracting the 
-	 * count of temporaries in the home context */
-	if (emit_double_param_instruction(hcl, HCL_CODE_MAKE_BLOCK, nargs, hcl->c->tv.size/*ntmprs*/) <= -1) return -1;
+	if (emit_double_param_instruction(hcl, HCL_CODE_MAKE_BLOCK, nargs, ntmprs) <= -1) return -1;
 
 	HCL_ASSERT (hcl, hcl->code.bc.len < HCL_SMOOI_MAX);  /* guaranteed in emit_byte_instruction() */
 	jump_inst_pos = hcl->code.bc.len;
@@ -1557,7 +1553,6 @@ static int compile_cons_xlist_expression (hcl_t* hcl, hcl_oop_t obj)
 
 static int emit_indexed_variable_access (hcl_t* hcl, hcl_oow_t index, hcl_oob_t baseinst1, hcl_oob_t baseinst2)
 {
-#if defined(HCL_USE_CTXTEMPVAR)
 	if (hcl->c->blk.depth >= 0)
 	{
 		hcl_oow_t i;
@@ -1582,7 +1577,6 @@ static int emit_indexed_variable_access (hcl_t* hcl, hcl_oow_t index, hcl_oob_t 
 			}
 		}
 	}
-#endif
 
 	/* TODO: top-level... verify this. this will vary depending on how i implement the top-level and global variables... */
 	if (emit_single_param_instruction (hcl, baseinst2, index) <= -1) return -1;
