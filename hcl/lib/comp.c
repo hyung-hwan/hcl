@@ -75,10 +75,13 @@ literals -->
 
 static int add_literal (hcl_t* hcl, hcl_oop_t obj, hcl_oow_t* index)
 {
-	hcl_oow_t capa, i;
+	hcl_oow_t capa, i, lfbase = 0;
 
-/* TODO: speed up the following duplicate check loop */
-	for (i = 0; i < hcl->code.lit.len; i++)
+
+	lfbase = (hcl->option.trait & HCL_TRAIT_INTERACTIVE)? hcl->c->blk.info[hcl->c->blk.depth].lfbase: 0;
+
+	/* TODO: speed up the following duplicate check loop */
+	for (i = lfbase; i < hcl->code.lit.len; i++)
 	{
 		/* this removes redundancy of symbols, characters, and integers. */
 		if (((hcl_oop_oop_t)hcl->code.lit.arr)->slot[i] == obj)
@@ -101,8 +104,7 @@ static int add_literal (hcl_t* hcl, hcl_oop_t obj, hcl_oow_t* index)
 		hcl->code.lit.arr = (hcl_oop_oop_t)tmp;
 	}
 
-	*index = hcl->code.lit.len;
-	if (hcl->option.trait & HCL_TRAIT_INTERACTIVE) *index -= hcl->c->blk.info[hcl->c->blk.depth].lfbase;
+	*index = hcl->code.lit.len - lfbase;
 
 	((hcl_oop_oop_t)hcl->code.lit.arr)->slot[hcl->code.lit.len++] = obj;
 	return 0;

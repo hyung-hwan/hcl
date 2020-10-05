@@ -182,7 +182,11 @@ static HCL_INLINE void fill_function_data (hcl_t* hcl, hcl_oop_function_t func, 
 
 	/* copy literal frames */
 	HCL_ASSERT (hcl, lfsize <= HCL_OBJ_GET_SIZE(func) - HCL_FUNCTION_NAMED_INSTVARS);
-	for (i = 0; i < lfsize; i++) func->literal_frame[i] = lfptr[i];
+	for (i = 0; i < lfsize; i++) 
+	{
+		func->literal_frame[i] = lfptr[i];
+		HCL_DEBUG2 (hcl, "literal frame %d => %O\n", (int)i, lfptr[i]);
+	}
 
 	/* initialize other fields */
 	func->home = homectx;
@@ -2351,13 +2355,13 @@ static int execute (hcl_t* hcl)
 HCL_DEBUG1(hcl, "****  MAKE FUNCTION joff = %zu\n", joff);
 				/* copy the byte codes from the active context to the new context */
 			#if (HCL_HCL_CODE_LONG_PARAM_SIZE == 2)
-				func = (hcl_oop_function_t)make_function(hcl, b4 - b3, &hcl->active_code[hcl->ip + 3], joff);
+				func = (hcl_oop_function_t)make_function(hcl, b4, &hcl->active_code[hcl->ip + 3], joff);
 			#else
-				func = (hcl_oop_function_t)make_function(hcl, b4 - b3, &hcl->active_code[hcl->ip + 2], joff);
+				func = (hcl_oop_function_t)make_function(hcl, b4, &hcl->active_code[hcl->ip + 2], joff);
 			#endif
 				if (HCL_UNLIKELY(!func)) goto oops;
 
-				fill_function_data (hcl, func, b1, b2, hcl->active_context, &hcl->active_function->literal_frame[b3], b4 - b3);
+				fill_function_data (hcl, func, b1, b2, hcl->active_context, &hcl->active_function->literal_frame[b3], b4);
 
 				/* push the new function to the stack of the active context */
 				HCL_STACK_PUSH (hcl, (hcl_oop_t)func);
