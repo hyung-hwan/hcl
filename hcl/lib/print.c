@@ -87,6 +87,7 @@ enum
 	WORD_CFRAME,
 	WORD_PRIM,
 
+	WORD_FUNCTION,
 	WORD_CONTEXT,
 	WORD_PROCESS,
 	WORD_PROCESS_SCHEDULER,
@@ -107,6 +108,7 @@ static struct
 	{  9,  { '#','<','C','F','R','A','M','E','>' } },
 	{  7,  { '#','<','P','R','I','M','>' } },
 
+	{  11, { '#','<','F','U','N','C','T','I','O','N','>' } },
 	{  10, { '#','<','C','O','N','T','E','X','T','>' } },
 	{  10, { '#','<','P','R','O','C','E','S','S','>' } },
 	{  20, { '#','<','P','R','O','C','E','S','S','-','S','C','H','E','D','U','L','E','R','>' } },
@@ -655,6 +657,10 @@ next:
 
 		case HCL_BRAND_PRIM:
 			word_index = WORD_PRIM;
+			goto print_word;
+
+		case HCL_BRAND_FUNCTION:
+			word_index = WORD_FUNCTION;
 			goto print_word;
 
 		case HCL_BRAND_CONTEXT:

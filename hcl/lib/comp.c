@@ -102,7 +102,7 @@ static int add_literal (hcl_t* hcl, hcl_oop_t obj, hcl_oow_t* index)
 	}
 
 	*index = hcl->code.lit.len;
-	if (hcl->option.trait & HCL_TRAIT_INTERACTIVE) *index -= hcl->c->blk.info[hcl->c->blk.depth].litbase;
+	if (hcl->option.trait & HCL_TRAIT_INTERACTIVE) *index -= hcl->c->blk.info[hcl->c->blk.depth].lfbase;
 
 	((hcl_oop_oop_t)hcl->code.lit.arr)->slot[hcl->code.lit.len++] = obj;
 	return 0;
@@ -161,7 +161,7 @@ static int find_temporary_variable_backward (hcl_t* hcl, hcl_oop_t name, hcl_oow
 	return -1;
 }
 
-static int store_temporary_variable_count_for_block (hcl_t* hcl, hcl_oow_t tmpr_count, hcl_oow_t lit_base)
+static int store_temporary_variable_count_for_block (hcl_t* hcl, hcl_oow_t tmpr_count, hcl_oow_t lfbase)
 {
 	HCL_ASSERT (hcl, hcl->c->blk.depth >= 0);
 
@@ -179,7 +179,7 @@ static int store_temporary_variable_count_for_block (hcl_t* hcl, hcl_oow_t tmpr_
 	}
 
 	hcl->c->blk.info[hcl->c->blk.depth].tmprcnt = tmpr_count;
-	hcl->c->blk.info[hcl->c->blk.depth].litbase = lit_base;
+	hcl->c->blk.info[hcl->c->blk.depth].lfbase = lfbase;
 	return 0;
 }
 
@@ -376,6 +376,7 @@ static int emit_double_param_instruction (hcl_t* hcl, int cmd, hcl_oow_t param_1
 			}
 
 
+		case HCL_CODE_MAKE_FUNCTION: /* this is quad-param instruction. you should emit two more parameters after the call to this function */
 		case HCL_CODE_MAKE_BLOCK:
 			bc = cmd;
 			goto write_long;
@@ -407,33 +408,22 @@ write_long:
 	    emit_byte_instruction(hcl, param_2) <= -1) return -1;
 #endif
 	return 0;
+}
 
-/*
-write_long2:
-	if (param_1 > MAX_CODE_PARAM || param_2 > MAX_CODE_PARAM)
+static HCL_INLINE int emit_long_param (hcl_t* hcl, hcl_oow_t param)
+{
+	if (param > MAX_CODE_PARAM)
 	{
 		hcl_seterrnum (hcl, HCL_ERANGE);
 		return -1;
 	}
+
 #if (HCL_HCL_CODE_LONG_PARAM_SIZE == 2)
-	if (emit_byte_instruction(hcl, bc) <= -1 ||
-	    emit_byte_instruction(hcl, (param_1 >> 24) & 0xFF) <= -1 ||
-	    emit_byte_instruction(hcl, (param_1 >> 16) & 0xFF) <= -1 ||
-	    emit_byte_instruction(hcl, (param_1 >>  8) & 0xFF) <= -1 ||
-	    emit_byte_instruction(hcl, param_1 & 0xFF) <= -1  ||
-	    emit_byte_instruction(hcl, (param_2 >> 24) & 0xFF) <= -1 ||
-	    emit_byte_instruction(hcl, (param_2 >> 16) & 0xFF) <= -1 ||
-	    emit_byte_instruction(hcl, (param_2 >>  8) & 0xFF) <= -1 ||
-	    emit_byte_instruction(hcl, param_2 & 0xFF) <= -1) return -1;
+	return (emit_byte_instruction(hcl, param >> 8) <= -1 ||
+	        emit_byte_instruction(hcl, param & 0xFF) <= -1)? -1: 0;
 #else
-	if (emit_byte_instruction(hcl, bc) <= -1 ||
-	    emit_byte_instruction(hcl, param_1 >> 8) <= -1 ||
-	    emit_byte_instruction(hcl, param_1 & 0xFF) <= -1 ||
-	    emit_byte_instruction(hcl, param_2 >> 8) <= -1 ||
-	    emit_byte_instruction(hcl, param_2 & 0xFF) <= -1) return -1;
+	return emit_byte_instruction(hcl, param_1);
 #endif
-*/
-	return 0;
 }
 
 static int emit_push_literal (hcl_t* hcl, hcl_oop_t obj)
@@ -509,6 +499,16 @@ static HCL_INLINE void patch_long_jump (hcl_t* hcl, hcl_ooi_t jip, hcl_ooi_t jum
 	patch_instruction (hcl, jip + 2, jump_offset & 0xFF);
 #else
 	patch_instruction (hcl, jip + 1, jump_offset);
+#endif
+}
+
+static HCL_INLINE void patch_long_param (hcl_t* hcl, hcl_ooi_t ip, hcl_oow_t param)
+{
+#if (HCL_HCL_CODE_LONG_PARAM_SIZE == 2)
+	patch_instruction (hcl, ip, param >> 8);
+	patch_instruction (hcl, ip + 1, param & 0xFF);
+#else
+	patch_instruction (hcl, ip, param);
 #endif
 }
 
@@ -868,7 +868,7 @@ static int compile_lambda (hcl_t* hcl, hcl_oop_t src, int defun)
 {
 	hcl_oop_t obj, args;
 	hcl_oow_t nargs, ntmprs;
-	hcl_ooi_t jump_inst_pos;
+	hcl_ooi_t jump_inst_pos, lfbase_pos, lfsize_pos;
 	hcl_oow_t saved_tv_count, tv_dup_start;
 	hcl_oop_t defun_name;
 
@@ -1062,7 +1062,20 @@ static int compile_lambda (hcl_t* hcl, hcl_oop_t src, int defun)
 	hcl->c->blk.depth++;
 	if (store_temporary_variable_count_for_block(hcl, hcl->c->tv.size, hcl->code.lit.len) <= -1) return -1;
 
-	if (emit_double_param_instruction(hcl, HCL_CODE_MAKE_BLOCK, nargs, ntmprs) <= -1) return -1;
+
+	if (hcl->option.trait & HCL_TRAIT_INTERACTIVE)
+	{
+		/* make_function nargs ntmprs lfbase lfsize */
+		if (emit_double_param_instruction(hcl, HCL_CODE_MAKE_FUNCTION, nargs, ntmprs) <= -1) return -1;
+		lfbase_pos = hcl->code.bc.len;
+		if (emit_long_param(hcl, hcl->code.lit.len) <= -1) return -1; /* lfbase */
+		lfsize_pos = hcl->code.bc.len;
+		if (emit_long_param(hcl, 0) <= -1) return -1;
+	}
+	else
+	{
+		if (emit_double_param_instruction(hcl, HCL_CODE_MAKE_BLOCK, nargs, ntmprs) <= -1) return -1;
+	}
 
 	HCL_ASSERT (hcl, hcl->code.bc.len < HCL_SMOOI_MAX);  /* guaranteed in emit_byte_instruction() */
 	jump_inst_pos = hcl->code.bc.len;
@@ -1095,6 +1108,14 @@ static int compile_lambda (hcl_t* hcl, hcl_oop_t src, int defun)
 	}
 
 	PUSH_SUBCFRAME (hcl, COP_EMIT_LAMBDA, HCL_SMOOI_TO_OOP(jump_inst_pos));
+
+	if (hcl->option.trait & HCL_TRAIT_INTERACTIVE)
+	{
+		hcl_cframe_t* cf;
+		cf = GET_SUBCFRAME (hcl);
+		cf->u.lambda.lfbase_pos = lfbase_pos;
+		cf->u.lambda.lfsize_pos= lfsize_pos;
+	}
 
 	return 0;
 }
@@ -2485,7 +2506,7 @@ static HCL_INLINE int emit_pop_into_dic (hcl_t* hcl)
 static HCL_INLINE int emit_lambda (hcl_t* hcl)
 {
 	hcl_cframe_t* cf;
-	hcl_oow_t block_code_size;
+	hcl_oow_t block_code_size, lfsize;
 	hcl_ooi_t jip;
 
 	cf = GET_TOP_CFRAME(hcl);
@@ -2493,6 +2514,9 @@ static HCL_INLINE int emit_lambda (hcl_t* hcl)
 	HCL_ASSERT (hcl, HCL_OOP_IS_SMOOI(cf->operand));
 
 	jip = HCL_OOP_TO_SMOOI(cf->operand);
+
+	if (hcl->option.trait & HCL_TRAIT_INTERACTIVE) 
+		lfsize = hcl->code.lit.len - hcl->c->blk.info[hcl->c->blk.depth].lfbase;
 
 	hcl->c->blk.depth--;
 	hcl->c->tv.size = hcl->c->blk.info[hcl->c->blk.depth].tmprcnt;
@@ -2518,6 +2542,9 @@ static HCL_INLINE int emit_lambda (hcl_t* hcl)
 		return -1;
 	}
 	patch_long_jump (hcl, jip, block_code_size);
+
+	if (hcl->option.trait & HCL_TRAIT_INTERACTIVE) 
+		patch_long_param (hcl, cf->u.lambda.lfsize_pos, lfsize);
 
 	POP_CFRAME (hcl);
 	return 0;

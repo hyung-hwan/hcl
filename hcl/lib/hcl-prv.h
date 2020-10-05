@@ -209,6 +209,12 @@ struct hcl_cframe_t
 		{
 			hcl_ooi_t index;
 		} bytearray_list;
+
+		struct
+		{
+			hcl_ooi_t lfbase_pos;
+			hcl_ooi_t lfsize_pos;
+		} lambda;
 	} u;
 };
 
@@ -217,7 +223,7 @@ typedef struct hcl_cframe_t hcl_cframe_t;
 struct hcl_blk_info_t
 {
 	hcl_oow_t tmprcnt;
-	hcl_oow_t litbase;
+	hcl_oow_t lfbase;
 };
 typedef struct hcl_blk_info_t hcl_blk_info_t;
 

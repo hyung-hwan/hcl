@@ -1167,6 +1167,13 @@ hcl_logufmt (hcl, HCL_LOG_WARN, fmt, ustr, 0x6789);
 		trait |= HCL_TRAIT_INTERACTIVE;
 		hcl_setoption (hcl, HCL_TRAIT, &trait);
 	}
+else
+{
+	hcl_bitmask_t trait;
+	hcl_getoption (hcl, HCL_TRAIT, &trait);
+	trait |= HCL_TRAIT_INTERACTIVE;
+	hcl_setoption (hcl, HCL_TRAIT, &trait);
+}
 
 	while (1)
 	{

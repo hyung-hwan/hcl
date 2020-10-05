@@ -81,7 +81,7 @@ static HCL_INLINE const char* proc_state_to_string (int state)
 	{ \
 		STORE_ACTIVE_IP (hcl); \
 		(hcl)->active_context = (v_ctx); \
-		(hcl)->active_function = (hcl_oop_function_t)(hcl)->active_context->origin; \
+		(hcl)->active_function = (hcl)->active_context->origin->receiver_or_base; \
 		(hcl)->active_code = HCL_FUNCTION_GET_CODE_BYTE((hcl)->active_function); \
 		LOAD_ACTIVE_IP (hcl); \
 		(hcl)->processor->active->current_context = (hcl)->active_context; \
@@ -1017,7 +1017,7 @@ static int __activate_function (hcl_t* hcl, hcl_oop_function_t rcv_func, hcl_ooi
 	 * (printf ">>>> %d\n" (sum 10))
 	 */
 
-	/* the receiver must be a block context */
+	/* the receiver must be a function */
 	HCL_ASSERT (hcl, HCL_IS_FUNCTION(hcl, rcv_func));
 
 	if (HCL_OOP_TO_SMOOI(rcv_func->nargs) != nargs)
@@ -1043,7 +1043,7 @@ static int __activate_function (hcl_t* hcl, hcl_oop_function_t rcv_func, hcl_ooi
 	blkctx->nargs = rcv_func->nargs;
 	blkctx->receiver_or_base = (hcl_oop_t)rcv_func;
 	blkctx->home = rcv_func->home;
-	blkctx->origin = rcv_func;
+	blkctx->origin = blkctx; /* the origin of the context over a function should be itself */
 
 /* TODO: check the stack size of a block context to see if it's large enough to hold arguments */
 	/* copy the arguments to the stack */
@@ -1319,7 +1319,7 @@ static int start_initial_process_and_context (hcl_t* hcl, hcl_ooi_t initial_ip)
 	ctx->sp = HCL_SMOOI_TO_OOP(-1); /* pointer to -1 below the bottom */
 	ctx->nargs = HCL_SMOOI_TO_OOP(0);
 	ctx->ntmprs = HCL_SMOOI_TO_OOP(0);
-	ctx->origin = hcl->initial_function;
+	ctx->origin = ctx; /* the origin of the initial context should be itself */
 	ctx->home = hcl->initial_function->home; /* this should be nil */
 	ctx->sender = (hcl_oop_context_t)hcl->_nil;
 	ctx->receiver_or_base = hcl->initial_function;
@@ -2255,7 +2255,7 @@ static int execute (hcl_t* hcl)
 					}
 
 /*
-//					HCL_ASSERT (hcl, HCL_CLASSOF(hcl, hcl->active_context->origin) == hcl->_method_context);
+//					HCL_ASSERT (hcl, HCL_IS_FUNCTION(hcl, hcl->active_context->origin) == hcl->_method_context);
 */
 					/* restore the stack pointer */
 					hcl->sp = HCL_OOP_TO_SMOOI(hcl->active_context->origin->sp);
@@ -2268,10 +2268,9 @@ static int execute (hcl_t* hcl)
 					{
 						/* the new active context is the fake initial context.
 						 * this context can't get executed further. */
+						HCL_ASSERT (hcl, HCL_IS_CONTEXT(hcl, hcl->active_context));
 						HCL_ASSERT (hcl, (hcl_oop_t)hcl->active_context->sender == hcl->_nil);
-/*
-//							HCL_ASSERT (hcl, HCL_CLASSOF(hcl, hcl->active_context) == hcl->_method_context);
-*/
+
 						HCL_ASSERT (hcl, hcl->active_context->receiver_or_base == hcl->_nil);
 						HCL_ASSERT (hcl, hcl->active_context == hcl->processor->active->initial_context);
 						HCL_ASSERT (hcl, hcl->active_context->origin == hcl->processor->active->initial_context->origin);
@@ -2304,9 +2303,9 @@ static int execute (hcl_t* hcl)
 				if (hcl->active_context == hcl->processor->active->initial_context)
 				{
 					/* the active context to return from is an initial context of
-					 * the active process. this process must have been created 
-					 * over a block using the newProcess method. let's terminate
-					 * the process. */
+					 * the active process. let's terminate the process. 
+					 * the initial context has been forged over the initial function
+					 * in start_initial_process_and_context() */
 					HCL_ASSERT (hcl, (hcl_oop_t)hcl->active_context->sender == hcl->_nil);
 					terminate_process (hcl, hcl->processor->active);
 				}
@@ -2314,20 +2313,7 @@ static int execute (hcl_t* hcl)
 				{
 					/* it is a normal block return as the active block context 
 					 * is not the initial context of a process */
-
-					/* the process stack is shared. the return value 
-					 * doesn't need to get moved. */
-/*
-					//XXX SWITCH_ACTIVE_CONTEXT (hcl, (hcl_oop_context_t)hcl->active_context->sender);
-*/
-					if (hcl->active_context->sender == hcl->processor->active->initial_context)
-					{
-						terminate_process (hcl, hcl->processor->active);
-					}
-					else
-					{
-						SWITCH_ACTIVE_CONTEXT (hcl, (hcl_oop_context_t)hcl->active_context->sender);
-					}
+					SWITCH_ACTIVE_CONTEXT (hcl, (hcl_oop_context_t)hcl->active_context->sender);
 				}
 
 				break;
