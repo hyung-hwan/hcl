@@ -1116,7 +1116,7 @@ static int compile_lambda (hcl_t* hcl, hcl_oop_t src, int defun)
 		hcl_cframe_t* cf;
 		cf = GET_SUBCFRAME (hcl);
 		cf->u.lambda.lfbase_pos = lfbase_pos;
-		cf->u.lambda.lfsize_pos= lfsize_pos;
+		cf->u.lambda.lfsize_pos = lfsize_pos;
 	}
 
 	return 0;
@@ -1634,8 +1634,10 @@ static HCL_INLINE int compile_symbol (hcl_t* hcl, hcl_oop_t obj)
 		}
 
 		/* add the entire cons pair to the literal frame */
+
 		if (add_literal(hcl, cons, &index) <= -1 ||
 		    emit_single_param_instruction(hcl, HCL_CODE_PUSH_OBJECT_0, index) <= -1) return -1;
+HCL_DEBUG5 (hcl, "************* blk depth [%d] %O , index %d lfbase %d lit len %d\n", (int)hcl->c->blk.depth, cons, (int)index, (int)hcl->c->blk.info[hcl->c->blk.depth].lfbase, (int)hcl->code.lit.len);
 
 		return 0;
 	}
@@ -2511,6 +2513,7 @@ static HCL_INLINE int emit_lambda (hcl_t* hcl)
 	hcl_oow_t block_code_size, lfsize;
 	hcl_ooi_t jip;
 
+HCL_DEBUG1 (hcl, "emit_lambda   depth %d\n", (int)hcl->c->blk.depth);
 	cf = GET_TOP_CFRAME(hcl);
 	HCL_ASSERT (hcl, cf->opcode == COP_EMIT_LAMBDA);
 	HCL_ASSERT (hcl, HCL_OOP_IS_SMOOI(cf->operand));
@@ -2597,6 +2600,7 @@ static HCL_INLINE int emit_set (hcl_t* hcl)
 
 		HCL_ASSERT (hcl, HCL_IS_SYMBOL(hcl, cf->operand));
 
+HCL_DEBUG2 (hcl, "emit_set....%O --- %d\n", cf->operand, (int)hcl->c->blk.depth);
 		cons = (hcl_oop_t)hcl_getatsysdic(hcl, cf->operand);
 		if (!cons) 
 		{
@@ -2614,7 +2618,7 @@ static HCL_INLINE int emit_set (hcl_t* hcl)
 		HCL_ASSERT (hcl, HCL_OOP_IS_SMOOI(cf->operand));
 
 		index = (hcl_oow_t)HCL_OOP_TO_SMOOI(cf->operand);
-		if (emit_indexed_variable_access (hcl, index, HCL_CODE_STORE_INTO_CTXTEMPVAR_0, HCL_CODE_STORE_INTO_TEMPVAR_0) <= -1) return -1;
+		if (emit_indexed_variable_access(hcl, index, HCL_CODE_STORE_INTO_CTXTEMPVAR_0, HCL_CODE_STORE_INTO_TEMPVAR_0) <= -1) return -1;
 	}
 
 	POP_CFRAME (hcl);
@@ -2641,8 +2645,10 @@ int hcl_compile (hcl_t* hcl, hcl_oop_t obj)
 	HCL_ASSERT (hcl, hcl->c->blk.depth == -1);
 
 /* TODO: in case i implement all global variables as block arguments at the top level...what should i do? */
+
 	hcl->c->blk.depth++;
-	if (store_temporary_variable_count_for_block(hcl, hcl->c->tv.size, 0) <= -1) return -1;
+HCL_DEBUG2 (hcl, "ENTERING DEPTH %d LIT LEN  %d\n", (int)hcl->c->blk.depth, (int)hcl->code.lit.len);
+	if (store_temporary_variable_count_for_block(hcl, hcl->c->tv.size, hcl->code.lit.len) <= -1) return -1;
 
 	PUSH_CFRAME (hcl, COP_COMPILE_OBJECT, obj);
 

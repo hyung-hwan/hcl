@@ -1674,8 +1674,9 @@ static int execute (hcl_t* hcl)
 				b1 = bcode & 0x7; /* low 3 bits */
 			push_literal:
 				LOG_INST_1 (hcl, "push_literal @%zu", b1);
-				//HCL_STACK_PUSH (hcl, hcl->active_function->literal_frame[b1]);
-				HCL_STACK_PUSH (hcl, hcl->code.lit.arr->slot[b1]);
+				/*HCL_STACK_PUSH (hcl, hcl->code.lit.arr->slot[b1]);*/
+				HCL_STACK_PUSH (hcl, hcl->active_function->literal_frame[b1]);
+HCL_DEBUG3 (hcl, "*** push literal %O    => %d active_function %p\n", hcl->active_function->literal_frame[b1], b1, hcl->active_function);
 				break;
 
 			/* ------------------------------------------------- */
@@ -1704,6 +1705,7 @@ static int execute (hcl_t* hcl)
 			handle_object:
 				/*ass = hcl->code.lit.arr->slot[b1];*/
 				ass = (hcl_oop_cons_t)hcl->active_function->literal_frame[b1];
+HCL_DEBUG3 (hcl, "handle object ass => %O   => %d active_function %p\n", ass, b1, hcl->active_function);
 				HCL_ASSERT (hcl, HCL_IS_CONS(hcl, ass));
 
 				if ((bcode >> 3) & 1)
