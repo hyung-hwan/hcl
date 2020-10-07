@@ -1160,6 +1160,7 @@ hcl_logufmt (hcl, HCL_LOG_WARN, fmt, ustr, 0x6789);
 }
 #endif
 
+#if 1
 	if (xtn->reader_istty)
 	{
 		hcl_bitmask_t trait;
@@ -1174,6 +1175,7 @@ else
 	trait |= HCL_TRAIT_INTERACTIVE;
 	hcl_setoption (hcl, HCL_TRAIT, &trait);
 }
+#endif
 
 	while (1)
 	{

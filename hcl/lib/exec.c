@@ -1676,7 +1676,6 @@ static int execute (hcl_t* hcl)
 				LOG_INST_1 (hcl, "push_literal @%zu", b1);
 				/*HCL_STACK_PUSH (hcl, hcl->code.lit.arr->slot[b1]);*/
 				HCL_STACK_PUSH (hcl, hcl->active_function->literal_frame[b1]);
-HCL_DEBUG3 (hcl, "*** push literal %O    => %d active_function %p\n", hcl->active_function->literal_frame[b1], b1, hcl->active_function);
 				break;
 
 			/* ------------------------------------------------- */
@@ -1705,7 +1704,6 @@ HCL_DEBUG3 (hcl, "*** push literal %O    => %d active_function %p\n", hcl->activ
 			handle_object:
 				/*ass = hcl->code.lit.arr->slot[b1];*/
 				ass = (hcl_oop_cons_t)hcl->active_function->literal_frame[b1];
-HCL_DEBUG3 (hcl, "handle object ass => %O   => %d active_function %p\n", ass, b1, hcl->active_function);
 				HCL_ASSERT (hcl, HCL_IS_CONS(hcl, ass));
 
 				if ((bcode >> 3) & 1)
@@ -2343,7 +2341,6 @@ HCL_DEBUG3 (hcl, "handle object ass => %O   => %d active_function %p\n", ass, b1
 
 				HCL_ASSERT (hcl, b1 >= 0);
 				HCL_ASSERT (hcl, b2 >= b1);
-				HCL_ASSERT (hcl, b3 >= 0);
 
 				/* the MAKE_FUNCTION instruction is followed by the long JUMP_FORWARD_X instruction.
 				* i can decode the instruction and get the size of instructions
@@ -2354,7 +2351,6 @@ HCL_DEBUG3 (hcl, "handle object ass => %O   => %d active_function %p\n", ass, b1
 				joff = (joff << 8) | hcl->active_code[hcl->ip + 2];
 			#endif
 
-HCL_DEBUG1(hcl, "****  MAKE FUNCTION joff = %zu\n", joff);
 				/* copy the byte codes from the active context to the new context */
 			#if (HCL_HCL_CODE_LONG_PARAM_SIZE == 2)
 				func = (hcl_oop_function_t)make_function(hcl, b4, &hcl->active_code[hcl->ip + 3], joff);

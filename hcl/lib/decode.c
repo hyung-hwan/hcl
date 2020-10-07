@@ -566,7 +566,6 @@ int hcl_decode (hcl_t* hcl, hcl_oow_t start, hcl_oow_t end)
 
 				HCL_ASSERT (hcl, b1 >= 0);
 				HCL_ASSERT (hcl, b2 >= b1);
-				HCL_ASSERT (hcl, b4 >= b3);
 				break;
 
 			case HCL_CODE_MAKE_BLOCK:

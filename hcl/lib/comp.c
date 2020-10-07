@@ -86,7 +86,7 @@ static int add_literal (hcl_t* hcl, hcl_oop_t obj, hcl_oow_t* index)
 		/* this removes redundancy of symbols, characters, and integers. */
 		if (((hcl_oop_oop_t)hcl->code.lit.arr)->slot[i] == obj)
 		{
-			*index = i;
+			*index = i - lfbase;
 			return i;
 		}
 	}
@@ -1070,7 +1070,7 @@ static int compile_lambda (hcl_t* hcl, hcl_oop_t src, int defun)
 		/* make_function nargs ntmprs lfbase lfsize */
 		if (emit_double_param_instruction(hcl, HCL_CODE_MAKE_FUNCTION, nargs, ntmprs) <= -1) return -1;
 		lfbase_pos = hcl->code.bc.len;
-		if (emit_long_param(hcl, hcl->code.lit.len) <= -1) return -1; /* lfbase */
+		if (emit_long_param(hcl, hcl->code.lit.len - hcl->c->blk.info[hcl->c->blk.depth - 1].lfbase) <= -1) return -1; /* lfbase */
 		lfsize_pos = hcl->code.bc.len;
 		if (emit_long_param(hcl, 0) <= -1) return -1;
 	}
@@ -1637,7 +1637,6 @@ static HCL_INLINE int compile_symbol (hcl_t* hcl, hcl_oop_t obj)
 
 		if (add_literal(hcl, cons, &index) <= -1 ||
 		    emit_single_param_instruction(hcl, HCL_CODE_PUSH_OBJECT_0, index) <= -1) return -1;
-HCL_DEBUG5 (hcl, "************* blk depth [%d] %O , index %d lfbase %d lit len %d\n", (int)hcl->c->blk.depth, cons, (int)index, (int)hcl->c->blk.info[hcl->c->blk.depth].lfbase, (int)hcl->code.lit.len);
 
 		return 0;
 	}
@@ -2513,7 +2512,6 @@ static HCL_INLINE int emit_lambda (hcl_t* hcl)
 	hcl_oow_t block_code_size, lfsize;
 	hcl_ooi_t jip;
 
-HCL_DEBUG1 (hcl, "emit_lambda   depth %d\n", (int)hcl->c->blk.depth);
 	cf = GET_TOP_CFRAME(hcl);
 	HCL_ASSERT (hcl, cf->opcode == COP_EMIT_LAMBDA);
 	HCL_ASSERT (hcl, HCL_OOP_IS_SMOOI(cf->operand));
@@ -2600,7 +2598,6 @@ static HCL_INLINE int emit_set (hcl_t* hcl)
 
 		HCL_ASSERT (hcl, HCL_IS_SYMBOL(hcl, cf->operand));
 
-HCL_DEBUG2 (hcl, "emit_set....%O --- %d\n", cf->operand, (int)hcl->c->blk.depth);
 		cons = (hcl_oop_t)hcl_getatsysdic(hcl, cf->operand);
 		if (!cons) 
 		{
@@ -2646,9 +2643,39 @@ int hcl_compile (hcl_t* hcl, hcl_oop_t obj)
 
 /* TODO: in case i implement all global variables as block arguments at the top level...what should i do? */
 
-	hcl->c->blk.depth++;
-HCL_DEBUG2 (hcl, "ENTERING DEPTH %d LIT LEN  %d\n", (int)hcl->c->blk.depth, (int)hcl->code.lit.len);
-	if (store_temporary_variable_count_for_block(hcl, hcl->c->tv.size, hcl->code.lit.len) <= -1) return -1;
+	hcl->c->blk.depth++; /* this must be 0 here */
+
+	/* 
+	 * In the non-INTERACTIVE mode, the literal frame base doesn't matter.
+	 * Only the initial function object contains the literal frame. 
+	 * No other function objects are created. All lambda defintions are
+	 * translated to base context objects instead.
+	 * 
+	 * In the INTERACTIVE mode, the literal frame base plays a key role.
+	 * hcl_compile() is called for the top-level expression andthe literal
+	 * frame base can be 0. The means it is ok for a top-level code to 
+	 * reference part of the literal frame reserved for a lambda function.
+	 *
+	 *  (set b 1)
+	 *  (defun set-a(x) (set a x))
+	 *  (set a 2)
+	 *  (set-a 4)
+	 *  (printf "%d\n" a)
+	 * 
+	 * the global literal frame looks like this:
+	 *  @0         (b)
+	 *  @1         (a)
+	 *  @2         (set-a)
+	 *  @3         (printf . #<PRIM>)
+	 *  @4         "%d\n"
+	 *
+	 * @1 to @2 will be copied to a function object when defun is executed.
+	 * The literal frame of the created function object for set-a looks 
+	 * like this
+	 *  @0         (a)
+	 *  @1         (set-a) 
+	 */
+	if (store_temporary_variable_count_for_block(hcl, hcl->c->tv.size, 0) <= -1) return -1;
 
 	PUSH_CFRAME (hcl, COP_COMPILE_OBJECT, obj);
 
