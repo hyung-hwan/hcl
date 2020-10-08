@@ -1483,9 +1483,9 @@ static int execute (hcl_t* hcl)
 		hcl->proc_switched = 0;
 	#endif
 
-		if (HCL_UNLIKELY(hcl->ip >= hcl->code.bc.len)) 
+		if (HCL_UNLIKELY(hcl->ip >= HCL_FUNCTION_GET_CODE_SIZE(hcl->active_function)))
 		{
-			HCL_DEBUG1 (hcl, "Stopping executeion as IP reached the end of bytecode(%zu)\n", hcl->code.bc.len);
+			HCL_DEBUG1 (hcl, "Stopping execution as IP reached the end of bytecode(%zu)\n", hcl->code.bc.len);
 			return_value = hcl->_nil;
 			goto handle_return;
 		}
@@ -2186,7 +2186,7 @@ static int execute (hcl_t* hcl)
 				HCL_ASSERT (hcl, !HCL_STACK_ISEMPTY(hcl));
 
 				/* at the top level, the value is just popped off the stack
-				 * after evaluation of an expressio. so it's likely the
+				 * after evaluation of an expression. so it's likely the
 				 * return value of the last expression unless explicit
 				 * returning is performed */
 				hcl->last_retv = HCL_STACK_GETTOP(hcl);
@@ -2204,12 +2204,9 @@ static int execute (hcl_t* hcl)
 				return_value = hcl->active_context->origin->receiver_or_base;
 
 			handle_return:
+				hcl->last_retv = return_value;
 				if (hcl->active_context->origin == hcl->processor->active->initial_context->origin)
 				{
-/*
-//					HCL_ASSERT (hcl, HCL_CLASSOF(hcl, hcl->active_context) == hcl->_block_context);
-//					HCL_ASSERT (hcl, HCL_CLASSOF(hcl, hcl->processor->active->initial_context) == hcl->_block_context);
-*/
 					/* decrement the instruction pointer back to the return instruction.
 					 * even if the context is reentered, it will just return.
 					 *hcl->ip--;*/
@@ -2222,7 +2219,6 @@ static int execute (hcl_t* hcl)
 					 * before context switching and marks a dead context */
 					if (hcl->active_context->origin == hcl->active_context)
 					{
-						/* returning from a method */
 /*
 //						HCL_ASSERT (hcl, HCL_CLASSOF(hcl, hcl->active_context) == hcl->_method_context);
 */
@@ -2258,9 +2254,6 @@ static int execute (hcl_t* hcl)
 						hcl->active_context->origin->ip = HCL_SMOOI_TO_OOP(-1);
 					}
 
-/*
-//					HCL_ASSERT (hcl, HCL_IS_FUNCTION(hcl, hcl->active_context->origin) == hcl->_method_context);
-*/
 					/* restore the stack pointer */
 					hcl->sp = HCL_OOP_TO_SMOOI(hcl->active_context->origin->sp);
 					SWITCH_ACTIVE_CONTEXT (hcl, hcl->active_context->origin->sender);
@@ -2442,17 +2435,14 @@ oops:
 	return -1;
 }
 
-hcl_oop_t hcl_executefromip (hcl_t* hcl, hcl_oow_t initial_ip)
+hcl_oop_t hcl_execute (hcl_t* hcl)
 {
+//////////////////////////////////////////////////////////////////////////////////////////////
+	hcl_oop_function_t func;
 	int n;
 	hcl_bitmask_t log_default_type_mask;
 
 	HCL_ASSERT (hcl, hcl->code.bc.len < HCL_SMOOI_MAX); /* asserted by the compiler */
-	if (initial_ip >= hcl->code.bc.len)
-	{
-		hcl_seterrnum (hcl, HCL_EINVAL);
-		return HCL_NULL;
-	}
 
 	log_default_type_mask = hcl->log.default_type_mask;
 	hcl->log.default_type_mask |= HCL_LOG_VM;
@@ -2460,9 +2450,31 @@ hcl_oop_t hcl_executefromip (hcl_t* hcl, hcl_oow_t initial_ip)
 	HCL_ASSERT (hcl, hcl->initial_context == HCL_NULL);
 	HCL_ASSERT (hcl, hcl->active_context == HCL_NULL);
 
-	hcl->last_retv = hcl->_nil;
 
-	n = start_initial_process_and_context(hcl, initial_ip);
+	/* the code generated doesn't cater for its use as an initial funtion.
+	 * mutate the generated code so that the intiail function can break
+	 * out of the execution loop in execute() smoothly */
+#if 0
+	/* append RETURN_FROM_BLOCK */
+	if (hcl_emitbyteinstruction(hcl, HCL_CODE_RETURN_FROM_BLOCK) <= -1) return -1;
+#else
+	/* substitute RETURN_STACKTOP for POP_STACKTOP) */
+	HCL_ASSERT (hcl, hcl->code.bc.ptr[hcl->code.bc.len - 1] == HCL_CODE_POP_STACKTOP);
+	hcl->code.bc.ptr[hcl->code.bc.len - 1] = HCL_CODE_RETURN_STACKTOP;
+#endif
+
+	func = (hcl_oop_function_t)make_function(hcl, hcl->code.lit.len, hcl->code.bc.ptr, hcl->code.bc.len);
+	if (HCL_UNLIKELY(!func)) return HCL_NULL;
+
+	/* pass nil for the home context of the initial function */
+	fill_function_data (hcl, func, 0, 0, (hcl_oop_context_t)hcl->_nil, hcl->code.lit.arr->slot, hcl->code.lit.len);
+
+	hcl->initial_function = func;
+//////////////////////////////////////////////////////////////////////////////////////////////
+
+
+	hcl->last_retv = hcl->_nil;
+	n = start_initial_process_and_context(hcl, 0);
 	if (n >= 0) 
 	{
 		n = execute(hcl);
@@ -2475,23 +2487,6 @@ hcl_oop_t hcl_executefromip (hcl_t* hcl, hcl_oow_t initial_ip)
 
 	hcl->log.default_type_mask = log_default_type_mask;
 	return (n <= -1)? HCL_NULL: hcl->last_retv;
-}
-
-hcl_oop_t hcl_execute (hcl_t* hcl)
-{
-//////////////////////////////////////////////////////////////////////////////////////////////
-	hcl_oop_function_t func;
-
-	func = (hcl_oop_function_t)make_function(hcl, hcl->code.lit.len, hcl->code.bc.arr->slot, hcl->code.bc.len);
-	if (HCL_UNLIKELY(!func)) return HCL_NULL;
-
-	/* pass nil for the home context of the initial function */
-	fill_function_data (hcl, func, 0, 0, (hcl_oop_context_t)hcl->_nil, hcl->code.lit.arr->slot, hcl->code.lit.len);
-
-	hcl->initial_function = func;
-//////////////////////////////////////////////////////////////////////////////////////////////
-
-	return hcl_executefromip (hcl, 0);
 }
 
 void hcl_abort (hcl_t* hcl)

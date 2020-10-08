@@ -1285,8 +1285,9 @@ struct hcl_t
 	{
 		struct
 		{
-			hcl_oop_byte_t arr; /* byte code array - not part of object memory */
+			hcl_oob_t* ptr; /* byte code array */
 			hcl_oow_t len;
+			hcl_oow_t capa;
 		} bc;
 
 		struct
@@ -1648,11 +1649,6 @@ HCL_EXPORT int hcl_addbuiltinprims (
  */
 HCL_EXPORT hcl_oop_t hcl_execute (
 	hcl_t* hcl
-);
-
-HCL_EXPORT hcl_oop_t hcl_executefromip (
-	hcl_t*    hcl,
-	hcl_oow_t initial_ip
 );
 
 HCL_EXPORT void hcl_abort (

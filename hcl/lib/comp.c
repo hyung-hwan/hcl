@@ -190,13 +190,11 @@ static int store_temporary_variable_count_for_block (hcl_t* hcl, hcl_oow_t tmpr_
 static HCL_INLINE void patch_instruction (hcl_t* hcl, hcl_oow_t index, hcl_oob_t bc)
 {
 	HCL_ASSERT (hcl, index < hcl->code.bc.len);
-	hcl->code.bc.arr->slot[index] = bc;
+	hcl->code.bc.ptr[index] = bc;
 }
 
 static int emit_byte_instruction (hcl_t* hcl, hcl_oob_t bc)
 {
-	hcl_oow_t capa;
-
 	/* the context object has the ip field. it should be representable
 	 * in a small integer. for simplicity, limit the total byte code length
 	 * to fit in a small integer. because 'ip' points to the next instruction
@@ -208,23 +206,27 @@ static int emit_byte_instruction (hcl_t* hcl, hcl_oob_t bc)
 		return -1;
 	}
 
-	capa = HCL_OBJ_GET_SIZE(hcl->code.bc.arr);
-	if (hcl->code.bc.len >= capa)
+	if (hcl->code.bc.len >= hcl->code.bc.capa)
 	{
-		hcl_oop_t tmp;
+		hcl_oob_t* tmp;
 		hcl_oow_t newcapa;
 
-		newcapa = HCL_ALIGN(capa + 1, HCL_BC_BUFFER_ALIGN);
-		tmp = hcl_remakengcbytearray(hcl, (hcl_oop_t)hcl->code.bc.arr, newcapa);
+		newcapa = HCL_ALIGN(hcl->code.bc.capa + 1, HCL_BC_BUFFER_ALIGN);
+		tmp = hcl_reallocmem(hcl, hcl->code.bc.ptr, HCL_SIZEOF(*tmp) * newcapa);
 		if (!tmp) return -1;
 
-		hcl->code.bc.arr = (hcl_oop_byte_t)tmp;
+		hcl->code.bc.ptr = tmp;
+		hcl->code.bc.capa = newcapa;
 	}
 
-	hcl->code.bc.arr->slot[hcl->code.bc.len++] = bc;
+	hcl->code.bc.ptr[hcl->code.bc.len++] = bc;
 	return 0;
 }
 
+int hcl_emitbyteinstruction (hcl_t* hcl, hcl_oob_t bc)
+{
+	return emit_byte_instruction(hcl, bc);
+}
 
 static int emit_single_param_instruction (hcl_t* hcl, int cmd, hcl_oow_t param_1)
 {
@@ -486,13 +488,13 @@ static HCL_INLINE void patch_long_jump (hcl_t* hcl, hcl_ooi_t jip, hcl_ooi_t jum
 		
 		HCL_ASSERT (hcl, jump_offset <= MAX_CODE_JUMP * 2);
 
-		HCL_ASSERT (hcl, hcl->code.bc.arr->slot[jip] == HCL_CODE_JUMP_FORWARD_X ||
-		            hcl->code.bc.arr->slot[jip] == HCL_CODE_JUMP_BACKWARD_X ||
-		            hcl->code.bc.arr->slot[jip] == HCL_CODE_JUMP_FORWARD_IF_TRUE ||
-		            hcl->code.bc.arr->slot[jip] == HCL_CODE_JUMP_FORWARD_IF_FALSE);
+		HCL_ASSERT (hcl, hcl->code.bc.ptr[jip] == HCL_CODE_JUMP_FORWARD_X ||
+		                 hcl->code.bc.ptr[jip] == HCL_CODE_JUMP_BACKWARD_X ||
+		                 hcl->code.bc.ptr[jip] == HCL_CODE_JUMP_FORWARD_IF_TRUE ||
+		                 hcl->code.bc.ptr[jip] == HCL_CODE_JUMP_FORWARD_IF_FALSE);
 
 		/* JUMP2 instructions are chosen to be greater than its JUMP counterpart by 1 */
-		patch_instruction (hcl, jip, hcl->code.bc.arr->slot[jip] + 1); 
+		patch_instruction (hcl, jip, hcl->code.bc.ptr[jip] + 1); 
 		jump_offset -= MAX_CODE_JUMP;
 	}
 

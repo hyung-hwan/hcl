@@ -2145,7 +2145,7 @@ static HCL_INLINE int format_stack_args (hcl_fmtout_t* fmtout, hcl_ooi_t nargs, 
 
 			if (!hcl_inttostr(hcl, arg, 10 | HCL_INTTOSTR_NONEWOBJ)) 
 			{
-				HCL_LOG1 (hcl, HCL_LOG_WARN | HCL_LOG_UNTYPED, "unable to convert %O to string \n", arg);
+				HCL_LOG2 (hcl, HCL_LOG_WARN | HCL_LOG_UNTYPED, "unable to convert %O for float output\n", arg, hcl_geterrmsg(hcl));
 				goto invalid_format;
 			}
 
@@ -2489,7 +2489,6 @@ static HCL_INLINE int format_stack_args (hcl_fmtout_t* fmtout, hcl_ooi_t nargs, 
 			break;
 		}
 
-
 		print_integer:
 		{
 			const hcl_ooch_t* nsptr;
@@ -2523,7 +2522,7 @@ static HCL_INLINE int format_stack_args (hcl_fmtout_t* fmtout, hcl_ooi_t nargs, 
 			{
 				/*hcl_seterrbfmt (hcl, HCL_EINVAL, "not a valid number - %O", arg);
 				goto oops;*/
-				HCL_LOG1 (hcl, HCL_LOG_WARN | HCL_LOG_UNTYPED, "unable to convert integer %O to string \n", arg);
+				HCL_LOG2 (hcl, HCL_LOG_WARN | HCL_LOG_UNTYPED, "unable to convert %O for integer output - %js\n", arg, hcl_geterrmsg(hcl));
 				goto invalid_format;
 			}
 

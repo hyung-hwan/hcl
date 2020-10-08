@@ -451,32 +451,32 @@ int hcl_ignite (hcl_t* hcl)
 
 	if (!hcl->_nil) 
 	{
-		hcl->_nil = hcl_makenil (hcl);
-		if (!hcl->_nil) return -1;
+		hcl->_nil = hcl_makenil(hcl);
+		if (HCL_UNLIKELY(!hcl->_nil)) return -1;
 	}
 
 	if (!hcl->_true) 
 	{
-		hcl->_true = hcl_maketrue (hcl);
-		if (!hcl->_true) return -1;
+		hcl->_true = hcl_maketrue(hcl);
+		if (HCL_UNLIKELY(!hcl->_true)) return -1;
 	}
 	if (!hcl->_false)
 	{
-		hcl->_false = hcl_makefalse (hcl);
-		if (!hcl->_false) return -1;
+		hcl->_false = hcl_makefalse(hcl);
+		if (HCL_UNLIKELY(!hcl->_false)) return -1;
 	}
 
 
 	if (!hcl->symtab) 
 	{
-		hcl->symtab = (hcl_oop_dic_t)hcl_makedic (hcl, hcl->option.dfl_symtab_size);
-		if (!hcl->symtab) return -1;
+		hcl->symtab = (hcl_oop_dic_t)hcl_makedic(hcl, hcl->option.dfl_symtab_size);
+		if (HCL_UNLIKELY(!hcl->symtab)) return -1;
 	}
 
 	if (!hcl->sysdic)
 	{
-		hcl->sysdic = (hcl_oop_dic_t)hcl_makedic (hcl, hcl->option.dfl_sysdic_size);
-		if (!hcl->sysdic) return -1;
+		hcl->sysdic = (hcl_oop_dic_t)hcl_makedic(hcl, hcl->option.dfl_sysdic_size);
+		if (HCL_UNLIKELY(!hcl->sysdic)) return -1;
 	}
 
 	/* symbol table available now. symbols can be created */
@@ -484,8 +484,8 @@ int hcl_ignite (hcl_t* hcl)
 	{
 		hcl_oop_t tmp;
 
-		tmp = hcl_makesymbol (hcl, syminfo[i].ptr, syminfo[i].len);
-		if (!tmp) return -1;
+		tmp = hcl_makesymbol(hcl, syminfo[i].ptr, syminfo[i].len);
+		if (HCL_UNLIKELY(!tmp)) return -1;
 
 		HCL_OBJ_SET_FLAGS_SYNCODE (tmp, syminfo[i].syncode);
 		*(hcl_oop_t*)((hcl_uint8_t*)hcl + syminfo[i].offset) = tmp;
@@ -496,29 +496,32 @@ int hcl_ignite (hcl_t* hcl)
 		/* Create a nil process used to simplify nil check in GC.
 		 * only accessible by VM. not exported via the global dictionary. */
 		hcl->nil_process = (hcl_oop_process_t)hcl_allocoopobj(hcl, HCL_BRAND_PROCESS, HCL_PROCESS_NAMED_INSTVARS);
-		if (!hcl->nil_process) return -1;
+		if (HCL_UNLIKELY(!hcl->nil_process)) return -1;
 		hcl->nil_process->sp = HCL_SMOOI_TO_OOP(-1);
 	}
 
 	if (!hcl->processor)
 	{
 		hcl->processor = (hcl_oop_process_scheduler_t)hcl_allocoopobj(hcl, HCL_BRAND_PROCESS_SCHEDULER, HCL_PROCESS_SCHEDULER_NAMED_INSTVARS);
-		if (!hcl->processor) return -1;
+		if (HCL_UNLIKELY(!hcl->processor)) return -1;
 		hcl->processor->tally = HCL_SMOOI_TO_OOP(0);
 		hcl->processor->active = hcl->nil_process;
 	}
 
-	if (!hcl->code.bc.arr)
+	/* TODO: move code.bc.ptr creation to hcl_init? */
+	if (!hcl->code.bc.ptr)
 	{
-		hcl->code.bc.arr = (hcl_oop_byte_t)hcl_makengcbytearray(hcl, HCL_NULL, HCL_BC_BUFFER_INIT); /* TODO: set a proper intial size */
-		if (!hcl->code.bc.arr) return -1;
+		hcl->code.bc.ptr = (hcl_oop_byte_t)hcl_allocmem(hcl, HCL_SIZEOF(*hcl->code.bc.ptr) * HCL_BC_BUFFER_INIT); /* TODO: set a proper intial size */
+		if (HCL_UNLIKELY(!hcl->code.bc.ptr)) return -1;
 		HCL_ASSERT (hcl, hcl->code.bc.len == 0);
+		hcl->code.bc.capa = HCL_BC_BUFFER_INIT;
 	}
 
+	/* TODO: move code.lit.arr creation to hcl_init() after swithching to hcl_allocmem? */
 	if (!hcl->code.lit.arr)
 	{
 		hcl->code.lit.arr = (hcl_oop_oop_t)hcl_makengcarray(hcl, HCL_LIT_BUFFER_INIT); /* TOOD: set a proper initial size */
-		if (!hcl->code.lit.arr) return -1;
+		if (HCL_UNLIKELY(!hcl->code.lit.arr)) return -1;
 		HCL_ASSERT (hcl, hcl->code.lit.len == 0);
 	}
 

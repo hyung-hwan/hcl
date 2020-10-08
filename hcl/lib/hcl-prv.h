@@ -1093,7 +1093,7 @@ hcl_pfbase_t* hcl_querymod (
 );
 
 /* ========================================================================= */
-/* fmt.c                                                                  */
+/* fmt.c                                                                     */
 /* ========================================================================= */
 int hcl_fmt_object_ (
 	hcl_fmtout_t* fmtout,
@@ -1113,6 +1113,14 @@ int hcl_logfmtcallstack (
 int hcl_strfmtcallstack (
 	hcl_t*    hcl,
 	hcl_ooi_t nargs
+);
+
+/* ========================================================================= */
+/* comp.c                                                                    */
+/* ========================================================================= */
+int hcl_emitbyteinstruction (
+	hcl_t*     hcl,
+	hcl_oob_t  bc
 );
 
 #if defined(__cplusplus)

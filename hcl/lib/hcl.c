@@ -241,10 +241,10 @@ void hcl_fini (hcl_t* hcl)
 		hcl->proc_map_free_last = -1;
 	}
 
-	if (hcl->code.bc.arr)
+	if (hcl->code.bc.ptr)
 	{
-		hcl_freengcobj (hcl, (hcl_oop_t)hcl->code.bc.arr);
-		hcl->code.bc.arr = HCL_NULL;
+		hcl_freemem (hcl, hcl->code.bc.ptr);
+		hcl->code.bc.ptr = HCL_NULL;
 		hcl->code.bc.len = 0;
 	}
 

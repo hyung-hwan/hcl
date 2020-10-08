@@ -1160,15 +1160,10 @@ hcl_logufmt (hcl, HCL_LOG_WARN, fmt, ustr, 0x6789);
 }
 #endif
 
-#if 1
-	if (xtn->reader_istty)
-	{
-		hcl_bitmask_t trait;
-		hcl_getoption (hcl, HCL_TRAIT, &trait);
-		trait |= HCL_TRAIT_INTERACTIVE;
-		hcl_setoption (hcl, HCL_TRAIT, &trait);
-	}
-else
+#if 0
+// TODO: change the option name
+// in the INTERACTIVE mode, the compiler generates MAKE_FUNCTION for lambda functions.
+// in the non-INTERACTIVE mode, the compiler generates MAKE_CONTEXT for lambda functions.
 {
 	hcl_bitmask_t trait;
 	hcl_getoption (hcl, HCL_TRAIT, &trait);
@@ -1215,11 +1210,15 @@ count++;
 		}
 		else
 		{
-			hcl_oow_t code_offset;
-
-			code_offset = hcl_getbclen(hcl);
+			if (xtn->reader_istty)
+			{
+				/* TODO: create a proper function for this and call it */
+				hcl->code.bc.len = 0;
+				hcl->code.lit.len = 0;
+			}
 
 			if (verbose) hcl_prbfmt (hcl, "\n"); /* flush the output buffer by hcl_print above */
+
 			if (hcl_compile(hcl, obj) <= -1)
 			{
 				if (hcl->errnum == HCL_ESYNERR)
@@ -1239,12 +1238,12 @@ count++;
 				/* interactive mode */
 				hcl_oop_t retv;
 
-				hcl_decode (hcl, code_offset, hcl_getbclen(hcl));
+				hcl_decode (hcl, 0, hcl_getbclen(hcl));
 				HCL_LOG0 (hcl, HCL_LOG_MNEMONIC, "------------------------------------------\n");
 				g_hcl = hcl;
 				//setup_tick ();
 
-				retv = hcl_executefromip(hcl, code_offset);
+				retv = hcl_execute(hcl);
 
 				/* flush pending output data in the interactive mode(e.g. printf without a newline) */
 				hcl_flushio (hcl); 

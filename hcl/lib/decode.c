@@ -77,7 +77,7 @@ int hcl_decode (hcl_t* hcl, hcl_oow_t start, hcl_oow_t end)
 	if (end > hcl->code.bc.len) end = hcl->code.bc.len;
 
 	ip = start;
-	cdptr = ((hcl_oop_byte_t)hcl->code.bc.arr)->slot;
+	cdptr = hcl->code.bc.ptr;
 
 /* TODO: check if ip increases beyond bcode when fetching parameters too */
 	while (ip < end)
