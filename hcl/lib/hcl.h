@@ -525,6 +525,10 @@ struct hcl_fpdec_t
 typedef struct hcl_function_t hcl_function_t;
 typedef struct hcl_function_t* hcl_oop_function_t;
 
+#define HCL_BLOCK_NAMED_INSTVARS 4 
+typedef struct hcl_block_t hcl_block_t;
+typedef struct hcl_block_t* hcl_oop_block_t;
+
 #define HCL_CONTEXT_NAMED_INSTVARS 8
 typedef struct hcl_context_t hcl_context_t;
 typedef struct hcl_context_t* hcl_oop_context_t;
@@ -533,14 +537,27 @@ struct hcl_function_t
 {
 	HCL_OBJ_HEADER;
 
-	hcl_oop_t ntmprs; /* smooi */
-	hcl_oop_t nargs;  /* smooi */
+	hcl_oop_t ntmprs; /* smooi. number of temporaries. includes arguments as well */
+	hcl_oop_t nargs;  /* smooi. number of arguments */
 	hcl_oop_context_t home; /* home context. nil for the initial function */
 
 	/* == variable indexed part == */
 	hcl_oop_t literal_frame[1]; /* it stores literals. it may not exist */
 
 	/* after the literal frame comes the actual byte code */
+};
+
+/* hcl_function_t copies the byte codes and literal frames into itself
+ * hlc_block_t contains minimal information(ip) for referening byte codes 
+ * and literal frames available in home->origin.
+ */
+struct hcl_block_t
+{
+	HCL_OBJ_HEADER;
+	hcl_oop_t          ntmprs; /* smooi. number of temporaries. includes arguments as well */
+	hcl_oop_t          nargs; /* smooi. number of arguments */
+	hcl_oop_t          ip; /* smooi. instruction pointer where the byte code begins in home->origin */
+	hcl_oop_context_t  home; /* home context */
 };
 
 struct hcl_context_t
@@ -569,10 +586,9 @@ struct hcl_context_t
 	hcl_oop_t          nargs;
 
 	/* it points to the receiver of the message for a method context.
-	 * a base block context(created but not yet activated) has nil in this 
-	 * field. if a block context is activated by 'value', it points 
-	 * to the block context object used as a base for shallow-copy. */
-	hcl_oop_t          receiver_or_base; /* when used as a base, it's either a context or a function */
+	 * a block context points to a block object and a function context
+	 * points to a function object */
+	hcl_oop_t          receiver_or_base; /* when used as a base, it's either a block or a function */
 
 	/* it is set to nil for a method context.
 	 * for a block context, it points to the active context at the 
@@ -581,19 +597,21 @@ struct hcl_context_t
 	 * an activated block context copies this field from the base block context. */
 	hcl_oop_context_t home; /* context or nil */
 
-	/* it points to the method context created of the method defining the code
-	 * of this context. a method context points to itself. a block context
-	 * points to the method context where it is created. another block context
-	 * created within the block context also points to the same method context.
-	 *   ctx->origin: method context
-	 *   ctx->origin->receiver_or_base: actual function containing byte codes pertaining to ctx.
+	/* a function context is created with itself in this field. The function
+	 * context creation is based on a function object(initial or lambda/defun).
 	 *
-	 * when a method context is created, it is set to itself. no change is
-	 * made when the method context is activated. when a base block context is 
-	 * created (when MAKE_BLOCK or BLOCK_COPY is executed), it is set to the
-	 * origin of the active context. when the base block context is shallow-copied
-	 * for activation (when it is sent 'value'), it is set to the origin of
-	 * the base block context. */
+	 * a block context is created over a block object. it stores 
+	 * a function context points to itself in this field. a block context
+	 * points to the function context where it is created. another block context
+	 * created within the block context also points to the same function context.
+	 *
+	 * take note of the following points:
+	 *   ctx->origin: function context
+	 *   ctx->origin->receiver_or_base: actual function containing byte codes pertaining to ctx.
+	 * 
+	 * a base of a block context is a block object but ctx->origin is guaranteed to be
+	 * a function context. so its base is also a function object all the time.
+	 */
 	hcl_oop_context_t  origin; 
 
 	/* variable indexed part */
@@ -1386,6 +1404,7 @@ enum hcl_brand_t
 	HCL_BRAND_PRIM,
 
 	HCL_BRAND_FUNCTION,
+	HCL_BRAND_BLOCK,
 	HCL_BRAND_CONTEXT,
 	HCL_BRAND_PROCESS,
 	HCL_BRAND_PROCESS_SCHEDULER,
@@ -1430,6 +1449,7 @@ typedef enum hcl_concode_t hcl_concode_t;
 #define HCL_IS_SYMBOL_ARRAY(hcl,v) (HCL_OOP_IS_POINTER(v) && HCL_OBJ_GET_FLAGS_BRAND(v) == HCL_BRAND_SYMBOL_ARRAY)
 #define HCL_IS_CONTEXT(hcl,v) (HCL_OOP_IS_POINTER(v) && HCL_OBJ_GET_FLAGS_BRAND(v) == HCL_BRAND_CONTEXT)
 #define HCL_IS_FUNCTION(hcl,v) (HCL_OOP_IS_POINTER(v) && HCL_OBJ_GET_FLAGS_BRAND(v) == HCL_BRAND_FUNCTION)
+#define HCL_IS_BLOCK(hcl,v) (HCL_OOP_IS_POINTER(v) && HCL_OBJ_GET_FLAGS_BRAND(v) == HCL_BRAND_BLOCK)
 #define HCL_IS_PROCESS(hcl,v) (HCL_OOP_IS_POINTER(v) && HCL_OBJ_GET_FLAGS_BRAND(v) == HCL_BRAND_PROCESS)
 #define HCL_IS_CONS(hcl,v) (HCL_OOP_IS_POINTER(v) && HCL_OBJ_GET_FLAGS_BRAND(v) == HCL_BRAND_CONS)
 #define HCL_IS_CONS_CONCODED(hcl,v,concode) (HCL_IS_CONS(hcl,v) && HCL_OBJ_GET_FLAGS_SYNCODE(v) == (concode))

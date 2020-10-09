@@ -167,7 +167,7 @@ static HCL_INLINE hcl_oop_t make_context (hcl_t* hcl, hcl_ooi_t ntmprs)
 	return hcl_allocoopobj(hcl, HCL_BRAND_CONTEXT, HCL_CONTEXT_NAMED_INSTVARS + (hcl_oow_t)ntmprs);
 }
 
-static HCL_INLINE hcl_oop_t make_function (hcl_t* hcl, hcl_oow_t lfsize, const hcl_oob_t* bptr, hcl_oow_t blen)
+static HCL_INLINE hcl_oop_function_t make_function (hcl_t* hcl, hcl_oow_t lfsize, const hcl_oob_t* bptr, hcl_oow_t blen)
 {
 	/* the literal frame is placed in the variable part.
 	 * the byte code is placed in the trailer space */
@@ -179,6 +179,10 @@ static HCL_INLINE void fill_function_data (hcl_t* hcl, hcl_oop_function_t func, 
 	/* Although this function could be integrated into make_function(),
 	 * this function has been separated from make_function() to make GC handling simpler */
 	hcl_oow_t i;
+
+	HCL_ASSERT (hcl, nargs >= 0 && nargs <= HCL_SMOOI_MAX);
+	HCL_ASSERT (hcl, ntmprs >= 0 && ntmprs <= HCL_SMOOI_MAX);
+	HCL_ASSERT (hcl, nargs <= ntmprs);
 
 	/* copy literal frames */
 	HCL_ASSERT (hcl, lfsize <= HCL_OBJ_GET_SIZE(func) - HCL_FUNCTION_NAMED_INSTVARS);
@@ -192,6 +196,25 @@ static HCL_INLINE void fill_function_data (hcl_t* hcl, hcl_oop_function_t func, 
 	func->home = homectx;
 	func->nargs = HCL_SMOOI_TO_OOP(nargs);
 	func->ntmprs = HCL_SMOOI_TO_OOP(ntmprs);
+}
+
+static HCL_INLINE hcl_oop_block_t make_block (hcl_t* hcl)
+{
+	/* create a base block used for creation of a block context */
+	return hcl_allocoopobj(hcl, HCL_BRAND_BLOCK, HCL_BLOCK_NAMED_INSTVARS);
+}
+
+static HCL_INLINE void fill_block_data (hcl_t* hcl, hcl_oop_block_t blk, hcl_ooi_t nargs, hcl_ooi_t ntmprs, hcl_ooi_t ip, hcl_oop_context_t homectx)
+{
+	HCL_ASSERT (hcl, nargs >= 0 && nargs <= HCL_SMOOI_MAX);
+	HCL_ASSERT (hcl, ntmprs >= 0 && ntmprs <= HCL_SMOOI_MAX);
+	HCL_ASSERT (hcl, nargs <= ntmprs);
+	HCL_ASSERT (hcl, ip >= 0 && nargs <= HCL_SMOOI_MAX);
+
+	blk->home = homectx;
+	blk->nargs = HCL_SMOOI_TO_OOP(nargs);
+	blk->ntmprs = HCL_SMOOI_TO_OOP(ntmprs);
+	blk->ip = HCL_SMOOI_TO_OOP(ip);
 }
 
 static HCL_INLINE int prepare_to_alloc_pid (hcl_t* hcl)
@@ -902,7 +925,7 @@ static void update_sem_heap (hcl_t* hcl, hcl_ooi_t index, hcl_oop_semaphore_t ne
 }
 /* ------------------------------------------------------------------------- */
 
-static int __activate_context (hcl_t* hcl, hcl_oop_context_t rcv_blkctx, hcl_ooi_t nargs, hcl_oop_context_t* pblkctx)
+static int __activate_block (hcl_t* hcl, hcl_oop_block_t rcv_blk, hcl_ooi_t nargs, hcl_oop_context_t* pblkctx)
 {
 	/* prepare a new block context for activation.
 	 * the receiver must be a block context which becomes the base
@@ -923,35 +946,22 @@ static int __activate_context (hcl_t* hcl, hcl_oop_context_t rcv_blkctx, hcl_ooi
 	 */
 
 	/* the receiver must be a block context */
-	HCL_ASSERT (hcl, HCL_IS_CONTEXT (hcl, rcv_blkctx));
-	if (rcv_blkctx->receiver_or_base != hcl->_nil)
-	{
-		/* the 'source' field is not nil.
-		 * this block context has already been activated once.
-		 * you can't send 'value' again to reactivate it.
-		 * For example, [thisContext value] value. */
-		HCL_ASSERT (hcl, HCL_OBJ_GET_SIZE(rcv_blkctx) > HCL_CONTEXT_NAMED_INSTVARS);
-		HCL_LOG1 (hcl, HCL_LOG_IC | HCL_LOG_ERROR, 
-			"Error - re-valuing of a block context - %O\n", rcv_blkctx);
-		hcl_seterrbfmt (hcl, HCL_ERECALL, "cannot recall %O", rcv_blkctx);
-		return -1;
-	}
-	HCL_ASSERT (hcl, HCL_OBJ_GET_SIZE(rcv_blkctx) == HCL_CONTEXT_NAMED_INSTVARS);
+	HCL_ASSERT (hcl, HCL_IS_BLOCK(hcl, rcv_blk));
 
-	if (HCL_OOP_TO_SMOOI(rcv_blkctx->nargs) != nargs)
+	if (HCL_OOP_TO_SMOOI(rcv_blk->nargs) != nargs)
 	{
 		HCL_LOG3 (hcl, HCL_LOG_IC | HCL_LOG_ERROR, 
-			"Error - wrong number of arguments to a block context %O - expecting %zd, got %zd\n",
-			rcv_blkctx, HCL_OOP_TO_SMOOI(rcv_blkctx->nargs), nargs);
+			"Error - wrong number of arguments to a block %O - expecting %zd, got %zd\n",
+			rcv_blk, HCL_OOP_TO_SMOOI(rcv_blk->nargs), nargs);
 		hcl_seterrnum (hcl, HCL_ECALLARG);
 		return -1;
 	}
 
-	local_ntmprs = HCL_OOP_TO_SMOOI(rcv_blkctx->ntmprs);
+	local_ntmprs = HCL_OOP_TO_SMOOI(rcv_blk->ntmprs);
 	HCL_ASSERT (hcl, local_ntmprs >= nargs);
 
-	/* create a new block context to clone rcv_blkctx */
-	hcl_pushtmp (hcl, (hcl_oop_t*)&rcv_blkctx);
+	/* create a new block context to clone rcv_blk */
+	hcl_pushtmp (hcl, (hcl_oop_t*)&rcv_blk);
 	blkctx = (hcl_oop_context_t)make_context(hcl, local_ntmprs); 
 	hcl_poptmp (hcl);
 	if (!blkctx) return -1;
@@ -960,15 +970,16 @@ static int __activate_context (hcl_t* hcl, hcl_oop_context_t rcv_blkctx, hcl_ooi
 	/* shallow-copy the named part including home, origin, etc. */
 	for (i = 0; i < HCL_CONTEXT_NAMED_INSTVARS; i++)
 	{
-		((hcl_oop_oop_t)blkctx)->slot[i] = ((hcl_oop_oop_t)rcv_blkctx)->slot[i];
+		((hcl_oop_oop_t)blkctx)->slot[i] = ((hcl_oop_oop_t)rcv_blk)->slot[i];
 	}
 #else
-	blkctx->ip = rcv_blkctx->ip;
-	blkctx->ntmprs = rcv_blkctx->ntmprs;
-	blkctx->nargs = rcv_blkctx->nargs;
-	blkctx->receiver_or_base = (hcl_oop_t)rcv_blkctx;
-	blkctx->home = rcv_blkctx->home;
-	blkctx->origin = rcv_blkctx->origin;
+	blkctx->ip = rcv_blk->ip;
+	blkctx->ntmprs = rcv_blk->ntmprs;
+	blkctx->nargs = rcv_blk->nargs;
+	blkctx->receiver_or_base = (hcl_oop_t)rcv_blk;
+	blkctx->home = rcv_blk->home;
+	/* blkctx->origin = rcv_blk->origin; */
+	blkctx->origin = rcv_blk->home->origin;
 #endif
 
 /* TODO: check the stack size of a block context to see if it's large enough to hold arguments */
@@ -980,7 +991,7 @@ static int __activate_context (hcl_t* hcl, hcl_oop_context_t rcv_blkctx, hcl_ooi
 
 	HCL_STACK_POPS (hcl, nargs + 1); /* pop arguments and receiver */
 
-	HCL_ASSERT (hcl, (rcv_blkctx == hcl->initial_context && (hcl_oop_t)blkctx->home == hcl->_nil) || (hcl_oop_t)blkctx->home != hcl->_nil);
+	HCL_ASSERT (hcl, (rcv_blk == hcl->initial_context && (hcl_oop_t)blkctx->home == hcl->_nil) || (hcl_oop_t)blkctx->home != hcl->_nil);
 	blkctx->sp = HCL_SMOOI_TO_OOP(-1); /* not important at all */
 	blkctx->sender = hcl->active_context;
 
@@ -988,15 +999,16 @@ static int __activate_context (hcl_t* hcl, hcl_oop_context_t rcv_blkctx, hcl_ooi
 	return 0;
 }
 
-static HCL_INLINE int activate_context (hcl_t* hcl, hcl_ooi_t nargs)
+static HCL_INLINE int activate_block (hcl_t* hcl, hcl_ooi_t nargs)
 {
 	int x;
-	hcl_oop_context_t rcv, blkctx;
+	hcl_oop_block_t rcv;
+	hcl_oop_context_t blkctx;
 
-	rcv = (hcl_oop_context_t)HCL_STACK_GETRCV(hcl, nargs);
-	HCL_ASSERT (hcl, HCL_IS_CONTEXT(hcl, rcv));
+	rcv = (hcl_oop_block_t)HCL_STACK_GETRCV(hcl, nargs);
+	HCL_ASSERT (hcl, HCL_IS_BLOCK(hcl, rcv));
 
-	x = __activate_context(hcl, rcv, nargs, &blkctx);
+	x = __activate_block(hcl, rcv, nargs, &blkctx);
 	if (HCL_UNLIKELY(x <= -1)) return -1;
 
 	SWITCH_ACTIVE_CONTEXT (hcl, (hcl_oop_context_t)blkctx);
@@ -1820,12 +1832,12 @@ static int execute (hcl_t* hcl)
 				{
 					switch (HCL_OBJ_GET_FLAGS_BRAND(rcv))
 					{
-						case HCL_BRAND_CONTEXT:
-							if (activate_context(hcl, b1) <= -1) goto oops;
-							break;
-
 						case HCL_BRAND_FUNCTION:
 							if (activate_function(hcl, b1) <= -1) goto oops;
+							break;
+
+						case HCL_BRAND_BLOCK:
+							if (activate_block(hcl, b1) <= -1) goto oops;
 							break;
 
 						case HCL_BRAND_PRIM:
@@ -2346,9 +2358,9 @@ static int execute (hcl_t* hcl)
 
 				/* copy the byte codes from the active context to the new context */
 			#if (HCL_HCL_CODE_LONG_PARAM_SIZE == 2)
-				func = (hcl_oop_function_t)make_function(hcl, b4, &hcl->active_code[hcl->ip + 3], joff);
+				func = make_function(hcl, b4, &hcl->active_code[hcl->ip + 3], joff);
 			#else
-				func = (hcl_oop_function_t)make_function(hcl, b4, &hcl->active_code[hcl->ip + 2], joff);
+				func = make_function(hcl, b4, &hcl->active_code[hcl->ip + 2], joff);
 			#endif
 				if (HCL_UNLIKELY(!func)) goto oops;
 
@@ -2361,6 +2373,7 @@ static int execute (hcl_t* hcl)
 
 			case HCL_CODE_MAKE_BLOCK:
 			{
+#if 0
 				hcl_oop_context_t blkctx;
 
 				/* b1 - number of block arguments
@@ -2372,6 +2385,7 @@ static int execute (hcl_t* hcl)
 
 				HCL_ASSERT (hcl, b1 >= 0);
 				HCL_ASSERT (hcl, b2 >= b1);
+
 
 				/* the block context object created here is used as a base
 				 * object for block context activation. activate_context()
@@ -2402,6 +2416,31 @@ static int execute (hcl_t* hcl)
 
 				/* push the new block context to the stack of the active context */
 				HCL_STACK_PUSH (hcl, (hcl_oop_t)blkctx);
+#else
+				hcl_oop_block_t blkobj;
+
+				/* b1 - number of block arguments
+				 * b2 - number of block temporaries */
+				FETCH_PARAM_CODE_TO (hcl, b1);
+				FETCH_PARAM_CODE_TO (hcl, b2);
+
+				LOG_INST_2 (hcl, "make_block %zu %zu", b1, b2);
+
+				HCL_ASSERT (hcl, b1 >= 0);
+				HCL_ASSERT (hcl, b2 >= b1);
+
+				blkobj = make_block(hcl);
+				if (HCL_UNLIKELY(!blkobj)) goto oops;
+
+				/* the long forward jump instruction has the format of 
+				 *   11000100 KKKKKKKK or 11000100 KKKKKKKK KKKKKKKK 
+				 * depending on HCL_HCL_CODE_LONG_PARAM_SIZE. change 'ip' to point to
+				 * the instruction after the jump. */
+				fill_block_data (hcl, blkobj, b1, b2, hcl->ip + HCL_HCL_CODE_LONG_PARAM_SIZE + 1, hcl->active_context);
+
+				/* push the new block context to the stack of the active context */
+				HCL_STACK_PUSH (hcl, (hcl_oop_t)blkobj);
+#endif
 				break;
 			}
 
@@ -2463,7 +2502,7 @@ hcl_oop_t hcl_execute (hcl_t* hcl)
 	hcl->code.bc.ptr[hcl->code.bc.len - 1] = HCL_CODE_RETURN_STACKTOP;
 #endif
 
-	func = (hcl_oop_function_t)make_function(hcl, hcl->code.lit.len, hcl->code.bc.ptr, hcl->code.bc.len);
+	func = make_function(hcl, hcl->code.lit.len, hcl->code.bc.ptr, hcl->code.bc.len);
 	if (HCL_UNLIKELY(!func)) return HCL_NULL;
 
 	/* pass nil for the home context of the initial function */
