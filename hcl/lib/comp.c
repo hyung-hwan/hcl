@@ -1124,15 +1124,16 @@ static int compile_lambda (hcl_t* hcl, hcl_oop_t src, int defun)
 	return 0;
 }
 
-static int compile_return (hcl_t* hcl, hcl_oop_t src)
+static int compile_return (hcl_t* hcl, hcl_oop_t src, int mode)
 {
 	hcl_oop_t obj, val;
 
 	HCL_ASSERT (hcl, HCL_IS_CONS(hcl, src));
-	HCL_ASSERT (hcl, HCL_CONS_CAR(src) == hcl->_return);
+	HCL_ASSERT (hcl, HCL_CONS_CAR(src) == hcl->_return || HCL_CONS_CAR(src) == hcl->_return_from_home);
 
 	obj = HCL_CONS_CDR(src);
 
+/* TODO: error message - cater for return-from home */
 	if (HCL_IS_NIL(hcl, obj))
 	{
 /* TODO: should i allow (return)? does it return the last value on the stack? */
@@ -1156,7 +1157,8 @@ static int compile_return (hcl_t* hcl, hcl_oop_t src)
 	}
 
 	SWITCH_TOP_CFRAME (hcl, COP_COMPILE_OBJECT, val);
-	PUSH_SUBCFRAME (hcl, COP_EMIT_RETURN, hcl->_nil);
+
+	PUSH_SUBCFRAME (hcl, COP_EMIT_RETURN, HCL_SMOOI_TO_OOP(mode));
 
 	return 0;
 }
@@ -1473,7 +1475,11 @@ static int compile_cons_xlist_expression (hcl_t* hcl, hcl_oop_t obj)
 			case HCL_SYNCODE_RETURN:
 				/* (return 10)
 				 * (return (+ 10 20)) */
-				if (compile_return(hcl, obj) <= -1) return -1;
+				if (compile_return(hcl, obj, 0) <= -1) return -1;
+				break;
+
+			case HCL_SYNCODE_RETURN_FROM_HOME:
+				if (compile_return(hcl, obj, 1) <= -1) return -1;
 				break;
 
 			case HCL_SYNCODE_UNTIL:
@@ -2577,9 +2583,9 @@ static HCL_INLINE int emit_return (hcl_t* hcl)
 
 	cf = GET_TOP_CFRAME(hcl);
 	HCL_ASSERT (hcl, cf->opcode == COP_EMIT_RETURN);
-	HCL_ASSERT (hcl, HCL_IS_NIL(hcl, cf->operand));
+	HCL_ASSERT (hcl, HCL_OOP_IS_SMOOI(cf->operand));
 
-	n = emit_byte_instruction(hcl, HCL_CODE_RETURN_FROM_BLOCK);
+	n = emit_byte_instruction(hcl, (HCL_OOP_TO_SMOOI(cf->operand) == 0? HCL_CODE_RETURN_FROM_BLOCK: HCL_CODE_RETURN_STACKTOP));
 
 	POP_CFRAME (hcl);
 	return n;

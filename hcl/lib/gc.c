@@ -29,7 +29,7 @@
 static struct 
 {
 	hcl_oow_t  len;
-	hcl_ooch_t ptr[10];
+	hcl_ooch_t ptr[20];
 	int syncode;
 	hcl_oow_t  offset;
 } syminfo[] =
@@ -44,6 +44,8 @@ static struct
 	{  6, { 'l','a','m','b','d','a' },     HCL_SYNCODE_LAMBDA,  HCL_OFFSETOF(hcl_t,_lambda) },
 	{  2, { 'o','r' },                     HCL_SYNCODE_OR,      HCL_OFFSETOF(hcl_t,_or)  },
 	{  6, { 'r','e','t','u','r','n'},      HCL_SYNCODE_RETURN,  HCL_OFFSETOF(hcl_t,_return) },
+	{ 16, { 'r','e','t','u','r','n','-','f','r','o','m','-','h','o','m','e'},
+	                                       HCL_SYNCODE_RETURN_FROM_HOME,  HCL_OFFSETOF(hcl_t,_return_from_home) },
 	{  3, { 's','e','t' },                 HCL_SYNCODE_SET,     HCL_OFFSETOF(hcl_t,_set)    },
 	{  5, { 'u','n','t','i','l' },         HCL_SYNCODE_UNTIL,   HCL_OFFSETOF(hcl_t,_until)  },
 	{  5, { 'w','h','i','l','e' },         HCL_SYNCODE_WHILE,   HCL_OFFSETOF(hcl_t,_while)  }
