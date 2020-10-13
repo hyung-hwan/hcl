@@ -529,7 +529,7 @@ typedef struct hcl_function_t* hcl_oop_function_t;
 typedef struct hcl_block_t hcl_block_t;
 typedef struct hcl_block_t* hcl_oop_block_t;
 
-#define HCL_CONTEXT_NAMED_INSTVARS 8
+#define HCL_CONTEXT_NAMED_INSTVARS 7
 typedef struct hcl_context_t hcl_context_t;
 typedef struct hcl_context_t* hcl_oop_context_t;
 
@@ -573,11 +573,6 @@ struct hcl_context_t
 
 	/* SmallInteger, instruction pointer */
 	hcl_oop_t          ip;
-
-	/* SmallInteger, stack pointer.
-	 * For a method context, this pointer stores the stack pointer
-	 * of the active process before it gets activated. */
-	hcl_oop_t          sp;
 
 	/* SmallInteger. Number of temporaries. Includes arguments as well */
 	hcl_oop_t          ntmprs;

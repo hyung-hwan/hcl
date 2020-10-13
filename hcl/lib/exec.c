@@ -992,7 +992,6 @@ static int __activate_block (hcl_t* hcl, hcl_oop_block_t rcv_blk, hcl_ooi_t narg
 	HCL_STACK_POPS (hcl, nargs + 1); /* pop arguments and receiver */
 
 	HCL_ASSERT (hcl, (rcv_blk == hcl->initial_context && (hcl_oop_t)blkctx->home == hcl->_nil) || (hcl_oop_t)blkctx->home != hcl->_nil);
-	blkctx->sp = HCL_SMOOI_TO_OOP(-1); /* not important at all */
 	blkctx->sender = hcl->active_context;
 
 	*pnewctx = blkctx;
@@ -1071,7 +1070,6 @@ static int __activate_function (hcl_t* hcl, hcl_oop_function_t rcv_func, hcl_ooi
 	HCL_STACK_POPS (hcl, nargs + 1); /* pop arguments and receiver */
 
 	HCL_ASSERT (hcl, (hcl_oop_t)functx->home != hcl->_nil);
-	functx->sp = HCL_SMOOI_TO_OOP(-1); /* not important at all */
 	functx->sender = hcl->active_context;
 
 	*pnewctx = functx;
@@ -1332,7 +1330,6 @@ static int start_initial_process_and_context (hcl_t* hcl, hcl_ooi_t initial_ip)
 	hcl->sp = -1;
 
 	ctx->ip = HCL_SMOOI_TO_OOP(initial_ip);
-	ctx->sp = HCL_SMOOI_TO_OOP(-1); /* pointer to -1 below the bottom */
 	ctx->nargs = HCL_SMOOI_TO_OOP(0);
 	ctx->ntmprs = HCL_SMOOI_TO_OOP(0);
 	ctx->origin = ctx; /* the origin of the initial context is itself as this is created over the initial function */
@@ -1369,8 +1366,8 @@ static int start_initial_process_and_context (hcl_t* hcl, hcl_ooi_t initial_ip)
 	 * __activate_function() creates a new context and pops the function object and arguments off the stack.
 	 * at this point, it should be as if the pop-off has been completed.
 	 * because this is the very beginning, nothing should exist in the stack */
-	HCL_ASSERT (hcl, hcl->active_context->sp == HCL_SMOOI_TO_OOP(-1));
 	HCL_ASSERT (hcl, hcl->sp == -1);
+	HCL_ASSERT (hcl, hcl->sp == HCL_OOP_TO_SMOOI(proc->sp));
 
 	HCL_ASSERT (hcl, proc == hcl->processor->active);
 	hcl->initial_context = proc->initial_context;
@@ -1409,7 +1406,7 @@ HCL_DEBUG1 (hcl, ">>> RETURNING FROM INITIAL CONTEXT -> SP %d\n", (int)hcl->sp);
 
 		if (hcl->sp >= 0)
 		{
-			/* return-from-home has been called from where it shouldn't be
+			/* return-from-home has been called from where it shouldn't be. for instance,
 			 *  (printf "xxx %d\n" (return-from-home 999))
 			 *  -----------------------------------------------
 			 *  (if (>  19 (return-from-home 20)) 30) */
