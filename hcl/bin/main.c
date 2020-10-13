@@ -1274,7 +1274,7 @@ count++;
 		}
 	}
 
-	if (!xtn->reader_istty)
+	if (!xtn->reader_istty && hcl_getbclen(hcl) > 0)
 	{
 		hcl_oop_t retv;
 
@@ -1297,7 +1297,7 @@ count++;
 		g_hcl = HCL_NULL;
 		/*hcl_dumpsymtab (hcl);*/
 	}
-	
+
 	set_signal_to_default (SIGINT);
 	hcl_close (hcl);
 
