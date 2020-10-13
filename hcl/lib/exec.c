@@ -1380,16 +1380,6 @@ HCL_DEBUG1 (hcl, "*** initial_context %p\n", hcl->initial_context);
 /* ------------------------------------------------------------------------- */
 static HCL_INLINE int do_return (hcl_t* hcl, hcl_oop_t return_value)
 {
-#if 0
-(defun x(a) 
-   (defun y(k) (return-from-home (+ k k k)))
-   (+ a  a a)
-   (y 40) ; this should act like (return (y 40))
-)
-
-(x 2)
-(y 10)  ; this should return from x but x  it should end up with dead return...
-#endif
 	hcl_oop_context_t ctx;
 
 HCL_DEBUG2 (hcl, ">>> do_return from active_context %p  home %p\n", hcl->active_context, hcl->active_context->home);
@@ -1468,10 +1458,6 @@ HCL_DEBUG1 (hcl, ">>> NON-LOCAL return FROM INITIAL XXX CONTEXT -> SP %d\n", (in
 			hcl_seterrbfmt (hcl, HCL_EINTERN, "unable to return from dead context"); /* TODO: can i make this error catchable at the hcl level? */
 			return -1;
 		}
-
-		/* the stack pointer must not be restored. let me comment out the restroing line
-		hcl->sp = HCL_OOP_TO_SMOOI(hcl->active_context->home->sp);
-		*/
 
 		hcl->active_context->home->ip = HCL_SMOOI_TO_OOP(-1); /* mark that this context has returned */
 		hcl->ip = -1; /* mark that the active context has returned. saved into hcl->active_context->ip in SWITCH_ACTIVE_CONTEXT() */
