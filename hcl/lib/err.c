@@ -73,8 +73,8 @@ static hcl_ooch_t errstr_32[] = {'b','u','f','f','e','r',' ','f','u','l','l','\0
 static hcl_ooch_t errstr_33[] = {'s','y','n','t','a','x',' ','e','r','r','o','r','\0'};
 static hcl_ooch_t errstr_34[] = {'c','a','l','l',' ','e','r','r','o','r','\0'};
 
-static hcl_ooch_t errstr_35[] = {'r','e','c','a','l','l',' ','p','r','o','h','i','b','i','t','e','d','\0'};
-static hcl_ooch_t errstr_36[] = {'a','r','g','u','m','e','n','t',' ','n','u','m','b','e','r',' ','e','r','r','o','r','\0'};
+static hcl_ooch_t errstr_35[] = {'a','r','g','u','m','e','n','t',' ','n','u','m','b','e','r',' ','e','r','r','o','r','\0'};
+static hcl_ooch_t errstr_36[] = {'t','o','o',' ','m','a','n','y',' ','s','e','m','a','p','h','o','r','e','s','\0'};
 
 static hcl_ooch_t* errstr[] =
 {

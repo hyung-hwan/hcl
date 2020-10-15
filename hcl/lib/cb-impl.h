@@ -45,16 +45,15 @@ HCL_EXPORT void hcl_vmprim_free_heap (
 	void*              ptr
 );
 
-HCL_EXPORT void hcl_vmprim_gettime (
+HCL_EXPORT void hcl_vmprim_vm_gettime (
 	hcl_t*             hcl,
 	hcl_ntime_t*       now
 );
 
-HCL_EXPORT void hcl_vmprim_sleep (
+HCL_EXPORT int hcl_vmprim_vm_sleep (
 	hcl_t*             hcl,
 	const hcl_ntime_t* dur
 );
-
 
 HCL_EXPORT void hcl_vmprim_dl_startup (
 	hcl_t*             hcl

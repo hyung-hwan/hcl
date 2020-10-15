@@ -92,7 +92,8 @@ enum
 	WORD_CONTEXT,
 	WORD_PROCESS,
 	WORD_PROCESS_SCHEDULER,
-	WORD_SEMAPHORE
+	WORD_SEMAPHORE,
+	WORD_SEMAPHORE_GROUP
 };
 
 static struct 
@@ -114,7 +115,8 @@ static struct
 	{  10, { '#','<','C','O','N','T','E','X','T','>' } },
 	{  10, { '#','<','P','R','O','C','E','S','S','>' } },
 	{  20, { '#','<','P','R','O','C','E','S','S','-','S','C','H','E','D','U','L','E','R','>' } },
-	{  12, { '#','<','S','E','M','A','P','H','O','R','E','>' } }
+	{  12, { '#','<','S','E','M','A','P','H','O','R','E','>' } },
+	{  18, { '#','<','S','E','M','A','P','H','O','R','E','-','G','R','O','U','P','>' } }
 };
 
 static HCL_INLINE int print_single_char (hcl_fmtout_t* fmtout, hcl_ooch_t ch)
@@ -683,6 +685,10 @@ next:
 
 		case HCL_BRAND_SEMAPHORE:
 			word_index = WORD_SEMAPHORE;
+			goto print_word;
+
+		case HCL_BRAND_SEMAPHORE_GROUP:
+			word_index = WORD_SEMAPHORE_GROUP;
 			goto print_word;
 
 		default:

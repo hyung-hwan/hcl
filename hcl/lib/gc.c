@@ -306,7 +306,6 @@ void hcl_gc (hcl_t* hcl)
 	hcl->processor = (hcl_oop_process_scheduler_t)hcl_moveoop(hcl, (hcl_oop_t)hcl->processor);
 	hcl->nil_process = (hcl_oop_process_t)hcl_moveoop(hcl, (hcl_oop_t)hcl->nil_process);
 
-	
 	for (i = 0; i < hcl->code.lit.len; i++)
 	{
 		/* the literal array ia a NGC object. but the literal objects 
@@ -325,6 +324,23 @@ void hcl_gc (hcl_t* hcl)
 	for (i = 0; i < hcl->sem_heap_count; i++)
 	{
 		hcl->sem_heap[i] = (hcl_oop_semaphore_t)hcl_moveoop(hcl, (hcl_oop_t)hcl->sem_heap[i]);
+	}
+
+	for (i = 0; i < hcl->sem_io_tuple_count; i++)
+	{
+		if (hcl->sem_io_tuple[i].sem[HCL_SEMAPHORE_IO_TYPE_INPUT])
+			hcl->sem_io_tuple[i].sem[HCL_SEMAPHORE_IO_TYPE_INPUT] = (hcl_oop_semaphore_t)hcl_moveoop(hcl, (hcl_oop_t)hcl->sem_io_tuple[i].sem[HCL_SEMAPHORE_IO_TYPE_INPUT]);
+		if (hcl->sem_io_tuple[i].sem[HCL_SEMAPHORE_IO_TYPE_OUTPUT])
+			hcl->sem_io_tuple[i].sem[HCL_SEMAPHORE_IO_TYPE_OUTPUT] = (hcl_oop_semaphore_t)hcl_moveoop(hcl, (hcl_oop_t)hcl->sem_io_tuple[i].sem[HCL_SEMAPHORE_IO_TYPE_OUTPUT]);
+	}
+
+#if defined(ENABLE_GCFIN)
+	hcl->sem_gcfin = (hcl_oop_semaphore_t)hcl_moveoop(hcl, (hcl_oop_t)hcl->sem_gcfin);
+#endif
+
+	for (i = 0; i < hcl->proc_map_capa; i++)
+	{
+		hcl->proc_map[i] = hcl_moveoop(hcl, hcl->proc_map[i]);
 	}
 
 	for (i = 0; i < hcl->tmp_count; i++)
@@ -506,8 +522,10 @@ int hcl_ignite (hcl_t* hcl)
 	{
 		hcl->processor = (hcl_oop_process_scheduler_t)hcl_allocoopobj(hcl, HCL_BRAND_PROCESS_SCHEDULER, HCL_PROCESS_SCHEDULER_NAMED_INSTVARS);
 		if (HCL_UNLIKELY(!hcl->processor)) return -1;
-		hcl->processor->tally = HCL_SMOOI_TO_OOP(0);
 		hcl->processor->active = hcl->nil_process;
+		hcl->processor->total_count = HCL_SMOOI_TO_OOP(0);
+		hcl->processor->runnable.count = HCL_SMOOI_TO_OOP(0);
+		hcl->processor->suspended.count = HCL_SMOOI_TO_OOP(0);
 	}
 
 	/* TODO: move code.bc.ptr creation to hcl_init? */

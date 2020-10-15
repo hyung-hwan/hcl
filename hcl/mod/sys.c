@@ -39,7 +39,7 @@ static hcl_pfrc_t pf_sys_time (hcl_t* hcl, hcl_mod_t* mod, hcl_ooi_t nargs)
 {
 	hcl_ntime_t now;
 	hcl_oop_t tv;
-	hcl->vmprim.gettime(hcl, &now); /* should I use time() instead? */
+	hcl->vmprim.vm_gettime(hcl, &now); /* should I use time() instead? */
 	tv = hcl_oowtoint(hcl, now.sec);
 	if (!tv) return HCL_PF_FAILURE;
 	HCL_STACK_SETRET (hcl, nargs, tv);

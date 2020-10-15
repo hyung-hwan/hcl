@@ -1059,8 +1059,8 @@ int main (int argc, char* argv[])
 	vmprim.dl_open = hcl_vmprim_dl_open;
 	vmprim.dl_close = hcl_vmprim_dl_close;
 	vmprim.dl_getsym = hcl_vmprim_dl_getsym;
-	vmprim.gettime = hcl_vmprim_gettime;
-	vmprim.sleep = hcl_vmprim_sleep;
+	vmprim.vm_gettime = hcl_vmprim_vm_gettime;
+	vmprim.vm_sleep = hcl_vmprim_vm_sleep;
 
 	hcl = hcl_open(&sys_mmgr, HCL_SIZEOF(xtn_t), memsize, &vmprim, HCL_NULL);
 	if (!hcl)
@@ -1160,7 +1160,7 @@ hcl_logufmt (hcl, HCL_LOG_WARN, fmt, ustr, 0x6789);
 }
 #endif
 
-#if 1
+#if 0
 // TODO: change the option name
 // in the INTERACTIVE mode, the compiler generates MAKE_FUNCTION for lambda functions.
 // in the non-INTERACTIVE mode, the compiler generates MAKE_CONTEXT for lambda functions.

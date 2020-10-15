@@ -173,7 +173,7 @@ static int store_temporary_variable_count_for_block (hcl_t* hcl, hcl_oow_t tmpr_
 		hcl_oow_t newcapa;
 
 		newcapa = HCL_ALIGN (hcl->c->blk.depth + 1, BLK_INFO_BUFFER_ALIGN);
-		tmp = (hcl_oow_t*)hcl_reallocmem (hcl, hcl->c->blk.info, newcapa * HCL_SIZEOF(*tmp));
+		tmp = (hcl_blk_info_t*)hcl_reallocmem (hcl, hcl->c->blk.info, newcapa * HCL_SIZEOF(*tmp));
 		if (!tmp) return -1;
 
 		hcl->c->blk.info_capa = newcapa;

@@ -726,8 +726,8 @@ hcl_server_proto_t* hcl_server_proto_open (hcl_oow_t xtnsize, hcl_server_worker_
 	vmprim.dl_open = hcl_vmprim_dl_open;
 	vmprim.dl_close = hcl_vmprim_dl_close;
 	vmprim.dl_getsym = hcl_vmprim_dl_getsym;
-	vmprim.gettime = hcl_vmprim_gettime;
-	vmprim.sleep = hcl_vmprim_sleep;
+	vmprim.gettime = hcl_vmprim_vm_gettime;
+	vmprim.sleep = hcl_vmprim_vm_sleep;
 
 	proto = (hcl_server_proto_t*)hcl_server_allocmem(worker->server, HCL_SIZEOF(*proto));
 	if (!proto) return HCL_NULL;

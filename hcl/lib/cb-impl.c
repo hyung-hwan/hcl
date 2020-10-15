@@ -527,7 +527,7 @@ void hcl_vmprim_free_heap (hcl_t* hcl, void* ptr)
  * POSSIBLY MONOTONIC TIME
  * ----------------------------------------------------------------- */
 
-void hcl_vmprim_gettime (hcl_t* hcl, hcl_ntime_t* now)
+void hcl_vmprim_vm_gettime (hcl_t* hcl, hcl_ntime_t* now)
 {
 #if defined(_WIN32)
 
@@ -614,6 +614,14 @@ void hcl_vmprim_gettime (hcl_t* hcl, hcl_ntime_t* now)
 #endif
 }
 
+/* -----------------------------------------------------------------
+ * TODO: MUX
+ * ----------------------------------------------------------------- */
+
+#if 0
+TODO TODO TODO 
+#endif
+
 /* ----------------------------------------------------------------- 
  * SLEEPING
  * ----------------------------------------------------------------- */
@@ -627,7 +635,7 @@ void hcl_vmprim_gettime (hcl_t* hcl, hcl_ntime_t* now)
 #	endif
 #endif
 
-void hcl_vmprim_sleep (hcl_t* hcl, const hcl_ntime_t* dur)
+int hcl_vmprim_vm_sleep (hcl_t* hcl, const hcl_ntime_t* dur)
 {
 #if defined(_WIN32)
 	xtn_t* xtn = (xtn_t*)hcl_getxtn(hcl);
@@ -692,6 +700,8 @@ void hcl_vmprim_sleep (hcl_t* hcl, const hcl_ntime_t* dur)
 	#	error UNSUPPORT SLEEP
 	#endif
 #endif
+
+	return 0;
 }
 
 /* ----------------------------------------------------------------- 

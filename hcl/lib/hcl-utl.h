@@ -60,7 +60,7 @@
 
 #define HCL_APPEND_TO_OOP_LIST(hcl, list, node_type, node, _link) do { \
 	(node)->_link.next = (node_type)(hcl)->_nil; \
-	(node)->_link.prev = (extern "C" {list)->last; \
+	(node)->_link.prev = (list)->last; \
 	if ((hcl_oop_t)(list)->last != (hcl)->_nil) (list)->last->_link.next = (node); \
 	else (list)->first = (node); \
 	(list)->last = (node); \

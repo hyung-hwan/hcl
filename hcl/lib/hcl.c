@@ -233,10 +233,24 @@ void hcl_fini (hcl_t* hcl)
 		hcl->sem_heap_count = 0;
 	}
 
+	if (hcl->sem_io_tuple)
+	{
+		hcl_freemem (hcl, hcl->sem_io_tuple);
+		hcl->sem_io_tuple_capa = 0;
+		hcl->sem_io_tuple_count = 0;
+	}
+
+	if (hcl->sem_io_map)
+	{
+		hcl_freemem (hcl, hcl->sem_io_map);
+		hcl->sem_io_map_capa = 0;
+	}
+
 	if (hcl->proc_map)
 	{
 		hcl_freemem (hcl, hcl->proc_map);
 		hcl->proc_map_capa = 0;
+		hcl->proc_map_used = 0;
 		hcl->proc_map_free_first = -1;
 		hcl->proc_map_free_last = -1;
 	}

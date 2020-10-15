@@ -33,6 +33,11 @@
 #define PROC_STATE_SUSPENDED 0
 #define PROC_STATE_TERMINATED -1
 
+static const char* io_type_str[] =
+{
+	"input",
+	"output"
+};
 
 static HCL_INLINE const char* proc_state_to_string (int state)
 {
@@ -50,18 +55,23 @@ static HCL_INLINE const char* proc_state_to_string (int state)
 
 #define PROC_MAP_INC 64
 
+/* TODO: adjust these max semaphore pointer buffer capacity,
+ *       proably depending on the object memory size? */
 #define SEM_LIST_INC 256
 #define SEM_HEAP_INC 256
+#define SEM_IO_TUPLE_INC 256
 #define SEM_LIST_MAX (SEM_LIST_INC * 1000)
 #define SEM_HEAP_MAX (SEM_HEAP_INC * 1000)
+#define SEM_IO_TUPLE_MAX (SEM_IO_TUPLE_INC * 1000)
+#define SEM_IO_MAP_ALIGN 1024 /* this must a power of 2 */
 
 #define SEM_HEAP_PARENT(x) (((x) - 1) / 2)
 #define SEM_HEAP_LEFT(x)   ((x) * 2 + 1)
 #define SEM_HEAP_RIGHT(x)  ((x) * 2 + 2)
 
 #define SEM_HEAP_EARLIER_THAN(stx,x,y) ( \
-	(HCL_OOP_TO_SMOOI((x)->heap_ftime_sec) < HCL_OOP_TO_SMOOI((y)->heap_ftime_sec)) || \
-	(HCL_OOP_TO_SMOOI((x)->heap_ftime_sec) == HCL_OOP_TO_SMOOI((y)->heap_ftime_sec) && HCL_OOP_TO_SMOOI((x)->heap_ftime_nsec) < HCL_OOP_TO_SMOOI((y)->heap_ftime_nsec)) \
+	(HCL_OOP_TO_SMOOI((x)->u.timed.ftime_sec) < HCL_OOP_TO_SMOOI((y)->u.timed.ftime_sec)) || \
+	(HCL_OOP_TO_SMOOI((x)->u.timed.ftime_sec) == HCL_OOP_TO_SMOOI((y)->u.timed.ftime_sec) && HCL_OOP_TO_SMOOI((x)->u.timed.ftime_nsec) < HCL_OOP_TO_SMOOI((y)->u.timed.ftime_nsec)) \
 )
 
 #define LOAD_IP(hcl, v_ctx) ((hcl)->ip = HCL_OOP_TO_SMOOI((v_ctx)->ip))
@@ -118,10 +128,16 @@ static HCL_INLINE const char* proc_state_to_string (int state)
 #	define LOG_INST_3(hcl,fmt,a1,a2,a3,a4)
 #endif
 
-static int vm_startup (hcl_t* hcl)
+static int delete_sem_from_sem_io_tuple (hcl_t* hcl, hcl_oop_semaphore_t sem, int force);
+static void signal_io_semaphore (hcl_t* hcl, hcl_ooi_t io_handle, hcl_ooi_t mask);
+
+/* ------------------------------------------------------------------------- */
+
+static HCL_INLINE int vm_startup (hcl_t* hcl)
 {
 	hcl_cb_t* cb;
-	
+	hcl_oow_t i;
+
 	HCL_DEBUG1 (hcl, "VM started up at IP %zd\n", hcl->ip);
 
 	for (cb = hcl->cblist; cb; cb = cb->next)
@@ -135,7 +151,18 @@ static int vm_startup (hcl_t* hcl)
 			return -1;
 		}
 	}
-	hcl->vmprim.gettime (hcl, &hcl->exec_start_time); /* raw time. no adjustment */
+
+	for (i = 0; i < hcl->sem_io_map_capa; i++)
+	{
+		hcl->sem_io_map[i] = -1;
+	}
+
+#if defined(ENABLE_GCFIN)
+	moo->sem_gcfin = (moo_oop_semaphore_t)moo->_nil;
+	moo->sem_gcfin_sigreq = 0;
+#endif
+
+	hcl->vmprim.vm_gettime (hcl, &hcl->exec_start_time); /* raw time. no adjustment */
 
 	return 0;
 }
@@ -143,12 +170,78 @@ static int vm_startup (hcl_t* hcl)
 static void vm_cleanup (hcl_t* hcl)
 {
 	hcl_cb_t* cb;
-	hcl->vmprim.gettime (hcl, &hcl->exec_end_time); /* raw time. no adjustment */
+	hcl_oow_t i;
+
+	for (i = 0; i < hcl->sem_io_map_capa;)
+	{
+		hcl_ooi_t sem_io_index;
+		if ((sem_io_index = hcl->sem_io_map[i]) >= 0)
+		{
+			HCL_ASSERT (hcl, sem_io_index < hcl->sem_io_tuple_count);
+			HCL_ASSERT (hcl, hcl->sem_io_tuple[sem_io_index].sem[HCL_SEMAPHORE_IO_TYPE_INPUT] ||
+			                 hcl->sem_io_tuple[sem_io_index].sem[HCL_SEMAPHORE_IO_TYPE_OUTPUT]);
+
+			if (hcl->sem_io_tuple[sem_io_index].sem[HCL_SEMAPHORE_IO_TYPE_INPUT])
+			{
+				delete_sem_from_sem_io_tuple (hcl, hcl->sem_io_tuple[sem_io_index].sem[HCL_SEMAPHORE_IO_TYPE_INPUT], 1);
+			}
+			if (hcl->sem_io_tuple[sem_io_index].sem[HCL_SEMAPHORE_IO_TYPE_OUTPUT])
+			{
+				delete_sem_from_sem_io_tuple (hcl, hcl->sem_io_tuple[sem_io_index].sem[HCL_SEMAPHORE_IO_TYPE_OUTPUT], 1);
+			}
+
+			HCL_ASSERT (hcl, hcl->sem_io_map[i] <= -1);
+		}
+		else 
+		{
+			i++;
+		}
+	}
+
+	HCL_ASSERT (hcl, hcl->sem_io_tuple_count == 0);
+	HCL_ASSERT (hcl, hcl->sem_io_count == 0);
+
+	hcl->vmprim.vm_gettime (hcl, &hcl->exec_end_time); /* raw time. no adjustment */
 	for (cb = hcl->cblist; cb; cb = cb->next)
 	{
 		if (cb->vm_cleanup) cb->vm_cleanup(hcl);
 	}
-	HCL_DEBUG1 (hcl, "VM cleaned up at IP %zd\n", hcl->ip);
+
+#if defined(ENABLE_GCFIN)
+	moo->sem_gcfin = (moo_oop_semaphore_t)moo->_nil;
+	moo->sem_gcfin_sigreq = 0;
+
+	/* deregister all pending finalizable objects pending just in case these
+	 * have not been removed for various reasons. (e.g. sudden VM abortion)
+	 */
+	hcl_deregallfinalizables (hcl);
+#endif
+
+	HCL_DEBUG0 (hcl, "VM cleaned up\n");
+}
+
+static HCL_INLINE void vm_gettime (hcl_t* hcl, hcl_ntime_t* now)
+{
+	hcl->vmprim.vm_gettime (hcl, now);
+	/* in vm_startup(), hcl->exec_start_time has been set to the time of
+	 * that moment. time returned here get offset by hcl->exec_start_time and 
+	 * thus becomes relative to it. this way, it is kept small such that it
+	 * can be represented in a small integer with leaving almost zero chance
+	 * of overflow. */
+	HCL_SUB_NTIME (now, now, &hcl->exec_start_time);  /* now = now - exec_start_time */
+}
+
+
+static HCL_INLINE int vm_sleep (hcl_t* hcl, const hcl_ntime_t* dur)
+{
+/* TODO: return 1 if it gets into the halting state */
+	hcl->vmprim.vm_sleep(hcl, dur);
+	return 0;
+}
+
+static HCL_INLINE void vm_muxwait (hcl_t* hcl, const hcl_ntime_t* dur)
+{
+	hcl->vmprim.vm_muxwait (hcl, dur, signal_io_semaphore);
 }
 
 static void vm_checkbc (hcl_t* hcl, hcl_oob_t bcode)
@@ -159,19 +252,20 @@ static void vm_checkbc (hcl_t* hcl, hcl_oob_t bcode)
 		if (cb->vm_checkbc) cb->vm_checkbc(hcl, bcode);
 	}
 }
+
 /* ------------------------------------------------------------------------- */
 
-static HCL_INLINE hcl_oop_t make_context (hcl_t* hcl, hcl_ooi_t ntmprs)
+static HCL_INLINE hcl_oop_context_t make_context (hcl_t* hcl, hcl_ooi_t ntmprs)
 {
 	HCL_ASSERT (hcl, ntmprs >= 0);
-	return hcl_allocoopobj(hcl, HCL_BRAND_CONTEXT, HCL_CONTEXT_NAMED_INSTVARS + (hcl_oow_t)ntmprs);
+	return (hcl_oop_context_t)hcl_allocoopobj(hcl, HCL_BRAND_CONTEXT, HCL_CONTEXT_NAMED_INSTVARS + (hcl_oow_t)ntmprs);
 }
 
 static HCL_INLINE hcl_oop_function_t make_function (hcl_t* hcl, hcl_oow_t lfsize, const hcl_oob_t* bptr, hcl_oow_t blen)
 {
 	/* the literal frame is placed in the variable part.
 	 * the byte code is placed in the trailer space */
-	return hcl_allocoopobjwithtrailer(hcl, HCL_BRAND_FUNCTION, HCL_FUNCTION_NAMED_INSTVARS + lfsize, bptr, blen);
+	return (hcl_oop_function_t)hcl_allocoopobjwithtrailer(hcl, HCL_BRAND_FUNCTION, HCL_FUNCTION_NAMED_INSTVARS + lfsize, bptr, blen);
 }
 
 static HCL_INLINE void fill_function_data (hcl_t* hcl, hcl_oop_function_t func, hcl_ooi_t nargs, hcl_ooi_t ntmprs, hcl_oop_context_t homectx, const hcl_oop_t* lfptr, hcl_oow_t lfsize)
@@ -189,7 +283,9 @@ static HCL_INLINE void fill_function_data (hcl_t* hcl, hcl_oop_function_t func, 
 	for (i = 0; i < lfsize; i++) 
 	{
 		func->literal_frame[i] = lfptr[i];
+	#if 0
 		HCL_DEBUG2 (hcl, "literal frame %d => %O\n", (int)i, lfptr[i]);
+	#endif
 	}
 
 	/* initialize other fields */
@@ -201,7 +297,7 @@ static HCL_INLINE void fill_function_data (hcl_t* hcl, hcl_oop_function_t func, 
 static HCL_INLINE hcl_oop_block_t make_block (hcl_t* hcl)
 {
 	/* create a base block used for creation of a block context */
-	return hcl_allocoopobj(hcl, HCL_BRAND_BLOCK, HCL_BLOCK_NAMED_INSTVARS);
+	return (hcl_oop_block_t)hcl_allocoopobj(hcl, HCL_BRAND_BLOCK, HCL_BLOCK_NAMED_INSTVARS);
 }
 
 static HCL_INLINE void fill_block_data (hcl_t* hcl, hcl_oop_block_t blk, hcl_ooi_t nargs, hcl_ooi_t ntmprs, hcl_ooi_t ip, hcl_oop_context_t homectx)
@@ -268,6 +364,7 @@ static HCL_INLINE void alloc_pid (hcl_t* hcl, hcl_oop_process_t proc)
 	hcl->proc_map_free_first = HCL_OOP_TO_SMOOI(hcl->proc_map[pid]);
 	if (hcl->proc_map_free_first <= -1) hcl->proc_map_free_last = -1;
 	hcl->proc_map[pid] = (hcl_oop_t)proc;
+	hcl->proc_map_used++;
 }
 
 static HCL_INLINE void free_pid (hcl_t* hcl, hcl_oop_process_t proc)
@@ -276,6 +373,7 @@ static HCL_INLINE void free_pid (hcl_t* hcl, hcl_oop_process_t proc)
 
 	pid = HCL_OOP_TO_SMOOI(proc->id);
 	HCL_ASSERT (hcl, pid < hcl->proc_map_capa);
+	HCL_ASSERT (hcl, hcl->proc_map_used > 0);
 
 	hcl->proc_map[pid] = HCL_SMOOI_TO_OOP(-1);
 	if (hcl->proc_map_free_last <= -1)
@@ -288,6 +386,7 @@ static HCL_INLINE void free_pid (hcl_t* hcl, hcl_oop_process_t proc)
 		hcl->proc_map[hcl->proc_map_free_last] = HCL_SMOOI_TO_OOP(pid);
 	}
 	hcl->proc_map_free_last = pid;
+	hcl->proc_map_used--;
 }
 
 
@@ -295,6 +394,18 @@ static hcl_oop_process_t make_process (hcl_t* hcl, hcl_oop_context_t c)
 {
 	hcl_oop_process_t proc;
 	hcl_oow_t stksize;
+	hcl_ooi_t total_count;
+	hcl_ooi_t suspended_count;
+
+	total_count = HCL_OOP_TO_SMOOI(hcl->processor->total_count);
+	if (total_count >= HCL_SMOOI_MAX)
+	{
+	#if defined(HCL_DEBUG_VM_PROCESSOR)
+		HCL_LOG0 (hcl, HCL_LOG_IC | HCL_LOG_FATAL, "Processor - too many processes\n");
+	#endif
+		hcl_seterrbfmt (hcl, HCL_EPFULL, "maximum number(%zd) of processes reached", HCL_SMOOI_MAX);
+		return HCL_NULL;
+	}
 
 	if (hcl->proc_map_free_first <= -1 && prepare_to_alloc_pid(hcl) <= -1) return HCL_NULL;
 
@@ -307,10 +418,16 @@ static hcl_oop_process_t make_process (hcl_t* hcl, hcl_oop_context_t c)
 	hcl_poptmp (hcl);
 	if (HCL_UNLIKELY(!proc)) return HCL_NULL;
 
+#if 0
+////////////////////
+////	HCL_OBJ_SET_FLAGS_PROC (proc, proc_flags); /* a special flag to indicate an object is a process instance */
+////////////////////
+#endif
+	proc->state = HCL_SMOOI_TO_OOP(PROC_STATE_SUSPENDED);
+
 	/* assign a process id to the process */
 	alloc_pid (hcl, proc);
 
-	proc->state = HCL_SMOOI_TO_OOP(PROC_STATE_SUSPENDED);
 	proc->initial_context = c;
 	proc->current_context = c;
 	proc->sp = HCL_SMOOI_TO_OOP(-1);
@@ -320,29 +437,36 @@ static hcl_oop_process_t make_process (hcl_t* hcl, hcl_oop_context_t c)
 #if defined(HCL_DEBUG_VM_PROCESSOR)
 	HCL_LOG2 (hcl, HCL_LOG_IC | HCL_LOG_DEBUG, "Processor - process[%zd] **CREATED**->%hs\n", HCL_OOP_TO_SMOOI(proc->id), proc_state_to_string(HCL_OOP_TO_SMOOI(proc->state)));
 #endif
+
+	/* a process is created in the SUSPENDED state. chain it to the suspended process list */
+	suspended_count = HCL_OOP_TO_SMOOI(hcl->processor->suspended.count);
+	HCL_APPEND_TO_OOP_LIST (hcl, &hcl->processor->suspended, hcl_oop_process_t, proc, ps);
+	suspended_count++;
+	hcl->processor->suspended.count = HCL_SMOOI_TO_OOP(suspended_count);
+
+	total_count++;
+	hcl->processor->total_count = HCL_SMOOI_TO_OOP(total_count);
+
 	return proc;
 }
 
 static HCL_INLINE void sleep_active_process (hcl_t* hcl, int state)
 {
-#if defined(HCL_DEBUG_VM_PROCESSOR)
-	HCL_LOG3 (hcl, HCL_LOG_IC | HCL_LOG_DEBUG, "Processor - put process %O context %O ip=%zd to sleep\n", hcl->processor->active, hcl->active_context, hcl->ip);
-#endif
-
 	STORE_ACTIVE_SP(hcl);
+
+	/* store the current active context to the current process.
+	 * it is the suspended context of the process to be suspended */
+	HCL_ASSERT (hcl, hcl->processor->active != hcl->nil_process);
 
 #if defined(HCL_DEBUG_VM_PROCESSOR)
 	HCL_LOG3 (hcl, HCL_LOG_IC | HCL_LOG_DEBUG, "Processor - process[%zd] %hs->%hs in sleep_active_process\n", HCL_OOP_TO_SMOOI(hcl->processor->active->id), proc_state_to_string(HCL_OOP_TO_SMOOI(hcl->processor->active->state)), proc_state_to_string(state));
 #endif
 
-	/* store the current active context to the current process.
-	 * it is the suspended context of the process to be suspended */
-	HCL_ASSERT (hcl, hcl->processor->active != hcl->nil_process);
 	hcl->processor->active->current_context = hcl->active_context;
 	hcl->processor->active->state = HCL_SMOOI_TO_OOP(state);
 }
 
-static HCL_INLINE void wake_new_process (hcl_t* hcl, hcl_oop_process_t proc)
+static HCL_INLINE void wake_process (hcl_t* hcl, hcl_oop_process_t proc)
 {
 
 #if defined(HCL_DEBUG_VM_PROCESSOR)
@@ -350,6 +474,7 @@ static HCL_INLINE void wake_new_process (hcl_t* hcl, hcl_oop_process_t proc)
 #endif
 
 	/* activate the given process */
+	HCL_ASSERT (hcl, proc->state == HCL_SMOOI_TO_OOP(PROC_STATE_RUNNABLE));
 	proc->state = HCL_SMOOI_TO_OOP(PROC_STATE_RUNNING);
 	hcl->processor->active = proc;
 
@@ -373,19 +498,26 @@ static void switch_to_process (hcl_t* hcl, hcl_oop_process_t proc, int new_state
 	            proc->state == HCL_SMOOI_TO_OOP(PROC_STATE_WAITING));
 
 	sleep_active_process (hcl, new_state_for_old_active);
-	wake_new_process (hcl, proc);
+	wake_process (hcl, proc);
 
+	hcl->proc_switched = 1;
+}
+
+static HCL_INLINE void switch_to_process_from_nil (hcl_t* hcl, hcl_oop_process_t proc)
+{
+	HCL_ASSERT (hcl, hcl->processor->active == hcl->nil_process);
+	wake_process (hcl, proc);
 	hcl->proc_switched = 1;
 }
 
 static HCL_INLINE hcl_oop_process_t find_next_runnable_process (hcl_t* hcl)
 {
-	hcl_oop_process_t npr;
+	hcl_oop_process_t nrp;
 
 	HCL_ASSERT (hcl, hcl->processor->active->state == HCL_SMOOI_TO_OOP(PROC_STATE_RUNNING));
-	npr = hcl->processor->active->next;
-	if ((hcl_oop_t)npr == hcl->_nil) npr = hcl->processor->runnable_head;
-	return npr;
+	nrp = hcl->processor->active->ps.next;
+	if ((hcl_oop_t)nrp == hcl->_nil) nrp = hcl->processor->runnable.first;
+	return nrp;
 }
 
 static HCL_INLINE void switch_to_next_runnable_process (hcl_t* hcl)
@@ -396,16 +528,18 @@ static HCL_INLINE void switch_to_next_runnable_process (hcl_t* hcl)
 	if (nrp != hcl->processor->active) switch_to_process (hcl, nrp, PROC_STATE_RUNNABLE);
 }
 
-static HCL_INLINE int chain_into_processor (hcl_t* hcl, hcl_oop_process_t proc, int new_state)
+static HCL_INLINE void chain_into_processor (hcl_t* hcl, hcl_oop_process_t proc, int new_state)
 {
 	/* the process is not scheduled at all. 
 	 * link it to the processor's process list. */
-	hcl_ooi_t tally;
+	hcl_ooi_t runnable_count;
+	hcl_ooi_t suspended_count;
 
-	HCL_ASSERT (hcl, (hcl_oop_t)proc->prev == hcl->_nil);
-	HCL_ASSERT (hcl, (hcl_oop_t)proc->next == hcl->_nil);
+	/*HCL_ASSERT (hcl, (hcl_oop_t)proc->ps.prev == hcl->_nil);
+	HCL_ASSERT (hcl, (hcl_oop_t)proc->ps.next == hcl->_nil);*/
 
 	HCL_ASSERT (hcl, proc->state == HCL_SMOOI_TO_OOP(PROC_STATE_SUSPENDED));
+	HCL_ASSERT (hcl, new_state == PROC_STATE_RUNNABLE || new_state == PROC_STATE_RUNNING);
 
 #if defined(HCL_DEBUG_VM_PROCESSOR)
 	HCL_LOG3 (hcl, HCL_LOG_IC | HCL_LOG_DEBUG, 
@@ -415,91 +549,105 @@ static HCL_INLINE int chain_into_processor (hcl_t* hcl, hcl_oop_process_t proc, 
 		proc_state_to_string(new_state));
 #endif
 
-	tally = HCL_OOP_TO_SMOOI(hcl->processor->tally);
+	runnable_count = HCL_OOP_TO_SMOOI(hcl->processor->runnable.count);
 
-	HCL_ASSERT (hcl, tally >= 0);
-	if (tally >= HCL_SMOOI_MAX)
-	{
-#if defined(HCL_DEBUG_VM_PROCESSOR)
-		HCL_LOG0 (hcl, HCL_LOG_IC | HCL_LOG_FATAL, "Processor - too many process\n");
-#endif
-		hcl_seterrnum (hcl, HCL_EPFULL);
-		hcl_seterrbfmt (hcl, HCL_EPFULL, "maximum number(%zd) of processes reached", HCL_SMOOI_MAX);
-		return -1;
-	}
+	HCL_ASSERT (hcl, runnable_count >= 0);
+
+	suspended_count = HCL_OOP_TO_SMOOI(hcl->processor->suspended.count);
+	HCL_DELETE_FROM_OOP_LIST (hcl, &hcl->processor->suspended, proc, ps);
+	suspended_count--;
+	hcl->processor->suspended.count = HCL_SMOOI_TO_OOP(suspended_count);
 
 	/* append to the runnable list */
-	if (tally > 0)
-	{
-		proc->prev = hcl->processor->runnable_tail;
-		hcl->processor->runnable_tail->next = proc;
-	}
-	else
-	{
-		hcl->processor->runnable_head = proc;
-	}
-	hcl->processor->runnable_tail = proc;
+	HCL_APPEND_TO_OOP_LIST (hcl, &hcl->processor->runnable, hcl_oop_process_t, proc, ps);
 	proc->state = HCL_SMOOI_TO_OOP(new_state);
 
-	tally++;
-	hcl->processor->tally = HCL_SMOOI_TO_OOP(tally);
-
-	return 0;
+	runnable_count++;
+	hcl->processor->runnable.count = HCL_SMOOI_TO_OOP(runnable_count);
 }
 
 static HCL_INLINE void unchain_from_processor (hcl_t* hcl, hcl_oop_process_t proc, int new_state)
 {
-	hcl_ooi_t tally;
+	hcl_ooi_t runnable_count;
+	hcl_ooi_t suspended_count;
+	hcl_ooi_t total_count;
 
-	/* the processor's process chain must be composed of running/runnable
-	 * processes only */
 	HCL_ASSERT (hcl, proc->state == HCL_SMOOI_TO_OOP(PROC_STATE_RUNNING) ||
-	                 proc->state == HCL_SMOOI_TO_OOP(PROC_STATE_RUNNABLE));
+	                 proc->state == HCL_SMOOI_TO_OOP(PROC_STATE_RUNNABLE) ||
+	                 proc->state == HCL_SMOOI_TO_OOP(PROC_STATE_SUSPENDED));
 
-	tally = HCL_OOP_TO_SMOOI(hcl->processor->tally);
-	HCL_ASSERT (hcl, tally > 0);
-
-	if ((hcl_oop_t)proc->prev != hcl->_nil) proc->prev->next = proc->next;
-	else hcl->processor->runnable_head = proc->next;
-	if ((hcl_oop_t)proc->next != hcl->_nil) proc->next->prev = proc->prev;
-	else hcl->processor->runnable_tail = proc->prev;
+	HCL_ASSERT (hcl, proc->state != HCL_SMOOI_TO_OOP(new_state));
 
 #if defined(HCL_DEBUG_VM_PROCESSOR)
 	HCL_LOG3 (hcl, HCL_LOG_IC | HCL_LOG_DEBUG, "Processor - process[%zd] %hs->%hs in unchain_from_processor\n", HCL_OOP_TO_SMOOI(proc->id), proc_state_to_string(HCL_OOP_TO_SMOOI(proc->state)), proc_state_to_string(HCL_OOP_TO_SMOOI(new_state)));
 #endif
 
-	proc->prev = (hcl_oop_process_t)hcl->_nil;
-	proc->next = (hcl_oop_process_t)hcl->_nil;
+	if (proc->state == HCL_SMOOI_TO_OOP(PROC_STATE_SUSPENDED))
+	{
+		suspended_count = HCL_OOP_TO_SMOOI(hcl->processor->suspended.count);
+		HCL_ASSERT (hcl, suspended_count > 0);
+		HCL_DELETE_FROM_OOP_LIST (hcl, &hcl->processor->suspended, proc, ps);
+		suspended_count--;
+		hcl->processor->suspended.count = HCL_SMOOI_TO_OOP(suspended_count);
+	}
+	else
+	{
+		runnable_count = HCL_OOP_TO_SMOOI(hcl->processor->runnable.count);
+		HCL_ASSERT (hcl, runnable_count > 0);
+		HCL_DELETE_FROM_OOP_LIST (hcl, &hcl->processor->runnable, proc, ps);
+		runnable_count--;
+		hcl->processor->runnable.count = HCL_SMOOI_TO_OOP(runnable_count);
+		if (runnable_count == 0) hcl->processor->active = hcl->nil_process;
+	}
+
+	if (new_state == PROC_STATE_TERMINATED)
+	{
+		/* do not chain it to the suspended process list as it's being terminated */
+		proc->ps.prev = (hcl_oop_process_t)hcl->_nil;
+		proc->ps.next = (hcl_oop_process_t)hcl->_nil;
+
+		total_count = HCL_OOP_TO_SMOOI(hcl->processor->total_count);
+		total_count--;
+		hcl->processor->total_count = HCL_SMOOI_TO_OOP(total_count);
+	}
+	else
+	{
+		/* append to the suspended process list */
+		HCL_ASSERT (hcl, new_state == PROC_STATE_SUSPENDED);
+
+		suspended_count = HCL_OOP_TO_SMOOI(hcl->processor->suspended.count);
+		HCL_APPEND_TO_OOP_LIST (hcl, &hcl->processor->suspended, hcl_oop_process_t, proc, ps);
+		suspended_count++;
+		hcl->processor->suspended.count= HCL_SMOOI_TO_OOP(suspended_count);
+	}
+
 	proc->state = HCL_SMOOI_TO_OOP(new_state);
-
-	tally--;
-	if (tally == 0) hcl->processor->active = hcl->nil_process;
-	hcl->processor->tally = HCL_SMOOI_TO_OOP(tally);
-
-
 }
 
 static HCL_INLINE void chain_into_semaphore (hcl_t* hcl, hcl_oop_process_t proc, hcl_oop_semaphore_t sem)
 {
-	/* append a process to the process list of a semaphore*/
+	/* append a process to the process list of a semaphore or a semaphore group */
+
+	/* a process chained to a semaphore cannot get chained to
+	 * a semaphore again. a process can get chained to a single semaphore 
+	 * or a single semaphore group only */
+	if ((hcl_oop_t)proc->sem != hcl->_nil) return; /* ignore it if it happens anyway. TODO: is it desirable???? */
 
 	HCL_ASSERT (hcl, (hcl_oop_t)proc->sem == hcl->_nil);
-	HCL_ASSERT (hcl, (hcl_oop_t)proc->prev == hcl->_nil);
-	HCL_ASSERT (hcl, (hcl_oop_t)proc->next == hcl->_nil);
+	HCL_ASSERT (hcl, (hcl_oop_t)proc->sem_wait.prev == hcl->_nil);
+	HCL_ASSERT (hcl, (hcl_oop_t)proc->sem_wait.next == hcl->_nil);
 
-	if ((hcl_oop_t)sem->waiting_head == hcl->_nil)
-	{
-		HCL_ASSERT (hcl, (hcl_oop_t)sem->waiting_tail == hcl->_nil);
-		sem->waiting_head = proc;
-	}
-	else
-	{
-		proc->prev = sem->waiting_tail;
-		sem->waiting_tail->next = proc;
-	}
-	sem->waiting_tail = proc;
+	/* a semaphore or a semaphore group must be given for process chaining */
+	HCL_ASSERT (hcl, HCL_IS_SEMAPHORE(hcl, sem) || HCL_IS_SEMAPHORE_GROUP(hcl, sem));
 
-	proc->sem = sem;
+	/* i assume the head part of the semaphore has the same layout as
+	 * the semaphore group */
+	HCL_ASSERT (hcl, HCL_OFFSETOF(hcl_semaphore_t,waiting) ==
+	                 HCL_OFFSETOF(hcl_semaphore_group_t,waiting));
+
+	HCL_APPEND_TO_OOP_LIST (hcl, &sem->waiting, hcl_oop_process_t, proc, sem_wait);
+
+	proc->sem = (hcl_oop_t)sem;
 }
 
 static HCL_INLINE void unchain_from_semaphore (hcl_t* hcl, hcl_oop_process_t proc)
@@ -507,17 +655,102 @@ static HCL_INLINE void unchain_from_semaphore (hcl_t* hcl, hcl_oop_process_t pro
 	hcl_oop_semaphore_t sem;
 
 	HCL_ASSERT (hcl, (hcl_oop_t)proc->sem != hcl->_nil);
+	HCL_ASSERT (hcl, HCL_IS_SEMAPHORE(hcl, proc->sem) || HCL_IS_SEMAPHORE_GROUP(hcl, proc->sem));
+	HCL_ASSERT (hcl, HCL_OFFSETOF(hcl_semaphore_t,waiting) == HCL_OFFSETOF(hcl_semaphore_group_t,waiting));
 
-	sem = proc->sem;
-	if ((hcl_oop_t)proc->prev != hcl->_nil) proc->prev->next = proc->next;
-	else sem->waiting_head = proc->next;
-	if ((hcl_oop_t)proc->next != hcl->_nil) proc->next->prev = proc->prev;
-	else sem->waiting_tail = proc->prev;
+	/* proc->sem may be one of a semaphore or a semaphore group.
+	 * i assume that 'waiting' is defined to the same position 
+	 * in both Semaphore and SemaphoreGroup. there is no need to 
+	 * write different code for each class. */
+	sem = (hcl_oop_semaphore_t)proc->sem;  /* semgrp = (hcl_oop_semaphore_group_t)proc->sem */
+	HCL_DELETE_FROM_OOP_LIST (hcl, &sem->waiting, proc, sem_wait); 
 
-	proc->prev = (hcl_oop_process_t)hcl->_nil;
-	proc->next = (hcl_oop_process_t)hcl->_nil;
+	proc->sem_wait.prev = (hcl_oop_process_t)hcl->_nil;
+	proc->sem_wait.next = (hcl_oop_process_t)hcl->_nil;
+	proc->sem = hcl->_nil;
+}
 
-	proc->sem = (hcl_oop_semaphore_t)hcl->_nil;
+static void dump_process_info (hcl_t* hcl, hcl_bitmask_t log_mask)
+{
+	if (HCL_OOP_TO_SMOOI(hcl->processor->runnable.count) > 0)
+	{
+		hcl_oop_process_t p;
+		HCL_LOG0 (hcl, log_mask, "> Runnable:");
+		p = hcl->processor->runnable.first;
+		while (p)
+		{
+			HCL_LOG1 (hcl, log_mask, " %O", p->id);
+			if (p == hcl->processor->runnable.last) break;
+			p = p->ps.next;
+		}
+		HCL_LOG0 (hcl, log_mask, "\n");
+	}
+	if (HCL_OOP_TO_SMOOI(hcl->processor->suspended.count) > 0)
+	{
+		hcl_oop_process_t p;
+		HCL_LOG0 (hcl, log_mask, "> Suspended:");
+		p = hcl->processor->suspended.first;
+		while (p)
+		{
+			HCL_LOG1 (hcl, log_mask, " %O", p->id);
+			if (p == hcl->processor->suspended.last) break;
+			p = p->ps.next;
+		}
+		HCL_LOG0 (hcl, log_mask, "\n");
+	}
+	if (hcl->sem_io_wait_count > 0)
+	{
+		hcl_ooi_t io_handle;
+
+		HCL_LOG0 (hcl, log_mask, "> IO semaphores:");
+		for (io_handle = 0; io_handle < hcl->sem_io_map_capa; io_handle++)
+		{
+			hcl_ooi_t index;
+
+			index = hcl->sem_io_map[io_handle];
+			if (index >= 0)
+			{
+				hcl_oop_semaphore_t sem;
+
+				HCL_LOG1 (hcl, log_mask, " h=%zd", io_handle);
+
+				/* dump process IDs waiting for input signaling */
+				HCL_LOG0 (hcl, log_mask, "(wpi");
+				sem = hcl->sem_io_tuple[index].sem[HCL_SEMAPHORE_IO_TYPE_INPUT];
+				if (sem) 
+				{
+					hcl_oop_process_t wp; /* waiting process */
+					for (wp = sem->waiting.first; (hcl_oop_t)wp != hcl->_nil; wp = wp->sem_wait.next)
+					{
+						HCL_LOG1 (hcl, log_mask, ":%zd", HCL_OOP_TO_SMOOI(wp->id));
+					}
+				}
+				else
+				{
+					HCL_LOG0 (hcl, log_mask, ":none");
+				}
+
+				/* dump process IDs waitingt for output signaling */
+				HCL_LOG0 (hcl, log_mask, ",wpo");
+				sem = hcl->sem_io_tuple[index].sem[HCL_SEMAPHORE_IO_TYPE_OUTPUT];
+				if (sem) 
+				{
+					hcl_oop_process_t wp; /* waiting process */
+					for (wp = sem->waiting.first; (hcl_oop_t)wp != hcl->_nil; wp = wp->sem_wait.next)
+					{
+						HCL_LOG1 (hcl, log_mask, ":%zd", HCL_OOP_TO_SMOOI(wp->id));
+					}
+				}
+				else
+				{
+					HCL_LOG0 (hcl, log_mask, ":none");
+				}
+
+				HCL_LOG0 (hcl, log_mask, ")");
+			}
+		}
+		HCL_LOG0 (hcl, log_mask, "\n");
+	}
 }
 
 static void terminate_process (hcl_t* hcl, hcl_oop_process_t proc)
@@ -526,7 +759,6 @@ static void terminate_process (hcl_t* hcl, hcl_oop_process_t proc)
 	    proc->state == HCL_SMOOI_TO_OOP(PROC_STATE_RUNNABLE))
 	{
 		/* RUNNING/RUNNABLE ---> TERMINATED */
-
 	#if defined(HCL_DEBUG_VM_PROCESSOR)
 		HCL_LOG2 (hcl, HCL_LOG_IC | HCL_LOG_DEBUG, "Processor - process[%zd] %hs->TERMINATED in terminate_process\n", HCL_OOP_TO_SMOOI(proc->id), proc_state_to_string(HCL_OOP_TO_SMOOI(proc->state)));
 	#endif
@@ -535,7 +767,7 @@ static void terminate_process (hcl_t* hcl, hcl_oop_process_t proc)
 		{
 			hcl_oop_process_t nrp;
 
-			nrp = find_next_runnable_process (hcl);
+			nrp = find_next_runnable_process(hcl);
 
 			unchain_from_processor (hcl, proc, PROC_STATE_TERMINATED);
 			proc->sp = HCL_SMOOI_TO_OOP(-1); /* invalidate the process stack */
@@ -549,7 +781,19 @@ static void terminate_process (hcl_t* hcl, hcl_oop_process_t proc)
 			{
 				/* no runnable process after termination */
 				HCL_ASSERT (hcl, hcl->processor->active == hcl->nil_process);
-				HCL_LOG0 (hcl, HCL_LOG_IC | HCL_LOG_DEBUG, "No runnable process after process termination\n");
+				if (HCL_LOG_ENABLED(hcl, HCL_LOG_IC | HCL_LOG_DEBUG))
+				{
+					HCL_LOG5 (hcl, HCL_LOG_IC | HCL_LOG_DEBUG, 
+						"No runnable process after termination of process %zd - total %zd runnable/running %zd suspended %zd - sem_io_wait_count %zu\n", 
+						HCL_OOP_TO_SMOOI(proc->id),
+						HCL_OOP_TO_SMOOI(hcl->processor->total_count),
+						HCL_OOP_TO_SMOOI(hcl->processor->runnable.count),
+						HCL_OOP_TO_SMOOI(hcl->processor->suspended.count),
+						hcl->sem_io_wait_count
+					);
+
+					dump_process_info (hcl, HCL_LOG_IC | HCL_LOG_DEBUG);
+				}
 			}
 			else
 			{
@@ -572,41 +816,67 @@ static void terminate_process (hcl_t* hcl, hcl_oop_process_t proc)
 		HCL_LOG2 (hcl, HCL_LOG_IC | HCL_LOG_DEBUG, "Processor - process[%zd] %hs->TERMINATED in terminate_process\n", HCL_OOP_TO_SMOOI(proc->id), proc_state_to_string(HCL_OOP_TO_SMOOI(proc->state)));
 	#endif
 
-		proc->state = HCL_SMOOI_TO_OOP(PROC_STATE_TERMINATED);
+		/*proc->state = HCL_SMOOI_TO_OOP(PROC_STATE_TERMINATED);*/
+		unchain_from_processor (hcl, proc, PROC_STATE_TERMINATED);
 		proc->sp = HCL_SMOOI_TO_OOP(-1); /* invalidate the proce stack */
 
 		if ((hcl_oop_t)proc->sem != hcl->_nil)
 		{
+			if (HCL_IS_SEMAPHORE_GROUP(hcl, proc->sem))
+			{
+				if (HCL_OOP_TO_SMOOI(((hcl_oop_semaphore_group_t)proc->sem)->sem_io_count) > 0)
+				{
+					HCL_ASSERT (hcl, hcl->sem_io_wait_count > 0);
+					hcl->sem_io_wait_count--;
+					HCL_DEBUG1 (hcl, "terminate_process(sg) - lowered sem_io_wait_count to %zu\n", hcl->sem_io_wait_count);
+				}
+			}
+			else 
+			{
+				HCL_ASSERT (hcl, HCL_IS_SEMAPHORE(hcl, proc->sem));
+				if (((hcl_oop_semaphore_t)proc->sem)->subtype == HCL_SMOOI_TO_OOP(HCL_SEMAPHORE_SUBTYPE_IO))
+				{
+					HCL_ASSERT (hcl, hcl->sem_io_wait_count > 0);
+					hcl->sem_io_wait_count--;
+					HCL_DEBUG3 (hcl, "terminate_process(s) - lowered sem_io_wait_count to %zu for IO semaphore at index %zd handle %zd\n",
+						hcl->sem_io_wait_count, 
+						HCL_OOP_TO_SMOOI(((hcl_oop_semaphore_t)proc->sem)->u.io.index),
+						HCL_OOP_TO_SMOOI(((hcl_oop_semaphore_t)proc->sem)->u.io.handle)
+					);
+				}
+			}
+
 			unchain_from_semaphore (hcl, proc);
 		}
 
 		/* when terminated, clear it from the pid table and set the process id to a negative number */
 		free_pid (hcl, proc);
 	}
+#if 0
 	else if (proc->state == HCL_SMOOI_TO_OOP(PROC_STATE_WAITING))
 	{
 		/* WAITING ---> TERMINATED */
 		/* TODO: */
 	}
+#endif
 }
 
 static void resume_process (hcl_t* hcl, hcl_oop_process_t proc)
 {
 	if (proc->state == HCL_SMOOI_TO_OOP(PROC_STATE_SUSPENDED))
 	{
-		/* SUSPENED ---> RUNNING */
-		HCL_ASSERT (hcl, (hcl_oop_t)proc->prev == hcl->_nil);
-		HCL_ASSERT (hcl, (hcl_oop_t)proc->next == hcl->_nil);
+		/* SUSPENDED ---> RUNNABLE */
+		/*HCL_ASSERT (hcl, (hcl_oop_t)proc->ps.prev == hcl->_nil);
+		HCL_ASSERT (hcl, (hcl_oop_t)proc->ps.next == hcl->_nil);*/
 
 	#if defined(HCL_DEBUG_VM_PROCESSOR)
 		HCL_LOG2 (hcl, HCL_LOG_IC | HCL_LOG_DEBUG, "Processor - process[%zd] %hs->RUNNABLE in resume_process\n", HCL_OOP_TO_SMOOI(proc->id), proc_state_to_string(HCL_OOP_TO_SMOOI(proc->state)));
 	#endif
 
-		chain_into_processor (hcl, proc, PROC_STATE_RUNNABLE); /* TODO: error check */
-		/*proc->current_context = proc->initial_context;*/
-		
-
-		/* don't switch to this process. just set the state to RUNNING */
+		/* don't switch to this process. just change the state to RUNNABLE.
+		 * process switching should be triggerd by the process scheduler. */
+		chain_into_processor (hcl, proc, PROC_STATE_RUNNABLE); 
+		/*HCL_STORE_OOP (hcl, &proc->current_context = proc->initial_context);*/
 	}
 #if 0
 	else if (proc->state == HCL_SMOOI_TO_OOP(PROC_STATE_RUNNABLE))
@@ -627,11 +897,12 @@ static void suspend_process (hcl_t* hcl, hcl_oop_process_t proc)
 		/* RUNNING/RUNNABLE ---> SUSPENDED */
 
 	#if defined(HCL_DEBUG_VM_PROCESSOR)
-		HCL_LOG1 (hcl, HCL_LOG_IC | HCL_LOG_DEBUG, "Processor - process %O RUNNING/RUNNABLE->SUSPENDED\n", proc);
+		HCL_LOG2 (hcl, HCL_LOG_IC | HCL_LOG_DEBUG, "Processor - process[%zd] %hs->SUSPENDED in suspend_process\n", HCL_OOP_TO_SMOOI(proc->id), proc_state_to_string(HCL_OOP_TO_SMOOI(proc->state)));
 	#endif
 
 		if (proc == hcl->processor->active)
 		{
+			/* suspend the active process */
 			hcl_oop_process_t nrp;
 
 			nrp = find_next_runnable_process (hcl);
@@ -649,15 +920,17 @@ static void suspend_process (hcl_t* hcl, hcl_oop_process_t proc)
 			}
 			else
 			{
-				/* keep the unchained process at the runnable state for
-				 * the immediate call to switch_to_process() below */
-				unchain_from_processor (hcl, proc, PROC_STATE_RUNNABLE);
-				/* unchain_from_processor() leaves the active process
-				 * untouched unless the unchained process is the last
-				 * running/runnable process. so calling switch_to_process()
-				 * which expects the active process to be valid is safe */
+				/* unchain_from_processor moves the process to the suspended
+				 * process and sets its state to the given state(SUSPENDED here).
+				 * it doesn't change the active process. we switch the active
+				 * process with switch_to_process(). setting the state of the
+				 * old active process to SUSPENDED is redundant because it's
+				 * done in unchain_from_processor(). the state of the active
+				 * process is somewhat wrong for a short period of time until
+				 * switch_to_process() has changed the active process. */
+				unchain_from_processor (hcl, proc, PROC_STATE_SUSPENDED);
 				HCL_ASSERT (hcl, hcl->processor->active != hcl->nil_process);
-				switch_to_process (hcl, nrp, PROC_STATE_SUSPENDED);
+				switch_to_process (hcl, nrp, PROC_STATE_SUSPENDED); 
 			}
 		}
 		else
@@ -683,12 +956,13 @@ static void yield_process (hcl_t* hcl, hcl_oop_process_t proc)
 		if (nrp != proc) 
 		{
 		#if defined(HCL_DEBUG_VM_PROCESSOR)
-			HCL_LOG1 (hcl, HCL_LOG_IC | HCL_LOG_DEBUG, "Processor - process %O RUNNING->RUNNABLE\n", proc);
+			HCL_LOG2 (hcl, HCL_LOG_IC | HCL_LOG_DEBUG, "Processor - process[%zd] %hs->RUNNABLE in yield_process\n", HCL_OOP_TO_SMOOI(proc->id), proc_state_to_string(HCL_OOP_TO_SMOOI(proc->state)));
 		#endif
 			switch_to_process (hcl, nrp, PROC_STATE_RUNNABLE);
 		}
 	}
 }
+
 
 static int async_signal_semaphore (hcl_t* hcl, hcl_oop_semaphore_t sem)
 {
@@ -705,8 +979,8 @@ static int async_signal_semaphore (hcl_t* hcl, hcl_oop_semaphore_t sem)
 		hcl_oop_semaphore_t* tmp;
 
 		new_capa = hcl->sem_list_capa + SEM_LIST_INC; /* TODO: overflow check.. */
-		tmp = hcl_reallocmem (hcl, hcl->sem_list, HCL_SIZEOF(hcl_oop_semaphore_t) * new_capa);
-		if (!tmp) return -1;
+		tmp = (hcl_oop_semaphore_t*)hcl_reallocmem (hcl, hcl->sem_list, HCL_SIZEOF(hcl_oop_semaphore_t) * new_capa);
+		if (HCL_UNLIKELY(!tmp)) return -1;
 
 		hcl->sem_list = tmp;
 		hcl->sem_list_capa = new_capa;
@@ -722,42 +996,134 @@ static hcl_oop_process_t signal_semaphore (hcl_t* hcl, hcl_oop_semaphore_t sem)
 {
 	hcl_oop_process_t proc;
 	hcl_ooi_t count;
+	hcl_oop_semaphore_group_t sg;
 
-	if ((hcl_oop_t)sem->waiting_head == hcl->_nil)
+	sg = sem->group;
+	if ((hcl_oop_t)sg != hcl->_nil)
+	{
+		/* the semaphore belongs to a semaphore group */
+		if ((hcl_oop_t)sg->waiting.first != hcl->_nil)
+		{
+			hcl_ooi_t sp;
+
+			/* there is a process waiting on the process group */
+			proc = sg->waiting.first; /* will wake the first process in the waiting list */
+
+			unchain_from_semaphore (hcl, proc);
+			resume_process (hcl, proc);
+
+			/* [IMPORTANT] RETURN VALUE of SemaphoreGroup's wait.
+			 * ------------------------------------------------------------
+			 * the waiting process has been suspended after a waiting
+			 * primitive function in Semaphore or SemaphoreGroup.
+			 * the top of the stack of the process must hold the temporary 
+			 * return value set by await_semaphore() or await_semaphore_group().
+			 * change the return value forcibly to the actual signaled 
+			 * semaphore */
+			HCL_ASSERT (hcl, HCL_OOP_TO_SMOOI(proc->sp) < (hcl_ooi_t)(HCL_OBJ_GET_SIZE(proc) - HCL_PROCESS_NAMED_INSTVARS));
+			sp = HCL_OOP_TO_SMOOI(proc->sp);
+			proc->slot[sp] = (hcl_oop_t)sem;
+
+			/* i should decrement the counter as long as the group being 
+			 * signaled contains an IO semaphore */
+			if (HCL_OOP_TO_SMOOI(sg->sem_io_count) > 0) 
+			{
+				HCL_ASSERT (hcl, hcl->sem_io_wait_count > 0);
+				hcl->sem_io_wait_count--;
+				HCL_DEBUG2 (hcl, "signal_semaphore(sg) - lowered sem_io_wait_count to %zu for handle %zd\n", hcl->sem_io_wait_count, HCL_OOP_TO_SMOOI(sem->u.io.handle));
+			}
+			return proc;
+		}
+	}
+
+	/* if the semaphore belongs to a semaphore group and the control reaches 
+	 * here, no process is waiting on the semaphore group. however, a process
+	 * may still be waiting on the semaphore. If a process waits on a semaphore
+	 * group and another process wait on a semaphore that belongs to the 
+	 * semaphore group, the process waiting on the group always wins. 
+	 * 
+	 *    TODO: implement a fair scheduling policy. or do i simply have to disallow individual wait on a semaphore belonging to a group?
+	 *       
+	 * if it doesn't belong to a sempahore group, i'm free from the starvation issue.
+	 */
+	if ((hcl_oop_t)sem->waiting.first == hcl->_nil)
 	{
 		/* no process is waiting on this semaphore */
+
 		count = HCL_OOP_TO_SMOOI(sem->count);
 		count++;
 		sem->count = HCL_SMOOI_TO_OOP(count);
+
+		HCL_ASSERT (hcl, count >= 1);
+		if (count == 1 && (hcl_oop_t)sg != hcl->_nil)
+		{
+			/* move the semaphore from the unsignaled list to the signaled list
+			 * if the semaphore count has changed from 0 to 1 in a group */
+			HCL_DELETE_FROM_OOP_LIST (hcl, &sg->sems[HCL_SEMAPHORE_GROUP_SEMS_UNSIG], sem, grm);
+			HCL_APPEND_TO_OOP_LIST (hcl, &sg->sems[HCL_SEMAPHORE_GROUP_SEMS_SIG], hcl_oop_semaphore_t, sem, grm);
+		}
 
 		/* no process has been resumed */
 		return (hcl_oop_process_t)hcl->_nil;
 	}
 	else
 	{
-		proc = sem->waiting_head;
+		proc = sem->waiting.first;
 
 		/* [NOTE] no GC must occur as 'proc' isn't protected with hcl_pushtmp(). */
 
+		/* detach a process from a semaphore's waiting list and 
+		 * make it runnable */
 		unchain_from_semaphore (hcl, proc);
-		resume_process (hcl, proc); /* TODO: error check */
+		resume_process (hcl, proc);
 
-		/* return the resumed process */
+		if (sem->subtype == HCL_SMOOI_TO_OOP(HCL_SEMAPHORE_SUBTYPE_IO)) 
+		{
+			HCL_ASSERT (hcl, hcl->sem_io_wait_count > 0);
+			hcl->sem_io_wait_count--;
+			HCL_DEBUG3 (hcl, "signal_semaphore(s) - lowered sem_io_wait_count to %zu for IO semaphore at index %zd handle %zd\n",
+				hcl->sem_io_wait_count, HCL_OOP_TO_SMOOI(sem->u.io.index), HCL_OOP_TO_SMOOI(sem->u.io.handle));
+		}
+
+		/* return the resumed(runnable) process */
 		return proc;
 	}
 }
 
-static void await_semaphore (hcl_t* hcl, hcl_oop_semaphore_t sem)
+static HCL_INLINE int can_await_semaphore (hcl_t* hcl, hcl_oop_semaphore_t sem)
+{
+	/* a sempahore that doesn't belong to a gruop can be waited on */
+	return (hcl_oop_t)sem->group == hcl->_nil;
+}
+
+static HCL_INLINE void await_semaphore (hcl_t* hcl, hcl_oop_semaphore_t sem)
 {
 	hcl_oop_process_t proc;
 	hcl_ooi_t count;
+	hcl_oop_semaphore_group_t semgrp;
+
+	semgrp = sem->group;
+
+	/* the caller of this function must ensure that the semaphore doesn't belong to a group */
+	HCL_ASSERT (hcl, (hcl_oop_t)semgrp == hcl->_nil);
 
 	count = HCL_OOP_TO_SMOOI(sem->count);
 	if (count > 0)
 	{
-		/* it's already signalled */
+		/* it's already signaled */
 		count--;
 		sem->count = HCL_SMOOI_TO_OOP(count);
+
+		if ((hcl_oop_t)semgrp != hcl->_nil && count == 0)
+		{
+
+			int sems_idx;
+			/* TODO: if i disallow individual wait on a semaphore in a group,
+			 *       this membership manipulation is redundant */
+			HCL_DELETE_FROM_OOP_LIST (hcl, &semgrp->sems[HCL_SEMAPHORE_GROUP_SEMS_SIG], sem, grm);
+			sems_idx = count > 0? HCL_SEMAPHORE_GROUP_SEMS_SIG: HCL_SEMAPHORE_GROUP_SEMS_UNSIG;
+			HCL_APPEND_TO_OOP_LIST (hcl, &semgrp->sems[sems_idx], hcl_oop_semaphore_t, sem, grm);
+		}
 	}
 	else
 	{
@@ -770,10 +1136,81 @@ static void await_semaphore (hcl_t* hcl, hcl_oop_semaphore_t sem)
 		/* link the suspended process to the semaphore's process list */
 		chain_into_semaphore (hcl, proc, sem); 
 
-		HCL_ASSERT (hcl, sem->waiting_tail == proc);
+		HCL_ASSERT (hcl, sem->waiting.last == proc);
+
+		if (sem->subtype == HCL_SMOOI_TO_OOP(HCL_SEMAPHORE_SUBTYPE_IO)) 
+		{
+			hcl->sem_io_wait_count++;
+			HCL_DEBUG3 (hcl, "await_semaphore - raised sem_io_wait_count to %zu for IO semaphore at index %zd handle %zd\n",
+				hcl->sem_io_wait_count, HCL_OOP_TO_SMOOI(sem->u.io.index), HCL_OOP_TO_SMOOI(sem->u.io.handle));
+		}
 
 		HCL_ASSERT (hcl, hcl->processor->active != proc);
 	}
+}
+
+static HCL_INLINE hcl_oop_t await_semaphore_group (hcl_t* hcl, hcl_oop_semaphore_group_t semgrp)
+{
+	/* wait for one of semaphores in the group to be signaled */
+
+	hcl_oop_process_t proc;
+	hcl_oop_semaphore_t sem;
+
+	HCL_ASSERT (hcl, HCL_IS_SEMAPHORE_GROUP(hcl, semgrp));
+
+	if (HCL_OOP_TO_SMOOI(semgrp->sem_count) <= 0)
+	{
+		/* cannot wait on a semaphore group that has no member semaphores.
+		 * return failure if waiting on such a semapohre group is attempted */
+		HCL_ASSERT (hcl, (hcl_oop_t)semgrp->sems[HCL_SEMAPHORE_GROUP_SEMS_SIG].first == hcl->_nil);
+		HCL_ASSERT (hcl, (hcl_oop_t)semgrp->sems[HCL_SEMAPHORE_GROUP_SEMS_SIG].last == hcl->_nil);
+		return HCL_ERROR_TO_OOP(HCL_EINVAL); /* TODO: better error code? */
+	}
+
+	sem = semgrp->sems[HCL_SEMAPHORE_GROUP_SEMS_SIG].first;
+	if ((hcl_oop_t)sem != hcl->_nil)
+	{
+		hcl_ooi_t count;
+		int sems_idx;
+
+		/* there is a semaphore signaled in the group */
+		count = HCL_OOP_TO_SMOOI(sem->count);
+		HCL_ASSERT (hcl, count > 0);
+		count--;
+		sem->count = HCL_SMOOI_TO_OOP(count);
+
+		HCL_DELETE_FROM_OOP_LIST (hcl, &semgrp->sems[HCL_SEMAPHORE_GROUP_SEMS_SIG], sem, grm);
+		sems_idx = count > 0? HCL_SEMAPHORE_GROUP_SEMS_SIG: HCL_SEMAPHORE_GROUP_SEMS_UNSIG;
+		HCL_APPEND_TO_OOP_LIST (hcl, &semgrp->sems[sems_idx], hcl_oop_semaphore_t, sem, grm);
+
+		return (hcl_oop_t)sem;
+	}
+
+	/* no semaphores have been signaled. suspend the current process
+	 * until at least one of them is signaled */
+	proc = hcl->processor->active;
+
+	/* suspend the active process */
+	suspend_process (hcl, proc); 
+
+	/* link the suspended process to the semaphore group's process list */
+	chain_into_semaphore (hcl, proc, (hcl_oop_semaphore_t)semgrp); 
+
+	HCL_ASSERT (hcl, semgrp->waiting.last == proc);
+
+	if (HCL_OOP_TO_SMOOI(semgrp->sem_io_count) > 0) 
+	{
+		/* there might be more than 1 IO semaphores in the group
+		 * but i increment hcl->sem_io_wait_count by 1 only */
+		hcl->sem_io_wait_count++; 
+		HCL_DEBUG1 (hcl, "await_semaphore_group - raised sem_io_wait_count to %zu\n", hcl->sem_io_wait_count);
+	}
+
+	/* the current process will get suspended after the caller (mostly a 
+	 * a primitive function handler) is over as it's added to a suspened
+	 * process list above */
+	HCL_ASSERT (hcl, hcl->processor->active != proc);
+	return hcl->_nil; 
 }
 
 static void sift_up_sem_heap (hcl_t* hcl, hcl_ooi_t index)
@@ -791,7 +1228,7 @@ static void sift_up_sem_heap (hcl_t* hcl, hcl_ooi_t index)
 			do
 			{
 				/* move down the parent to the current position */
-				parsem->heap_index = HCL_SMOOI_TO_OOP(index);
+				parsem->u.timed.index = HCL_SMOOI_TO_OOP(index);
 				hcl->sem_heap[index] = parsem;
 
 				/* traverse up */
@@ -803,7 +1240,7 @@ static void sift_up_sem_heap (hcl_t* hcl, hcl_ooi_t index)
 			}
 			while (SEM_HEAP_EARLIER_THAN(hcl, sem, parsem));
 
-			sem->heap_index = HCL_SMOOI_TO_OOP(index);
+			sem->u.timed.index = HCL_SMOOI_TO_OOP(index);
 			hcl->sem_heap[index] = sem;
 		}
 	}
@@ -824,7 +1261,7 @@ static void sift_down_sem_heap (hcl_t* hcl, hcl_ooi_t index)
 			left = SEM_HEAP_LEFT(index);
 			right = SEM_HEAP_RIGHT(index);
 
-			if (right < hcl->sem_heap_count && SEM_HEAP_EARLIER_THAN(hcl, hcl->sem_heap[left], hcl->sem_heap[right]))
+			if (right < hcl->sem_heap_count && SEM_HEAP_EARLIER_THAN(hcl, hcl->sem_heap[right], hcl->sem_heap[left]))
 			{
 				child = right;
 			}
@@ -836,14 +1273,14 @@ static void sift_down_sem_heap (hcl_t* hcl, hcl_ooi_t index)
 			chisem = hcl->sem_heap[child];
 			if (SEM_HEAP_EARLIER_THAN(hcl, sem, chisem)) break;
 
-			chisem->heap_index = HCL_SMOOI_TO_OOP(index);
-			hcl->sem_heap[index ] = chisem;
+			chisem->u.timed.index = HCL_SMOOI_TO_OOP(index);
+			hcl->sem_heap[index] = chisem;
 
 			index = child;
 		}
 		while (index < base);
 
-		sem->heap_index = HCL_SMOOI_TO_OOP(index);
+		sem->u.timed.index = HCL_SMOOI_TO_OOP(index);
 		hcl->sem_heap[index] = sem;
 	}
 }
@@ -852,10 +1289,11 @@ static int add_to_sem_heap (hcl_t* hcl, hcl_oop_semaphore_t sem)
 {
 	hcl_ooi_t index;
 
-#if 0
+	HCL_ASSERT (hcl, sem->subtype == hcl->_nil);
+
 	if (hcl->sem_heap_count >= SEM_HEAP_MAX)
 	{
-		hcl_seterrnum (hcl, HCL_ESHFULL);
+		hcl_seterrbfmt(hcl, HCL_ESEMFLOOD, "too many semaphores in the semaphore heap");
 		return -1;
 	}
 
@@ -867,8 +1305,8 @@ static int add_to_sem_heap (hcl_t* hcl, hcl_oop_semaphore_t sem)
 		/* no overflow check when calculating the new capacity
 		 * owing to SEM_HEAP_MAX check above */
 		new_capa = hcl->sem_heap_capa + SEM_HEAP_INC;
-		tmp = hcl_reallocmem (hcl, hcl->sem_heap, HCL_SIZEOF(hcl_oop_semaphore_t) * new_capa);
-		if (!tmp) return -1;
+		tmp = (hcl_oop_semaphore_t*)hcl_reallocmem(hcl, hcl->sem_heap, HCL_SIZEOF(hcl_oop_semaphore_t) * new_capa);
+		if (HCL_UNLIKELY(!tmp)) return -1;
 
 		hcl->sem_heap = tmp;
 		hcl->sem_heap_capa = new_capa;
@@ -878,11 +1316,11 @@ static int add_to_sem_heap (hcl_t* hcl, hcl_oop_semaphore_t sem)
 
 	index = hcl->sem_heap_count;
 	hcl->sem_heap[index] = sem;
-	sem->heap_index = HCL_SMOOI_TO_OOP(index);
+	sem->u.timed.index = HCL_SMOOI_TO_OOP(index);
+	sem->subtype = HCL_SMOOI_TO_OOP(HCL_SEMAPHORE_SUBTYPE_TIMED);
 	hcl->sem_heap_count++;
 
 	sift_up_sem_heap (hcl, index);
-#endif
 	return 0;
 }
 
@@ -890,15 +1328,21 @@ static void delete_from_sem_heap (hcl_t* hcl, hcl_ooi_t index)
 {
 	hcl_oop_semaphore_t sem, lastsem;
 
+	HCL_ASSERT (hcl, index >= 0 && index < hcl->sem_heap_count);
+
 	sem = hcl->sem_heap[index];
-	sem->heap_index = HCL_SMOOI_TO_OOP(-1);
+
+	sem->subtype = hcl->_nil;
+	sem->u.timed.index = hcl->_nil;
+	sem->u.timed.ftime_sec = hcl->_nil;
+	sem->u.timed.ftime_nsec = hcl->_nil;
 
 	hcl->sem_heap_count--;
-	if (hcl->sem_heap_count > 0 && index != hcl->sem_heap_count)
+	if (/*hcl->sem_heap_count > 0 &&*/ index != hcl->sem_heap_count)
 	{
 		/* move the last item to the deletion position */
 		lastsem = hcl->sem_heap[hcl->sem_heap_count];
-		lastsem->heap_index = HCL_SMOOI_TO_OOP(index);
+		lastsem->u.timed.index = HCL_SMOOI_TO_OOP(index);
 		hcl->sem_heap[index] = lastsem;
 
 		if (SEM_HEAP_EARLIER_THAN(hcl, lastsem, sem)) 
@@ -908,14 +1352,16 @@ static void delete_from_sem_heap (hcl_t* hcl, hcl_ooi_t index)
 	}
 }
 
+#if 0
+/* unused */
 static void update_sem_heap (hcl_t* hcl, hcl_ooi_t index, hcl_oop_semaphore_t newsem)
 {
 	hcl_oop_semaphore_t sem;
 
 	sem = hcl->sem_heap[index];
-	sem->heap_index = HCL_SMOOI_TO_OOP(-1);
+	sem->timed.index = hcl->_nil;
 
-	newsem->heap_index = HCL_SMOOI_TO_OOP(index);
+	newsem->timed.index = HCL_SMOOI_TO_OOP(index);
 	hcl->sem_heap[index] = newsem;
 
 	if (SEM_HEAP_EARLIER_THAN(hcl, newsem, sem))
@@ -923,6 +1369,341 @@ static void update_sem_heap (hcl_t* hcl, hcl_ooi_t index, hcl_oop_semaphore_t ne
 	else
 		sift_down_sem_heap (hcl, index);
 }
+#endif
+
+static int add_sem_to_sem_io_tuple (hcl_t* hcl, hcl_oop_semaphore_t sem, hcl_ooi_t io_handle, hcl_semaphore_io_type_t io_type)
+{
+	hcl_ooi_t index;
+	hcl_ooi_t new_mask;
+	int n, tuple_added = 0;
+
+	HCL_ASSERT (hcl, sem->subtype == (hcl_oop_t)hcl->_nil);
+	HCL_ASSERT (hcl, sem->u.io.index == (hcl_oop_t)hcl->_nil);
+	/*HCL_ASSERT (hcl, sem->io.handle == (hcl_oop_t)hcl->_nil);
+	HCL_ASSERT (hcl, sem->io.type == (hcl_oop_t)hcl->_nil);*/
+
+	if (io_handle < 0)
+	{
+		hcl_seterrbfmt (hcl, HCL_EINVAL, "handle %zd out of supported range", io_handle);
+		return -1;
+	}
+	
+	if (io_handle >= hcl->sem_io_map_capa)
+	{
+		hcl_oow_t new_capa, i;
+		hcl_ooi_t* tmp;
+
+/* TODO: specify the maximum io_handle supported and check it here instead of just relying on memory allocation success/failure? */
+		new_capa = HCL_ALIGN_POW2(io_handle + 1, SEM_IO_MAP_ALIGN);
+
+		tmp = hcl_reallocmem (hcl, hcl->sem_io_map, HCL_SIZEOF(*tmp) * new_capa);
+		if (!tmp) 
+		{
+			const hcl_ooch_t* oldmsg = hcl_backuperrmsg(hcl);
+			hcl_seterrbfmt (hcl, hcl->errnum, "handle %zd out of supported range - %js", oldmsg);
+			return -1;
+		}
+
+		for (i = hcl->sem_io_map_capa; i < new_capa; i++) tmp[i] = -1;
+
+		hcl->sem_io_map = tmp;
+		hcl->sem_io_map_capa = new_capa;
+	}
+
+	index = hcl->sem_io_map[io_handle];
+	if (index <= -1)
+	{
+		/* this handle is not in any tuples. add it to a new tuple */
+		if (hcl->sem_io_tuple_count >= SEM_IO_TUPLE_MAX)
+		{
+			hcl_seterrbfmt (hcl, HCL_ESEMFLOOD, "too many IO semaphore tuples"); 
+			return -1;
+		}
+
+		if (hcl->sem_io_tuple_count >= hcl->sem_io_tuple_capa)
+		{
+			hcl_oow_t new_capa;
+			hcl_sem_tuple_t* tmp;
+
+			/* no overflow check when calculating the new capacity
+			 * owing to SEM_IO_TUPLE_MAX check above */
+			new_capa = hcl->sem_io_tuple_capa + SEM_IO_TUPLE_INC;
+			tmp = hcl_reallocmem (hcl, hcl->sem_io_tuple, HCL_SIZEOF(hcl_sem_tuple_t) * new_capa);
+			if (!tmp) return -1;
+
+			hcl->sem_io_tuple = tmp;
+			hcl->sem_io_tuple_capa = new_capa;
+		}
+
+		/* this condition must be true assuming SEM_IO_TUPLE_MAX <= HCL_SMOOI_MAX */
+		HCL_ASSERT (hcl, hcl->sem_io_tuple_count <= HCL_SMOOI_MAX); 
+		index = hcl->sem_io_tuple_count;
+
+		tuple_added = 1;
+
+		/* safe to initialize before vm_muxadd() because
+		 * hcl->sem_io_tuple_count has not been incremented. 
+		 * still no impact even if it fails. */
+		hcl->sem_io_tuple[index].sem[HCL_SEMAPHORE_IO_TYPE_INPUT] = HCL_NULL;
+		hcl->sem_io_tuple[index].sem[HCL_SEMAPHORE_IO_TYPE_OUTPUT] = HCL_NULL;
+		hcl->sem_io_tuple[index].handle = io_handle;
+		hcl->sem_io_tuple[index].mask = 0;
+
+		new_mask = ((hcl_ooi_t)1 << io_type);
+
+		hcl_pushtmp (hcl, (hcl_oop_t*)&sem);
+		n = hcl->vmprim.vm_muxadd(hcl, io_handle, new_mask);
+		hcl_poptmp (hcl);
+	}
+	else
+	{
+		if (hcl->sem_io_tuple[index].sem[io_type])
+		{
+			hcl_seterrbfmt (hcl, HCL_EINVAL, "handle %zd already linked with an IO semaphore for %hs", io_handle, io_type_str[io_type]);
+			return -1;
+		}
+
+		new_mask = hcl->sem_io_tuple[index].mask; /* existing mask */
+		new_mask |= ((hcl_ooi_t)1 << io_type);
+
+		hcl_pushtmp (hcl, (hcl_oop_t*)&sem);
+		n = hcl->vmprim.vm_muxmod(hcl, io_handle, new_mask);
+		hcl_poptmp (hcl);
+	}
+
+	if (n <= -1) 
+	{
+		HCL_LOG3 (hcl, HCL_LOG_WARN, "Failed to add IO semaphore at index %zd for %hs on handle %zd\n", index, io_type_str[io_type], io_handle);
+		return -1;
+	}
+
+	HCL_LOG3 (hcl, HCL_LOG_DEBUG, "Added IO semaphore at index %zd for %hs on handle %zd\n", index, io_type_str[io_type], io_handle);
+
+	sem->subtype = HCL_SMOOI_TO_OOP(HCL_SEMAPHORE_SUBTYPE_IO);
+	sem->u.io.index = HCL_SMOOI_TO_OOP(index);
+	sem->u.io.handle = HCL_SMOOI_TO_OOP(io_handle);
+	sem->u.io.type = HCL_SMOOI_TO_OOP((hcl_ooi_t)io_type);
+
+	hcl->sem_io_tuple[index].handle = io_handle;
+	hcl->sem_io_tuple[index].mask = new_mask;
+	hcl->sem_io_tuple[index].sem[io_type] = sem;
+
+	hcl->sem_io_count++;
+	if (tuple_added) 
+	{
+		hcl->sem_io_tuple_count++;
+		hcl->sem_io_map[io_handle] = index;
+	}
+
+	/* update the number of IO semaphores in a group if necessary */
+	if ((hcl_oop_t)sem->group != hcl->_nil)
+	{
+		hcl_ooi_t count;
+		count = HCL_OOP_TO_SMOOI(sem->group->sem_io_count);
+		count++;
+		sem->group->sem_io_count = HCL_SMOOI_TO_OOP(count);
+	}
+
+	return 0;
+}
+
+static int delete_sem_from_sem_io_tuple (hcl_t* hcl, hcl_oop_semaphore_t sem, int force)
+{
+	hcl_ooi_t index;
+	hcl_ooi_t new_mask, io_handle, io_type;
+	int x;
+
+	HCL_ASSERT (hcl, sem->subtype == HCL_SMOOI_TO_OOP(HCL_SEMAPHORE_SUBTYPE_IO));
+	HCL_ASSERT (hcl, HCL_OOP_IS_SMOOI(sem->u.io.type));
+	HCL_ASSERT (hcl, HCL_OOP_IS_SMOOI(sem->u.io.index));
+	HCL_ASSERT (hcl, HCL_OOP_IS_SMOOI(sem->u.io.handle));
+
+	index = HCL_OOP_TO_SMOOI(sem->u.io.index);
+	HCL_ASSERT (hcl, index >= 0 && index < hcl->sem_io_tuple_count);
+
+	io_handle = HCL_OOP_TO_SMOOI(sem->u.io.handle);
+	if (io_handle < 0 || io_handle >= hcl->sem_io_map_capa)
+	{
+		hcl_seterrbfmt (hcl, HCL_EINVAL, "handle %zd out of supported range", io_handle);
+		return -1;
+	}
+	HCL_ASSERT (hcl, hcl->sem_io_map[io_handle] == HCL_OOP_TO_SMOOI(sem->u.io.index));
+
+	io_type = HCL_OOP_TO_SMOOI(sem->u.io.type);
+
+	new_mask = hcl->sem_io_tuple[index].mask;
+	new_mask &= ~((hcl_ooi_t)1 << io_type); /* this is the new mask after deletion */
+
+	hcl_pushtmp (hcl, (hcl_oop_t*)&sem);
+	x = new_mask? hcl->vmprim.vm_muxmod(hcl, io_handle, new_mask):
+	              hcl->vmprim.vm_muxdel(hcl, io_handle); 
+	hcl_poptmp (hcl);
+	if (x <= -1) 
+	{
+		HCL_LOG3 (hcl, HCL_LOG_WARN, "Failed to delete IO semaphore at index %zd handle %zd for %hs\n", index, io_handle, io_type_str[io_type]);
+		if (!force) return -1;
+
+		/* [NOTE] 
+		 *   this means there could be some issue handling the file handles.
+		 *   the file handle might have been closed before reaching here.
+		 *   assuming the callback works correctly, it's not likely that the
+		 *   underlying operating system returns failure for no reason.
+		 *   i should inspect the overall vm implementation */
+		HCL_LOG1 (hcl, HCL_LOG_ERROR, "Forcibly unmapping the IO semaphored handle %zd as if it's deleted\n", io_handle);
+	}
+	else
+	{
+		HCL_LOG3 (hcl, HCL_LOG_DEBUG, "Deleted IO semaphore at index %zd handle %zd for %hs\n", index, io_handle, io_type_str[io_type]);
+	}
+
+	sem->subtype = hcl->_nil;
+	sem->u.io.index = hcl->_nil;
+	sem->u.io.handle = hcl->_nil;
+	sem->u.io.type = hcl->_nil;
+	hcl->sem_io_count--;
+
+	if ((hcl_oop_t)sem->group != hcl->_nil)
+	{
+		hcl_ooi_t count;
+		count = HCL_OOP_TO_SMOOI(sem->group->sem_io_count);
+		HCL_ASSERT (hcl, count > 0);
+		count--;
+		sem->group->sem_io_count = HCL_SMOOI_TO_OOP(count);
+	}
+
+	if (new_mask)
+	{
+		hcl->sem_io_tuple[index].mask = new_mask;
+		hcl->sem_io_tuple[index].sem[io_type] = HCL_NULL;
+	}
+	else
+	{
+		hcl->sem_io_tuple_count--;
+
+		if (/*hcl->sem_io_tuple_count > 0 &&*/ index != hcl->sem_io_tuple_count)
+		{
+			/* migrate the last item to the deleted slot to compact the gap */
+			hcl->sem_io_tuple[index] = hcl->sem_io_tuple[hcl->sem_io_tuple_count];
+
+			if (hcl->sem_io_tuple[index].sem[HCL_SEMAPHORE_IO_TYPE_INPUT]) 
+				hcl->sem_io_tuple[index].sem[HCL_SEMAPHORE_IO_TYPE_INPUT]->u.io.index = HCL_SMOOI_TO_OOP(index);
+			if (hcl->sem_io_tuple[index].sem[HCL_SEMAPHORE_IO_TYPE_OUTPUT])
+				hcl->sem_io_tuple[index].sem[HCL_SEMAPHORE_IO_TYPE_OUTPUT]->u.io.index = HCL_SMOOI_TO_OOP(index);
+
+			hcl->sem_io_map[hcl->sem_io_tuple[index].handle] = index;
+
+			HCL_LOG2 (hcl, HCL_LOG_DEBUG, "Migrated IO semaphore tuple from index %zd to %zd\n", hcl->sem_io_tuple_count, index);
+		}
+
+		hcl->sem_io_map[io_handle] = -1;
+	}
+
+	return 0;
+}
+
+static void _signal_io_semaphore (hcl_t* hcl, hcl_oop_semaphore_t sem)
+{
+	hcl_oop_process_t proc;
+
+	proc = signal_semaphore (hcl, sem);
+
+	if (hcl->processor->active == hcl->nil_process && (hcl_oop_t)proc != hcl->_nil)
+	{
+		/* this is the only runnable process. 
+		 * switch the process to the running state.
+		 * it uses wake_process() instead of
+		 * switch_to_process() as there is no running 
+		 * process at this moment */
+		HCL_ASSERT (hcl, proc->state == HCL_SMOOI_TO_OOP(PROC_STATE_RUNNABLE));
+		HCL_ASSERT (hcl, proc == hcl->processor->runnable.first);
+
+	#if 0
+		wake_process (hcl, proc); /* switch to running */
+		hcl->proc_switched = 1;
+	#else
+		switch_to_process_from_nil (hcl, proc);
+	#endif
+	}
+}
+
+static void signal_io_semaphore (hcl_t* hcl, hcl_ooi_t io_handle, hcl_ooi_t mask)
+{
+	if (io_handle >= 0 && io_handle < hcl->sem_io_map_capa && hcl->sem_io_map[io_handle] >= 0)
+	{
+		hcl_oop_semaphore_t insem, outsem;
+		hcl_ooi_t sem_io_index;
+
+		sem_io_index = hcl->sem_io_map[io_handle];
+		insem = hcl->sem_io_tuple[sem_io_index].sem[HCL_SEMAPHORE_IO_TYPE_INPUT];
+		outsem = hcl->sem_io_tuple[sem_io_index].sem[HCL_SEMAPHORE_IO_TYPE_OUTPUT];
+
+		if (outsem)
+		{
+			if ((mask & (HCL_SEMAPHORE_IO_MASK_OUTPUT | HCL_SEMAPHORE_IO_MASK_ERROR)) ||
+			    (!insem && (mask & HCL_SEMAPHORE_IO_MASK_HANGUP)))
+			{
+				_signal_io_semaphore (hcl, outsem);
+			}
+		}
+
+		if (insem)
+		{
+			if (mask & (HCL_SEMAPHORE_IO_MASK_INPUT | HCL_SEMAPHORE_IO_MASK_HANGUP | HCL_SEMAPHORE_IO_MASK_ERROR))
+			{
+				_signal_io_semaphore (hcl, insem);
+			}
+		}
+	}
+	else
+	{
+		/* you may come across this warning message if the multiplexer returned
+		 * an IO event */
+		HCL_LOG2 (hcl, HCL_LOG_WARN, "Warning - semaphore signaling requested on an unmapped handle %zd with mask %#zx\n", io_handle, mask);
+	}
+}
+
+void hcl_releaseiohandle (hcl_t* hcl, hcl_ooi_t io_handle)
+{
+	/* TODO: optimize io semapore unmapping. since i'm to close the handle,
+	 *       i don't need to call delete_sem_from_sem_io_tuple() seperately for input
+	 *       and output. */
+	if (io_handle < hcl->sem_io_map_capa)
+	{
+		hcl_ooi_t index;
+		hcl_oop_semaphore_t sem;
+
+		index = hcl->sem_io_map[io_handle];
+		if (index >= 0)
+		{
+			HCL_ASSERT(hcl, hcl->sem_io_tuple[index].handle == io_handle);
+			sem = hcl->sem_io_tuple[index].sem[HCL_SEMAPHORE_IO_TYPE_INPUT];
+			if (sem) 
+			{
+				HCL_ASSERT(hcl, sem->subtype == HCL_SMOOI_TO_OOP(HCL_SEMAPHORE_SUBTYPE_IO));
+				delete_sem_from_sem_io_tuple (hcl, sem, 0);
+			}
+		}
+	}
+
+	if (io_handle < hcl->sem_io_map_capa)
+	{
+		hcl_ooi_t index;
+		hcl_oop_semaphore_t sem;
+
+		index = hcl->sem_io_map[io_handle];
+		if (index >= 0)
+		{
+			HCL_ASSERT(hcl, hcl->sem_io_tuple[index].handle == io_handle);
+			sem = hcl->sem_io_tuple[index].sem[HCL_SEMAPHORE_IO_TYPE_OUTPUT];
+			if (sem) 
+			{
+				HCL_ASSERT(hcl, sem->subtype == HCL_SMOOI_TO_OOP(HCL_SEMAPHORE_SUBTYPE_IO));
+				delete_sem_from_sem_io_tuple (hcl, sem, 0);
+			}
+		}
+	}
+}
+
 /* ------------------------------------------------------------------------- */
 
 static int __activate_block (hcl_t* hcl, hcl_oop_block_t rcv_blk, hcl_ooi_t nargs, hcl_oop_context_t* pnewctx)
@@ -962,7 +1743,7 @@ static int __activate_block (hcl_t* hcl, hcl_oop_block_t rcv_blk, hcl_ooi_t narg
 
 	/* create a new block context to clone rcv_blk */
 	hcl_pushtmp (hcl, (hcl_oop_t*)&rcv_blk);
-	blkctx = (hcl_oop_context_t)make_context(hcl, local_ntmprs); 
+	blkctx = make_context(hcl, local_ntmprs); 
 	hcl_poptmp (hcl);
 	if (HCL_UNLIKELY(!blkctx)) return -1;
 
@@ -991,8 +1772,8 @@ static int __activate_block (hcl_t* hcl, hcl_oop_block_t rcv_blk, hcl_ooi_t narg
 
 	HCL_STACK_POPS (hcl, nargs + 1); /* pop arguments and receiver */
 
-	HCL_ASSERT (hcl, (rcv_blk == hcl->initial_context && (hcl_oop_t)blkctx->home == hcl->_nil) || (hcl_oop_t)blkctx->home != hcl->_nil);
 	blkctx->sender = hcl->active_context;
+	HCL_ASSERT (hcl, (hcl_oop_t)blkctx->home != hcl->_nil); /* if not intial context, the home must not be null */
 
 	*pnewctx = blkctx;
 	return 0;
@@ -1049,7 +1830,7 @@ static int __activate_function (hcl_t* hcl, hcl_oop_function_t rcv_func, hcl_ooi
 
 	/* create a new block context to clone rcv_func */
 	hcl_pushtmp (hcl, (hcl_oop_t*)&rcv_func);
-	functx = (hcl_oop_context_t)make_context(hcl, local_ntmprs); 
+	functx = make_context(hcl, local_ntmprs); 
 	hcl_poptmp (hcl);
 	if (HCL_UNLIKELY(!functx)) return -1;
 
@@ -1265,7 +2046,7 @@ HCL_DEBUG1 (hcl, "NARG %d\n", (int)nargs);
 				{
 					argv[++i] = hcl_dupootobchars(hcl, HCL_OBJ_GET_CHAR_SLOT(ta), HCL_OBJ_GET_SIZE(ta), HCL_NULL);
 				}
-HCL_DEBUG2 (hcl, "ARG %d -> %hs\n", (int)i - 1, argv[i]);
+				/*HCL_DEBUG2 (hcl, "ARG %d -> %hs\n", (int)i - 1, argv[i]);*/
 			}
 			argv[nargs + 1] = HCL_NULL;
 			execvp (xcmd, argv);
@@ -1299,14 +2080,14 @@ static hcl_oop_process_t start_initial_process (hcl_t* hcl, hcl_oop_context_t ct
 	hcl_oop_process_t proc;
 
 	/* there must be no active process when this function is called */
-	HCL_ASSERT (hcl, hcl->processor->tally == HCL_SMOOI_TO_OOP(0));
+	HCL_ASSERT (hcl, hcl->processor->runnable.count == HCL_SMOOI_TO_OOP(0));
 	HCL_ASSERT (hcl, hcl->processor->active == hcl->nil_process);
 
 	proc = make_process(hcl, ctx);
 	if (HCL_UNLIKELY(!proc)) return HCL_NULL;
 
 	/* skip RUNNABLE and go to RUNNING */
-	if (chain_into_processor(hcl, proc, PROC_STATE_RUNNING) <= -1) return HCL_NULL; 
+	chain_into_processor(hcl, proc, PROC_STATE_RUNNING);
 	hcl->processor->active = proc;
 
 	/* do something that resume_process() would do with less overhead */
@@ -1323,7 +2104,7 @@ static int start_initial_process_and_context (hcl_t* hcl, hcl_ooi_t initial_ip)
 	hcl_oop_process_t proc;
 
 	/* create the initial context over the initial function */
-	ctx = (hcl_oop_context_t)make_context(hcl, 0); /* no temporary variables */
+	ctx = make_context(hcl, 0); /* no temporary variables */
 	if (HCL_UNLIKELY(!ctx)) return -1;
 
 	hcl->ip = initial_ip;
@@ -1349,7 +2130,7 @@ static int start_initial_process_and_context (hcl_t* hcl, hcl_ooi_t initial_ip)
 	 * is not NULL. at this poinst, hcl->processor should point to
 	 * an instance of ProcessScheduler. */
 	HCL_ASSERT (hcl, (hcl_oop_t)hcl->processor != hcl->_nil);
-	HCL_ASSERT (hcl, hcl->processor->tally == HCL_SMOOI_TO_OOP(0));
+	HCL_ASSERT (hcl, hcl->processor->runnable.count == HCL_SMOOI_TO_OOP(0));
 
 	/* start_initial_process() calls the SWITCH_ACTIVE_CONTEXT() macro.
 	 * the macro assumes a non-null value in hcl->active_context.
@@ -1373,16 +2154,284 @@ static int start_initial_process_and_context (hcl_t* hcl, hcl_ooi_t initial_ip)
 	hcl->initial_context = proc->initial_context;
 	HCL_ASSERT (hcl, hcl->initial_context == hcl->active_context);
 
-HCL_DEBUG1 (hcl, "*** initial_context %p\n", hcl->initial_context);
 	return 0;
 }
 
 /* ------------------------------------------------------------------------- */
+
+static HCL_INLINE int switch_process_if_needed (hcl_t* hcl)
+{
+	if (hcl->sem_heap_count > 0)
+	{
+		/* handle timed semaphores */
+		hcl_ntime_t ft, now;
+
+		vm_gettime (hcl, &now);
+
+		do
+		{
+			HCL_ASSERT (hcl, hcl->sem_heap[0]->subtype == HCL_SMOOI_TO_OOP(HCL_SEMAPHORE_SUBTYPE_TIMED));
+			HCL_ASSERT (hcl, HCL_OOP_IS_SMOOI(hcl->sem_heap[0]->u.timed.ftime_sec));
+			HCL_ASSERT (hcl, HCL_OOP_IS_SMOOI(hcl->sem_heap[0]->u.timed.ftime_nsec));
+
+			HCL_INIT_NTIME (&ft,
+				HCL_OOP_TO_SMOOI(hcl->sem_heap[0]->u.timed.ftime_sec),
+				HCL_OOP_TO_SMOOI(hcl->sem_heap[0]->u.timed.ftime_nsec)
+			);
+
+			if (HCL_CMP_NTIME(&ft, (hcl_ntime_t*)&now) <= 0)
+			{
+				hcl_oop_process_t proc;
+
+			signal_timed:
+				/* waited long enough. signal the semaphore */
+
+				proc = signal_semaphore(hcl, hcl->sem_heap[0]);
+				/* [NOTE] no hcl_pushvolat() on proc. no GC must occur
+				 *        in the following line until it's used for
+				 *        wake_process() below. */
+				delete_from_sem_heap (hcl, 0); /* hcl->sem_heap_count is decremented in delete_from_sem_heap() */
+
+				/* if no process is waiting on the semaphore, 
+				 * signal_semaphore() returns hcl->_nil. */
+
+				if (hcl->processor->active == hcl->nil_process && (hcl_oop_t)proc != hcl->_nil)
+				{
+					/* this is the only runnable process. 
+					 * switch the process to the running state.
+					 * it uses wake_process() instead of
+					 * switch_to_process() as there is no running 
+					 * process at this moment */
+
+				#if defined(HCL_DEBUG_VM_PROCESSOR) && (HCL_DEBUG_VM_PROCESSOR >= 2)
+					HCL_LOG2 (hcl, HCL_LOG_IC | HCL_LOG_DEBUG, "Processor - switching to a process[%zd] while no process is active - total runnables %zd\n", HCL_OOP_TO_SMOOI(proc->id), HCL_OOP_TO_SMOOI(hcl->processor->runnable.count));
+				#endif
+
+					HCL_ASSERT (hcl, proc->state == HCL_SMOOI_TO_OOP(PROC_STATE_RUNNABLE));
+					HCL_ASSERT (hcl, proc == hcl->processor->runnable.last); /* resume_process() appends to the runnable list */
+				#if 0
+					wake_process (hcl, proc); /* switch to running */
+					hcl->proc_switched = 1;
+				#else
+					switch_to_process_from_nil (hcl, proc);
+				#endif
+				}
+			}
+			else if (hcl->processor->active == hcl->nil_process)
+			{
+				/* no running process. before firing time. */
+				HCL_SUB_NTIME (&ft, &ft, (hcl_ntime_t*)&now);
+
+				if (hcl->sem_io_wait_count > 0)
+				{
+					/* no running process but io semaphore being waited on */
+					vm_muxwait (hcl, &ft);
+
+					/* exit early if a process has been woken up. 
+					 * the break in the else part further down will get hit
+					 * eventually even if the following line doesn't exist.
+					 * having the following line causes to skip firing the
+					 * timed semaphore that would expire between now and the 
+					 * moment the next inspection occurs. */
+					if (hcl->processor->active != hcl->nil_process) goto switch_to_next;
+				}
+				else
+				{
+					int halting;
+
+#if defined(ENABLE_GCFIN)
+					/* no running process, no io semaphore */
+					if ((hcl_oop_t)hcl->sem_gcfin != hcl->_nil && hcl->sem_gcfin_sigreq) goto signal_sem_gcfin;
+#endif
+					halting = vm_sleep(hcl, &ft);
+
+					if (halting)
+					{
+						vm_gettime (hcl, &now);
+						goto signal_timed;
+					}
+				}
+				vm_gettime (hcl, &now);
+			}
+			else 
+			{
+				/* there is a running process. go on */
+				break;
+			}
+		}
+		while (hcl->sem_heap_count > 0 && !hcl->abort_req);
+	}
+
+	if (hcl->sem_io_wait_count > 0) 
+	{
+		if (hcl->processor->active == hcl->nil_process)
+		{
+			hcl_ntime_t ft;
+
+			HCL_ASSERT (hcl, hcl->processor->runnable.count == HCL_SMOOI_TO_OOP(0));
+
+#if defined(ENABLE_GCFIN)
+			/* no runnable process while there is an io semaphore being waited for */
+			if ((hcl_oop_t)hcl->sem_gcfin != hcl->_nil && hcl->sem_gcfin_sigreq) goto signal_sem_gcfin;
+#endif
+
+			if (hcl->processor->suspended.count == HCL_SMOOI_TO_OOP(0))
+			{
+				/* no suspended process. the program is buggy or is probably being
+				 * terminated forcibly. 
+				 * the default signal handler may lead to this situation. */
+				hcl->abort_req = 1;
+			}
+			else
+			{
+				do
+				{
+					HCL_INIT_NTIME (&ft, 3, 0); /* TODO: use a configured time */
+					vm_muxwait (hcl, &ft);
+				}
+				while (hcl->processor->active == hcl->nil_process && !hcl->abort_req);
+			}
+		}
+		else
+		{
+			/* well, there is a process waiting on one or more semaphores while
+			 * there are other normal processes to run. check IO activities
+			 * before proceeding to handle normal process scheduling */
+
+			/* [NOTE] the check with the multiplexer may happen too frequently
+			 *       because this is called everytime process switching is requested.
+			 *       the actual callback implementation should try to avoid invoking 
+			 *       actual system calls too frequently for less overhead. */
+			vm_muxwait (hcl, HCL_NULL);
+		}
+	}
+
+#if defined(ENABLE_GCFIN)
+	if ((hcl_oop_t)hcl->sem_gcfin != hcl->_nil) 
+	{
+		hcl_oop_process_t proc;
+
+		if (hcl->sem_gcfin_sigreq)
+		{
+		signal_sem_gcfin:
+			HCL_LOG0 (hcl, HCL_LOG_IC | HCL_LOG_DEBUG, "Signaled GCFIN semaphore\n");
+			proc = signal_semaphore(hcl, hcl->sem_gcfin);
+
+			if (hcl->processor->active == hcl->nil_process && (hcl_oop_t)proc != hcl->_nil)
+			{
+				HCL_ASSERT (hcl, proc->state == HCL_SMOOI_TO_OOP(PROC_STATE_RUNNABLE));
+				HCL_ASSERT (hcl, proc == hcl->processor->runnable.first);
+				switch_to_process_from_nil (hcl, proc);
+			}
+
+			hcl->sem_gcfin_sigreq = 0;
+		}
+		else
+		{
+			/* the gcfin semaphore signalling is not requested and there are 
+			 * no runnable processes nor no waiting semaphores. if there is 
+			 * process waiting on the gcfin semaphore, i will just schedule
+			 * it to run by calling signal_semaphore() on hcl->sem_gcfin.
+			 */
+			/* TODO: check if this is the best implementation practice */
+			if (hcl->processor->active == hcl->nil_process)
+			{
+				/* there is no active process. in most cases, the only process left
+				 * should be the gc finalizer process started in the System>>startup.
+				 * if there are other suspended processes at this point, the processes
+				 * are not likely to run again. 
+				 * 
+				 * imagine the following single line program that creates a process 
+				 * but never start it.
+				 *
+				 *    method(#class) main { | p |  p := [] newProcess. }
+				 *
+				 * the gc finalizer process and the process assigned to p exist. 
+				 * when the code reaches here, the 'p' process still is alive
+				 * despite no active process nor no process waiting on timers
+				 * and semaphores. so when the entire program terminates, there
+				 * might still be some suspended processes that are not possible
+				 * to schedule.
+				 */
+
+				HCL_LOG4 (hcl, HCL_LOG_IC | HCL_LOG_DEBUG, 
+					"Signaled GCFIN semaphore without gcfin signal request - total %zd runnable/running %zd suspended %zd - sem_io_wait_count %zu\n",
+					HCL_OOP_TO_SMOOI(hcl->processor->total_count),
+					HCL_OOP_TO_SMOOI(hcl->processor->runnable.count),
+					HCL_OOP_TO_SMOOI(hcl->processor->suspended.count),
+					hcl->sem_io_wait_count);
+				proc = signal_semaphore(hcl, hcl->sem_gcfin);
+				if ((hcl_oop_t)proc != hcl->_nil) 
+				{
+					HCL_ASSERT (hcl, proc->state == HCL_SMOOI_TO_OOP(PROC_STATE_RUNNABLE));
+					HCL_ASSERT (hcl, proc == hcl->processor->runnable.first);
+					hcl->_system->cvar[2] = hcl->_true; /* set gcfin_should_exit in System to true. if the postion of the class variable changes, the index must get changed, too. */
+					switch_to_process_from_nil (hcl, proc); /* sechedule the gc finalizer process */
+				}
+			}
+		}
+	}
+#endif
+
+
+#if 0
+	while (hcl->sem_list_count > 0)
+	{
+		/* handle async signals */
+		--hcl->sem_list_count;
+		signal_semaphore (hcl, hcl->sem_list[hcl->sem_list_count]);
+		if (hcl->processor->active == hcl->nil_process)
+		{suspended process
+		}
+	}
+	/*
+	if (semaphore heap has pending request)
+	{
+		signal them...
+	}*/
+#endif
+
+	if (hcl->processor->active == hcl->nil_process) 
+	{
+		/* no more waiting semaphore and no more process */
+		HCL_ASSERT (hcl, hcl->processor->runnable.count = HCL_SMOOI_TO_OOP(0));
+		HCL_LOG0 (hcl, HCL_LOG_IC | HCL_LOG_DEBUG, "No more runnable process\n");
+		if (HCL_OOP_TO_SMOOI(hcl->processor->suspended.count) > 0)
+		{
+			/* there exist suspended processes while no processes are runnable.
+			 * most likely, the running program contains process/semaphore related bugs */
+			HCL_LOG1 (hcl, HCL_LOG_IC | HCL_LOG_WARN, 
+				"%zd suspended process(es) found - check your program\n",
+				HCL_OOP_TO_SMOOI(hcl->processor->suspended.count));
+		}
+		return 0;
+	}
+
+switch_to_next:
+	/* TODO: implement different process switching scheme - time-slice or clock based??? */
+#if defined(HCL_EXTERNAL_PROCESS_SWITCH)
+	if (hcl->switch_proc)
+	{
+#endif
+		if (!hcl->proc_switched) 
+		{
+			switch_to_next_runnable_process (hcl);
+			hcl->proc_switched = 0;
+		}
+#if defined(HCL_EXTERNAL_PROCESS_SWITCH)
+		hcl->switch_proc = 0;
+	}
+	else hcl->proc_switched = 0;
+#endif
+
+	return 1;
+}
+/* ------------------------------------------------------------------------- */
+
 static HCL_INLINE int do_return (hcl_t* hcl, hcl_oop_t return_value)
 {
 	hcl_oop_context_t ctx;
 
-HCL_DEBUG2 (hcl, ">>> do_return from active_context %p  home %p\n", hcl->active_context, hcl->active_context->home);
 	/* if (hcl->active_context == hcl->processor->active->initial_context) // read the interactive mode note below... */
 	if (hcl->active_context->home == hcl->_nil)
 	{
@@ -1390,9 +2439,6 @@ HCL_DEBUG2 (hcl, ">>> do_return from active_context %p  home %p\n", hcl->active_
 		 *  (return-from-home 999) */
 		HCL_ASSERT (hcl, (hcl_oop_t)hcl->active_context->sender == hcl->_nil);
 		hcl->active_context->ip = HCL_SMOOI_TO_OOP(-1); /* mark the active context dead */
-
-/* the stack contains the final return value so the stack pointer must be 0. */
-HCL_DEBUG1 (hcl, ">>> RETURNING FROM INITIAL CONTEXT -> SP %d\n", (int)hcl->sp);
 
 		if (hcl->sp >= 0)
 		{
@@ -1426,8 +2472,6 @@ HCL_DEBUG1 (hcl, ">>> RETURNING FROM INITIAL CONTEXT -> SP %d\n", (int)hcl->sp);
 		HCL_ASSERT (hcl, (hcl_oop_t)hcl->active_context->home->sender == hcl->_nil);
 		hcl->active_context->home->ip = HCL_SMOOI_TO_OOP(-1); /* mark that this context has returned */
 
-/* the stack contains the final return value so the stack pointer must be 0. */
-HCL_DEBUG1 (hcl, ">>> NON-LOCAL return FROM INITIAL XXX CONTEXT -> SP %d\n", (int)hcl->sp);
 		if (hcl->sp >= 0)
 		{
 			/* return-from-home has been called from where it shouldn't be
@@ -1467,16 +2511,17 @@ HCL_DEBUG1 (hcl, ">>> NON-LOCAL return FROM INITIAL XXX CONTEXT -> SP %d\n", (in
 		HCL_STACK_PUSH (hcl, return_value);
 
 
-HCL_DEBUG1 (hcl, "****** non local returning %O\n", return_value);
-{
-int i;
-for (i = hcl->sp; i >= 0; i--)
-{
-	HCL_DEBUG2 (hcl, "STACK[%d] => %O\n", i, HCL_STACK_GET(hcl, i));
-}
-}
-
-
+#if 0
+		/* stack dump */
+		HCL_DEBUG1 (hcl, "****** non local returning %O\n", return_value);
+		{
+			int i;
+			for (i = hcl->sp; i >= 0; i--)
+			{
+				HCL_DEBUG2 (hcl, "STACK[%d] => %O\n", i, HCL_STACK_GET(hcl, i));
+			}
+		}
+#endif
 	}
 
 	return 0;
@@ -1484,7 +2529,6 @@ for (i = hcl->sp; i >= 0; i--)
 
 static HCL_INLINE void do_return_from_block (hcl_t* hcl)
 {
-HCL_DEBUG1 (hcl, "RETURNING(return_from_block) FROM active_context %p\n", hcl->active_context);
 	/*if (hcl->active_context == hcl->processor->active->initial_context)*/
 	if (hcl->active_context->home == hcl->_nil)
 	{
@@ -1528,102 +2572,8 @@ static int execute (hcl_t* hcl)
 
 	while (1)
 	{
-	#if defined(ENABLE_MULTI_PROCS) 
-		/* i don't think i will ever implement this in HCL.
-		 * but let's keep the code here for some while */
-		if (hcl->sem_heap_count > 0)
-		{
-			hcl_ntime_t ft, now;
-			hcl->vmprim.gettime (hcl, &now);
-
-			do
-			{
-				HCL_ASSERT (hcl, HCL_OOP_IS_SMOOI(hcl->sem_heap[0]->heap_ftime_sec));
-				HCL_ASSERT (hcl, HCL_OOP_IS_SMOOI(hcl->sem_heap[0]->heap_ftime_nsec));
-
-				HCL_INIT_NTIME (&ft,
-					HCL_OOP_TO_SMOOI(hcl->sem_heap[0]->heap_ftime_sec),
-					HCL_OOP_TO_SMOOI(hcl->sem_heap[0]->heap_ftime_nsec)
-				);
-
-				if (HCL_CMP_NTIME(&ft, (hcl_ntime_t*)&now) <= 0)
-				{
-					hcl_oop_process_t proc;
-
-					/* waited long enough. signal the semaphore */
-
-					proc = signal_semaphore (hcl, hcl->sem_heap[0]);
-					/* [NOTE] no hcl_pushtmp() on proc. no GC must occur
-					 *        in the following line until it's used for
-					 *        wake_new_process() below. */
-					delete_from_sem_heap (hcl, 0);
-
-					/* if no process is waiting on the semaphore, 
-					 * signal_semaphore() returns hcl->_nil. */
-
-					if (hcl->processor->active == hcl->nil_process && (hcl_oop_t)proc != hcl->_nil)
-					{
-						/* this is the only runnable process. 
-						 * switch the process to the running state.
-						 * it uses wake_new_process() instead of
-						 * switch_to_process() as there is no running 
-						 * process at this moment */
-						HCL_ASSERT (hcl, proc->state == HCL_SMOOI_TO_OOP(PROC_STATE_RUNNABLE));
-						HCL_ASSERT (hcl, proc == hcl->processor->runnable_head);
-
-						wake_new_process (hcl, proc);
-						hcl->proc_switched = 1;
-					}
-				}
-				else if (hcl->processor->active == hcl->nil_process)
-				{
-					HCL_SUB_NTIME (&ft, &ft, (hcl_ntime_t*)&now);
-					hcl->vmprim.sleep (hcl, &ft); /* TODO: change this to i/o multiplexer??? */
-					hcl->vmprim.gettime (hcl, &now);
-				}
-				else 
-				{
-					break;
-				}
-			} 
-			while (hcl->sem_heap_count > 0);
-		}
-	#endif
-
-		if (hcl->processor->active == hcl->nil_process) 
-		{
-			/* no more waiting semaphore and no more process */
-			HCL_ASSERT (hcl, hcl->processor->tally = HCL_SMOOI_TO_OOP(0));
-			HCL_LOG0 (hcl, HCL_LOG_IC | HCL_LOG_DEBUG, "No more runnable process\n");
-
-			#if 0
-			if (there is semaphore awaited.... )
-			{
-			/* DO SOMETHING */
-			}
-			#endif
-
-			break;
-		}
-
-	#if defined(ENABLE_MULTI_PROCS)
-		while (hcl->sem_list_count > 0)
-		{
-			/* handle async signals */
-			--hcl->sem_list_count;
-			signal_semaphore (hcl, hcl->sem_list[hcl->sem_list_count]);
-		}
-
-		/* TODO: implement different process switching scheme - time-slice or clock based??? */
-		#if defined(HCL_EXTERNAL_PROCESS_SWITCH)
-		if (!hcl->proc_switched && hcl->switch_proc) { switch_to_next_runnable_process (hcl); }
-		hcl->switch_proc = 0;
-		#else
-		if (!hcl->proc_switched) { switch_to_next_runnable_process (hcl); }
-		#endif
-
-		hcl->proc_switched = 0;
-	#endif
+		/* stop requested or no more runnable process */
+		if (hcl->abort_req || (!hcl->no_proc_switch && switch_process_if_needed(hcl) == 0)) break;
 
 		if (HCL_UNLIKELY(hcl->ip >= HCL_FUNCTION_GET_CODE_SIZE(hcl->active_function)))
 		{
@@ -1639,7 +2589,7 @@ static int execute (hcl_t* hcl)
 		/*while (bcode == HCL_CODE_NOOP) FETCH_BYTE_CODE_TO (hcl, bcode);*/
 
 		if (hcl->vm_checkbc_cb_count) vm_checkbc (hcl, bcode);
-		
+
 		if (HCL_UNLIKELY(hcl->abort_req))
 		{
 			/* i place this abortion check after vm_checkbc()
@@ -2500,6 +3450,31 @@ hcl_oop_t hcl_execute (hcl_t* hcl)
 	fill_function_data (hcl, func, 0, 0, (hcl_oop_context_t)hcl->_nil, hcl->code.lit.arr->slot, hcl->code.lit.len);
 
 	hcl->initial_function = func; /* the initial function is ready */
+
+#if 0 
+	/* unless the system is buggy, hcl->proc_map_used should be 0.
+	 * the standard library terminates all processes before halting.
+	 *
+	 * [EXPERIMENTAL]
+	 * if you like the process allocation to start from 0, uncomment
+	 * the following 'if' block */
+	if (hcl->proc_map_capa > 0 && hcl->proc_map_used == 0)
+	{
+		/* rechain the process map. it must be compatible with prepare_to_alloc_pid().
+		 * by placing the low indiced slot at the beginning of the free list, 
+		 * the special processes (main_proc, gcfin_proc, ossig_proc) are allocated
+		 * with low process IDs. */
+		hcl_ooi_t i, j;
+
+		hcl->proc_map_free_first = 0;
+		for (i = 0, j = 1; j < hcl->proc_map_capa; i++, j++)
+		{
+			hcl->proc_map[i] = HCL_SMOOI_TO_OOP(j);
+		}
+		hcl->proc_map[i] = HCL_SMOOI_TO_OOP(-1);
+		hcl->proc_map_free_last = i;
+	}
+#endif
 
 	n = start_initial_process_and_context(hcl, 0); /*  set up the initial context over the initial function */
 	if (n >= 0) 

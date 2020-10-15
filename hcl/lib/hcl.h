@@ -74,21 +74,20 @@ enum hcl_errnum_t
 	HCL_ENUMARGS,  /**< wrong number of arguments */
 	HCL_ERANGE,    /**< range error. overflow and underflow */
 	HCL_EBCFULL,   /**< byte-code full */
-	
+
 	HCL_EDFULL,    /**< dictionary full */
 	HCL_EPFULL,    /**< processor full */
 	HCL_EFINIS,    /**< unexpected end of data/input/stream/etc */
 	HCL_EFLOOD,    /**< too many items/data */
 	HCL_EDIVBY0,   /**< divide by zero */
-	
+
 	HCL_EIOERR,    /**< I/O error */
 	HCL_EECERR,    /**< encoding conversion error */
 	HCL_EBUFFULL,  /**< buffer full */
 	HCL_ESYNERR,   /**< syntax error */
 	HCL_ECALL,     /**< runtime error - cannot call */
-	
-	HCL_ERECALL,   /**< runtime error - cannot call again */
-	HCL_ECALLARG   /**< runtime error - wrong number of arguments to call */
+	HCL_ECALLARG,  /**< runtime error - wrong number of arguments to call */
+	HCL_ESEMFLOOD  /**< runtime error - too many semaphores */
 };
 typedef enum hcl_errnum_t hcl_errnum_t;
 
@@ -613,13 +612,17 @@ struct hcl_context_t
 	hcl_oop_t          slot[1]; /* stack */
 };
 
-#define HCL_PROCESS_NAMED_INSTVARS 8 /* TODO: RENAME THIS TO SOMETHING ELSE */
+#define HCL_PROCESS_NAMED_INSTVARS 10
 typedef struct hcl_process_t hcl_process_t;
 typedef struct hcl_process_t* hcl_oop_process_t;
 
-#define HCL_SEMAPHORE_NAMED_INSTVARS 6 /* TODO: RENAME THIS TO SOMETHIGN ELSE */
+#define HCL_SEMAPHORE_NAMED_INSTVARS 11
 typedef struct hcl_semaphore_t hcl_semaphore_t;
 typedef struct hcl_semaphore_t* hcl_oop_semaphore_t;
+
+#define HCL_SEMAPHORE_GROUP_NAMED_INSTVARS 8
+typedef struct hcl_semaphore_group_t hcl_semaphore_group_t;
+typedef struct hcl_semaphore_group_t* hcl_oop_semaphore_group_t;
 
 struct hcl_process_t
 {
@@ -631,36 +634,142 @@ struct hcl_process_t
 	hcl_oop_t         state; /* SmallInteger */
 	hcl_oop_t         sp;    /* stack pointer. SmallInteger */
 
-	hcl_oop_process_t prev;
-	hcl_oop_process_t next;
+	struct
+	{
+		hcl_oop_process_t prev;
+		hcl_oop_process_t next;
+	} ps;  /* links to use with the process scheduler */
 
-	hcl_oop_semaphore_t sem;
+	struct
+	{
+		hcl_oop_process_t prev;
+		hcl_oop_process_t next;
+	} sem_wait; /* links to use with a semaphore */
+
+	hcl_oop_t sem; /* nil, semaphore, or semaphore group */
 
 	/* == variable indexed part == */
 	hcl_oop_t slot[1]; /* process stack */
 };
 
+enum hcl_semaphore_subtype_t
+{
+	HCL_SEMAPHORE_SUBTYPE_TIMED = 0,
+	HCL_SEMAPHORE_SUBTYPE_IO    = 1
+};
+typedef enum hcl_semaphore_subtype_t hcl_semaphore_subtype_t;
+
+enum hcl_semaphore_io_type_t
+{
+	HCL_SEMAPHORE_IO_TYPE_INPUT   = 0,
+	HCL_SEMAPHORE_IO_TYPE_OUTPUT  = 1
+};
+typedef enum hcl_semaphore_io_type_t hcl_semaphore_io_type_t;
+
+enum hcl_semaphore_io_mask_t
+{
+	HCL_SEMAPHORE_IO_MASK_INPUT   = (1 << 0),
+	HCL_SEMAPHORE_IO_MASK_OUTPUT  = (1 << 1),
+	HCL_SEMAPHORE_IO_MASK_HANGUP  = (1 << 2),
+	HCL_SEMAPHORE_IO_MASK_ERROR   = (1 << 3)
+};
+typedef enum hcl_semaphore_io_mask_t hcl_semaphore_io_mask_t;
+
 struct hcl_semaphore_t
 {
 	HCL_OBJ_HEADER;
+
+	/* [IMPORTANT] make sure that the position of 'waiting' in hcl_semaphore_t
+	 *             must be exactly the same as its position in hcl_semaphore_group_t */
+	struct
+	{
+		hcl_oop_process_t first;
+		hcl_oop_process_t last;
+	} waiting; /* list of processes waiting on this semaphore */
+	/* [END IMPORTANT] */
+
 	hcl_oop_t count; /* SmallInteger */
-	hcl_oop_process_t waiting_head;
-	hcl_oop_process_t waiting_tail;
-	hcl_oop_t heap_index; /* index to the heap */
-	hcl_oop_t heap_ftime_sec; /* firing time */
-	hcl_oop_t heap_ftime_nsec; /* firing time */
+
+	/* nil for normal. SmallInteger if associated with 
+	 * timer(HCL_SEMAPHORE_SUBTYPE_TIMED) or IO(HCL_SEMAPHORE_SUBTYPE_IO). */
+	hcl_oop_t subtype; 
+
+	union
+	{
+		struct 
+		{
+			hcl_oop_t index; /* index to the heap that stores timed semaphores */
+			hcl_oop_t ftime_sec; /* firing time */
+			hcl_oop_t ftime_nsec; /* firing time */
+		} timed;
+
+		struct
+		{
+			hcl_oop_t index; /* index to sem_io_tuple */
+			hcl_oop_t handle;
+			hcl_oop_t type; /* SmallInteger */
+		} io;
+	} u;
+
+	hcl_oop_t signal_action;
+
+	hcl_oop_semaphore_group_t group; /* nil or belonging semaphore group */
+	struct
+	{
+		hcl_oop_semaphore_t prev;
+		hcl_oop_semaphore_t next;
+	} grm; /* group membership chain */
 };
 
-#define HCL_PROCESS_SCHEDULER_NAMED_INSTVARS 4
+#define HCL_SEMAPHORE_GROUP_SEMS_UNSIG 0
+#define HCL_SEMAPHORE_GROUP_SEMS_SIG   1
+
+struct hcl_semaphore_group_t
+{
+	HCL_OBJ_HEADER;
+
+	/* [IMPORTANT] make sure that the position of 'waiting' in hcl_semaphore_group_t
+	 *             must be exactly the same as its position in hcl_semaphore_t */
+	struct
+	{
+		hcl_oop_process_t first;
+		hcl_oop_process_t last; 
+	} waiting; /* list of processes waiting on this semaphore group */
+	/* [END IMPORTANT] */
+
+	struct
+	{
+		hcl_oop_semaphore_t first;
+		hcl_oop_semaphore_t last;
+	} sems[2]; /* sems[0] - unsignaled semaphores, sems[1] - signaled semaphores */
+
+	hcl_oop_t sem_io_count; /* the number of io semaphores in the group */
+	hcl_oop_t sem_count; /* the total number of semaphores in the group */
+};
+
+#define HCL_PROCESS_SCHEDULER_NAMED_INSTVARS 8
 typedef struct hcl_process_scheduler_t hcl_process_scheduler_t;
 typedef struct hcl_process_scheduler_t* hcl_oop_process_scheduler_t;
 struct hcl_process_scheduler_t
 {
 	HCL_OBJ_HEADER;
-	hcl_oop_t tally; /* SmallInteger, the number of runnable processes */
+
 	hcl_oop_process_t active; /*  pointer to an active process in the runnable process list */
-	hcl_oop_process_t runnable_head; /* runnable process list */
-	hcl_oop_process_t runnable_tail; /* runnable process list */
+	hcl_oop_t total_count;  /* smooi, total number of processes - runnable/running/suspended */
+
+	struct
+	{
+		hcl_oop_t         count; /* smooi, the number of runnable/running processes */
+		hcl_oop_process_t first; /* runnable process list */
+		hcl_oop_process_t last; /* runnable process list */
+	} runnable;
+
+	struct
+	{
+		hcl_oop_t         count; /* smooi, the number of suspended processes */
+		hcl_oop_process_t first; /* suspended process list */
+		hcl_oop_process_t last; /* suspended process list */
+	} suspended;
 };
 
 /**
@@ -856,7 +965,36 @@ typedef void (*hcl_vmprim_gettime_t) (
 	hcl_ntime_t*       now
 );
 
-typedef void (*hcl_vmprim_sleep_t) (
+typedef int (*hcl_vmprim_muxadd_t) (
+	hcl_t*                  hcl,
+	hcl_ooi_t               io_handle,
+	hcl_ooi_t               masks
+);
+
+typedef int (*hcl_vmprim_muxmod_t) (
+	hcl_t*                  hcl,
+	hcl_ooi_t               io_handle,
+	hcl_ooi_t               masks
+);
+
+typedef int (*hcl_vmprim_muxdel_t) (
+	hcl_t*                  hcl,
+	hcl_ooi_t               io_handle
+);
+
+typedef void (*hcl_vmprim_muxwait_cb_t) (
+	hcl_t*                  hcl,
+	hcl_ooi_t               io_handle,
+	hcl_ooi_t               masks
+);
+
+typedef void (*hcl_vmprim_muxwait_t) (
+	hcl_t*                  hcl,
+	const hcl_ntime_t*      duration,
+	hcl_vmprim_muxwait_cb_t muxwcb
+);
+
+typedef int (*hcl_vmprim_sleep_t) (
 	hcl_t*             hcl,
 	const hcl_ntime_t* duration
 );
@@ -886,8 +1024,12 @@ struct hcl_vmprim_t
 	hcl_vmprim_dlclose_t   dl_close; /* required */
 	hcl_vmprim_dlgetsym_t  dl_getsym; /* requried */
 
-	hcl_vmprim_gettime_t   gettime; /* required */
-	hcl_vmprim_sleep_t     sleep; /* required */
+	hcl_vmprim_gettime_t   vm_gettime; /* required */
+	hcl_vmprim_muxadd_t    vm_muxadd;
+	hcl_vmprim_muxdel_t    vm_muxdel;
+	hcl_vmprim_muxmod_t    vm_muxmod;
+	hcl_vmprim_muxwait_t   vm_muxwait;
+	hcl_vmprim_sleep_t     vm_sleep; /* required */
 };
 
 typedef struct hcl_vmprim_t hcl_vmprim_t;
@@ -1124,6 +1266,15 @@ struct hcl_mod_data_t
 };
 typedef struct hcl_mod_data_t hcl_mod_data_t;
 
+
+struct hcl_sem_tuple_t
+{
+	hcl_oop_semaphore_t sem[2]; /* [0] input, [1] output */
+	hcl_ooi_t handle; /* io handle */
+	hcl_ooi_t mask;
+};
+typedef struct hcl_sem_tuple_t hcl_sem_tuple_t;
+
 /* =========================================================================
  * HCL VM
  * ========================================================================= */
@@ -1222,21 +1373,39 @@ struct hcl_t
 	hcl_oop_process_scheduler_t processor; /* instance of ProcessScheduler */
 	hcl_oop_process_t nil_process; /* instance of Process */
 
+	/* ============================================================================= */
+
 	/* pending asynchronous semaphores */
 	hcl_oop_semaphore_t* sem_list;
 	hcl_oow_t sem_list_count;
 	hcl_oow_t sem_list_capa;
 
-	/* semaphores sorted according to time-out */
+	/* semaphores sorted according to time-out. 
+	 * organize entries using heap as the earliest entry
+	 * needs to be checked first */
 	hcl_oop_semaphore_t* sem_heap;
 	hcl_oow_t sem_heap_count;
 	hcl_oow_t sem_heap_capa;
+
+	/* semaphores for I/O handling. plain array */
+	/*hcl_oop_semaphore_t* sem_io;*/
+	hcl_sem_tuple_t* sem_io_tuple;
+	hcl_oow_t sem_io_tuple_count;
+	hcl_oow_t sem_io_tuple_capa;
+
+	hcl_oow_t sem_io_count;
+	hcl_oow_t sem_io_wait_count; /* number of processes waiting on an IO semaphore */
+
+	hcl_ooi_t* sem_io_map;
+	hcl_oow_t sem_io_map_capa;
+	/* ============================================================================= */
 
 	hcl_oop_t* tmp_stack[256]; /* stack for temporaries */
 	hcl_oow_t tmp_count;
 
 	hcl_oop_t* proc_map;
 	hcl_oow_t proc_map_capa;
+	hcl_oow_t proc_map_used;
 	hcl_ooi_t proc_map_free_first;
 	hcl_ooi_t proc_map_free_last;
 
@@ -1253,13 +1422,13 @@ struct hcl_t
 	hcl_oob_t* active_code;
 	hcl_ooi_t sp;
 	hcl_ooi_t ip;
+	int no_proc_switch; /* process switching disabled */
 	int proc_switched; /* TODO: this is temporary. implement something else to skip immediate context switching */
 	int switch_proc;
 	int abort_req;
-	hcl_oop_t last_retv;
-
 	hcl_ntime_t exec_start_time;
 	hcl_ntime_t exec_end_time;
+	hcl_oop_t last_retv;
 	/* == END EXECUTION REGISTERS == */
 
 	/* == BIGINT CONVERSION == */
@@ -1404,7 +1573,8 @@ enum hcl_brand_t
 	HCL_BRAND_CONTEXT,
 	HCL_BRAND_PROCESS,
 	HCL_BRAND_PROCESS_SCHEDULER,
-	HCL_BRAND_SEMAPHORE
+	HCL_BRAND_SEMAPHORE,
+	HCL_BRAND_SEMAPHORE_GROUP
 };
 typedef enum hcl_brand_t hcl_brand_t;
 
@@ -1459,6 +1629,9 @@ typedef enum hcl_concode_t hcl_concode_t;
 #define HCL_IS_BIGINT(hcl,v) (HCL_OOP_IS_POINTER(v) && (HCL_OBJ_GET_FLAGS_BRAND(v) == HCL_BRAND_PBIGINT || HCL_OBJ_GET_FLAGS_BRAND(v) == HCL_BRAND_NBIGINT))
 #define HCL_IS_STRING(hcl,v) (HCL_OOP_IS_POINTER(v) && HCL_OBJ_GET_FLAGS_BRAND(v) == HCL_BRAND_STRING)
 #define HCL_IS_FPDEC(hcl,v) (HCL_OOP_IS_POINTER(v) && HCL_OBJ_GET_FLAGS_BRAND(v) == HCL_BRAND_FPDEC)
+#define HCL_IS_PROCESS(hcl,v) (HCL_OOP_IS_POINTER(v) && HCL_OBJ_GET_FLAGS_BRAND(v) == HCL_BRAND_PROCESS)
+#define HCL_IS_SEMAPHORE(hcl,v) (HCL_OOP_IS_POINTER(v) && HCL_OBJ_GET_FLAGS_BRAND(v) == HCL_BRAND_SEMAPHORE)
+#define HCL_IS_SEMAPHORE_GROUP(hcl,v) (HCL_OOP_IS_POINTER(v) && HCL_OBJ_GET_FLAGS_BRAND(v) == HCL_BRAND_SEMAPHORE_GROUP)
 
 #define HCL_CONS_CAR(v)  (((hcl_cons_t*)(v))->car)
 #define HCL_CONS_CDR(v)  (((hcl_cons_t*)(v))->cdr)
