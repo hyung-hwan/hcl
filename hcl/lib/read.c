@@ -1301,8 +1301,8 @@ static const hcl_ooch_t* add_io_name (hcl_t* hcl, const hcl_oocs_t* name)
 	hcl_iolink_t* link;
 	hcl_ooch_t* ptr;
 
-	link = (hcl_iolink_t*) hcl_callocmem (hcl, HCL_SIZEOF(*link) + HCL_SIZEOF(hcl_ooch_t) * (name->len + 1));
-	if (!link) return HCL_NULL;
+	link = (hcl_iolink_t*)hcl_callocmem (hcl, HCL_SIZEOF(*link) + HCL_SIZEOF(hcl_ooch_t) * (name->len + 1));
+	if (HCL_UNLIKELY(!link)) return HCL_NULL;
 
 	ptr = (hcl_ooch_t*)(link + 1);
 
@@ -1325,8 +1325,8 @@ static int begin_include (hcl_t* hcl)
 	io_name = add_io_name (hcl, TOKEN_NAME(hcl));
 	if (!io_name) return -1;
 
-	arg = (hcl_ioinarg_t*) hcl_callocmem (hcl, HCL_SIZEOF(*arg));
-	if (!arg) goto oops;
+	arg = (hcl_ioinarg_t*)hcl_callocmem (hcl, HCL_SIZEOF(*arg));
+	if (HCL_UNLIKELY(!arg)) goto oops;
 
 	arg->name = io_name;
 	arg->line = 1;
@@ -2145,7 +2145,7 @@ static int read_object (hcl_t* hcl)
 			HCL_ASSERT (hcl, level > 0);
 
 			/* if so, append the element read into the quote list */
-			if (chain_to_list (hcl, obj) == HCL_NULL) return -1;
+			if (chain_to_list(hcl, obj) == HCL_NULL) return -1;
 
 			/* exit out of the quoted list. the quoted list can have 
 			 * one element only. */
