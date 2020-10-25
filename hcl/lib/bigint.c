@@ -2804,8 +2804,12 @@ hcl_oop_t hcl_divints (hcl_t* hcl, hcl_oop_t x, hcl_oop_t y, int modulo, hcl_oop
 		if (!r) return HCL_NULL;
 	}
 
-	if (rem) *rem = r;
-	return normalize_bigint (hcl, z);
+	hcl_pushtmp (hcl, &r);
+	z = normalize_bigint(hcl, z);
+	hcl_poptmp (hcl);
+
+	if (z && rem) *rem = r;
+	return z;
 
 oops_einval:
 	hcl_seterrbfmt (hcl, HCL_EINVAL, "parameter not integer - %O, %O", x, y);
