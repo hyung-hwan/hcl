@@ -110,7 +110,7 @@ AC_CHECK_HEADERS([stddef.h wchar.h wctype.h errno.h signal.h fcntl.h dirent.h])
 AC_CHECK_HEADERS([time.h sys/time.h utime.h spawn.h execinfo.h ucontext.h])
 AC_CHECK_HEADERS([dlfcn.h ltdl.h sys/mman.h sys/uio.h])
 AC_CHECK_HEADERS([sys/devpoll.h sys/epoll.h poll.h])
-AC_CHECK_HEADERS([libunwind.h])
+AC_CHECK_HEADERS([libunwind.h quadmath.h])
 
 dnl check data types
 dnl AC_CHECK_TYPE([wchar_t], 
