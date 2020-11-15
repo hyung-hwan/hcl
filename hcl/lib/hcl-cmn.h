@@ -336,6 +336,50 @@
 #endif
 
 /* =========================================================================
+ * FLOATING-POINT TYPE
+ * ========================================================================= */
+/** \typedef hcl_fltbas_t
+ * The hcl_fltbas_t type defines the largest floating-pointer number type
+ * naturally supported.
+ */
+#if defined(__FreeBSD__) || defined(__MINGW32__)
+	/* TODO: check if the support for long double is complete.
+	 *       if so, use long double for hcl_flt_t */
+	typedef double hcl_fltbas_t;
+#	define HCL_SIZEOF_FLTBAS_T HCL_SIZEOF_DOUBLE
+#elif HCL_SIZEOF_LONG_DOUBLE > HCL_SIZEOF_DOUBLE
+	typedef long double hcl_fltbas_t;
+#	define HCL_SIZEOF_FLTBAS_T HCL_SIZEOF_LONG_DOUBLE
+#else
+	typedef double hcl_fltbas_t;
+#	define HCL_SIZEOF_FLTBAS_T HCL_SIZEOF_DOUBLE
+#endif
+
+/** \typedef hcl_fltmax_t
+ * The hcl_fltmax_t type defines the largest floating-pointer number type
+ * ever supported.
+ */
+#if HCL_SIZEOF___FLOAT128 >= HCL_SIZEOF_FLTBAS_T
+	/* the size of long double may be equal to the size of __float128
+	 * for alignment on some platforms */
+	typedef __float128 hcl_fltmax_t;
+#	define HCL_SIZEOF_FLTMAX_T HCL_SIZEOF___FLOAT128
+#	define HCL_FLTMAX_REQUIRE_QUADMATH 1
+#else
+	typedef hcl_fltbas_t hcl_fltmax_t;
+#	define HCL_SIZEOF_FLTMAX_T HCL_SIZEOF_FLTBAS_T
+#	undef HCL_FLTMAX_REQUIRE_QUADMATH
+#endif
+
+#if defined(HCL_USE_FLTMAX)
+typedef hcl_fltmax_t hcl_flt_t;
+#define HCL_SIZEOF_FLT_T HCL_SIZEOF_FLTMAX_T
+#else
+typedef hcl_fltbas_t hcl_flt_t;
+#define HCL_SIZEOF_FLT_T HCL_SIZEOF_FLTBAS_T
+#endif
+
+/* =========================================================================
  * BASIC HARD-CODED DEFINES
  * ========================================================================= */
 #define HCL_BITS_PER_BYTE (8)

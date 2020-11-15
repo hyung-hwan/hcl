@@ -37,9 +37,7 @@
  * This sample code adds a series of keys and values and print them
  * in descending key order.
  * \code
- * #include <hcl/cmn/rbt.h>
- * #include <hcl/cmn/mem.h>
- * #include <hcl/cmn/sio.h>
+ * #include <hcl-rbt.h>
  * 
  * static hcl_rbt_walk_t walk (hcl_rbt_t* rbt, hcl_rbt_pair_t* pair, void* ctx)
  * {
@@ -53,8 +51,8 @@
  *   hcl_rbt_t* s1;
  *   int i;
  * 
- *   s1 = hcl_rbt_open (HCL_MMGR_GETDFL(), 0, 1, 1); // error handling skipped
- *   hcl_rbt_setstyle (s1, hcl_get_rbt_style(HCL_RBT_STYLE_INLINE_COPIERS));
+ *   s1 = hcl_rbt_open(HCL_MMGR_GETDFL(), 0, 1, 1); // error handling skipped
+ *   hcl_rbt_setstyle(s1, hcl_get_rbt_style(HCL_RBT_STYLE_INLINE_COPIERS));
  * 
  *   for (i = 0; i < 20; i++)
  *   {

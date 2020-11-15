@@ -49,6 +49,7 @@ pkglibdir = $(libdir)
 pkginclude_HEADERS = \
 	hcl.h \
 	hcl-cmn.h \
+	hcl-fmt.h \
 	hcl-opt.h \
 	hcl-rbt.h \
 	hcl-utl.h
@@ -68,6 +69,7 @@ libhcl_la_SOURCES = \
 	dic.c \
 	err.c \
 	exec.c \
+	fmt-imp.h \
 	fmt.c \
 	gc.c \
 	hcl.c \

@@ -236,8 +236,9 @@ am__can_run_installinfo = \
     n|no|NO) false;; \
     *) (install-info --version) >/dev/null 2>&1;; \
   esac
-am__pkginclude_HEADERS_DIST = hcl.h hcl-cmn.h hcl-opt.h hcl-rbt.h \
-	hcl-utl.h hcl-c.h hcl-s.h hcl-tmr.h hcl-xutl.h hcl-json.h
+am__pkginclude_HEADERS_DIST = hcl.h hcl-cmn.h hcl-fmt.h hcl-opt.h \
+	hcl-rbt.h hcl-utl.h hcl-c.h hcl-s.h hcl-tmr.h hcl-xutl.h \
+	hcl-json.h
 HEADERS = $(pkginclude_HEADERS)
 am__tagged_files = $(HEADERS) $(SOURCES) $(TAGS_FILES) \
 	$(LISP)hcl-cfg.h.in
@@ -422,8 +423,8 @@ LIBADD_LIB_COMMON = $(LIBM) $(am__append_1) $(am__append_2) \
 @WIN32_TRUE@CPPFLAGS_PFMOD = -DHCL_DEFAULT_PFMODPREFIX=\"libhcl-\" \
 @WIN32_TRUE@	-DHCL_DEFAULT_PFMODPOSTFIX=\"-1.dll\" \
 @WIN32_TRUE@	$(am__append_4) $(am__append_5)
-pkginclude_HEADERS = hcl.h hcl-cmn.h hcl-opt.h hcl-rbt.h hcl-utl.h \
-	$(am__append_9)
+pkginclude_HEADERS = hcl.h hcl-cmn.h hcl-fmt.h hcl-opt.h hcl-rbt.h \
+	hcl-utl.h $(am__append_9)
 pkglib_LTLIBRARIES = libhcl.la $(am__append_8)
 libhcl_la_SOURCES = \
 	hcl.h \
@@ -439,6 +440,7 @@ libhcl_la_SOURCES = \
 	dic.c \
 	err.c \
 	exec.c \
+	fmt-imp.h \
 	fmt.c \
 	gc.c \
 	hcl.c \

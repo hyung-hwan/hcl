@@ -245,8 +245,8 @@ void hcl_seterrbfmt (hcl_t* hcl, hcl_errnum_t errnum, const hcl_bch_t* fmt, ...)
 	hcl->errmsg.len = 0;
 
 	HCL_MEMSET (&fo, 0, HCL_SIZEOF(fo));
-	fo.putbcs = err_bcs;
-	fo.putucs = err_ucs;
+	fo.putbchars = err_bcs;
+	fo.putuchars = err_ucs;
 	fo.putobj = hcl_fmt_object_;
 	fo.ctx = hcl;
 
@@ -266,8 +266,8 @@ void hcl_seterrufmt (hcl_t* hcl, hcl_errnum_t errnum, const hcl_uch_t* fmt, ...)
 	hcl->errmsg.len = 0;
 
 	HCL_MEMSET (&fo, 0, HCL_SIZEOF(fo));
-	fo.putbcs = err_bcs;
-	fo.putucs = err_ucs;
+	fo.putbchars = err_bcs;
+	fo.putuchars = err_ucs;
 	fo.putobj = hcl_fmt_object_;
 	fo.ctx = hcl;
 
@@ -288,8 +288,8 @@ void hcl_seterrbfmtv (hcl_t* hcl, hcl_errnum_t errnum, const hcl_bch_t* fmt, va_
 	hcl->errmsg.len = 0;
 
 	HCL_MEMSET (&fo, 0, HCL_SIZEOF(fo));
-	fo.putbcs = err_bcs;
-	fo.putucs = err_ucs;
+	fo.putbchars = err_bcs;
+	fo.putuchars = err_ucs;
 	fo.putobj = hcl_fmt_object_;
 	fo.ctx = hcl;
 
@@ -306,8 +306,8 @@ void hcl_seterrufmtv (hcl_t* hcl, hcl_errnum_t errnum, const hcl_uch_t* fmt, va_
 	hcl->errmsg.len = 0;
 
 	HCL_MEMSET (&fo, 0, HCL_SIZEOF(fo));
-	fo.putbcs = err_bcs;
-	fo.putucs = err_ucs;
+	fo.putbchars = err_bcs;
+	fo.putuchars = err_ucs;
 	fo.putobj = hcl_fmt_object_;
 	fo.ctx = hcl;
 

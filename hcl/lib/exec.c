@@ -158,8 +158,8 @@ static HCL_INLINE int vm_startup (hcl_t* hcl)
 	}
 
 #if defined(ENABLE_GCFIN)
-	moo->sem_gcfin = (moo_oop_semaphore_t)moo->_nil;
-	moo->sem_gcfin_sigreq = 0;
+	hcl->sem_gcfin = (moo_oop_semaphore_t)hcl->_nil;
+	hcl->sem_gcfin_sigreq = 0;
 #endif
 
 	hcl->vmprim.vm_gettime (hcl, &hcl->exec_start_time); /* raw time. no adjustment */
@@ -208,8 +208,8 @@ static void vm_cleanup (hcl_t* hcl)
 	}
 
 #if defined(ENABLE_GCFIN)
-	moo->sem_gcfin = (moo_oop_semaphore_t)moo->_nil;
-	moo->sem_gcfin_sigreq = 0;
+	hcl->sem_gcfin = (moo_oop_semaphore_t)hcl->_nil;
+	hcl->sem_gcfin_sigreq = 0;
 
 	/* deregister all pending finalizable objects pending just in case these
 	 * have not been removed for various reasons. (e.g. sudden VM abortion)

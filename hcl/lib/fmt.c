@@ -1,7 +1,7 @@
 /*
  * $Id$
  *
-    Copyright (c) 2014-2018 Chung, Hyung-Hwan. All rights reserved.
+    Copyright (c) 2016-2018 Chung, Hyung-Hwan. All rights reserved.
 
     Redistribution and use in source and binary forms, with or without
     modification, are permitted provided that the following conditions
@@ -68,7 +68,8 @@
 #include "hcl-prv.h"
 
 
-#if 0
+#if defined(HCL_ENABLE_FLTFMT)
+
 #include <stdio.h> /* for snrintf(). used for floating-point number formatting */
 #if defined(_MSC_VER) || defined(__BORLANDC__) || (defined(__WATCOMC__) && (__WATCOMC__ < 1200))
 #	define snprintf _snprintf 
@@ -79,6 +80,7 @@
 #if defined(HAVE_QUADMATH_H)
 #	include <quadmath.h> /* for quadmath_snprintf() */
 #endif
+
 #endif
 
 /* Max number conversion buffer length: 
@@ -169,6 +171,135 @@ static const hcl_bch_t hex2ascii_upper[] =
 static hcl_uch_t uch_nullstr[] = { '(','n','u','l','l', ')','\0' };
 static hcl_bch_t bch_nullstr[] = { '(','n','u','l','l', ')','\0' };
 
+/* ------------------------------------------------------------------------- */
+
+/*define static int fmt_uintmax_to_bcstr(...)*/
+#undef char_t
+#undef fmt_uintmax
+#define char_t hcl_bch_t
+#define fmt_uintmax fmt_uintmax_to_bcstr
+#include "fmt-imp.h"
+
+/*define static int fmt_uintmax_to_ucstr(...)*/
+#undef char_t
+#undef fmt_uintmax
+#define char_t hcl_uch_t
+#define fmt_uintmax fmt_uintmax_to_ucstr
+#include "fmt-imp.h"
+
+int hcl_fmt_intmax_to_bcstr (
+	hcl_bch_t* buf, int size, 
+	hcl_intmax_t value, int base_and_flags, int prec,
+	hcl_bch_t fillchar, const hcl_bch_t* prefix)
+{
+	hcl_bch_t signchar;
+	hcl_uintmax_t absvalue;
+
+	if (value < 0)
+	{
+		signchar = '-';
+		absvalue = -value;
+	}
+	else if (base_and_flags & HCL_FMT_INTMAX_TO_BCSTR_PLUSSIGN)
+	{
+		signchar = '+';
+		absvalue = value;
+	}
+	else if (base_and_flags & HCL_FMT_INTMAX_TO_BCSTR_EMPTYSIGN)
+	{
+		signchar = ' ';
+		absvalue = value;
+	}
+	else
+	{
+		signchar = '\0';
+		absvalue = value;
+	}
+
+	return fmt_uintmax_to_bcstr(buf, size, absvalue, base_and_flags, prec, fillchar, signchar, prefix);
+}
+
+int hcl_fmt_uintmax_to_bcstr (
+	hcl_bch_t* buf, int size, 
+	hcl_uintmax_t value, int base_and_flags, int prec,
+	hcl_bch_t fillchar, const hcl_bch_t* prefix)
+{
+	hcl_bch_t signchar;
+
+	/* determine if a sign character is needed */
+	if (base_and_flags & HCL_FMT_INTMAX_TO_BCSTR_PLUSSIGN)
+	{
+		signchar = '+';
+	}
+	else if (base_and_flags & HCL_FMT_INTMAX_TO_BCSTR_EMPTYSIGN)
+	{
+		signchar = ' ';
+	}
+	else
+	{
+		signchar = '\0';
+	}
+
+	return fmt_uintmax_to_bcstr(buf, size, value, base_and_flags, prec, fillchar, signchar, prefix);
+}
+
+/* ==================== wide-char ===================================== */
+
+int hcl_fmt_intmax_to_ucstr (
+	hcl_uch_t* buf, int size, 
+	hcl_intmax_t value, int base_and_flags, int prec,
+	hcl_uch_t fillchar, const hcl_uch_t* prefix)
+{
+	hcl_uch_t signchar;
+	hcl_uintmax_t absvalue;
+
+	if (value < 0)
+	{
+		signchar = '-';
+		absvalue = -value;
+	}
+	else if (base_and_flags & HCL_FMT_INTMAX_TO_UCSTR_PLUSSIGN)
+	{
+		signchar = '+';
+		absvalue = value;
+	}
+	else if (base_and_flags & HCL_FMT_INTMAX_TO_UCSTR_EMPTYSIGN)
+	{
+		signchar = ' ';
+		absvalue = value;
+	}
+	else
+	{
+		signchar = '\0';
+		absvalue = value;
+	}
+
+	return fmt_uintmax_to_ucstr(buf, size, absvalue, base_and_flags, prec, fillchar, signchar, prefix);
+}
+
+int hcl_fmt_uintmax_to_ucstr (
+	hcl_uch_t* buf, int size, 
+	hcl_uintmax_t value, int base_and_flags, int prec,
+	hcl_uch_t fillchar, const hcl_uch_t* prefix)
+{
+	hcl_uch_t signchar;
+
+	/* determine if a sign character is needed */
+	if (base_and_flags & HCL_FMT_INTMAX_TO_UCSTR_PLUSSIGN)
+	{
+		signchar = '+';
+	}
+	else if (base_and_flags & HCL_FMT_INTMAX_TO_UCSTR_EMPTYSIGN)
+	{
+		signchar = ' ';
+	}
+	else
+	{
+		signchar = '\0';
+	}
+
+	return fmt_uintmax_to_ucstr(buf, size, value, base_and_flags, prec, fillchar, signchar, prefix);
+}
 
 /* ------------------------------------------------------------------------- */
 /*
@@ -211,7 +342,7 @@ static hcl_bch_t* sprintn_upper (hcl_bch_t* nbuf, hcl_uintmax_t num, int base, h
 		for (_yy = 0; _yy < n; _yy++) \
 		{ \
 			int _xx; \
-			if ((_xx = fmtout->putbcs(fmtout, &_cc, 1)) <= -1) goto oops; \
+			if ((_xx = fmtout->putbchars(fmtout, &_cc, 1)) <= -1) goto oops; \
 			if (_xx == 0) goto done; \
 			fmtout->count++; \
 		} \
@@ -221,7 +352,7 @@ static hcl_bch_t* sprintn_upper (hcl_bch_t* nbuf, hcl_uintmax_t num, int base, h
 #define PUT_BCS(fmtout,ptr,len) do { \
 	if (len > 0) { \
 		int _xx; \
-		if ((_xx = fmtout->putbcs(fmtout, ptr, len)) <= -1) goto oops; \
+		if ((_xx = fmtout->putbchars(fmtout, ptr, len)) <= -1) goto oops; \
 		if (_xx == 0) goto done; \
 		fmtout->count += len; \
 	} \
@@ -234,7 +365,7 @@ static hcl_bch_t* sprintn_upper (hcl_bch_t* nbuf, hcl_uintmax_t num, int base, h
 		for (_yy = 0; _yy < n; _yy++) \
 		{ \
 			int _xx; \
-			if ((_xx = fmtout->putucs(fmtout, &_cc, 1)) <= -1) goto oops; \
+			if ((_xx = fmtout->putuchars(fmtout, &_cc, 1)) <= -1) goto oops; \
 			if (_xx == 0) goto done; \
 			fmtout->count++; \
 		} \
@@ -244,7 +375,7 @@ static hcl_bch_t* sprintn_upper (hcl_bch_t* nbuf, hcl_uintmax_t num, int base, h
 #define PUT_UCS(fmtout,ptr,len) do { \
 	if (len > 0) { \
 		int _xx; \
-		if ((_xx = fmtout->putucs(fmtout, ptr, len)) <= -1) goto oops; \
+		if ((_xx = fmtout->putuchars(fmtout, ptr, len)) <= -1) goto oops; \
 		if (_xx == 0) goto done; \
 		fmtout->count += len; \
 	} \
@@ -287,10 +418,25 @@ static int fmt_outv (hcl_fmtout_t* fmtout, va_list ap)
 	hcl_bch_t nbuf[MAXNBUF];
 	const hcl_bch_t* nbufp;
 	int stop = 0;
-#if 0
-	hcl_bchbuf_t* fltfmt;
-	hcl_oochbuf_t* fltout;
+
+#if defined(HCL_ENABLE_FLTFMT)
+	struct
+	{
+		struct
+		{
+			hcl_bch_t  sbuf[32];
+			hcl_bch_t* ptr;
+			hcl_oow_t  capa;
+		} fmt;
+		struct
+		{
+			hcl_bch_t  sbuf[64];
+			hcl_bch_t* ptr;
+			hcl_oow_t  capa;
+		} out;
+	} fb; /* some buffers for handling float-point number formatting */
 #endif
+
 	hcl_bch_t* (*sprintn) (hcl_bch_t* nbuf, hcl_uintmax_t num, int base, hcl_ooi_t* lenp);
 
 	fmtptr = (const hcl_uint8_t*)fmtout->fmt_str;
@@ -306,16 +452,11 @@ static int fmt_outv (hcl_fmtout_t* fmtout, va_list ap)
 
 	/* this is an internal function. it doesn't reset count to 0 */
 	/* fmtout->count = 0; */
-
-#if 0
-	fltfmt = &hcl->d->fltfmt;
-	fltout = &hcl->d->fltout;
-
-	fltfmt->ptr  = fltfmt->buf;
-	fltfmt->capa = HCL_COUNTOF(fltfmt->buf) - 1;
-
-	fltout->ptr  = fltout->buf;
-	fltout->capa = HCL_COUNTOF(fltout->buf) - 1;
+#if defined(HCL_ENABLE_FLTFMT)
+	fb.fmt.ptr = fb.fmt.sbuf;
+	fb.fmt.capa = HCL_COUNTOF(fb.fmt.sbuf) - 1;
+	fb.out.ptr = fb.out.sbuf;
+	fb.out.capa = HCL_COUNTOF(fb.out.sbuf) - 1;
 #endif
 
 	while (1)
@@ -891,7 +1032,7 @@ static int fmt_outv (hcl_fmtout_t* fmtout, va_list ap)
 			break;
 		}
 
-#if 0
+#if defined(HCL_ENABLE_FLTFMT)
 		case 'e':
 		case 'E':
 		case 'f':
@@ -906,23 +1047,27 @@ static int fmt_outv (hcl_fmtout_t* fmtout, va_list ap)
 			/* let me rely on snprintf until i implement float-point to string conversion */
 			int q;
 			hcl_oow_t fmtlen;
-		#if (HCL_SIZEOF___FLOAT128 > 0) && defined(HAVE_QUADMATH_SNPRINTF)
-			__float128 v_qd;
-		#endif
-			long double v_ld;
-			double v_d;
+			union
+			{
+			#if (HCL_SIZEOF___FLOAT128 > 0) && defined(HAVE_QUADMATH_SNPRINTF)
+				__float128 qd;
+			#endif
+				long double ld;
+				double d;
+			} v;
 			int dtype = 0;
 			hcl_oow_t newcapa;
+			hcl_bch_t* bsp;
 
 			if (lm_flag & LF_J)
 			{
 			#if (HCL_SIZEOF___FLOAT128 > 0) && defined(HAVE_QUADMATH_SNPRINTF) && (HCL_SIZEOF_FLTMAX_T == HCL_SIZEOF___FLOAT128)
-				v_qd = va_arg (ap, hcl_fltmax_t);
+				v.qd = va_arg(ap, hcl_fltmax_t);
 				dtype = LF_QD;
 			#elif HCL_SIZEOF_FLTMAX_T == HCL_SIZEOF_DOUBLE
-				v_d = va_arg(ap, hcl_fltmax_t);
+				v.d = va_arg(ap, hcl_fltmax_t);
 			#elif HCL_SIZEOF_FLTMAX_T == HCL_SIZEOF_LONG_DOUBLE
-				v_ld = va_arg(ap, hcl_fltmax_t);
+				v.ld = va_arg(ap, hcl_fltmax_t);
 				dtype = LF_LD;
 			#else
 				#error Unsupported hcl_flt_t
@@ -937,9 +1082,9 @@ static int fmt_outv (hcl_fmtout_t* fmtout, va_list ap)
 				 * so i prefer the format specifier with no modifier.
 				 */
 			#if HCL_SIZEOF_FLT_T == HCL_SIZEOF_DOUBLE
-				v_d = va_arg(ap, hcl_flt_t);
+				v.d = va_arg(ap, hcl_flt_t);
 			#elif HCL_SIZEOF_FLT_T == HCL_SIZEOF_LONG_DOUBLE
-				v_ld = va_arg(ap, hcl_flt_t);
+				v.ld = va_arg(ap, hcl_flt_t);
 				dtype = LF_LD;
 			#else
 				#error Unsupported hcl_flt_t
@@ -947,13 +1092,13 @@ static int fmt_outv (hcl_fmtout_t* fmtout, va_list ap)
 			}
 			else if (lm_flag & (LF_LD | LF_L))
 			{
-				v_ld = va_arg (ap, long double);
+				v.ld = va_arg(ap, long double);
 				dtype = LF_LD;
 			}
 		#if (HCL_SIZEOF___FLOAT128 > 0) && defined(HAVE_QUADMATH_SNPRINTF)
 			else if (lm_flag & (LF_QD | LF_Q))
 			{
-				v_qd = va_arg(ap, __float128);
+				v.qd = va_arg(ap, __float128);
 				dtype = LF_QD;
 			}
 		#endif
@@ -963,63 +1108,63 @@ static int fmt_outv (hcl_fmtout_t* fmtout, va_list ap)
 			}
 			else
 			{
-				v_d = va_arg (ap, double);
+				v.d = va_arg(ap, double);
 			}
 
-			fmtlen = fmt - percent;
-			if (fmtlen > fltfmt->capa)
+			fmtlen = fmtptr - percent;
+			if (fmtlen > fb.fmt.capa)
 			{
-				if (fltfmt->ptr == fltfmt->buf)
+				if (fb.fmt.ptr == fb.fmt.sbuf)
 				{
-					fltfmt->ptr = HCL_MMGR_ALLOC(HCL_MMGR_GETDFL(), HCL_SIZEOF(*fltfmt->ptr) * (fmtlen + 1));
-					if (!fltfmt->ptr) goto oops;
+					fb.fmt.ptr = (hcl_bch_t*)HCL_MMGR_ALLOC(fmtout->mmgr, HCL_SIZEOF(*fb.fmt.ptr) * (fmtlen + 1));
+					if (!fb.fmt.ptr) goto oops;
 				}
 				else
 				{
 					hcl_bch_t* tmpptr;
 
-					tmpptr = HCL_MMGR_REALLOC(HCL_MMGR_GETDFL(), fltfmt->ptr, HCL_SIZEOF(*fltfmt->ptr) * (fmtlen + 1));
+					tmpptr = (hcl_bch_t*)HCL_MMGR_REALLOC(fmtout->mmgr, fb.fmt.ptr, HCL_SIZEOF(*fb.fmt.ptr) * (fmtlen + 1));
 					if (!tmpptr) goto oops;
-					fltfmt->ptr = tmpptr;
+					fb.fmt.ptr = tmpptr;
 				}
 
-				fltfmt->capa = fmtlen;
+				fb.fmt.capa = fmtlen;
 			}
 
 			/* compose back the format specifier */
 			fmtlen = 0;
-			fltfmt->ptr[fmtlen++] = '%';
-			if (flagc & FLAGC_SPACE) fltfmt->ptr[fmtlen++] = ' ';
-			if (flagc & FLAGC_SHARP) fltfmt->ptr[fmtlen++] = '#';
-			if (flagc & FLAGC_SIGN) fltfmt->ptr[fmtlen++] = '+';
-			if (flagc & FLAGC_LEFTADJ) fltfmt->ptr[fmtlen++] = '-';
-			if (flagc & FLAGC_ZEROPAD) fltfmt->ptr[fmtlen++] = '0';
+			fb.fmt.ptr[fmtlen++] = '%';
+			if (flagc & FLAGC_SPACE) fb.fmt.ptr[fmtlen++] = ' ';
+			if (flagc & FLAGC_SHARP) fb.fmt.ptr[fmtlen++] = '#';
+			if (flagc & FLAGC_SIGN) fb.fmt.ptr[fmtlen++] = '+';
+			if (flagc & FLAGC_LEFTADJ) fb.fmt.ptr[fmtlen++] = '-';
+			if (flagc & FLAGC_ZEROPAD) fb.fmt.ptr[fmtlen++] = '0';
 
-			if (flagc & FLAGC_STAR1) fltfmt->ptr[fmtlen++] = '*';
+			if (flagc & FLAGC_STAR1) fb.fmt.ptr[fmtlen++] = '*';
 			else if (flagc & FLAGC_WIDTH) 
 			{
-				fmtlen += hcl_fmtuintmaxtombs (
-					&fltfmt->ptr[fmtlen], fltfmt->capa - fmtlen, 
+				fmtlen += hcl_fmt_uintmax_to_bcstr(
+					&fb.fmt.ptr[fmtlen], fb.fmt.capa - fmtlen, 
 					width, 10, -1, '\0', HCL_NULL);
 			}
-			if (flagc & FLAGC_DOT) fltfmt->ptr[fmtlen++] = '.';
-			if (flagc & FLAGC_STAR2) fltfmt->ptr[fmtlen++] = '*';
+			if (flagc & FLAGC_DOT) fb.fmt.ptr[fmtlen++] = '.';
+			if (flagc & FLAGC_STAR2) fb.fmt.ptr[fmtlen++] = '*';
 			else if (flagc & FLAGC_PRECISION) 
 			{
-				fmtlen += hcl_fmtuintmaxtombs (
-					&fltfmt->ptr[fmtlen], fltfmt->capa - fmtlen, 
+				fmtlen += hcl_fmt_uintmax_to_bcstr(
+					&fb.fmt.ptr[fmtlen], fb.fmt.capa - fmtlen, 
 					precision, 10, -1, '\0', HCL_NULL);
 			}
 
 			if (dtype == LF_LD)
-				fltfmt->ptr[fmtlen++] = 'L';
+				fb.fmt.ptr[fmtlen++] = 'L';
 		#if (HCL_SIZEOF___FLOAT128 > 0)
 			else if (dtype == LF_QD)
-				fltfmt->ptr[fmtlen++] = 'Q';
+				fb.fmt.ptr[fmtlen++] = 'Q';
 		#endif
 
-			fltfmt->ptr[fmtlen++] = ch;
-			fltfmt->ptr[fmtlen] = '\0';
+			fb.fmt.ptr[fmtlen++] = uch;
+			fb.fmt.ptr[fmtlen] = '\0';
 
 		#if defined(HAVE_SNPRINTF)
 			/* nothing special here */
@@ -1027,78 +1172,65 @@ static int fmt_outv (hcl_fmtout_t* fmtout, va_list ap)
 			/* best effort to avoid buffer overflow when no snprintf is available. 
 			 * i really can't do much if it happens. */
 			newcapa = precision + width + 32;
-			if (fltout->capa < newcapa)
+			if (fb.out.capa < newcapa)
 			{
-				HCL_ASSERT (hcl, fltout->ptr == fltout->buf);
+				HCL_ASSERT (moo, fb.out.ptr == fb.out.sbuf);
 
-				fltout->ptr = HCL_MMGR_ALLOC(HCL_MMGR_GETDFL(), HCL_SIZEOF(char_t) * (newcapa + 1));
-				if (!fltout->ptr) goto oops;
-				fltout->capa = newcapa;
+				fb.out.ptr = HCL_MMGR_ALLOC(fmtout->mmgr, HCL_SIZEOF(hcl_bch_t) * (newcapa + 1));
+				if (!fb.out.ptr) goto oops;
+				fb.out.capa = newcapa;
 			}
 		#endif
 
 			while (1)
 			{
-
 				if (dtype == LF_LD)
 				{
 				#if defined(HAVE_SNPRINTF)
-					q = snprintf ((hcl_bch_t*)fltout->ptr, fltout->capa + 1, fltfmt->ptr, v_ld);
+					q = snprintf((hcl_bch_t*)fb.out.ptr, fb.out.capa + 1, fb.fmt.ptr, v.ld);
 				#else
-					q = sprintf ((hcl_bch_t*)fltout->ptr, fltfmt->ptr, v_ld);
+					q = sprintf((hcl_bch_t*)fb.out.ptr, fb.fmt.ptr, v.ld);
 				#endif
 				}
 			#if (HCL_SIZEOF___FLOAT128 > 0) && defined(HAVE_QUADMATH_SNPRINTF)
 				else if (dtype == LF_QD)
 				{
-					q = quadmath_snprintf((hcl_bch_t*)fltout->ptr, fltout->capa + 1, fltfmt->ptr, v_qd);
+					q = quadmath_snprintf((hcl_bch_t*)fb.out.ptr, fb.out.capa + 1, fb.fmt.ptr, v.qd);
 				}
 			#endif
 				else
 				{
 				#if defined(HAVE_SNPRINTF)
-					q = snprintf ((hcl_bch_t*)fltout->ptr, fltout->capa + 1, fltfmt->ptr, v_d);
+					q = snprintf((hcl_bch_t*)fb.out.ptr, fb.out.capa + 1, fb.fmt.ptr, v.d);
 				#else
-					q = sprintf ((hcl_bch_t*)fltout->ptr, fltfmt->ptr, v_d);
+					q = sprintf((hcl_bch_t*)fb.out.ptr, fb.fmt.ptr, v.d);
 				#endif
 				}
 				if (q <= -1) goto oops;
-				if (q <= fltout->capa) break;
+				if (q <= fb.out.capa) break;
 
-				newcapa = fltout->capa * 2;
+				newcapa = fb.out.capa * 2;
 				if (newcapa < q) newcapa = q;
 
-				if (fltout->ptr == fltout->sbuf)
+				if (fb.out.ptr == fb.out.sbuf)
 				{
-					fltout->ptr = HCL_MMGR_ALLOC(HCL_MMGR_GETDFL(), HCL_SIZEOF(char_t) * (newcapa + 1));
-					if (!fltout->ptr) goto oops;
+					fb.out.ptr = (hcl_bch_t*)HCL_MMGR_ALLOC(fmtout->mmgr, HCL_SIZEOF(hcl_bch_t) * (newcapa + 1));
+					if (!fb.out.ptr) goto oops;
 				}
 				else
 				{
-					char_t* tmpptr;
-
-					tmpptr = HCL_MMGR_REALLOC(HCL_MMGR_GETDFL(), fltout->ptr, HCL_SIZEOF(char_t) * (newcapa + 1));
+					hcl_bch_t* tmpptr;
+					tmpptr = (hcl_bch_t*)HCL_MMGR_REALLOC(fmtout->mmgr, fb.out.ptr, HCL_SIZEOF(hcl_bch_t) * (newcapa + 1));
 					if (!tmpptr) goto oops;
-					fltout->ptr = tmpptr;
+					fb.out.ptr = tmpptr;
 				}
-				fltout->capa = newcapa;
+				fb.out.capa = newcapa;
 			}
 
-			if (HCL_SIZEOF(char_t) != HCL_SIZEOF(hcl_bch_t))
-			{
-				fltout->ptr[q] = '\0';
-				while (q > 0)
-				{
-					q--;
-					fltout->ptr[q] = ((hcl_bch_t*)fltout->ptr)[q];
-				}
-			}
-
-			sp = fltout->ptr;
-			flagc &= ~FLAGC_DOT;
-			width = 0;
-			precision = 0;
-			goto print_lowercase_s;
+			bsp = fb.out.ptr;
+			n = 0; while (bsp[n] != '\0') n++;
+			PUT_BCS (fmtout, bsp, n);
+			break;
 		}
 #endif
 
@@ -1297,9 +1429,17 @@ static int fmt_outv (hcl_fmtout_t* fmtout, va_list ap)
 	}
 
 done:
+#if defined(HCL_ENABLE_FLTFMT)
+	if (fb.fmt.ptr != fb.fmt.sbuf) HCL_MMGR_FREE (fmtout->mmgr, fb.fmt.ptr);
+	if (fb.out.ptr != fb.out.sbuf) HCL_MMGR_FREE (fmtout->mmgr, fb.out.ptr);
+#endif
 	return 0;
 
 oops:
+#if defined(HCL_ENABLE_FLTFMT)
+	if (fb.fmt.ptr != fb.fmt.sbuf) HCL_MMGR_FREE (fmtout->mmgr, fb.fmt.ptr);
+	if (fb.out.ptr != fb.out.sbuf) HCL_MMGR_FREE (fmtout->mmgr, fb.out.ptr);
+#endif
 	return -1;
 }
 
@@ -1557,8 +1697,9 @@ hcl_ooi_t hcl_logbfmtv (hcl_t* hcl, hcl_bitmask_t mask, const hcl_bch_t* fmt, va
 	fo.fmt_str = fmt;
 	fo.ctx = hcl;
 	fo.mask = mask;
-	fo.putbcs = log_bcs;
-	fo.putucs = log_ucs;
+	fo.mmgr = hcl_getmmgr(hcl);
+	fo.putbchars = log_bcs;
+	fo.putuchars = log_ucs;
 	fo.putobj = hcl_fmt_object_;
 
 	x = fmt_outv(&fo, ap);
@@ -1611,8 +1752,9 @@ hcl_ooi_t hcl_logufmtv (hcl_t* hcl, hcl_bitmask_t mask, const hcl_uch_t* fmt, va
 	fo.fmt_str = fmt;
 	fo.ctx = hcl;
 	fo.mask = mask;
-	fo.putbcs = log_bcs;
-	fo.putucs = log_ucs;
+	fo.mmgr = hcl_getmmgr(hcl);
+	fo.putbchars = log_bcs;
+	fo.putuchars = log_ucs;
 	fo.putobj = hcl_fmt_object_;
 
 	x = fmt_outv(&fo, ap);
@@ -1756,8 +1898,9 @@ hcl_ooi_t hcl_prbfmtv (hcl_t* hcl, const hcl_bch_t* fmt, va_list ap)
 	fo.fmt_str = fmt;
 	fo.ctx = hcl;
 	fo.mask = 0;
-	fo.putbcs = print_bcs;
-	fo.putucs = print_ucs;
+	fo.mmgr = hcl_getmmgr(hcl);
+	fo.putbchars = print_bcs;
+	fo.putuchars = print_ucs;
 	fo.putobj = hcl_fmt_object_;
 
 	x = fmt_outv(&fo, ap);
@@ -1788,8 +1931,9 @@ hcl_ooi_t hcl_prufmtv (hcl_t* hcl, const hcl_uch_t* fmt, va_list ap)
 	fo.fmt_str = fmt;
 	fo.ctx = hcl;
 	fo.mask = 0;
-	fo.putbcs = print_bcs;
-	fo.putucs = print_ucs;
+	fo.mmgr = hcl_getmmgr(hcl);
+	fo.putbchars = print_bcs;
+	fo.putuchars = print_ucs;
 	fo.putobj = hcl_fmt_object_;
 
 	x = fmt_outv(&fo, ap);
@@ -2637,8 +2781,8 @@ int hcl_strfmtcallstack (hcl_t* hcl, hcl_ooi_t nargs)
 
 	HCL_MEMSET (&fo, 0, HCL_SIZEOF(fo));
 	fo.ctx = hcl;
-	fo.putbcs = sprint_bcs;
-	fo.putucs = sprint_ucs;
+	fo.putbchars = sprint_bcs;
+	fo.putuchars = sprint_ucs;
 	fo.putobj = hcl_fmt_object_;
 	/* format_stack_args doesn't use fmt_str and fmt_type. 
 	 * it takes the format string from the stack. */
@@ -2653,9 +2797,12 @@ int hcl_prfmtcallstack (hcl_t* hcl, hcl_ooi_t nargs)
 	hcl_fmtout_t fo;
 
 	HCL_MEMSET (&fo, 0, HCL_SIZEOF(fo));
+
+	fo.mask = 0;
+	fo.mmgr = hcl_getmmgr(hcl);
 	fo.ctx = hcl;
-	fo.putbcs = print_bcs;
-	fo.putucs = print_ucs;
+	fo.putbchars = print_bcs;
+	fo.putuchars = print_ucs;
 	fo.putobj = hcl_fmt_object_;
 	/* format_stack_args doesn't use fmt_str and fmt_type. 
 	 * it takes the format string from the stack. */
@@ -2681,9 +2828,10 @@ int hcl_logfmtcallstack (hcl_t* hcl, hcl_ooi_t nargs)
 		fo.mask |= (hcl->log.default_type_mask & HCL_LOG_ALL_TYPES);
 	}
 
+	fo.mmgr = hcl_getmmgr(hcl);
 	fo.ctx = hcl;
-	fo.putbcs = log_bcs;
-	fo.putucs = log_ucs;
+	fo.putbchars = log_bcs;
+	fo.putuchars = log_ucs;
 	fo.putobj = hcl_fmt_object_;
 	/* format_stack_args doesn't use fmt_str and fmt_type. 
 	 * it takes the format string from the stack. */

@@ -28,6 +28,7 @@
 #define _HCL_PRV_H_
 
 #include "hcl.h"
+#include "hcl-fmt.h"
 #include "hcl-utl.h"
 
 /* you can define this to either 1 or 2 */
@@ -41,6 +42,9 @@
 #define HCL_ENABLE_KARATSUBA
 #define HCL_KARATSUBA_CUTOFF 32
 #define HCL_KARATSUBA_CUTOFF_DEBUG 3
+
+/* enable floating-pointer number support in the basic formatting functions */
+#define HCL_ENABLE_FLTFMT
 
 #if defined(HCL_BUILD_DEBUG)
 #define HCL_DEBUG_LEXER 1
