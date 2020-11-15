@@ -1,6 +1,5 @@
 AUTOMAKE_OPTIONS = nostdinc
 
-##AM_CFLAGS = $(PTHREAD_CFLAGS)
 
 CPPFLAGS_COMMON = \
 	-I$(abs_builddir) \
@@ -8,6 +7,8 @@ CPPFLAGS_COMMON = \
 	-I$(abs_srcdir) \
 	-I$(abs_srcdir)/../lib \
 	-I$(includedir)
+
+CFLAGS_COMMON = 
 
 if ENABLE_STATIC_MODULE
 
@@ -44,20 +45,24 @@ endif
 
 libhcl_arr_la_SOURCES = arr.c _arr.h
 libhcl_arr_la_CPPFLAGS = $(CPPFLAGS_COMMON)
+libhcl_arr_la_CFLAGS = $(CFLAGS_COMMON)
 libhcl_arr_la_LDFLAGS = $(LDFLAGS_COMMON)
 libhcl_arr_la_LIBADD = $(LIBADD_COMMON) 
 
 libhcl_dic_la_SOURCES = dic.c _dic.h
 libhcl_dic_la_CPPFLAGS = $(CPPFLAGS_COMMON)
+libhcl_dic_la_CFLAGS = $(CFLAGS_COMMON)
 libhcl_dic_la_LDFLAGS = $(LDFLAGS_COMMON)
 libhcl_dic_la_LIBADD = $(LIBADD_COMMON) 
 
 libhcl_str_la_SOURCES = str.c _str.h
 libhcl_str_la_CPPFLAGS = $(CPPFLAGS_COMMON)
+libhcl_str_la_CFLAGS = $(CFLAGS_COMMON)
 libhcl_str_la_LDFLAGS = $(LDFLAGS_COMMON)
 libhcl_str_la_LIBADD = $(LIBADD_COMMON) 
 
 libhcl_sys_la_SOURCES = sys.c _sys.h
 libhcl_sys_la_CPPFLAGS = $(CPPFLAGS_COMMON)
+libhcl_sys_la_CFLAGS = $(CFLAGS_COMMON)
 libhcl_sys_la_LDFLAGS = $(LDFLAGS_COMMON)
 libhcl_sys_la_LIBADD = $(LIBADD_COMMON) 

@@ -657,6 +657,17 @@ then
 fi
 AM_CONDITIONAL(ENABLE_LIBUNWIND, test "x${enable_libunwind_is}" = "xyes")
 
+dnl ==== include pthread options to the default flags ====
+dnl keep this as  the last option as it changes the default compile flags.
+dnl otherwise, other tests may get affected if this option is on.
+AC_ARG_ENABLE([pthread-flags], [AS_HELP_STRING([--enable-pthread-flags],[add thread flags to CFLAGS, LIBS(default. yes)])],
+	enable_pthread_flags_is=$enableval,enable_pthread_flags_is=yes)
+if test "$enable_pthread_flags_is" = "yes"
+then
+	[CFLAGS="$CFLAGS $PTHREAD_CFLAGS"]
+	[LIBS="$LIBS $PTHREAD_LIBS"]
+fi
+
 dnl ===== enable-hclx =====
 AC_ARG_ENABLE([hclx],
 	[AS_HELP_STRING([--enable-hclx],[build libhclx(default. no)])],

@@ -88,6 +88,10 @@ PRE_UNINSTALL = :
 POST_UNINSTALL = :
 build_triplet = @build@
 host_triplet = @host@
+
+##################################################
+# MAIN LIBRARY 
+##################################################
 @ENABLE_LIBLTDL_TRUE@am__append_1 = $(LTDL_LIBS)
 @ENABLE_LIBLTDL_FALSE@am__append_2 = $(DL_LIBS)
 bin_PROGRAMS = hcl$(EXEEXT) $(am__EXEEXT_1)
@@ -116,8 +120,7 @@ hcl_OBJECTS = $(am_hcl_OBJECTS)
 am__DEPENDENCIES_1 =
 @ENABLE_LIBLTDL_TRUE@am__DEPENDENCIES_2 = $(am__DEPENDENCIES_1)
 @ENABLE_LIBLTDL_FALSE@am__DEPENDENCIES_3 = $(am__DEPENDENCIES_1)
-am__DEPENDENCIES_4 = $(am__DEPENDENCIES_1) $(am__DEPENDENCIES_2) \
-	$(am__DEPENDENCIES_3)
+am__DEPENDENCIES_4 = $(am__DEPENDENCIES_2) $(am__DEPENDENCIES_3)
 AM_V_lt = $(am__v_lt_@AM_V@)
 am__v_lt_ = $(am__v_lt_@AM_DEFAULT_V@)
 am__v_lt_0 = --silent
@@ -334,6 +337,7 @@ pdfdir = @pdfdir@
 prefix = @prefix@
 program_transform_name = @program_transform_name@
 psdir = @psdir@
+runstatedir = @runstatedir@
 sbindir = @sbindir@
 sharedstatedir = @sharedstatedir@
 srcdir = @srcdir@
@@ -343,40 +347,37 @@ top_build_prefix = @top_build_prefix@
 top_builddir = @top_builddir@
 top_srcdir = @top_srcdir@
 AUTOMAKE_OPTIONS = nostdinc
-CPPFLAGS_ALL_COMMON = \
+CPPFLAGS_COMMON = \
 	-I$(abs_builddir) \
 	-I$(abs_builddir)/../lib  \
 	-I$(abs_srcdir) \
 	-I$(abs_srcdir)/../lib \
 	-I$(includedir)	
 
-LDFLAGS_ALL_COMMON = -L$(abs_builddir) -L$(abs_builddir)/../lib -L$(libdir)
 
-##################################################
-# MAIN LIBRARY 
-##################################################
-CPPFLAGS_LIB_COMMON = $(CPPFLAGS_ALL_COMMON) $(LTDLINCL)
-LDFLAGS_LIB_COMMON = $(LDFLAGS_ALL_COMMON) -version-info 1:0:0 -no-undefined
-LIBADD_LIB_COMMON = $(LIBM) $(am__append_1) $(am__append_2)
+#### $(LTDLINCL)
+CFLAGS_COMMON = 
+LDFLAGS_COMMON = -L$(abs_builddir)/../lib -L$(libdir)
+LIBADD_COMMON = $(am__append_1) $(am__append_2)
 hcl_SOURCES = main.c ../lib/cb-impl.h ../lib/cb-impl.c
-hcl_CPPFLAGS = $(CPPFLAGS_ALL_COMMON) $(CPPFLAGS_PFMOD)
-hcl_LDFLAGS = $(LDFLAGS_ALL_COMMON)
-hcl_LDADD = -lhcl $(LIBADD_LIB_COMMON)
+hcl_CPPFLAGS = $(CPPFLAGS_COMMON) 
+hcl_LDFLAGS = $(LDFLAGS_COMMON)
+hcl_LDADD = -lhcl $(LIBADD_COMMON)
 hcl_DEPENDENCIES = ../lib/libhcl.la
 @ENABLE_HCLX_TRUE@hcls_SOURCES = main-s.c
-@ENABLE_HCLX_TRUE@hcls_CPPFLAGS = $(CPPFLAGS_ALL_COMMON)
-@ENABLE_HCLX_TRUE@hcls_LDFLAGS = $(LDFLAGS_ALL_COMMON)
-@ENABLE_HCLX_TRUE@hcls_LDADD = -lhclx $(LIBADD_LIB_COMMON) $(PTHREAD_LIBS)
+@ENABLE_HCLX_TRUE@hcls_CPPFLAGS = $(CPPFLAGS_COMMON)
+@ENABLE_HCLX_TRUE@hcls_LDFLAGS = $(LDFLAGS_COMMON)
+@ENABLE_HCLX_TRUE@hcls_LDADD = -lhclx $(LIBADD_COMMON)
 @ENABLE_HCLX_TRUE@hcls_DEPENDENCIES = ../lib/libhclx.la
 @ENABLE_HCLX_TRUE@hclc_SOURCES = main-c.c
-@ENABLE_HCLX_TRUE@hclc_CPPFLAGS = $(CPPFLAGS_ALL_COMMON)
-@ENABLE_HCLX_TRUE@hclc_LDFLAGS = $(LDFLAGS_ALL_COMMON)
-@ENABLE_HCLX_TRUE@hclc_LDADD = -lhclx $(LIBADD_LIB_COMMON) $(PTHREAD_LIBS)
+@ENABLE_HCLX_TRUE@hclc_CPPFLAGS = $(CPPFLAGS_COMMON)
+@ENABLE_HCLX_TRUE@hclc_LDFLAGS = $(LDFLAGS_COMMON)
+@ENABLE_HCLX_TRUE@hclc_LDADD = -lhclx $(LIBADD_COMMON)
 @ENABLE_HCLX_TRUE@hclc_DEPENDENCIES = ../lib/libhclx.la
 @ENABLE_HCLX_TRUE@hclj_SOURCES = main-j.c
-@ENABLE_HCLX_TRUE@hclj_CPPFLAGS = $(CPPFLAGS_ALL_COMMON)
-@ENABLE_HCLX_TRUE@hclj_LDFLAGS = $(LDFLAGS_ALL_COMMON)
-@ENABLE_HCLX_TRUE@hclj_LDADD = -lhclx $(LIBADD_LIB_COMMON) $(PTHREAD_LIBS)
+@ENABLE_HCLX_TRUE@hclj_CPPFLAGS = $(CPPFLAGS_COMMON)
+@ENABLE_HCLX_TRUE@hclj_LDFLAGS = $(LDFLAGS_COMMON)
+@ENABLE_HCLX_TRUE@hclj_LDADD = -lhclx $(LIBADD_COMMON)
 @ENABLE_HCLX_TRUE@hclj_DEPENDENCIES = ../lib/libhclx.la
 all: all-am
 

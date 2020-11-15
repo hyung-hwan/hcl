@@ -3,8 +3,7 @@ AUTOMAKE_OPTIONS = nostdinc
 CPPFLAGS_ALL_COMMON = \
 	-I$(abs_builddir) \
 	-I$(abs_srcdir) \
-	-I$(includedir)	\
-	$(PTHREAD_CFLAGS)
+	-I$(includedir)	
 
 if ENABLE_STATIC_MODULE
 LDFLAGS_ALL_COMMON = -L$(abs_builddir)/../mod -L$(abs_builddir) -L$(libdir)
@@ -112,7 +111,7 @@ libhclx_la_SOURCES = \
 	hcl-c.c hcl-c.h
 libhclx_la_CPPFLAGS = $(CPPFLAGS_LIB_COMMON) $(CPPFLAGS_PFMOD)
 libhclx_la_LDFLAGS = $(LDFLAGS_LIB_COMMON)
-libhclx_la_LIBADD = -lhcl $(LIBADD_LIB_COMMON) $(PTHREAD_LIBS)
+libhclx_la_LIBADD = -lhcl $(LIBADD_LIB_COMMON)
 libhclx_la_DEPENDENCIES = libhcl.la
 endif
 

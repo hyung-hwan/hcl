@@ -125,7 +125,7 @@ static HCL_INLINE const char* proc_state_to_string (int state)
 #	define LOG_INST_1(hcl,fmt,a1)
 #	define LOG_INST_2(hcl,fmt,a1,a2)
 #	define LOG_INST_3(hcl,fmt,a1,a2,a3)
-#	define LOG_INST_3(hcl,fmt,a1,a2,a3,a4)
+#	define LOG_INST_4(hcl,fmt,a1,a2,a3,a4)
 #endif
 
 static int delete_sem_from_sem_io_tuple (hcl_t* hcl, hcl_oop_semaphore_t sem, int force);

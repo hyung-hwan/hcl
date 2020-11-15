@@ -333,6 +333,7 @@ pdfdir = @pdfdir@
 prefix = @prefix@
 program_transform_name = @program_transform_name@
 psdir = @psdir@
+runstatedir = @runstatedir@
 sbindir = @sbindir@
 sharedstatedir = @sharedstatedir@
 srcdir = @srcdir@
@@ -343,9 +344,9 @@ top_builddir = @top_builddir@
 top_srcdir = @top_srcdir@
 AUTOMAKE_OPTION = foreign
 ACLOCAL_AMFLAGS = -I m4
-EXTRA_DIST = 
+EXTRA_DIST = t t/test-bi.hcl
 SUBDIRS = $(am__append_1) $(am__append_2)
-DIST_SUBDIRS = $(SUBDIRS) t
+DIST_SUBDIRS = $(SUBDIRS) ##t
 all: all-recursive
 
 .SUFFIXES:

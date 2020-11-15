@@ -322,7 +322,7 @@ hcl_errnum_t hcl_vmprim_syserrstrb (hcl_t* hcl, int syserr_type, int syserr_code
 
 #if defined(HCL_BUILD_RELEASE)
 
-void hcl_cb_assertfail (hcl_t* hcl, const hcl_bch_t* expr, const hcl_bch_t* file, hcl_oow_t line)
+void hcl_vmprim_assertfail (hcl_t* hcl, const hcl_bch_t* expr, const hcl_bch_t* file, hcl_oow_t line)
 {
 	/* do nothing */
 }
