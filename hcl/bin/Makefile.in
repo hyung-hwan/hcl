@@ -121,6 +121,7 @@ am__DEPENDENCIES_1 =
 @ENABLE_LIBLTDL_TRUE@am__DEPENDENCIES_2 = $(am__DEPENDENCIES_1)
 @ENABLE_LIBLTDL_FALSE@am__DEPENDENCIES_3 = $(am__DEPENDENCIES_1)
 am__DEPENDENCIES_4 = $(am__DEPENDENCIES_2) $(am__DEPENDENCIES_3)
+hcl_DEPENDENCIES = ../lib/libhcl.la $(am__DEPENDENCIES_4)
 AM_V_lt = $(am__v_lt_@AM_V@)
 am__v_lt_ = $(am__v_lt_@AM_DEFAULT_V@)
 am__v_lt_0 = --silent
@@ -131,18 +132,24 @@ hcl_LINK = $(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) \
 am__hclc_SOURCES_DIST = main-c.c
 @ENABLE_HCLX_TRUE@am_hclc_OBJECTS = hclc-main-c.$(OBJEXT)
 hclc_OBJECTS = $(am_hclc_OBJECTS)
+@ENABLE_HCLX_TRUE@hclc_DEPENDENCIES = ../lib/libhclx.la \
+@ENABLE_HCLX_TRUE@	$(am__DEPENDENCIES_4)
 hclc_LINK = $(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) \
 	$(LIBTOOLFLAGS) --mode=link $(CCLD) $(AM_CFLAGS) $(CFLAGS) \
 	$(hclc_LDFLAGS) $(LDFLAGS) -o $@
 am__hclj_SOURCES_DIST = main-j.c
 @ENABLE_HCLX_TRUE@am_hclj_OBJECTS = hclj-main-j.$(OBJEXT)
 hclj_OBJECTS = $(am_hclj_OBJECTS)
+@ENABLE_HCLX_TRUE@hclj_DEPENDENCIES = ../lib/libhclx.la \
+@ENABLE_HCLX_TRUE@	$(am__DEPENDENCIES_4)
 hclj_LINK = $(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) \
 	$(LIBTOOLFLAGS) --mode=link $(CCLD) $(AM_CFLAGS) $(CFLAGS) \
 	$(hclj_LDFLAGS) $(LDFLAGS) -o $@
 am__hcls_SOURCES_DIST = main-s.c
 @ENABLE_HCLX_TRUE@am_hcls_OBJECTS = hcls-main-s.$(OBJEXT)
 hcls_OBJECTS = $(am_hcls_OBJECTS)
+@ENABLE_HCLX_TRUE@hcls_DEPENDENCIES = ../lib/libhclx.la \
+@ENABLE_HCLX_TRUE@	$(am__DEPENDENCIES_4)
 hcls_LINK = $(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) \
 	$(LIBTOOLFLAGS) --mode=link $(CCLD) $(AM_CFLAGS) $(CFLAGS) \
 	$(hcls_LDFLAGS) $(LDFLAGS) -o $@
@@ -362,23 +369,19 @@ LIBADD_COMMON = $(am__append_1) $(am__append_2)
 hcl_SOURCES = main.c ../lib/cb-impl.h ../lib/cb-impl.c
 hcl_CPPFLAGS = $(CPPFLAGS_COMMON) 
 hcl_LDFLAGS = $(LDFLAGS_COMMON)
-hcl_LDADD = -lhcl $(LIBADD_COMMON)
-hcl_DEPENDENCIES = ../lib/libhcl.la
+hcl_LDADD = ../lib/libhcl.la $(LIBADD_COMMON)
 @ENABLE_HCLX_TRUE@hcls_SOURCES = main-s.c
 @ENABLE_HCLX_TRUE@hcls_CPPFLAGS = $(CPPFLAGS_COMMON)
 @ENABLE_HCLX_TRUE@hcls_LDFLAGS = $(LDFLAGS_COMMON)
-@ENABLE_HCLX_TRUE@hcls_LDADD = -lhclx $(LIBADD_COMMON)
-@ENABLE_HCLX_TRUE@hcls_DEPENDENCIES = ../lib/libhclx.la
+@ENABLE_HCLX_TRUE@hcls_LDADD = ../lib/libhclx.la $(LIBADD_COMMON)
 @ENABLE_HCLX_TRUE@hclc_SOURCES = main-c.c
 @ENABLE_HCLX_TRUE@hclc_CPPFLAGS = $(CPPFLAGS_COMMON)
 @ENABLE_HCLX_TRUE@hclc_LDFLAGS = $(LDFLAGS_COMMON)
-@ENABLE_HCLX_TRUE@hclc_LDADD = -lhclx $(LIBADD_COMMON)
-@ENABLE_HCLX_TRUE@hclc_DEPENDENCIES = ../lib/libhclx.la
+@ENABLE_HCLX_TRUE@hclc_LDADD = ../lib/libhclx.la $(LIBADD_COMMON)
 @ENABLE_HCLX_TRUE@hclj_SOURCES = main-j.c
 @ENABLE_HCLX_TRUE@hclj_CPPFLAGS = $(CPPFLAGS_COMMON)
 @ENABLE_HCLX_TRUE@hclj_LDFLAGS = $(LDFLAGS_COMMON)
-@ENABLE_HCLX_TRUE@hclj_LDADD = -lhclx $(LIBADD_COMMON)
-@ENABLE_HCLX_TRUE@hclj_DEPENDENCIES = ../lib/libhclx.la
+@ENABLE_HCLX_TRUE@hclj_LDADD = ../lib/libhclx.la $(LIBADD_COMMON)
 all: all-am
 
 .SUFFIXES:

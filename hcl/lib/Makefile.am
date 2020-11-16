@@ -88,17 +88,12 @@ libhcl_la_SOURCES = \
 libhcl_la_CPPFLAGS = $(CPPFLAGS_LIB_COMMON)
 libhcl_la_LDFLAGS = $(LDFLAGS_LIB_COMMON)
 libhcl_la_LIBADD = $(LIBADD_LIB_COMMON)
-libhcl_la_DEPENDENCIES =
 
 if ENABLE_STATIC_MODULE
-libhcl_la_LIBADD += -lhcl-arr
-libhcl_la_DEPENDENCIES += $(abs_builddir)/../mod/libhcl-arr.la
-libhcl_la_LIBADD += -lhcl-dic
-libhcl_la_DEPENDENCIES += $(abs_builddir)/../mod/libhcl-dic.la
-libhcl_la_LIBADD += -lhcl-str
-libhcl_la_DEPENDENCIES += $(abs_builddir)/../mod/libhcl-str.la
-libhcl_la_LIBADD += -lhcl-sys
-libhcl_la_DEPENDENCIES += $(abs_builddir)/../mod/libhcl-sys.la
+libhcl_la_LIBADD += ../mod/libhcl-arr.la
+libhcl_la_LIBADD += ../mod/libhcl-dic.la
+libhcl_la_LIBADD += ../mod/libhcl-str.la
+libhcl_la_LIBADD += ../mod/libhcl-sys.la
 endif
 
 if ENABLE_HCLX
@@ -113,8 +108,7 @@ libhclx_la_SOURCES = \
 	hcl-c.c hcl-c.h
 libhclx_la_CPPFLAGS = $(CPPFLAGS_LIB_COMMON) $(CPPFLAGS_PFMOD)
 libhclx_la_LDFLAGS = $(LDFLAGS_LIB_COMMON)
-libhclx_la_LIBADD = -lhcl $(LIBADD_LIB_COMMON)
-libhclx_la_DEPENDENCIES = libhcl.la
+libhclx_la_LIBADD = libhcl.la $(LIBADD_LIB_COMMON)
 endif
 
 
