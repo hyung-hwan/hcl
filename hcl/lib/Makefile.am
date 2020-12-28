@@ -52,7 +52,8 @@ pkginclude_HEADERS = \
 	hcl-fmt.h \
 	hcl-opt.h \
 	hcl-rbt.h \
-	hcl-utl.h
+	hcl-utl.h \
+	hcl-xma.h
 
 pkglib_LTLIBRARIES = libhcl.la
 libhcl_la_SOURCES = \
@@ -84,7 +85,8 @@ libhcl_la_SOURCES = \
 	read.c \
 	sym.c \
 	utf8.c \
-	utl.c 
+	utl.c \
+	xma.c 
 libhcl_la_CPPFLAGS = $(CPPFLAGS_LIB_COMMON)
 libhcl_la_LDFLAGS = $(LDFLAGS_LIB_COMMON)
 libhcl_la_LIBADD = $(LIBADD_LIB_COMMON)
