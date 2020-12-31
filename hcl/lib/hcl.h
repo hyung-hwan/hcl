@@ -27,8 +27,9 @@
 #ifndef _HCL_H_
 #define _HCL_H_
 
-#include "hcl-cmn.h"
-#include "hcl-rbt.h"
+#include <hcl-cmn.h>
+#include <hcl-rbt.h>
+#include <hcl-xma.h>
 #include <stdarg.h>
 
 /* TODO: move this macro out to the build files.... */
@@ -256,6 +257,16 @@ typedef struct hcl_obj_word_t*     hcl_oop_word_t;
 #endif
 
 /* =========================================================================
+ * HEADER FOR GC IMPLEMENTATION
+ * ========================================================================= */
+typedef struct hcl_gchdr_t hcl_gchdr_t;
+struct hcl_gchdr_t
+{
+        hcl_gchdr_t* next;
+};
+/* The size of hcl_gchdr_t must be aligned to HCL_SIZEOF_OOP_T */
+
+/* =========================================================================
  * OBJECT STRUCTURE
  * ========================================================================= */
 enum hcl_obj_type_t
@@ -335,7 +346,7 @@ typedef enum hcl_obj_type_t hcl_obj_type_t;
 #define HCL_OBJ_FLAGS_UNIT_BITS     5
 #define HCL_OBJ_FLAGS_EXTRA_BITS    1
 #define HCL_OBJ_FLAGS_KERNEL_BITS   2
-#define HCL_OBJ_FLAGS_MOVED_BITS    1
+#define HCL_OBJ_FLAGS_MOVED_BITS    2
 #define HCL_OBJ_FLAGS_NGC_BITS      1
 #define HCL_OBJ_FLAGS_TRAILER_BITS  1
 #define HCL_OBJ_FLAGS_SYNCODE_BITS  4
@@ -803,8 +814,9 @@ typedef struct hcl_heap_t hcl_heap_t;
 struct hcl_heap_t
 {
 	hcl_uint8_t* base;  /* start of a heap */
-	hcl_uint8_t* limit; /* end of a heap */
-	hcl_uint8_t* ptr;   /* next allocation pointer */
+	hcl_oow_t    size;
+	hcl_xma_t*   xma;
+	hcl_mmgr_t   xmmgr;
 };
 
 /* =========================================================================
@@ -1344,9 +1356,7 @@ struct hcl_t
 	} log;
 	/* ========================= */
 
-	hcl_heap_t* permheap; /* TODO: put kernel objects to here */
-	hcl_heap_t* curheap;
-	hcl_heap_t* newheap;
+	hcl_heap_t* heap;
 
 	/* ========================= */
 	hcl_oop_t _nil;  /* pointer to the nil object */
@@ -1400,9 +1410,6 @@ struct hcl_t
 	hcl_oow_t sem_io_map_capa;
 	/* ============================================================================= */
 
-	hcl_oop_t* tmp_stack[256]; /* stack for temporaries */
-	hcl_oow_t tmp_count;
-
 	hcl_oop_t* proc_map;
 	hcl_oow_t proc_map_capa;
 	hcl_oow_t proc_map_used;
@@ -1413,6 +1420,9 @@ struct hcl_t
 	 * because the 2 high extended bits are used only if the low tag bits
 	 * are 3 */
 	int tagged_brands[16];
+
+	hcl_oop_t* volat_stack[256]; /* stack for temporaries */
+	hcl_oow_t volat_count;
 
 	/* == EXECUTION REGISTERS == */
 	hcl_oop_function_t initial_function;
@@ -1492,6 +1502,34 @@ struct hcl_t
 		hcl_oop_t e; /* top entry being printed */
 	} p;
 	/* == PRINTER == */
+
+	struct
+	{
+		hcl_gchdr_t* b; /* object blocks allocated */
+		struct
+		{
+			hcl_gchdr_t* curr;
+			hcl_gchdr_t* prev;
+		} ls;
+		hcl_oow_t bsz; /* total size of object blocks allocated */
+		hcl_oow_t threshold;
+		int lazy_sweep;
+
+		struct
+		{
+			hcl_oop_t* ptr;
+			hcl_oow_t capa;
+			hcl_oow_t len;
+			hcl_oow_t max;
+		} stack;
+
+		struct
+		{
+			hcl_ntime_t alloc;
+			hcl_ntime_t mark;
+			hcl_ntime_t sweep;
+		} stat;
+	} gci;
 
 #if defined(HCL_INCLUDE_COMPILER)
 	hcl_compiler_t* c;
@@ -1797,7 +1835,8 @@ HCL_EXPORT void hcl_deregcb (
  * It is not affected by #HCL_TRAIT_NOGC.
  */
 HCL_EXPORT void hcl_gc (
-	hcl_t* hcl
+	hcl_t* hcl,
+	int    full
 );
 
 
@@ -1810,12 +1849,6 @@ HCL_EXPORT void hcl_gc (
 hcl_oop_t hcl_moveoop (
 	hcl_t*     hcl,
 	hcl_oop_t  oop
-);
-
-
-HCL_EXPORT hcl_oow_t hcl_getpayloadbytes (
-	hcl_t*    hcl,
-	hcl_oop_t oop
 );
 
 HCL_EXPORT hcl_oop_t hcl_shallowcopy (
@@ -1974,16 +2007,16 @@ HCL_EXPORT void hcl_setsynerrufmt (
 /* =========================================================================
  * TEMPORARY OOP MANAGEMENT FUNCTIONS
  * ========================================================================= */
-HCL_EXPORT void hcl_pushtmp (
+HCL_EXPORT void hcl_pushvolat (
 	hcl_t*     hcl,
 	hcl_oop_t* oop_ptr
 );
 
-HCL_EXPORT void hcl_poptmp (
+HCL_EXPORT void hcl_popvolat (
 	hcl_t*     hcl
 );
 
-HCL_EXPORT void hcl_poptmps (
+HCL_EXPORT void hcl_popvolats (
 	hcl_t*     hcl,
 	hcl_oow_t  count
 );

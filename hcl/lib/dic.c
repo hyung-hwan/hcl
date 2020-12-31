@@ -66,9 +66,9 @@ static hcl_oop_oop_t expand_bucket (hcl_t* hcl, hcl_oop_oop_t oldbuc)
 		newsz = oldsz + inc;
 	}
 
-	hcl_pushtmp (hcl, (hcl_oop_t*)&oldbuc);
+	hcl_pushvolat (hcl, (hcl_oop_t*)&oldbuc);
 	newbuc = (hcl_oop_oop_t)hcl_makearray (hcl, newsz, 0); 
-	hcl_poptmp (hcl);
+	hcl_popvolat (hcl);
 	if (!newbuc) return HCL_NULL;
 
 	while (oldsz > 0)
@@ -172,9 +172,9 @@ static hcl_oop_cons_t find_or_upsert (hcl_t* hcl, hcl_oop_dic_t dic, hcl_oop_t k
 		return HCL_NULL;
 	}
 
-	hcl_pushtmp (hcl, (hcl_oop_t*)&dic); tmp_count++;
-	hcl_pushtmp (hcl, (hcl_oop_t*)&key); tmp_count++;
-	hcl_pushtmp (hcl, &value); tmp_count++;
+	hcl_pushvolat (hcl, (hcl_oop_t*)&dic); tmp_count++;
+	hcl_pushvolat (hcl, (hcl_oop_t*)&key); tmp_count++;
+	hcl_pushvolat (hcl, &value); tmp_count++;
 
 	/* no conversion to hcl_oow_t is necessary for tally + 1.
 	 * the maximum value of tally is checked to be HCL_SMOOI_MAX - 1.
@@ -220,11 +220,11 @@ static hcl_oop_cons_t find_or_upsert (hcl_t* hcl, hcl_oop_dic_t dic, hcl_oop_t k
 	dic->tally = HCL_SMOOI_TO_OOP(tally + 1);
 	dic->bucket->slot[index] = (hcl_oop_t)ass;
 
-	hcl_poptmps (hcl, tmp_count);
+	hcl_popvolats (hcl, tmp_count);
 	return ass;
 
 oops:
-	hcl_poptmps (hcl, tmp_count);
+	hcl_popvolats (hcl, tmp_count);
 	return HCL_NULL;
 }
 
@@ -370,9 +370,9 @@ hcl_oop_t hcl_makedic (hcl_t* hcl, hcl_oow_t inisize)
 
 		obj->tally = HCL_SMOOI_TO_OOP(0);
 
-		hcl_pushtmp (hcl, (hcl_oop_t*)&obj);
+		hcl_pushvolat (hcl, (hcl_oop_t*)&obj);
 		bucket = (hcl_oop_oop_t)hcl_makearray(hcl, inisize, 0);
-		hcl_poptmp (hcl);
+		hcl_popvolat (hcl);
 
 		if (!bucket) obj = HCL_NULL;
 		else obj->bucket = bucket;
@@ -385,7 +385,7 @@ int hcl_walkdic (hcl_t* hcl, hcl_oop_dic_t dic, hcl_dic_walker_t walker, void* c
 {
 	hcl_oow_t i;
 
-	hcl_pushtmp (hcl, (hcl_oop_t*)&dic);
+	hcl_pushvolat (hcl, (hcl_oop_t*)&dic);
 
 	for (i = 0; i < HCL_OBJ_GET_SIZE(dic->bucket); i++)
 	{
@@ -393,7 +393,7 @@ int hcl_walkdic (hcl_t* hcl, hcl_oop_dic_t dic, hcl_dic_walker_t walker, void* c
 		if (HCL_IS_CONS(hcl, tmp) && walker(hcl, dic, (hcl_oop_cons_t)tmp, ctx) <= -1) return -1;
 	}
 
-	hcl_poptmp (hcl);
+	hcl_popvolat (hcl);
 	return 0;
 }
 

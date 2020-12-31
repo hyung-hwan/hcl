@@ -679,9 +679,9 @@ static HCL_INLINE hcl_oop_t expand_bigint (hcl_t* hcl, hcl_oop_t oop, hcl_oow_t 
 		return HCL_NULL;
 	}
 
-	hcl_pushtmp (hcl, &oop);
+	hcl_pushvolat (hcl, &oop);
 	z = hcl_makebigint(hcl, HCL_OBJ_GET_FLAGS_BRAND(oop), HCL_NULL, count + inc);
-	hcl_poptmp (hcl);
+	hcl_popvolat (hcl);
 	if (!z) return HCL_NULL;
 
 	for (i = 0; i < count; i++)
@@ -699,9 +699,9 @@ static HCL_INLINE hcl_oop_t _clone_bigint (hcl_t* hcl, hcl_oop_t oop, hcl_oow_t 
 	HCL_ASSERT (hcl, HCL_OOP_IS_POINTER(oop));
 	if (count <= 0) count = HCL_OBJ_GET_SIZE(oop);
 
-	hcl_pushtmp (hcl, &oop);
+	hcl_pushvolat (hcl, &oop);
 	z = hcl_makebigint(hcl, brand, HCL_NULL, count);
-	hcl_poptmp (hcl);
+	hcl_popvolat (hcl);
 	if (!z) return HCL_NULL;
 
 	for (i = 0; i < count; i++)
@@ -2044,10 +2044,10 @@ static hcl_oop_t add_unsigned_integers (hcl_t* hcl, hcl_oop_t x, hcl_oop_t y)
 	}
 	zs++;
 
-	hcl_pushtmp (hcl, &x);
-	hcl_pushtmp (hcl, &y);
+	hcl_pushvolat (hcl, &x);
+	hcl_pushvolat (hcl, &y);
 	z = hcl_makebigint(hcl, HCL_OBJ_GET_FLAGS_BRAND(x), HCL_NULL, zs);
-	hcl_poptmps (hcl, 2);
+	hcl_popvolats (hcl, 2);
 	if (!z) return HCL_NULL;
 
 	add_unsigned_array (
@@ -2065,10 +2065,10 @@ static hcl_oop_t subtract_unsigned_integers (hcl_t* hcl, hcl_oop_t x, hcl_oop_t 
 
 	HCL_ASSERT (hcl, !is_less_unsigned(x, y));
 
-	hcl_pushtmp (hcl, &x);
-	hcl_pushtmp (hcl, &y);
+	hcl_pushvolat (hcl, &x);
+	hcl_pushvolat (hcl, &y);
 	z = hcl_makebigint(hcl, HCL_BRAND_PBIGINT, HCL_NULL, HCL_OBJ_GET_SIZE(x));
-	hcl_poptmps (hcl, 2);
+	hcl_popvolats (hcl, 2);
 	if (!z) return HCL_NULL;
 
 	subtract_unsigned_array (hcl, 
@@ -2092,10 +2092,10 @@ static hcl_oop_t multiply_unsigned_integers (hcl_t* hcl, hcl_oop_t x, hcl_oop_t 
 		return HCL_NULL;
 	}
 
-	hcl_pushtmp (hcl, &x);
-	hcl_pushtmp (hcl, &y);
+	hcl_pushvolat (hcl, &x);
+	hcl_pushvolat (hcl, &y);
 	z = hcl_makebigint(hcl, HCL_BRAND_PBIGINT, HCL_NULL, xs + ys);
-	hcl_poptmps (hcl, 2);
+	hcl_popvolats (hcl, 2);
 	if (!z) return HCL_NULL;
 
 #if defined(HCL_ENABLE_KARATSUBA)
@@ -2129,9 +2129,9 @@ static hcl_oop_t divide_unsigned_integers (hcl_t* hcl, hcl_oop_t x, hcl_oop_t y,
 		rr = clone_bigint(hcl, x, HCL_OBJ_GET_SIZE(x));
 		if (!rr) return HCL_NULL;
 
-		hcl_pushtmp (hcl, &rr);
+		hcl_pushvolat (hcl, &rr);
 		qq = make_bigint_with_ooi(hcl, 0); /* TODO: inefficient. no need to create a bigint object for zero. */
-		hcl_poptmp (hcl);
+		hcl_popvolat (hcl);
 
 		if (qq) *r = rr;
 		return qq;
@@ -2141,9 +2141,9 @@ static hcl_oop_t divide_unsigned_integers (hcl_t* hcl, hcl_oop_t x, hcl_oop_t y,
 		rr = make_bigint_with_ooi(hcl, 0); /* TODO: inefficient. no need to create a bigint object for zero. */
 		if (!rr) return HCL_NULL;
 
-		hcl_pushtmp (hcl, &rr);
+		hcl_pushvolat (hcl, &rr);
 		qq = make_bigint_with_ooi(hcl, 1); /* TODO: inefficient. no need to create a bigint object for zero. */
-		hcl_poptmp (hcl);
+		hcl_popvolat (hcl);
 
 		if (qq) *r = rr;
 		return qq;
@@ -2151,8 +2151,8 @@ static hcl_oop_t divide_unsigned_integers (hcl_t* hcl, hcl_oop_t x, hcl_oop_t y,
 
 	/* the caller must ensure that x >= y */
 	HCL_ASSERT (hcl, !is_less_unsigned(x, y)); 
-	hcl_pushtmp (hcl, &x);
-	hcl_pushtmp (hcl, &y);
+	hcl_pushvolat (hcl, &x);
+	hcl_pushvolat (hcl, &y);
 
 #define USE_DIVIDE_UNSIGNED_ARRAY2
 /*#define USE_DIVIDE_UNSIGNED_ARRAY3*/
@@ -2166,11 +2166,11 @@ static hcl_oop_t divide_unsigned_integers (hcl_t* hcl, hcl_oop_t x, hcl_oop_t y,
 #endif
 	if (!qq) 
 	{
-		hcl_poptmps (hcl, 2);
+		hcl_popvolats (hcl, 2);
 		return HCL_NULL;
 	}
 
-	hcl_pushtmp (hcl, &qq);
+	hcl_pushvolat (hcl, &qq);
 #if defined(USE_DIVIDE_UNSIGNED_ARRAY3)
 	rr = hcl_makebigint(hcl, HCL_BRAND_PBIGINT, HCL_NULL, HCL_OBJ_GET_SIZE(y));
 #elif defined(USE_DIVIDE_UNSIGNED_ARRAY2)
@@ -2178,7 +2178,7 @@ static hcl_oop_t divide_unsigned_integers (hcl_t* hcl, hcl_oop_t x, hcl_oop_t y,
 #else
 	rr = hcl_makebigint(hcl, HCL_BRAND_PBIGINT, HCL_NULL, HCL_OBJ_GET_SIZE(y) + 1);
 #endif
-	hcl_poptmps (hcl, 3);
+	hcl_popvolats (hcl, 3);
 	if (!rr) return HCL_NULL;
 
 
@@ -2228,9 +2228,9 @@ hcl_oop_t hcl_addints (hcl_t* hcl, hcl_oop_t x, hcl_oop_t y)
 			v = HCL_OOP_TO_SMOOI(x);
 			if (v == 0) return clone_bigint (hcl, y, HCL_OBJ_GET_SIZE(y));
 
-			hcl_pushtmp (hcl, &y);
+			hcl_pushvolat (hcl, &y);
 			x = make_bigint_with_ooi (hcl, v);
-			hcl_poptmp (hcl);
+			hcl_popvolat (hcl);
 			if (!x) return HCL_NULL;
 		}
 		else if (HCL_OOP_IS_SMOOI(y))
@@ -2240,9 +2240,9 @@ hcl_oop_t hcl_addints (hcl_t* hcl, hcl_oop_t x, hcl_oop_t y)
 			v = HCL_OOP_TO_SMOOI(y);
 			if (v == 0) return clone_bigint (hcl, x, HCL_OBJ_GET_SIZE(x));
 
-			hcl_pushtmp (hcl, &x);
+			hcl_pushvolat (hcl, &x);
 			y = make_bigint_with_ooi (hcl, v);
-			hcl_poptmp (hcl);
+			hcl_popvolat (hcl);
 			if (!y) return HCL_NULL;
 		}
 		else
@@ -2336,9 +2336,9 @@ hcl_oop_t hcl_subints (hcl_t* hcl, hcl_oop_t x, hcl_oop_t y)
 				return clone_bigint_negated (hcl, y, HCL_OBJ_GET_SIZE(y));
 			}
 
-			hcl_pushtmp (hcl, &y);
+			hcl_pushvolat (hcl, &y);
 			x = make_bigint_with_ooi (hcl, v);
-			hcl_poptmp (hcl);
+			hcl_popvolat (hcl);
 			if (!x) return HCL_NULL;
 		}
 		else if (HCL_OOP_IS_SMOOI(y))
@@ -2348,9 +2348,9 @@ hcl_oop_t hcl_subints (hcl_t* hcl, hcl_oop_t x, hcl_oop_t y)
 			v = HCL_OOP_TO_SMOOI(y);
 			if (v == 0) return clone_bigint (hcl, x, HCL_OBJ_GET_SIZE(x));
 
-			hcl_pushtmp (hcl, &x);
+			hcl_pushvolat (hcl, &x);
 			y = make_bigint_with_ooi (hcl, v);
-			hcl_poptmp (hcl);
+			hcl_popvolat (hcl);
 			if (!y) return HCL_NULL;
 		}
 		else
@@ -2414,14 +2414,14 @@ hcl_oop_t hcl_mulints (hcl_t* hcl, hcl_oop_t x, hcl_oop_t y)
 		{
 			/* overflowed - convert x and y normal objects and carry on */
 
-			/* no need to call hcl_pushtmp before creating x because
+			/* no need to call hcl_pushvolat before creating x because
 			 * xv and yv contains actual values needed */
 			x = make_bigint_with_ooi (hcl, xv);
 			if (!x) return HCL_NULL;
 
-			hcl_pushtmp (hcl, &x); /* protect x made above */
+			hcl_pushvolat (hcl, &x); /* protect x made above */
 			y = make_bigint_with_ooi (hcl, yv);
-			hcl_poptmp (hcl);
+			hcl_popvolat (hcl);
 			if (!y) return HCL_NULL;
 
 			goto full_multiply;
@@ -2453,9 +2453,9 @@ hcl_oop_t hcl_mulints (hcl_t* hcl, hcl_oop_t x, hcl_oop_t y)
 					return clone_bigint_negated (hcl, y, HCL_OBJ_GET_SIZE(y));
 			}
 
-			hcl_pushtmp (hcl, &y);
+			hcl_pushvolat (hcl, &y);
 			x = make_bigint_with_ooi (hcl, v);
-			hcl_poptmp (hcl);
+			hcl_popvolat (hcl);
 			if (!x) return HCL_NULL;
 		}
 		else if (HCL_OOP_IS_SMOOI(y))
@@ -2473,9 +2473,9 @@ hcl_oop_t hcl_mulints (hcl_t* hcl, hcl_oop_t x, hcl_oop_t y)
 					return clone_bigint_negated (hcl, x, HCL_OBJ_GET_SIZE(x));
 			}
 
-			hcl_pushtmp (hcl, &x);
+			hcl_pushvolat (hcl, &x);
 			y = make_bigint_with_ooi (hcl, v);
-			hcl_poptmp (hcl);
+			hcl_popvolat (hcl);
 			if (!y) return HCL_NULL;
 		}
 		else
@@ -2627,9 +2627,9 @@ hcl_oop_t hcl_divints (hcl_t* hcl, hcl_oop_t x, hcl_oop_t y, int modulo, hcl_oop
 			}
  
 			/* carry on to the full bigint division */
-			hcl_pushtmp (hcl, &y);
+			hcl_pushvolat (hcl, &y);
 			x = make_bigint_with_ooi(hcl, xv);
-			hcl_poptmp (hcl);
+			hcl_popvolat (hcl);
 			if (!x) return HCL_NULL;
 		}
 		else if (HCL_OOP_IS_SMOOI(y))
@@ -2706,10 +2706,10 @@ hcl_oop_t hcl_divints (hcl_t* hcl, hcl_oop_t x, hcl_oop_t y, int modulo, hcl_oop
 							if (!z) return HCL_NULL;
 							if (rem)
 							{
- 								hcl_pushtmp (hcl, &z);
+ 								hcl_pushvolat (hcl, &z);
 								r = hcl_addints(hcl, HCL_SMOOI_TO_OOP(ri), HCL_SMOOI_TO_OOP(yv));
  
-								hcl_poptmp (hcl);
+								hcl_popvolat (hcl);
 								if (!r) return HCL_NULL;
  
 								*rem = r;
@@ -2725,9 +2725,9 @@ hcl_oop_t hcl_divints (hcl_t* hcl, hcl_oop_t x, hcl_oop_t y, int modulo, hcl_oop
 			}
 
 			/* carry on to the full bigint division */
-			hcl_pushtmp (hcl, &x);
+			hcl_pushvolat (hcl, &x);
 			y = make_bigint_with_ooi (hcl, yv);
-			hcl_poptmp (hcl);
+			hcl_popvolat (hcl);
 			if (!y) return HCL_NULL;
 		}
 		else
@@ -2740,10 +2740,10 @@ hcl_oop_t hcl_divints (hcl_t* hcl, hcl_oop_t x, hcl_oop_t y, int modulo, hcl_oop
 	x_neg_sign = HCL_IS_NBIGINT(hcl, x);
 	y_neg_sign = HCL_IS_NBIGINT(hcl, y);
 
-	hcl_pushtmp (hcl, &x);
-	hcl_pushtmp (hcl, &y);
+	hcl_pushvolat (hcl, &x);
+	hcl_pushvolat (hcl, &y);
 	z = divide_unsigned_integers (hcl, x, y, &r);
-	hcl_poptmps (hcl, 2);
+	hcl_popvolats (hcl, 2);
 	if (!z) return HCL_NULL;
 
 	if (x_neg_sign) 
@@ -2757,30 +2757,30 @@ hcl_oop_t hcl_divints (hcl_t* hcl, hcl_oop_t x, hcl_oop_t y, int modulo, hcl_oop
 	{
 		HCL_OBJ_SET_FLAGS_BRAND (z, HCL_BRAND_NBIGINT);
 
-		hcl_pushtmp (hcl, &z);
-		hcl_pushtmp (hcl, &y);
+		hcl_pushvolat (hcl, &z);
+		hcl_pushvolat (hcl, &y);
 		r = normalize_bigint (hcl, r);
-		hcl_poptmps (hcl, 2);
+		hcl_popvolats (hcl, 2);
 		if (!r) return HCL_NULL;
 
 		if (r != HCL_SMOOI_TO_OOP(0) && modulo)
 		{
 			if (rem)
 			{
-				hcl_pushtmp (hcl, &z);
-				hcl_pushtmp (hcl, &y);
+				hcl_pushvolat (hcl, &z);
+				hcl_pushvolat (hcl, &y);
 				r = hcl_addints (hcl, r, y);
-				hcl_poptmps (hcl, 2);
+				hcl_popvolats (hcl, 2);
 				if (!r) return HCL_NULL;
 
-				hcl_pushtmp (hcl, &r);
+				hcl_pushvolat (hcl, &r);
 				z = normalize_bigint (hcl, z);
-				hcl_poptmp (hcl);
+				hcl_popvolat (hcl);
 				if (!z) return HCL_NULL;
 
-				hcl_pushtmp (hcl, &r);
+				hcl_pushvolat (hcl, &r);
 				z = hcl_subints (hcl, z, HCL_SMOOI_TO_OOP(1));
-				hcl_poptmp (hcl);
+				hcl_popvolat (hcl);
 				if (!z) return HCL_NULL;
 
 				*rem = r;
@@ -2798,15 +2798,15 @@ hcl_oop_t hcl_divints (hcl_t* hcl, hcl_oop_t x, hcl_oop_t y, int modulo, hcl_oop
 	}
 	else
 	{
-		hcl_pushtmp (hcl, &z);
+		hcl_pushvolat (hcl, &z);
 		r = normalize_bigint (hcl, r);
-		hcl_poptmp (hcl);
+		hcl_popvolat (hcl);
 		if (!r) return HCL_NULL;
 	}
 
-	hcl_pushtmp (hcl, &r);
+	hcl_pushvolat (hcl, &r);
 	z = normalize_bigint(hcl, z);
-	hcl_poptmp (hcl);
+	hcl_popvolat (hcl);
 
 	if (z && rem) *rem = r;
 	return z;
@@ -2952,9 +2952,9 @@ hcl_oop_t hcl_bitatint (hcl_t* hcl, hcl_oop_t x, hcl_oop_t y)
 
 			HCL_ASSERT (hcl, sign == 0);
 
-			hcl_pushtmp (hcl, &x);
+			hcl_pushvolat (hcl, &x);
 			quo = hcl_divints (hcl, y, HCL_SMOOI_TO_OOP(HCL_LIW_BITS), 0, &rem);
-			hcl_poptmp (hcl);
+			hcl_popvolat (hcl);
 			if (!quo) return HCL_NULL;
 
 			sign = integer_to_oow (hcl, quo, &wp);
@@ -3023,9 +3023,9 @@ hcl_oop_t hcl_bitandints (hcl_t* hcl, hcl_oop_t x, hcl_oop_t y)
 		v = HCL_OOP_TO_SMOOI(x);
 		if (v == 0) return HCL_SMOOI_TO_OOP(0);
 
-		hcl_pushtmp (hcl, &y);
+		hcl_pushvolat (hcl, &y);
 		x = make_bigint_with_ooi (hcl, v);
-		hcl_poptmp (hcl);
+		hcl_popvolat (hcl);
 		if (!x) return HCL_NULL;
 
 		goto bigint_and_bigint;
@@ -3039,9 +3039,9 @@ hcl_oop_t hcl_bitandints (hcl_t* hcl, hcl_oop_t x, hcl_oop_t y)
 		v = HCL_OOP_TO_SMOOI(y);
 		if (v == 0) return HCL_SMOOI_TO_OOP(0);
 
-		hcl_pushtmp (hcl, &x);
+		hcl_pushvolat (hcl, &x);
 		y = make_bigint_with_ooi (hcl, v);
-		hcl_poptmp (hcl);
+		hcl_popvolat (hcl);
 		if (!x) return HCL_NULL;
 
 		goto bigint_and_bigint;
@@ -3093,10 +3093,10 @@ hcl_oop_t hcl_bitandints (hcl_t* hcl, hcl_oop_t x, hcl_oop_t y)
 			zs = ys;
 		}
 
-		hcl_pushtmp (hcl, &x);
-		hcl_pushtmp (hcl, &y);
+		hcl_pushvolat (hcl, &x);
+		hcl_pushvolat (hcl, &y);
 		z = hcl_makebigint(hcl, HCL_BRAND_PBIGINT, HCL_NULL, zalloc);
-		hcl_poptmps (hcl, 2);
+		hcl_popvolats (hcl, 2);
 		if (!z) return HCL_NULL;
 
 		if (negx && negy)
@@ -3236,9 +3236,9 @@ hcl_oop_t hcl_bitorints (hcl_t* hcl, hcl_oop_t x, hcl_oop_t y)
 		v = HCL_OOP_TO_SMOOI(x);
 		if (v == 0) return clone_bigint(hcl, y, HCL_OBJ_GET_SIZE(y));
 
-		hcl_pushtmp (hcl, &y);
+		hcl_pushvolat (hcl, &y);
 		x = make_bigint_with_ooi (hcl, v);
-		hcl_poptmp (hcl);
+		hcl_popvolat (hcl);
 		if (!x) return HCL_NULL;
 
 		goto bigint_and_bigint;
@@ -3252,9 +3252,9 @@ hcl_oop_t hcl_bitorints (hcl_t* hcl, hcl_oop_t x, hcl_oop_t y)
 		v = HCL_OOP_TO_SMOOI(y);
 		if (v == 0) return clone_bigint(hcl, x, HCL_OBJ_GET_SIZE(x));
 
-		hcl_pushtmp (hcl, &x);
+		hcl_pushvolat (hcl, &x);
 		y = make_bigint_with_ooi (hcl, v);
-		hcl_poptmp (hcl);
+		hcl_popvolat (hcl);
 		if (!x) return HCL_NULL;
 
 		goto bigint_and_bigint;
@@ -3313,10 +3313,10 @@ hcl_oop_t hcl_bitorints (hcl_t* hcl, hcl_oop_t x, hcl_oop_t y)
 			return HCL_NULL;
 		}
 
-		hcl_pushtmp (hcl, &x);
-		hcl_pushtmp (hcl, &y);
+		hcl_pushvolat (hcl, &x);
+		hcl_pushvolat (hcl, &y);
 		z = hcl_makebigint(hcl, HCL_BRAND_PBIGINT, HCL_NULL, zalloc);
-		hcl_poptmps (hcl, 2);
+		hcl_popvolats (hcl, 2);
 		if (!z) return HCL_NULL;
 
 		if (negx && negy)
@@ -3454,9 +3454,9 @@ hcl_oop_t hcl_bitxorints (hcl_t* hcl, hcl_oop_t x, hcl_oop_t y)
 		v = HCL_OOP_TO_SMOOI(x);
 		if (v == 0) return clone_bigint(hcl, y, HCL_OBJ_GET_SIZE(y));
 
-		hcl_pushtmp (hcl, &y);
+		hcl_pushvolat (hcl, &y);
 		x = make_bigint_with_ooi (hcl, v);
-		hcl_poptmp (hcl);
+		hcl_popvolat (hcl);
 		if (!x) return HCL_NULL;
 
 		goto bigint_and_bigint;
@@ -3470,9 +3470,9 @@ hcl_oop_t hcl_bitxorints (hcl_t* hcl, hcl_oop_t x, hcl_oop_t y)
 		v = HCL_OOP_TO_SMOOI(y);
 		if (v == 0) return clone_bigint(hcl, x, HCL_OBJ_GET_SIZE(x));
 
-		hcl_pushtmp (hcl, &x);
+		hcl_pushvolat (hcl, &x);
 		y = make_bigint_with_ooi (hcl, v);
-		hcl_poptmp (hcl);
+		hcl_popvolat (hcl);
 		if (!x) return HCL_NULL;
 
 		goto bigint_and_bigint;
@@ -3531,10 +3531,10 @@ hcl_oop_t hcl_bitxorints (hcl_t* hcl, hcl_oop_t x, hcl_oop_t y)
 			return HCL_NULL;
 		}
 
-		hcl_pushtmp (hcl, &x);
-		hcl_pushtmp (hcl, &y);
+		hcl_pushvolat (hcl, &x);
+		hcl_pushvolat (hcl, &y);
 		z = hcl_makebigint(hcl, HCL_BRAND_PBIGINT, HCL_NULL, zalloc);
-		hcl_poptmps (hcl, 2);
+		hcl_popvolats (hcl, 2);
 		if (!z) return HCL_NULL;
 
 		if (negx && negy)
@@ -3690,9 +3690,9 @@ hcl_oop_t hcl_bitinvint (hcl_t* hcl, hcl_oop_t x)
 			return HCL_NULL;
 		}
 
-		hcl_pushtmp (hcl, &x);
+		hcl_pushvolat (hcl, &x);
 		z = hcl_makebigint(hcl, HCL_BRAND_PBIGINT, HCL_NULL, zalloc);
-		hcl_poptmp (hcl);
+		hcl_popvolat (hcl);
 		if (!z) return HCL_NULL;
 
 		if (negx)
@@ -3761,10 +3761,10 @@ static HCL_INLINE hcl_oop_t rshift_negative_bigint (hcl_t* hcl, hcl_oop_t x, hcl
 	HCL_ASSERT (hcl, HCL_IS_NBIGINT(hcl, x));
 	xs = HCL_OBJ_GET_SIZE(x);
 
-	hcl_pushtmp (hcl, &x);
+	hcl_pushvolat (hcl, &x);
 	/* +1 for the second inversion below */
 	z = hcl_makebigint(hcl, HCL_BRAND_NBIGINT, HCL_NULL, xs + 1);
-	hcl_poptmp (hcl);
+	hcl_popvolat (hcl);
 	if (!z) return HCL_NULL;
 
 	/* the following lines roughly for 'z = hcl_bitinv (hcl, x)' */
@@ -3832,15 +3832,15 @@ static HCL_INLINE hcl_oop_t rshift_negative_bigint_and_normalize (hcl_t* hcl, hc
 	shift = HCL_SMOOI_MAX;
 	do
 	{
-		hcl_pushtmp (hcl, &y);
+		hcl_pushvolat (hcl, &y);
 		z = rshift_negative_bigint (hcl, x, shift);
-		hcl_poptmp (hcl);
+		hcl_popvolat (hcl);
 		if (!z) return HCL_NULL;
 
 		/* y is a negative number. use hcl_addints() until it becomes 0 */
-		hcl_pushtmp (hcl, &z);
+		hcl_pushvolat (hcl, &z);
 		y = hcl_addints (hcl, y, HCL_SMOOI_TO_OOP(shift));
-		hcl_poptmp (hcl);
+		hcl_popvolat (hcl);
 		if (!y) return HCL_NULL;
 
 		sign = integer_to_oow (hcl, y, &shift);
@@ -3855,9 +3855,9 @@ static HCL_INLINE hcl_oop_t rshift_negative_bigint_and_normalize (hcl_t* hcl, hc
 			HCL_ASSERT (hcl, sign <= -1);
 		}
 
-		hcl_pushtmp (hcl, &y);
+		hcl_pushvolat (hcl, &y);
 		x = normalize_bigint (hcl, z);
-		hcl_poptmp (hcl);
+		hcl_popvolat (hcl);
 		if (!x) return HCL_NULL;
 
 		if (HCL_OOP_IS_SMOOI(x))
@@ -3905,9 +3905,9 @@ static HCL_INLINE hcl_oop_t rshift_positive_bigint_and_normalize (hcl_t* hcl, hc
 
 	zs = HCL_OBJ_GET_SIZE(x);
 
-	hcl_pushtmp (hcl, &y);
+	hcl_pushvolat (hcl, &y);
 	z = clone_bigint (hcl, x, zs);
-	hcl_poptmp (hcl);
+	hcl_popvolat (hcl);
 	if (!z) return HCL_NULL;
 
 	/* for convenience in subtraction below. 
@@ -3926,9 +3926,9 @@ static HCL_INLINE hcl_oop_t rshift_positive_bigint_and_normalize (hcl_t* hcl, hc
 		}
 
 		/* y is a negative number. use hcl_addints() until it becomes 0 */
-		hcl_pushtmp (hcl, &z);
+		hcl_pushvolat (hcl, &z);
 		y = hcl_addints (hcl, y, HCL_SMOOI_TO_OOP(shift));
-		hcl_poptmp (hcl);
+		hcl_popvolat (hcl);
 		if (!y) return HCL_NULL;
 
 		sign = integer_to_oow (hcl, y, &shift);
@@ -3967,21 +3967,21 @@ static HCL_INLINE hcl_oop_t lshift_bigint_and_normalize (hcl_t* hcl, hcl_oop_t x
 		wshift = shift / HCL_LIW_BITS;
 		if (shift > wshift * HCL_LIW_BITS) wshift++;
 
-		hcl_pushtmp (hcl, &y);
+		hcl_pushvolat (hcl, &y);
 		z = expand_bigint (hcl, x, wshift);
-		hcl_poptmp (hcl);
+		hcl_popvolat (hcl);
 		if (!z) return HCL_NULL;
 
 		lshift_unsigned_array (((hcl_oop_liword_t)z)->slot, HCL_OBJ_GET_SIZE(z), shift);
 
-		hcl_pushtmp (hcl, &y);
+		hcl_pushvolat (hcl, &y);
 		x = normalize_bigint (hcl, z);
-		hcl_poptmp (hcl);
+		hcl_popvolat (hcl);
 		if (!x) return HCL_NULL;
 
-		hcl_pushtmp (hcl, &x);
+		hcl_pushvolat (hcl, &x);
 		y = hcl_subints (hcl, y, HCL_SMOOI_TO_OOP(shift));
-		hcl_poptmp (hcl);
+		hcl_popvolat (hcl);
 		if (!y) return HCL_NULL;
 
 		sign = integer_to_oow (hcl, y, &shift);
@@ -4103,9 +4103,9 @@ hcl_oop_t hcl_bitshiftint (hcl_t* hcl, hcl_oop_t x, hcl_oop_t y)
 				return (v < 0)? HCL_SMOOI_TO_OOP(-1): HCL_SMOOI_TO_OOP(0);
 			}
 
-			hcl_pushtmp (hcl, &y);
+			hcl_pushvolat (hcl, &y);
 			x = make_bigint_with_ooi (hcl, v);
-			hcl_poptmp (hcl);
+			hcl_popvolat (hcl);
 			if (!x) return HCL_NULL;
 
 			goto bigint_and_bigint;
@@ -4642,11 +4642,11 @@ hcl_oop_t hcl_sqrtint (hcl_t* hcl, hcl_oop_t x)
 	m = hcl->_nil;
 	m2 = hcl->_nil;
 
-	hcl_pushtmp (hcl, &x);
-	hcl_pushtmp (hcl, &a);
-	hcl_pushtmp (hcl, &b);
-	hcl_pushtmp (hcl, &m);
-	hcl_pushtmp (hcl, &m2);
+	hcl_pushvolat (hcl, &x);
+	hcl_pushvolat (hcl, &a);
+	hcl_pushvolat (hcl, &b);
+	hcl_pushvolat (hcl, &m);
+	hcl_pushvolat (hcl, &m2);
 
 	a = hcl_ltints(hcl, x, HCL_SMOOI_TO_OOP(0));
 	if (!a) goto oops;
@@ -4692,7 +4692,7 @@ hcl_oop_t hcl_sqrtint (hcl_t* hcl, hcl_oop_t x)
 		}
 	}
 
-	hcl_poptmps (hcl, 5);
+	hcl_popvolats (hcl, 5);
 	x = hcl_subints(hcl, a, HCL_SMOOI_TO_OOP(1));
 	if (!x) return HCL_NULL;
 
@@ -4700,7 +4700,7 @@ hcl_oop_t hcl_sqrtint (hcl_t* hcl, hcl_oop_t x)
 	return x;
 
 oops:
-	hcl_poptmps (hcl, 5);
+	hcl_popvolats (hcl, 5);
 	return HCL_NULL;
 }
 

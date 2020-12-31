@@ -2650,9 +2650,9 @@ static HCL_INLINE int format_stack_args (hcl_fmtout_t* fmtout, hcl_ooi_t nargs, 
 
 				/* the given number for integer output is a fixed-point decimal.
 				 * i will drop all digits after the fixed point */
-				hcl_pushtmp (hcl, &arg);
+				hcl_pushvolat (hcl, &arg);
 				nv = hcl_truncfpdecval(hcl, fa->value, HCL_OOP_TO_SMOOI(fa->scale), 0);
-				hcl_poptmp (hcl);
+				hcl_popvolat (hcl);
 				if (!nv)
 				{
 					HCL_LOG1 (hcl, HCL_LOG_WARN | HCL_LOG_UNTYPED, "unable to truncate a fixed-point number %O to an integer for output\n", arg);

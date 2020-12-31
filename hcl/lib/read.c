@@ -1479,9 +1479,9 @@ static HCL_INLINE hcl_oop_t leave_list (hcl_t* hcl, int* flagv, int* oldflagv)
 			count++;
 		}
 
-		hcl_pushtmp (hcl, &head);
+		hcl_pushvolat (hcl, &head);
 		arr = (hcl_oop_oop_t)hcl_makearray(hcl, count, 0);
-		hcl_poptmp (hcl);
+		hcl_popvolat (hcl);
 		if (!arr) return HCL_NULL;
 
 		ptr = head;
@@ -1692,9 +1692,9 @@ static hcl_oop_t chain_to_list (hcl_t* hcl, hcl_oop_t obj)
 			return HCL_NULL;
 		}
 
-		hcl_pushtmp (hcl, (hcl_oop_t*)&rsa);
+		hcl_pushvolat (hcl, (hcl_oop_t*)&rsa);
 		cons = hcl_makecons(hcl, obj, hcl->_nil);
-		hcl_poptmp (hcl);
+		hcl_popvolat (hcl);
 		if (!cons) return HCL_NULL;
 
 		if (HCL_IS_NIL(hcl, rsa->slot[0]))
@@ -2094,7 +2094,7 @@ static int read_object (hcl_t* hcl)
 						return -1;
 					}
 
-					hcl_pushtmp (hcl, &obj);
+					hcl_pushvolat (hcl, &obj);
 					switch (pfbase->type)
 					{
 						case HCL_PFBASE_FUNC:
@@ -2115,17 +2115,17 @@ static int read_object (hcl_t* hcl)
 							break;
 
 						default:
-							hcl_poptmp (hcl);
+							hcl_popvolat (hcl);
 							hcl_seterrbfmt (hcl, HCL_EINVAL, "invalid pfbase type - %d\n", pfbase->type);
 							return -1;
 					}
 
 					if (!val || !hcl_putatsysdic(hcl, obj, val))
 					{
-						hcl_poptmp (hcl);
+						hcl_popvolat (hcl);
 						return -1;
 					}
-					hcl_poptmp (hcl);
+					hcl_popvolat (hcl);
 
 					/* make this dotted symbol special that it can't get changed
 					 * to a different value */

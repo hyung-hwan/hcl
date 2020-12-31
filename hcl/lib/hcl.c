@@ -138,6 +138,10 @@ int hcl_init (hcl_t* hcl, hcl_mmgr_t* mmgr, hcl_oow_t heapsz, const hcl_vmprim_t
 	hcl->log.ptr = (hcl_ooch_t*)hcl_allocmem(hcl, (hcl->log.capa + 1) * HCL_SIZEOF(*hcl->log.ptr)); 
 	if (HCL_UNLIKELY(!hcl->log.ptr)) goto oops;
 
+	hcl->gci.stack.capa = HCL_ALIGN_POW2(1, 1024); /* TODO: is this a good initial size? */
+	hcl->gci.stack.ptr = hcl_allocmem(hcl, (hcl->gci.stack.capa + 1) * HCL_SIZEOF(*hcl->gci.stack.ptr));
+	if (HCL_UNLIKELY(!hcl->gci.stack.ptr)) goto oops;
+
 	n = hcl_rbt_init(&hcl->modtab, hcl, HCL_SIZEOF(hcl_ooch_t), 1);
 	if (HCL_UNLIKELY(n <= -1)) goto oops;
 	modtab_inited = 1;
@@ -153,21 +157,20 @@ int hcl_init (hcl_t* hcl, hcl_mmgr_t* mmgr, hcl_oow_t heapsz, const hcl_vmprim_t
 	hcl->proc_map_free_first = -1;
 	hcl->proc_map_free_last = -1;
 
-	/*hcl->permheap = hcl_makeheap (hcl, what is the best size???);
-	if (!hcl->curheap) goto oops; */
-	hcl->curheap = hcl_makeheap(hcl, heapsz);
-	if (HCL_UNLIKELY(!hcl->curheap)) goto oops;
-	hcl->newheap = hcl_makeheap(hcl, heapsz);
-	if (HCL_UNLIKELY(!hcl->newheap)) goto oops;
+	hcl->heap = hcl_makeheap(hcl, heapsz);
+	if (HCL_UNLIKELY(!hcl->heap)) goto oops;
 
 	if (hcl->vmprim.dl_startup) hcl->vmprim.dl_startup (hcl);
 	return 0;
 
 oops:
-	if (hcl->newheap) hcl_killheap (hcl, hcl->newheap);
-	if (hcl->curheap) hcl_killheap (hcl, hcl->curheap);
-	if (hcl->permheap) hcl_killheap (hcl, hcl->permheap);
+	if (hcl->heap) hcl_killheap (hcl, hcl->heap);
 	if (modtab_inited) hcl_rbt_fini (&hcl->modtab);
+	if (hcl->gci.stack.ptr)
+	{
+		hcl_freemem (hcl, hcl->gci.stack.ptr);
+		hcl->gci.stack.capa = 0;
+	}
 	if (hcl->log.ptr) hcl_freemem (hcl, hcl->log.ptr);
 	hcl->log.capa = 0;
 	return -1;
@@ -277,9 +280,30 @@ void hcl_fini (hcl_t* hcl)
 		hcl->p.s.size = 0;
 	}
 
-	hcl_killheap (hcl, hcl->newheap);
-	hcl_killheap (hcl, hcl->curheap);
-	if (hcl->permheap) hcl_killheap (hcl, hcl->permheap);
+	if (hcl->gci.b)
+	{
+		hcl_gchdr_t* next;
+		do
+		{
+			next = hcl->gci.b->next;
+			hcl->gci.bsz -= HCL_SIZEOF(hcl_obj_t) + hcl_getobjpayloadbytes(hcl, (hcl_oop_t)(hcl->gci.b + 1));
+			hcl_freeheapmem (hcl, hcl->heap, hcl->gci.b);
+			hcl->gci.b = next;
+		}
+		while (hcl->gci.b);
+
+		HCL_ASSERT (hcl, hcl->gci.bsz == 0);
+	}
+
+	if (hcl->gci.stack.ptr)
+	{
+		hcl_freemem (hcl, hcl->gci.stack.ptr);
+		hcl->gci.stack.ptr = 0;
+		hcl->gci.stack.capa = 0;
+		hcl->gci.stack.len = 0;
+	}
+
+	hcl_killheap (hcl, hcl->heap);
 
 	if (hcl->log.ptr) 
 	{
@@ -337,7 +361,7 @@ void hcl_reset (hcl_t* hcl)
 	hcl->code.lit.len = 0;
 
 	/* clean up object memory */
-	hcl_gc (hcl);
+	hcl_gc (hcl, 1);
 }
 
 void hcl_setinloc (hcl_t* hcl, hcl_oow_t line, hcl_oow_t colm)

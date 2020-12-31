@@ -108,7 +108,6 @@ static hcl_pfrc_t pf_sys_random (hcl_t* hcl, hcl_mod_t* mod, hcl_ooi_t nargs)
 
 static hcl_pfinfo_t pfinfos[] =
 {
-	/*{ { 'V','A','R','\0' },                  { HCL_PFBASE_VAR,  HCL_NULL,           0,  0 } },*/
 	{ { 'r','a','n','d','o','m','\0' },      { HCL_PFBASE_FUNC,  pf_sys_random,       0,  0 } },
 	{ { 's','r','a','n','d','o','m','\0' },  { HCL_PFBASE_FUNC,  pf_sys_srandom,      1,  1 } },
 	{ { 's','t','i','m','e','\0' },          { HCL_PFBASE_FUNC,  pf_sys_stime,        1,  1 } },

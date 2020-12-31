@@ -26,29 +26,88 @@
 
 #include "hcl-prv.h"
 
-void* hcl_allocbytes (hcl_t* hcl, hcl_oow_t size)
-{
-	hcl_uint8_t* ptr;
 
-#if defined(HCL_BUILD_DEBUG)
-	if ((hcl->option.trait & HCL_TRAIT_DEBUG_GC) && !(hcl->option.trait & HCL_TRAIT_NOGC)) hcl_gc (hcl);
+#if defined(HCL_PROFILE_VM)
+#include <sys/time.h>
+#include <sys/resource.h> /* getrusage */
 #endif
 
-	ptr = (hcl_uint8_t*)hcl_allocheapmem(hcl, hcl->curheap, size);
-	if (!ptr && hcl->errnum == HCL_EOOMEM && !(hcl->option.trait & HCL_TRAIT_NOGC))
+void* hcl_allocbytes (hcl_t* hcl, hcl_oow_t size)
+{
+	hcl_gchdr_t* gch;
+	hcl_oow_t allocsize;
+	int gc_called = 0;
+
+#if defined(HCL_BUILD_DEBUG)
+	if ((hcl->option.trait & HCL_TRAIT_DEBUG_GC) && !(hcl->option.trait & HCL_TRAIT_NOGC)) hcl_gc (hcl, 1);
+#endif
+
+#if defined(HCL_PROFILE_VM)
+	struct rusage ru;
+	hcl_ntime_t rut;
+	getrusage(RUSAGE_SELF, &ru);
+	HCL_INIT_NTIME (&rut,  ru.ru_utime.tv_sec, HCL_USEC_TO_NSEC(ru.ru_utime.tv_usec));
+#endif
+
+	allocsize = HCL_SIZEOF(*gch) + size;
+
+	if (hcl->gci.bsz >= hcl->gci.threshold) 
 	{
-		hcl_gc (hcl);
-		HCL_LOG4 (hcl, HCL_LOG_GC | HCL_LOG_INFO,
-			"GC completed - current heap ptr %p limit %p size %zd free %zd\n", 
-			hcl->curheap->ptr, hcl->curheap->limit,
-			(hcl_oow_t)(hcl->curheap->limit - hcl->curheap->base),
-			(hcl_oow_t)(hcl->curheap->limit - hcl->curheap->ptr)
-		);
-		ptr = (hcl_uint8_t*)hcl_allocheapmem (hcl, hcl->curheap, size);
-/* TODO: grow heap if ptr is still null. */
+		hcl_gc (hcl, 0);
+		hcl->gci.threshold = hcl->gci.bsz + 100000; /* TODO: change this fomula */
+		gc_called = 1;
 	}
 
-	return ptr;
+	if (hcl->gci.lazy_sweep) hcl_gc_ms_sweep_lazy (hcl, allocsize);
+
+	gch = (hcl_gchdr_t*)hcl_callocheapmem_noerr(hcl, hcl->heap, allocsize); 
+	if (!gch)
+	{
+		if (HCL_UNLIKELY(hcl->option.trait & HCL_TRAIT_NOGC)) goto calloc_heapmem_fail;
+		if (gc_called) goto sweep_the_rest;
+
+		hcl_gc (hcl, 0);
+		if (hcl->gci.lazy_sweep) hcl_gc_ms_sweep_lazy (hcl, allocsize);
+
+		gch = (hcl_gchdr_t*)hcl_callocheapmem_noerr(hcl, hcl->heap, allocsize); 
+		if (HCL_UNLIKELY(!gch)) 
+		{
+		sweep_the_rest:
+			if (hcl->gci.lazy_sweep)
+			{
+				hcl_gc_ms_sweep_lazy (hcl, HCL_TYPE_MAX(hcl_oow_t)); /* sweep the rest */
+				gch = (hcl_gchdr_t*)hcl_callocheapmem(hcl, hcl->heap, allocsize); 
+				if (HCL_UNLIKELY(!gch)) return HCL_NULL;
+			}
+			else
+			{
+			calloc_heapmem_fail:
+				hcl_seterrnum (hcl, HCL_EOOMEM);
+				return HCL_NULL;
+			}
+		}
+	}
+
+	if (hcl->gci.lazy_sweep && hcl->gci.ls.curr == hcl->gci.b) 
+	{
+		/* if the lazy sweeping point is at the beginning of the allocation block,
+		 * hcl->gc.ls.prev must get updated */
+		HCL_ASSERT (hcl, hcl->gci.ls.prev == HCL_NULL);
+		hcl->gci.ls.prev = gch;
+	}
+
+	gch->next = hcl->gci.b;
+	hcl->gci.b = gch;
+	hcl->gci.bsz += size;
+
+
+#if defined(HCL_PROFILE_VM)
+	getrusage(RUSAGE_SELF, &ru);
+	HCL_SUB_NTIME_SNS (&rut, &rut, ru.ru_utime.tv_sec, HCL_USEC_TO_NSEC(ru.ru_utime.tv_usec));
+	HCL_SUB_NTIME (&hcl->gci.stat.alloc, &hcl->gci.stat.alloc, &rut); /* do subtraction because rut is negative */
+#endif
+	return (hcl_uint8_t*)(gch + 1);
+
 }
 
 static HCL_INLINE hcl_oop_t alloc_oop_array (hcl_t* hcl, int brand, hcl_oow_t size, int ngc)
@@ -149,7 +208,7 @@ static HCL_INLINE hcl_oop_t alloc_numeric_array (hcl_t* hcl, int brand, const vo
 		hdr = (hcl_oop_t)hcl_callocmem(hcl, HCL_SIZEOF(hcl_obj_t) + nbytes_aligned);
 	else
 		hdr = (hcl_oop_t)hcl_allocbytes(hcl, HCL_SIZEOF(hcl_obj_t) + nbytes_aligned);
-	if (!hdr) return HCL_NULL;
+	if (HCL_UNLIKELY(!hdr)) return HCL_NULL;
 
 	hdr->_flags = HCL_OBJ_MAKE_FLAGS(type, unit, extra, 0, 0, ngc, 0, 0);
 	hdr->_size = len;
@@ -235,8 +294,8 @@ hcl_oop_t hcl_makecons (hcl_t* hcl, hcl_oop_t car, hcl_oop_t cdr)
 {
 	hcl_oop_cons_t cons;
 
-	hcl_pushtmp (hcl, &car);
-	hcl_pushtmp (hcl, &cdr);
+	hcl_pushvolat (hcl, &car);
+	hcl_pushvolat (hcl, &cdr);
 
 	cons = (hcl_oop_cons_t)hcl_allocoopobj(hcl, HCL_BRAND_CONS, 2);
 	if (cons)
@@ -245,7 +304,7 @@ hcl_oop_t hcl_makecons (hcl_t* hcl, hcl_oop_t car, hcl_oop_t cdr)
 		cons->cdr = cdr;
 	}
 
-	hcl_poptmps (hcl, 2);
+	hcl_popvolats (hcl, 2);
 
 	return (hcl_oop_t)cons;
 }
@@ -281,9 +340,9 @@ hcl_oop_t hcl_makefpdec (hcl_t* hcl, hcl_oop_t value, hcl_ooi_t scale)
 		return HCL_NULL;
 	}
 	
-	hcl_pushtmp (hcl, &value);
+	hcl_pushvolat (hcl, &value);
 	f = (hcl_oop_fpdec_t)hcl_allocoopobj (hcl, HCL_BRAND_FPDEC, HCL_FPDEC_NAMED_INSTVARS);
-	hcl_poptmp (hcl);
+	hcl_popvolat (hcl);
 
 	if (!f) return HCL_NULL;
 
@@ -313,7 +372,7 @@ hcl_oop_t hcl_remakengcbytearray (hcl_t* hcl, hcl_oop_t obj, hcl_oow_t newsize)
 
 	HCL_ASSERT (hcl, !obj || (HCL_OOP_IS_POINTER(obj) && HCL_OBJ_GET_FLAGS_NGC(obj)));
 
-	/* no hcl_pushtmp() is needed because 'obj' is a non-GC object. */
+	/* no hcl_pushvolat() is needed because 'obj' is a non-GC object. */
 	/* TODO: improve this by using realloc */
 
 	tmp = hcl_makengcbytearray (hcl, HCL_NULL, newsize);
@@ -341,7 +400,7 @@ hcl_oop_t hcl_remakengcarray (hcl_t* hcl, hcl_oop_t obj, hcl_oow_t newsize)
 
 	HCL_ASSERT (hcl, !obj || (HCL_OOP_IS_POINTER(obj) && HCL_OBJ_GET_FLAGS_NGC(obj)));
 
-	/* no hcl_pushtmp() is needed because 'obj' is a non-GC object. */
+	/* no hcl_pushvolat() is needed because 'obj' is a non-GC object. */
 	/* TODO: improve this by using realloc */
 
 	tmp = hcl_makengcarray (hcl, newsize);

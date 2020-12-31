@@ -26,55 +26,96 @@
 
 #include "hcl-prv.h"
 
+static void* xma_alloc (hcl_mmgr_t* mmgr, hcl_oow_t size)
+{
+	return hcl_xma_alloc(mmgr->ctx, size);
+}
+
+static void* xma_realloc (hcl_mmgr_t* mmgr, void* ptr, hcl_oow_t size)
+{
+	return hcl_xma_realloc(mmgr->ctx, ptr, size);
+}
+
+static void xma_free (hcl_mmgr_t* mmgr, void* ptr)
+{
+	return hcl_xma_free (mmgr->ctx, ptr);
+}
+
 hcl_heap_t* hcl_makeheap (hcl_t* hcl, hcl_oow_t size)
 {
 	hcl_heap_t* heap;
 
 	heap = (hcl_heap_t*)hcl->vmprim.alloc_heap(hcl, HCL_SIZEOF(*heap) + size);
-	if (!heap)
+	if (HCL_UNLIKELY(!heap))
 	{
-		hcl_seterrnum (hcl, HCL_ESYSMEM);
+		const hcl_ooch_t* oldmsg = hcl_backuperrmsg(hcl);
+		hcl_seterrbfmt (hcl, hcl_geterrnum(hcl), "unable to allocate a heap - %js", oldmsg);
 		return HCL_NULL;
 	}
 
 	HCL_MEMSET (heap, 0, HCL_SIZEOF(*heap) + size);
 
 	heap->base = (hcl_uint8_t*)(heap + 1);
-	/* adjust the initial allocation pointer to a multiple of the oop size */
-	heap->ptr = (hcl_uint8_t*)HCL_ALIGN(((hcl_uintptr_t)heap->base), HCL_SIZEOF(hcl_oop_t));
-	heap->limit = heap->base + size;
+	heap->size = size;
 
-	HCL_ASSERT (hcl, heap->ptr >= heap->base);
-	HCL_ASSERT (hcl, heap->limit >= heap->base ); 
-	HCL_ASSERT (hcl, heap->limit - heap->base == size);
 
-	/* if size is too small, heap->ptr may go past heap->limit even at 
-	 * this moment depending on the alignment of heap->base. subsequent
-	 * calls to subhcl_allocheapmem() are bound to fail. Make sure to
-	 * pass a heap size large enough */
+	if (size <= 0)
+	{
+		/* use the existing memory allocator */
+		heap->xmmgr = *hcl_getmmgr(hcl);
+	}
+	else
+	{
+		/* create a new memory allocator over the allocated heap */
+		heap->xma = hcl_xma_open(hcl_getmmgr(hcl), 0, heap->base, heap->size);
+		if (HCL_UNLIKELY(!heap->xma))
+		{
+			hcl->vmprim.free_heap (hcl, heap);
+			hcl_seterrbfmt (hcl, HCL_ESYSMEM, "unable to allocate xma");
+			return HCL_NULL;
+		}
+
+		heap->xmmgr.alloc = xma_alloc;
+		heap->xmmgr.realloc = xma_realloc;
+		heap->xmmgr.free = xma_free;
+		heap->xmmgr.ctx = heap->xma;
+	}
 
 	return heap;
 }
 
 void hcl_killheap (hcl_t* hcl, hcl_heap_t* heap)
 {
+	if (heap->xma) hcl_xma_close (heap->xma);
 	hcl->vmprim.free_heap (hcl, heap);
 }
 
-void* hcl_allocheapmem (hcl_t* hcl, hcl_heap_t* heap, hcl_oow_t size)
+void* hcl_callocheapmem (hcl_t* hcl, hcl_heap_t* heap, hcl_oow_t size)
 {
-	hcl_uint8_t* ptr;
+	void* ptr;
 
-	/* check the heap size limit */
-	if (heap->ptr >= heap->limit || heap->limit - heap->ptr < size)
+	ptr = HCL_MMGR_ALLOC(&heap->xmmgr, size);
+	if (HCL_UNLIKELY(!ptr)) 
 	{
+		HCL_DEBUG2 (hcl, "Cannot callocate %zd bytes from heap - ptr %p\n", size, heap);
 		hcl_seterrnum (hcl, HCL_EOOMEM);
-		return HCL_NULL;
 	}
-
-	/* allocation is as simple as moving the heap pointer */
-	ptr = heap->ptr;
-	heap->ptr += size;
-
+	else
+	{
+		HCL_MEMSET (ptr, 0, size);
+	}
 	return ptr;
+}
+
+void* hcl_callocheapmem_noerr (hcl_t* hcl, hcl_heap_t* heap, hcl_oow_t size)
+{
+	void* ptr;
+	ptr = HCL_MMGR_ALLOC(&heap->xmmgr, size);
+	if (HCL_LIKELY(ptr)) HCL_MEMSET (ptr, 0, size);
+	return ptr;
+}
+
+void hcl_freeheapmem (hcl_t* hcl, hcl_heap_t* heap, void* ptr)
+{
+	HCL_MMGR_FREE (&heap->xmmgr, ptr);
 }

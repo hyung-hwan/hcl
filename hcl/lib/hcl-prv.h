@@ -689,16 +689,26 @@ void hcl_killheap (
 	hcl_heap_t* heap
 );
 
-/**
- * The hcl_allocheapmem() function allocates \a size bytes in the heap pointed
- * to by \a heap.
- *
- * \return memory pointer on success and #HCL_NULL on failure.
+/** 
+ * The hcl_allocheapmem() function allocates \a size bytes from the given heap
+ * and clears it with zeros.
  */
-void* hcl_allocheapmem (
-	hcl_t*      hcl,
-	hcl_heap_t* heap,
-	hcl_oow_t   size
+void* hcl_callocheapmem (
+	hcl_t*       hcl,
+	hcl_heap_t*  heap,
+	hcl_oow_t    size
+);
+
+void* hcl_callocheapmem_noerr (
+	hcl_t*       hcl,
+	hcl_heap_t*  heap,
+	hcl_oow_t    size
+);
+
+void hcl_freeheapmem (
+	hcl_t*       hcl,
+	hcl_heap_t*  heap,
+	void*        ptr
 );
 
 /* ========================================================================= */
@@ -776,6 +786,20 @@ hcl_oop_t hcl_findsymbol (
 /* ========================================================================= */
 hcl_oop_process_t hcl_makeproc (
 	hcl_t* hcl
+);
+
+/* ========================================================================= */
+/* gc.c                                                                    */
+/* ========================================================================= */
+
+hcl_oow_t hcl_getobjpayloadbytes (
+	hcl_t*    hcl,
+	hcl_oop_t oop
+);
+
+void hcl_gc_ms_sweep_lazy (
+	hcl_t*    moo,
+	hcl_oow_t allocsize
 );
 
 /* ========================================================================= */

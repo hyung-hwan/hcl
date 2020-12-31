@@ -127,17 +127,17 @@ hcl_oop_t hcl_addnums (hcl_t* hcl, hcl_oop_t x, hcl_oop_t y)
 		hcl_oop_t v;
 		hcl_ooi_t scale;
 
-		hcl_pushtmp (hcl, &x);
-		hcl_pushtmp (hcl, &y);
+		hcl_pushvolat (hcl, &x);
+		hcl_pushvolat (hcl, &y);
 
 		scale = equalize_scale(hcl, &x, &y);
 		if (scale <= -1) 
 		{
-			hcl_poptmps (hcl, 2);
+			hcl_popvolats (hcl, 2);
 			return HCL_NULL;
 		}
 		v = hcl_addints(hcl, ((hcl_oop_fpdec_t)x)->value, ((hcl_oop_fpdec_t)y)->value);
-		hcl_poptmps (hcl, 2);
+		hcl_popvolats (hcl, 2);
 		if (!v) return HCL_NULL;
 
 		return hcl_makefpdec(hcl, v, scale);
@@ -156,17 +156,17 @@ hcl_oop_t hcl_subnums (hcl_t* hcl, hcl_oop_t x, hcl_oop_t y)
 		hcl_oop_t v;
 		hcl_ooi_t scale;
 
-		hcl_pushtmp (hcl, &x);
-		hcl_pushtmp (hcl, &y);
+		hcl_pushvolat (hcl, &x);
+		hcl_pushvolat (hcl, &y);
 
 		scale = equalize_scale(hcl, &x, &y);
 		if (scale <= -1) 
 		{
-			hcl_poptmps (hcl, 2);
+			hcl_popvolats (hcl, 2);
 			return HCL_NULL;
 		}
 		v = hcl_subints(hcl, ((hcl_oop_fpdec_t)x)->value, ((hcl_oop_fpdec_t)y)->value);
-		hcl_poptmps (hcl, 2);
+		hcl_popvolats (hcl, 2);
 		if (!v) return HCL_NULL;
 
 		return hcl_makefpdec(hcl, v, scale);
@@ -269,19 +269,19 @@ hcl_oop_t hcl_divnums (hcl_t* hcl, hcl_oop_t x, hcl_oop_t y)
 
 	nv = xv;
 
-	hcl_pushtmp (hcl, &yv);
+	hcl_pushvolat (hcl, &yv);
 	for (i = 0; i < ys; i++)
 	{
 		nv = hcl_mulints(hcl, nv, HCL_SMOOI_TO_OOP(10));
 		if (!nv) 
 		{
-			hcl_poptmp (hcl);
+			hcl_popvolat (hcl);
 			return HCL_NULL;
 		}
 	}
 
 	nv = hcl_divints(hcl, nv, yv, 0, HCL_NULL);
-	hcl_poptmp (hcl);
+	hcl_popvolat (hcl);
 	if (!nv) return HCL_NULL;
 
 	return hcl_makefpdec(hcl, nv, xs);
@@ -299,17 +299,17 @@ static hcl_oop_t comp_nums (hcl_t* hcl, hcl_oop_t x, hcl_oop_t y, hcl_oop_t (*co
 		hcl_oop_t v;
 		hcl_ooi_t scale;
 
-		hcl_pushtmp (hcl, &x);
-		hcl_pushtmp (hcl, &y);
+		hcl_pushvolat (hcl, &x);
+		hcl_pushvolat (hcl, &y);
 
 		scale = equalize_scale(hcl, &x, &y);
 		if (scale <= -1) 
 		{
-			hcl_poptmps (hcl, 2);
+			hcl_popvolats (hcl, 2);
 			return HCL_NULL;
 		}
 		v = comper(hcl, ((hcl_oop_fpdec_t)x)->value, ((hcl_oop_fpdec_t)y)->value);
-		hcl_poptmps (hcl, 2);
+		hcl_popvolats (hcl, 2);
 		return v;
 	}
 }
@@ -362,7 +362,7 @@ hcl_oop_t hcl_sqrtnum (hcl_t* hcl, hcl_oop_t x)
 			v = hcl_mulints(hcl, v, HCL_SMOOI_TO_OOP(10));
 			if (!v)
 			{
-				hcl_poptmp (hcl);
+				hcl_popvolat (hcl);
 				return HCL_NULL;
 			}
 		}

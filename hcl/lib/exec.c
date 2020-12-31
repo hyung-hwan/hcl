@@ -413,9 +413,9 @@ static hcl_oop_process_t make_process (hcl_t* hcl, hcl_oop_context_t c)
 	if (stksize > HCL_TYPE_MAX(hcl_oow_t) - HCL_PROCESS_NAMED_INSTVARS)
 		stksize = HCL_TYPE_MAX(hcl_oow_t) - HCL_PROCESS_NAMED_INSTVARS;
 
-	hcl_pushtmp (hcl, (hcl_oop_t*)&c);
+	hcl_pushvolat (hcl, (hcl_oop_t*)&c);
 	proc = (hcl_oop_process_t)hcl_allocoopobj(hcl, HCL_BRAND_PROCESS, HCL_PROCESS_NAMED_INSTVARS + stksize);
-	hcl_poptmp (hcl);
+	hcl_popvolat (hcl);
 	if (HCL_UNLIKELY(!proc)) return HCL_NULL;
 
 #if 0
@@ -1070,7 +1070,7 @@ static hcl_oop_process_t signal_semaphore (hcl_t* hcl, hcl_oop_semaphore_t sem)
 	{
 		proc = sem->waiting.first;
 
-		/* [NOTE] no GC must occur as 'proc' isn't protected with hcl_pushtmp(). */
+		/* [NOTE] no GC must occur as 'proc' isn't protected with hcl_pushvolat(). */
 
 		/* detach a process from a semaphore's waiting list and 
 		 * make it runnable */
@@ -1451,9 +1451,9 @@ static int add_sem_to_sem_io_tuple (hcl_t* hcl, hcl_oop_semaphore_t sem, hcl_ooi
 
 		new_mask = ((hcl_ooi_t)1 << io_type);
 
-		hcl_pushtmp (hcl, (hcl_oop_t*)&sem);
+		hcl_pushvolat (hcl, (hcl_oop_t*)&sem);
 		n = hcl->vmprim.vm_muxadd(hcl, io_handle, new_mask);
-		hcl_poptmp (hcl);
+		hcl_popvolat (hcl);
 	}
 	else
 	{
@@ -1466,9 +1466,9 @@ static int add_sem_to_sem_io_tuple (hcl_t* hcl, hcl_oop_semaphore_t sem, hcl_ooi
 		new_mask = hcl->sem_io_tuple[index].mask; /* existing mask */
 		new_mask |= ((hcl_ooi_t)1 << io_type);
 
-		hcl_pushtmp (hcl, (hcl_oop_t*)&sem);
+		hcl_pushvolat (hcl, (hcl_oop_t*)&sem);
 		n = hcl->vmprim.vm_muxmod(hcl, io_handle, new_mask);
-		hcl_poptmp (hcl);
+		hcl_popvolat (hcl);
 	}
 
 	if (n <= -1) 
@@ -1534,10 +1534,10 @@ static int delete_sem_from_sem_io_tuple (hcl_t* hcl, hcl_oop_semaphore_t sem, in
 	new_mask = hcl->sem_io_tuple[index].mask;
 	new_mask &= ~((hcl_ooi_t)1 << io_type); /* this is the new mask after deletion */
 
-	hcl_pushtmp (hcl, (hcl_oop_t*)&sem);
+	hcl_pushvolat (hcl, (hcl_oop_t*)&sem);
 	x = new_mask? hcl->vmprim.vm_muxmod(hcl, io_handle, new_mask):
 	              hcl->vmprim.vm_muxdel(hcl, io_handle); 
-	hcl_poptmp (hcl);
+	hcl_popvolat (hcl);
 	if (x <= -1) 
 	{
 		HCL_LOG3 (hcl, HCL_LOG_WARN, "Failed to delete IO semaphore at index %zd handle %zd for %hs\n", index, io_handle, io_type_str[io_type]);
@@ -1742,9 +1742,9 @@ static int __activate_block (hcl_t* hcl, hcl_oop_block_t rcv_blk, hcl_ooi_t narg
 	HCL_ASSERT (hcl, local_ntmprs >= nargs);
 
 	/* create a new block context to clone rcv_blk */
-	hcl_pushtmp (hcl, (hcl_oop_t*)&rcv_blk);
+	hcl_pushvolat (hcl, (hcl_oop_t*)&rcv_blk);
 	blkctx = make_context(hcl, local_ntmprs); 
-	hcl_poptmp (hcl);
+	hcl_popvolat (hcl);
 	if (HCL_UNLIKELY(!blkctx)) return -1;
 
 #if 0
@@ -1829,9 +1829,9 @@ static int __activate_function (hcl_t* hcl, hcl_oop_function_t rcv_func, hcl_ooi
 	HCL_ASSERT (hcl, local_ntmprs >= nargs);
 
 	/* create a new block context to clone rcv_func */
-	hcl_pushtmp (hcl, (hcl_oop_t*)&rcv_func);
+	hcl_pushvolat (hcl, (hcl_oop_t*)&rcv_func);
 	functx = make_context(hcl, local_ntmprs); 
-	hcl_poptmp (hcl);
+	hcl_popvolat (hcl);
 	if (HCL_UNLIKELY(!functx)) return -1;
 
 	functx->ip = HCL_SMOOI_TO_OOP(0);
@@ -2137,9 +2137,9 @@ static int start_initial_process_and_context (hcl_t* hcl, hcl_ooi_t initial_ip)
 	 * let's force set active_context to ctx directly. */
 	hcl->active_context = ctx;
 
-	hcl_pushtmp (hcl, (hcl_oop_t*)&ctx);
+	hcl_pushvolat (hcl, (hcl_oop_t*)&ctx);
 	proc = start_initial_process(hcl, ctx); 
-	hcl_poptmp (hcl);
+	hcl_popvolat (hcl);
 	if (HCL_UNLIKELY(!proc)) return -1;
 
 	/* the stack must contain nothing as it should emulate the expresssion - (the-initial-function). 
@@ -2550,6 +2550,14 @@ static HCL_INLINE void do_return_from_block (hcl_t* hcl)
 }
 /* ------------------------------------------------------------------------- */
 
+static void xma_dumper (void* ctx, const char* fmt, ...)
+{
+	va_list ap;
+	va_start (ap, fmt);
+	hcl_logbfmtv ((hcl_t*)ctx, HCL_LOG_IC | HCL_LOG_INFO, fmt, ap);
+	va_end (ap);
+}
+
 static int execute (hcl_t* hcl)
 {
 	hcl_oob_t bcode;
@@ -2569,6 +2577,11 @@ static int execute (hcl_t* hcl)
 	hcl->abort_req = 0;
 	if (vm_startup(hcl) <= -1) return -1;
 	hcl->proc_switched = 0;
+
+	hcl->gci.lazy_sweep = 1; /* TODO: make it configurable?? */
+	HCL_INIT_NTIME (&hcl->gci.stat.alloc, 0, 0);
+	HCL_INIT_NTIME (&hcl->gci.stat.mark, 0, 0);
+	HCL_INIT_NTIME (&hcl->gci.stat.sweep, 0, 0);
 
 	while (1)
 	{
@@ -3395,6 +3408,8 @@ static int execute (hcl_t* hcl)
 	}
 
 done:
+	hcl->gci.lazy_sweep = 1;
+
 	vm_cleanup (hcl);
 #if defined(HCL_PROFILE_VM)
 	HCL_LOG1 (hcl, HCL_LOG_IC | HCL_LOG_INFO, "TOTAL INST COUTNER = %zu\n", inst_counter);
@@ -3402,6 +3417,8 @@ done:
 	return 0;
 
 oops:
+	hcl->gci.lazy_sweep = 1;
+
 	/* TODO: anything to do here? */
 	if (hcl->processor->active != hcl->nil_process) 
 	{
@@ -3488,6 +3505,14 @@ hcl_oop_t hcl_execute (hcl_t* hcl)
 /* TODO: reset processor fields. set processor->tally to zero. processor->active to nil_process... */
 	hcl->initial_context = HCL_NULL;
 	hcl->active_context = HCL_NULL;
+
+#if defined(HCL_PROFILE_VM)
+	HCL_LOG2 (hcl, HCL_LOG_IC | HCL_LOG_INFO, "GC - gci.bsz: %zu, gci.stack.max: %zu\n", hcl->gci.bsz, hcl->gci.stack.max);
+	if (hcl->heap->xma) hcl_xma_dump (hcl->heap->xma, xma_dumper, hcl);
+	HCL_LOG2 (hcl, HCL_LOG_IC | HCL_LOG_INFO, "GC - gci.stat.alloc: %ld.%09u\n", (unsigned long int)hcl->gci.stat.alloc.sec, (unsigned int)hcl->gci.stat.alloc.nsec);
+	HCL_LOG2 (hcl, HCL_LOG_IC | HCL_LOG_INFO, "GC - gci.stat.mark: %ld.%09u\n", (unsigned long int)hcl->gci.stat.mark.sec, (unsigned int)hcl->gci.stat.mark.nsec);
+	HCL_LOG2 (hcl, HCL_LOG_IC | HCL_LOG_INFO, "GC - gci.stat.sweep: %ld.%09u\n", (unsigned long int)hcl->gci.stat.sweep.sec, (unsigned int)hcl->gci.stat.sweep.nsec);
+#endif
 
 	hcl->log.default_type_mask = log_default_type_mask;
 	return (n <= -1)? HCL_NULL: hcl->last_retv;

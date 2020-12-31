@@ -219,7 +219,7 @@ static hcl_pfrc_t pf_sprintf (hcl_t* hcl, hcl_mod_t* mod, hcl_ooi_t nargs)
 
 static hcl_pfrc_t pf_gc (hcl_t* hcl, hcl_mod_t* mod, hcl_ooi_t nargs)
 {
-	hcl_gc (hcl);
+	hcl_gc (hcl, 1);
 	HCL_STACK_SETRET (hcl, nargs, hcl->_nil);
 	return HCL_PF_SUCCESS;
 }
@@ -850,17 +850,17 @@ int hcl_addbuiltinprims (hcl_t* hcl)
 	for (i = 0; i < HCL_COUNTOF(builtin_prims); i++)
 	{
 		prim = hcl_makeprim(hcl, builtin_prims[i].impl, builtin_prims[i].minargs, builtin_prims[i].maxargs, HCL_NULL);
-		if (!prim) return -1;
+		if (HCL_UNLIKELY(!prim)) return -1;
 
-		hcl_pushtmp (hcl, &prim);
+		hcl_pushvolat (hcl, &prim);
 		name = hcl_makesymbol(hcl, builtin_prims[i].name, builtin_prims[i].namelen);
-		hcl_poptmp (hcl);
-		if (!name) return -1;
+		hcl_popvolat (hcl);
+		if (HCL_UNLIKELY(!name)) return -1;
 
-		hcl_pushtmp (hcl, &name);
+		hcl_pushvolat (hcl, &name);
 		cons = hcl_putatsysdic(hcl, name, prim);
-		hcl_poptmp (hcl);
-		if (!cons) return -1;
+		hcl_popvolat (hcl);
+		if (HCL_UNLIKELY(!cons)) return -1;
 
 		/* turn on the kernel bit in the symbol associated with a primitive 
 		 * function. 'set' prevents this symbol from being used as a variable
