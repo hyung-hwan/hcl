@@ -2396,6 +2396,7 @@ static HCL_INLINE int switch_process_if_needed (hcl_t* hcl)
 		/* no more waiting semaphore and no more process */
 		HCL_ASSERT (hcl, hcl->processor->runnable.count = HCL_SMOOI_TO_OOP(0));
 		HCL_LOG0 (hcl, HCL_LOG_IC | HCL_LOG_DEBUG, "No more runnable process\n");
+
 		if (HCL_OOP_TO_SMOOI(hcl->processor->suspended.count) > 0)
 		{
 			/* there exist suspended processes while no processes are runnable.
@@ -2430,10 +2431,8 @@ switch_to_next:
 
 static HCL_INLINE int do_return (hcl_t* hcl, hcl_oop_t return_value)
 {
-	hcl_oop_context_t ctx;
-
 	/* if (hcl->active_context == hcl->processor->active->initial_context) // read the interactive mode note below... */
-	if (hcl->active_context->home == hcl->_nil)
+	if ((hcl_oop_t)hcl->active_context->home == hcl->_nil)
 	{
 		/* returning from the intial context.
 		 *  (return-from-home 999) */
@@ -2452,7 +2451,7 @@ static HCL_INLINE int do_return (hcl_t* hcl, hcl_oop_t return_value)
 		terminate_process (hcl, hcl->processor->active);
 	}
 	/*else if (hcl->active_context->home == hcl->processor->active->initial_context) // read the interactive mode note below...*/
-	else if (hcl->active_context->home->home == hcl->_nil)
+	else if ((hcl_oop_t)hcl->active_context->home->home == hcl->_nil)
 	{
 		/* non-local return out of the initial context 
 		 *  (defun y(x) (return-from-home (* x x)))
@@ -2494,7 +2493,7 @@ static HCL_INLINE int do_return (hcl_t* hcl, hcl_oop_t return_value)
 		(y 10); this ends up with the "unable to return from dead context" error.
 		*/
 		HCL_ASSERT (hcl, hcl->active_context != hcl->processor->active->initial_context);
-		HCL_ASSERT (hcl, hcl->active_context->home->sender != hcl->_nil);
+		HCL_ASSERT (hcl, (hcl_oop_t)hcl->active_context->home->sender != hcl->_nil);
 
 		if (hcl->active_context->home->ip == HCL_SMOOI_TO_OOP(-1))
 		{
@@ -3502,9 +3501,12 @@ hcl_oop_t hcl_execute (hcl_t* hcl)
 		HCL_INFO1 (hcl, "RETURNED VALUE - %O\n", hcl->last_retv);
 	}
 
-/* TODO: reset processor fields. set processor->tally to zero. processor->active to nil_process... */
 	hcl->initial_context = HCL_NULL;
 	hcl->active_context = HCL_NULL;
+	HCL_ASSERT (hcl, hcl->processor->total_count == HCL_SMOOI_TO_OOP(0));
+	HCL_ASSERT (hcl, hcl->processor->active == hcl->nil_process);
+	LOAD_ACTIVE_SP (hcl); /* sync hcl->nil_process->sp with hcl->sp */
+	HCL_ASSERT (hcl, hcl->sp == -1);
 
 #if defined(HCL_PROFILE_VM)
 	HCL_LOG2 (hcl, HCL_LOG_IC | HCL_LOG_INFO, "GC - gci.bsz: %zu, gci.stack.max: %zu\n", hcl->gci.bsz, hcl->gci.stack.max);
