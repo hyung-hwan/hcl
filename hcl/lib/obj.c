@@ -37,14 +37,16 @@ void* hcl_allocbytes (hcl_t* hcl, hcl_oow_t size)
 	hcl_gchdr_t* gch;
 	hcl_oow_t allocsize;
 	int gc_called = 0;
+#if defined(HCL_PROFILE_VM)
+	struct rusage ru;
+	hcl_ntime_t rut;
+#endif
 
 #if defined(HCL_BUILD_DEBUG)
 	if ((hcl->option.trait & HCL_TRAIT_DEBUG_GC) && !(hcl->option.trait & HCL_TRAIT_NOGC)) hcl_gc (hcl, 1);
 #endif
 
 #if defined(HCL_PROFILE_VM)
-	struct rusage ru;
-	hcl_ntime_t rut;
 	getrusage(RUSAGE_SELF, &ru);
 	HCL_INIT_NTIME (&rut,  ru.ru_utime.tv_sec, HCL_USEC_TO_NSEC(ru.ru_utime.tv_usec));
 #endif
