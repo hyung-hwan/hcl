@@ -726,8 +726,8 @@ hcl_server_proto_t* hcl_server_proto_open (hcl_oow_t xtnsize, hcl_server_worker_
 	vmprim.dl_open = hcl_vmprim_dl_open;
 	vmprim.dl_close = hcl_vmprim_dl_close;
 	vmprim.dl_getsym = hcl_vmprim_dl_getsym;
-	vmprim.gettime = hcl_vmprim_vm_gettime;
-	vmprim.sleep = hcl_vmprim_vm_sleep;
+	vmprim.vm_gettime = hcl_vmprim_vm_gettime;
+	vmprim.vm_sleep = hcl_vmprim_vm_sleep;
 
 	proto = (hcl_server_proto_t*)hcl_server_allocmem(worker->server, HCL_SIZEOF(*proto));
 	if (!proto) return HCL_NULL;
@@ -1192,7 +1192,7 @@ static int insert_exec_timer (hcl_server_proto_t* proto, const hcl_ntime_t* tmou
 
 	HCL_MEMSET (&event, 0, HCL_SIZEOF(event));
 	event.ctx = proto;
-	proto->hcl->vmprim.gettime (proto->hcl, &event.when);
+	proto->hcl->vmprim.vm_gettime (proto->hcl, &event.when);
 	HCL_ADD_NTIME (&event.when, &event.when, tmout);
 	event.handler = exec_runtime_handler;
 	event.updater = exec_runtime_updater;
@@ -1591,8 +1591,8 @@ hcl_server_t* hcl_server_open (hcl_mmgr_t* mmgr, hcl_oow_t xtnsize, hcl_server_p
 	vmprim.dl_open = hcl_vmprim_dl_open;
 	vmprim.dl_close = hcl_vmprim_dl_close;
 	vmprim.dl_getsym = hcl_vmprim_dl_getsym;
-	vmprim.gettime = hcl_vmprim_gettime;
-	vmprim.sleep = hcl_vmprim_sleep;
+	vmprim.vm_gettime = hcl_vmprim_vm_gettime;
+	vmprim.vm_sleep = hcl_vmprim_vm_sleep;
 
 #if defined(USE_LTDL)
 	lt_dlinit ();
@@ -1810,7 +1810,7 @@ static hcl_server_worker_t* alloc_worker (hcl_server_t* server, int cli_sck, con
 	worker->peeraddr = *peeraddr;
 	worker->server = server;
 	
-	server->dummy_hcl->vmprim.gettime (server->dummy_hcl, &worker->alloc_time); /* TODO: the callback may return monotonic time. find a way to guarantee it is realtime??? */
+	server->dummy_hcl->vmprim.vm_gettime (server->dummy_hcl, &worker->alloc_time); /* TODO: the callback may return monotonic time. find a way to guarantee it is realtime??? */
 
 	if (server->wid_map.free_first == HCL_SERVER_WID_INVALID && prepare_to_acquire_wid(server) <= -1) 
 	{

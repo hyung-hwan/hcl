@@ -247,7 +247,7 @@ int hcl_tmr_fire (hcl_tmr_t* tmr, const hcl_ntime_t* tm, hcl_oow_t* firecnt)
 	/* if the current time is not specified, get it from the system */
 	if (tm) now = *tm;
 	/*else if (hcl_gettime(&now) <= -1) return -1;*/
-	tmr->hcl->vmprim.gettime (tmr->hcl, &now);
+	tmr->hcl->vmprim.vm_gettime (tmr->hcl, &now);
 
 	while (tmr->size > 0)
 	{
@@ -274,7 +274,7 @@ int hcl_tmr_gettmout (hcl_tmr_t* tmr, const hcl_ntime_t* tm, hcl_ntime_t* tmout)
 	/* if the current time is not specified, get it from the system */
 	if (tm) now = *tm;
 	/*else if (hcl_gettime(&now) <= -1) return -1;*/
-	tmr->hcl->vmprim.gettime (tmr->hcl, &now);
+	tmr->hcl->vmprim.vm_gettime (tmr->hcl, &now);
 
 	HCL_SUB_NTIME (tmout, &tmr->event[0].when, &now);
 	if (tmout->sec < 0) HCL_CLEAR_NTIME (tmout);
