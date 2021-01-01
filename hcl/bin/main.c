@@ -951,7 +951,7 @@ static void print_synerr (hcl_t* hcl)
 	hcl_logbfmt (hcl, HCL_LOG_STDERR, "\n");
 }
 
-#define MIN_MEMSIZE 512000ul
+#define DEFAULT_HEAPSIZE 512000ul
  
 int main (int argc, char* argv[])
 {
@@ -963,22 +963,23 @@ int main (int argc, char* argv[])
 	hcl_bci_t c;
 	static hcl_bopt_lng_t lopt[] =
 	{
-		{ ":log",         'l' },
-		{ ":memsize",     'm' },
-		{ "large-pages",  '\0' },
 #if defined(HCL_BUILD_DEBUG)
-		{ ":debug",       '\0' }, /* NOTE: there is no short option for --debug */
+		{ ":debug",       '\0' },
 #endif
+		{ ":heapsize",    '\0' },
+		{ ":log",         'l' },
+
+		{ "large-pages",  '\0' },
 		{ HCL_NULL,       '\0' }
 	};
 	static hcl_bopt_t opt =
 	{
-		"l:m:v",
+		"l:v",
 		lopt
 	};
 
 	const char* logopt = HCL_NULL;
-	hcl_oow_t memsize = MIN_MEMSIZE;
+	hcl_oow_t heapsize = DEFAULT_HEAPSIZE;
 	int verbose = 0;
 	int large_pages = 0;
 
@@ -1004,17 +1005,17 @@ int main (int argc, char* argv[])
 				logopt = opt.arg;
 				break;
 
-			case 'm':
-				memsize = strtoul(opt.arg, HCL_NULL, 0);
-				if (memsize <= MIN_MEMSIZE) memsize = MIN_MEMSIZE;
-				break;
-
 			case 'v':
 				verbose = 1;
 				break;
 
 			case '\0':
-				if (hcl_comp_bcstr(opt.lngopt, "large-pages") == 0)
+				if (hcl_comp_bcstr(opt.lngopt, "heapsize") == 0)
+				{
+					heapsize = strtoul(opt.arg, HCL_NULL, 0);
+					break;
+				}
+				else if (hcl_comp_bcstr(opt.lngopt, "large-pages") == 0)
 				{
 					large_pages = 1;
 					break;
@@ -1062,7 +1063,7 @@ int main (int argc, char* argv[])
 	vmprim.vm_gettime = hcl_vmprim_vm_gettime;
 	vmprim.vm_sleep = hcl_vmprim_vm_sleep;
 
-	hcl = hcl_open(&sys_mmgr, HCL_SIZEOF(xtn_t), memsize, &vmprim, HCL_NULL);
+	hcl = hcl_open(&sys_mmgr, HCL_SIZEOF(xtn_t), heapsize, &vmprim, HCL_NULL);
 	if (!hcl)
 	{
 		printf ("ERROR: cannot open hcl\n");
