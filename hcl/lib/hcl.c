@@ -258,6 +258,12 @@ void hcl_fini (hcl_t* hcl)
 		hcl->proc_map_free_last = -1;
 	}
 
+	if (hcl->code.locptr)
+	{
+		hcl_freemem (hcl, hcl->code.locptr);
+		hcl->code.locptr = HCL_NULL;
+	}
+
 	if (hcl->code.bc.ptr)
 	{
 		hcl_freemem (hcl, hcl->code.bc.ptr);
@@ -304,6 +310,7 @@ void hcl_fini (hcl_t* hcl)
 	}
 
 	hcl_killheap (hcl, hcl->heap);
+	hcl_finidbgi (hcl);
 
 	if (hcl->log.ptr) 
 	{

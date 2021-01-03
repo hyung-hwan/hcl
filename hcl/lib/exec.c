@@ -3192,8 +3192,8 @@ static int execute (hcl_t* hcl)
 				LOG_INST_1 (hcl, "make_array %zu", b1);
 
 				/* create an empty array */
-				t = hcl_makearray (hcl, b1, 0);
-				if (!t) goto oops;
+				t = hcl_makearray(hcl, b1, 0);
+				if (HCL_UNLIKELY(!t)) goto oops;
 
 				HCL_STACK_PUSH (hcl, t); /* push the array created */
 				break;
@@ -3219,8 +3219,8 @@ static int execute (hcl_t* hcl)
 				LOG_INST_1 (hcl, "make_bytearray %zu", b1);
 
 				/* create an empty array */
-				t = hcl_makebytearray (hcl, HCL_NULL, b1);
-				if (!t) goto oops;
+				t = hcl_makebytearray(hcl, HCL_NULL, b1);
+				if (HCL_UNLIKELY(!t)) goto oops;
 
 				HCL_STACK_PUSH (hcl, t); /* push the byte array created */
 				break;
@@ -3253,8 +3253,8 @@ static int execute (hcl_t* hcl)
 
 				FETCH_PARAM_CODE_TO (hcl, b1);
 				LOG_INST_1 (hcl, "make_dic %zu", b1);
-				t = (hcl_oop_t)hcl_makedic (hcl, b1 + 10);
-				if (!t) goto oops;
+				t = (hcl_oop_t)hcl_makedic(hcl, b1 + 10);
+				if (HCL_UNLIKELY(!t)) goto oops;
 				HCL_STACK_PUSH (hcl, t);
 				break;
 			}
@@ -3269,7 +3269,33 @@ static int execute (hcl_t* hcl)
 				t2 = HCL_STACK_GETTOP(hcl); /* key */
 				HCL_STACK_POP (hcl);
 				t3 = HCL_STACK_GETTOP(hcl); /* dictionary */
-				if (!hcl_putatdic (hcl, (hcl_oop_dic_t)t3, t2, t1)) goto oops;
+				if (!hcl_putatdic(hcl, (hcl_oop_dic_t)t3, t2, t1)) goto oops;
+				break;
+			}
+
+			case HCL_CODE_MAKE_DLIST:
+			{
+				hcl_oop_t t;
+
+				FETCH_PARAM_CODE_TO (hcl, b1);
+				LOG_INST_1 (hcl, "make_dlist %zu", b1);
+
+				/* create an empty array */
+				t = hcl_makedlist(hcl, b1, 0);
+				if (HCL_UNLIKELY(!t)) goto oops;
+
+				HCL_STACK_PUSH (hcl, t); /* push the list created */
+				break;
+			}
+
+			case HCL_CODE_POP_INTO_DLIST:
+			{
+				hcl_oop_t t1, t2;
+				LOG_INST_0 (hcl, "pop_into_dlist");
+				t1 = HCL_STACK_GETTOP(hcl); /* value to store */
+				HCL_STACK_POP (hcl);
+				t2 = HCL_STACK_GETTOP(hcl); /* dlist */
+				/*  TODO: append t2 to the dlist */
 				break;
 			}
 

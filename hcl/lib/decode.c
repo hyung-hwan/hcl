@@ -530,6 +530,14 @@ int hcl_decode (hcl_t* hcl, hcl_oow_t start, hcl_oow_t end)
 				LOG_INST_0 (hcl, "pop_into_dic");
 				break;
 
+			case HCL_CODE_MAKE_DLIST:
+				FETCH_PARAM_CODE_TO (hcl, b1);
+				LOG_INST_1 (hcl, "make_dlist %zu", b1);
+				break;
+
+			case HCL_CODE_POP_INTO_DLIST:
+				LOG_INST_0 (hcl, "pop_into_dlist");
+
 			/* -------------------------------------------------------- */
 
 			case HCL_CODE_DUP_STACKTOP:

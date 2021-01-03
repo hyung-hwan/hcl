@@ -384,7 +384,7 @@ typedef enum hcl_obj_type_t hcl_obj_type_t;
 #define HCL_OBJ_SET_FLAGS_BRAND(oop,v)    HCL_SETBITS(hcl_oow_t, (oop)->_flags, HCL_OBJ_FLAGS_BRAND_SHIFT,   HCL_OBJ_FLAGS_BRAND_BITS,    v)
 
 #define HCL_OBJ_GET_SIZE(oop) ((oop)->_size)
-#define HCL_OBJ_GET_CLASS(oop) ((oop)->_class)
+/*#define HCL_OBJ_GET_CLASS(oop) ((oop)->_class)*/
 
 #define HCL_OBJ_SET_SIZE(oop,v) ((oop)->_size = (v))
 #define HCL_OBJ_SET_CLASS(oop,c) ((oop)->_class = (c))
@@ -415,8 +415,7 @@ typedef enum hcl_obj_type_t hcl_obj_type_t;
 
 #define HCL_OBJ_HEADER \
 	hcl_oow_t _flags; \
-	hcl_oow_t _size; \
-	hcl_oop_t _class
+	hcl_oow_t _size
 
 struct hcl_obj_t
 {
@@ -817,6 +816,75 @@ struct hcl_heap_t
 	hcl_oow_t    size;
 	hcl_xma_t*   xma;
 	hcl_mmgr_t   xmmgr;
+};
+
+typedef struct hcl_dbgi_t hcl_dbgi_t;
+struct hcl_dbgi_t
+{
+	hcl_oow_t _capa;
+	hcl_oow_t _len;
+	hcl_oow_t _last_file; /* offset to the last file element added */
+	hcl_oow_t _last_class; /* offset to the last class element added */
+	hcl_oow_t _last_text; /* offset to the last text element added */
+	hcl_oow_t _last_method;
+	/* actual information is recorded here */
+};
+
+enum hcl_dbgi_type_t
+{
+	/* bit 8 to bit 15 */
+	HCL_DBGI_TYPE_CODE_FILE    = 0,
+	HCL_DBGI_TYPE_CODE_CLASS   = 1,
+	HCL_DBGI_TYPE_CODE_TEXT    = 2,
+	/* TODO: interface? etc? */
+	HCL_DBGI_TYPE_CODE_METHOD  = 3, /* method instruction location information */
+
+	/* low 8 bits */
+	HCL_DBGI_TYPE_FLAG_INVALID = (1 << 0)
+};
+typedef enum hcl_dbgi_type_t hcl_dbgi_type_t;
+
+#define HCL_DBGI_MAKE_TYPE(code,flags) (((code) << 8) | (flags))
+#define HCL_DBGI_GET_TYPE_CODE(type) ((type) >> 8)
+#define HCL_DBGI_GET_TYPE_FLAGS(type) ((type) & 0xFF)
+
+#define HCL_DBGI_GET_DATA(hcl, offset) ((hcl_uint8_t*)(hcl)->dbgi + (offset))
+
+typedef struct hcl_dbgi_file_t hcl_dbgi_file_t;
+struct hcl_dbgi_file_t
+{
+	hcl_oow_t _type;
+	hcl_oow_t _len; /* length of this record including the header and the file path payload */
+	hcl_oow_t _next;
+	/* ... file path here ... */
+};
+
+typedef struct hcl_dbgi_class_t hcl_dbgi_class_t;
+struct hcl_dbgi_class_t
+{
+	hcl_oow_t _type;
+	hcl_oow_t _len; /* length of this record including the header and the class name payload */
+	hcl_oow_t _next; /* offset to a previous class */
+	hcl_oow_t _file;
+	hcl_oow_t _line;
+	/* ... class name here ... */
+};
+
+typedef struct hcl_dbgi_method_t hcl_dbgi_method_t;
+struct hcl_dbgi_method_t
+{
+	hcl_oow_t _type;
+	hcl_oow_t _len; /* length of this record including the header and the payload including method name and code line numbers */
+	hcl_oow_t _next;
+	hcl_oow_t _file;
+	hcl_oow_t _class;
+	hcl_oow_t start_line;
+	hcl_oow_t code_loc_start; /* start offset from the payload beginning within this record */
+	hcl_oow_t code_loc_len;
+	hcl_oow_t text_start;
+	hcl_oow_t text_len;
+	/* ... method name here ... */
+	/* ... code line numbers here ... */
 };
 
 /* =========================================================================
@@ -1357,6 +1425,7 @@ struct hcl_t
 	/* ========================= */
 
 	hcl_heap_t* heap;
+	hcl_dbgi_t* dbgi;
 
 	/* ========================= */
 	hcl_oop_t _nil;  /* pointer to the nil object */
@@ -1488,6 +1557,9 @@ struct hcl_t
 			hcl_oop_oop_t arr; /* literal array - not part of object memory */
 			hcl_oow_t len;
 		} lit;
+
+		/* array that hold the location of the byte code emitted */
+		hcl_oow_t* locptr;
 	} code;
 
 	/* == PRINTER == */
@@ -2003,6 +2075,24 @@ HCL_EXPORT void hcl_setsynerrufmt (
 #else
 #	define hcl_setsynerr(hcl,num,loc,tgt) hcl_setsynerrbfmt(hcl,num,loc,tgt,HCL_NULL)
 #endif
+
+/* =========================================================================
+ * DEBUG SUPPORT
+ * ========================================================================= */
+
+HCL_EXPORT int hcl_initdbgi (
+	hcl_t*    hcl,
+	hcl_oow_t init_capa
+);
+
+/**
+ * The hcl_finidbgi() function deletes the debug information.
+ * It is called by hcl_close(). Unless you want the debug information to
+ * be deleted earlier, you need not call this function explicitly.
+ */
+HCL_EXPORT void hcl_finidbgi (
+	hcl_t* hcl
+);
 
 /* =========================================================================
  * TEMPORARY OOP MANAGEMENT FUNCTIONS

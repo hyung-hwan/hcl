@@ -50,7 +50,7 @@
 #define HCL_DEBUG_LEXER 1
 #define HCL_DEBUG_VM_PROCESSOR 1
 #define HCL_DEBUG_VM_EXEC 1
-#define HCL_PROFILE_VM 1
+/*#define HCL_PROFILE_VM 1*/
 #endif
 
 /* allow the caller to drive process switching by calling
@@ -570,7 +570,7 @@ enum hcl_bcode_t
 	HCL_CODE_PUSH_FALSE               = 0x84, /* 132 */
 	HCL_CODE_PUSH_CONTEXT             = 0x85, /* 133 */
 	HCL_CODE_PUSH_PROCESS             = 0x86, /* 134 */
-	/* UNUSED135 */
+	/* UNUSED 135 */
 
 	HCL_CODE_POP_INTO_INSTVAR_X       = 0x88, /* 136 ## */
 
@@ -616,16 +616,15 @@ enum hcl_bcode_t
 	HCL_CODE_STORE_INTO_OBJVAR_X      = 0xE8, /* 232 ## */
 	HCL_CODE_POP_INTO_OBJVAR_X        = 0xEC, /* 236 ## */
 
-	/* UNUSED 237 */
-	HCL_CODE_MAKE_BYTEARRAY           = 0xEE, /* 238 */
-	HCL_CODE_POP_INTO_BYTEARRAY       = 0xEF, /* 239 */
+	HCL_CODE_MAKE_BYTEARRAY           = 0xED, /* 237 */
+	HCL_CODE_POP_INTO_BYTEARRAY       = 0xEE, /* 238 */
+	HCL_CODE_MAKE_DIC                 = 0xEF, /* 239 */
 
 	HCL_CODE_SEND_MESSAGE_X           = 0xF0, /* 240 ## */
 
-	/* UNUSED 241 */
-
-	HCL_CODE_MAKE_DIC                 = 0xF2, /* 242 */
-	HCL_CODE_POP_INTO_DIC             = 0xF3, /* 243 */
+	HCL_CODE_POP_INTO_DIC             = 0xF1, /* 241 */
+	HCL_CODE_MAKE_DLIST               = 0xF2, /* 242 */
+	HCL_CODE_POP_INTO_DLIST           = 0xF3, /* 243 */
 	HCL_CODE_SEND_MESSAGE_TO_SUPER_X  = 0xF4, /* 244 ## */
 
 	/* -------------------------------------- */
@@ -639,7 +638,7 @@ enum hcl_bcode_t
 	HCL_CODE_RETURN_RECEIVER          = 0xFA, /* ^self */
 	HCL_CODE_RETURN_FROM_BLOCK        = 0xFB, /* return the stack top from a block */
 
-	HCL_CODE_MAKE_FUNCTION                = 0xFC, /* 252 */
+	HCL_CODE_MAKE_FUNCTION            = 0xFC, /* 252 */
 	HCL_CODE_MAKE_BLOCK               = 0xFD, /* 253 */
 	/* UNUSED 254 */
 	HCL_CODE_NOOP                     = 0xFF  /* 255 */

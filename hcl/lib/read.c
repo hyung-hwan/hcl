@@ -780,7 +780,7 @@ static int get_sharp_token (hcl_t* hcl)
 	 * #\UHHHH  unicode character
 	 * #\uHHHH  unicode character
 	 * #[ ]     byte array
-	 * #{ }     qlist
+	 * #( )     qlist
 	 */
 
 	switch (c)
@@ -1382,7 +1382,7 @@ static int end_include (hcl_t* hcl)
 	/* if it is an included file, close it and
 	 * retry to read a character from an outer file */
 
-	x = hcl->c->reader (hcl, HCL_IO_CLOSE, hcl->c->curinp);
+	x = hcl->c->reader(hcl, HCL_IO_CLOSE, hcl->c->curinp);
 
 	/* if closing has failed, still destroy the
 	 * sio structure first as normal and return
@@ -1855,12 +1855,16 @@ static int read_object (hcl_t* hcl)
 				LIST_FLAG_SET_CONCODE (flagv, HCL_CONCODE_DIC);
 				goto start_list;
 
-#if 0
 			case HCL_IOTOK_QLPAREN: /* #() */
+#if 1
+				hcl_setsynerr (hcl, HCL_SYNERR_ILTOK, TOKEN_LOC(hcl), TOKEN_NAME(hcl));
+				return -1;
+#else
 				flagv = 0;
 				LIST_FLAG_SET_CONCODE (flagv, HCL_CONCODE_QLIST);
 				goto start_list;
 #endif
+
 			case HCL_IOTOK_LPAREN: /* () */
 				flagv = 0;
 				LIST_FLAG_SET_CONCODE (flagv, HCL_CONCODE_XLIST);

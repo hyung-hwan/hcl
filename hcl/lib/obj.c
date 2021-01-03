@@ -139,7 +139,7 @@ static HCL_INLINE hcl_oop_t alloc_oop_array (hcl_t* hcl, int brand, hcl_oow_t si
 
 	hdr->_flags = HCL_OBJ_MAKE_FLAGS(HCL_OBJ_TYPE_OOP, HCL_SIZEOF(hcl_oop_t), 0, 0, 0, ngc, 0, 0);
 	HCL_OBJ_SET_SIZE (hdr, size);
-	HCL_OBJ_SET_CLASS (hdr, hcl->_nil);
+	/*HCL_OBJ_SET_CLASS (hdr, hcl->_nil);*/
 	HCL_OBJ_SET_FLAGS_BRAND (hdr, brand);
 
 	while (size > 0) hdr->slot[--size] = hcl->_nil;
@@ -168,7 +168,7 @@ hcl_oop_t hcl_allocoopobjwithtrailer (hcl_t* hcl, int brand, hcl_oow_t size, con
 
 	hdr->_flags = HCL_OBJ_MAKE_FLAGS(HCL_OBJ_TYPE_OOP, HCL_SIZEOF(hcl_oop_t), 0, 0, 0, 0, 1, 0);
 	HCL_OBJ_SET_SIZE (hdr, size);
-	HCL_OBJ_SET_CLASS (hdr, hcl->_nil);
+	/*HCL_OBJ_SET_CLASS (hdr, hcl->_nil);*/
 	HCL_OBJ_SET_FLAGS_BRAND (hdr, brand);
 
 	for (i = 0; i < size; i++) hdr->slot[i] = hcl->_nil;
@@ -215,7 +215,7 @@ static HCL_INLINE hcl_oop_t alloc_numeric_array (hcl_t* hcl, int brand, const vo
 	hdr->_flags = HCL_OBJ_MAKE_FLAGS(type, unit, extra, 0, 0, ngc, 0, 0);
 	hdr->_size = len;
 	HCL_OBJ_SET_SIZE (hdr, len);
-	HCL_OBJ_SET_CLASS (hdr, hcl->_nil);
+	//HCL_OBJ_SET_CLASS (hdr, hcl->_nil);
 	HCL_OBJ_SET_FLAGS_BRAND (hdr, brand);
 
 	if (ptr)
@@ -319,6 +319,13 @@ hcl_oop_t hcl_makearray (hcl_t* hcl, hcl_oow_t size, int ngc)
 hcl_oop_t hcl_makebytearray (hcl_t* hcl, const hcl_oob_t* ptr, hcl_oow_t size)
 {
 	return hcl_allocbyteobj(hcl, HCL_BRAND_BYTE_ARRAY, ptr, size);
+}
+
+hcl_oop_t hcl_makedlist (hcl_t* hcl)
+{
+	//return hcl_allocoopobj(hcl, HCL_BRAND_DLIST);
+hcl_seterrnum (hcl, HCL_ENOIMPL);
+return HCL_NULL;
 }
 
 hcl_oop_t hcl_makestring (hcl_t* hcl, const hcl_ooch_t* ptr, hcl_oow_t len, int ngc)

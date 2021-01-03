@@ -36,10 +36,10 @@ enum
 #define BLK_INFO_BUFFER_ALIGN 128
 
 #define EMIT_BYTE_INSTRUCTION(hcl,code) \
-	do { if (emit_byte_instruction(hcl,code) <= -1) return -1; } while(0)
+	do { if (emit_byte_instruction(hcl, code, HCL_NULL) <= -1) return -1; } while(0)
 
 #define EMIT_SINGLE_PARAM_INSTRUCTION(hcl,code) \
-	do { if (emit_byte_instruction(hcl,code) <= -1) return -1; } while(0)
+	do { if (emit_byte_instruction(hcl, code, HCL_NULL) <= -1) return -1; } while(0)
 
 /* --------------------------------------------
 
@@ -193,7 +193,7 @@ static HCL_INLINE void patch_instruction (hcl_t* hcl, hcl_oow_t index, hcl_oob_t
 	hcl->code.bc.ptr[index] = bc;
 }
 
-static int emit_byte_instruction (hcl_t* hcl, hcl_oob_t bc)
+static int emit_byte_instruction (hcl_t* hcl, hcl_oob_t bc, const hcl_ioloc_t* srcloc)
 {
 	/* the context object has the ip field. it should be representable
 	 * in a small integer. for simplicity, limit the total byte code length
@@ -208,24 +208,41 @@ static int emit_byte_instruction (hcl_t* hcl, hcl_oob_t bc)
 
 	if (hcl->code.bc.len >= hcl->code.bc.capa)
 	{
-		hcl_oob_t* tmp;
 		hcl_oow_t newcapa;
+		hcl_oob_t* tmp;
+		hcl_oow_t* tmp2;
 
 		newcapa = HCL_ALIGN(hcl->code.bc.capa + 1, HCL_BC_BUFFER_ALIGN);
-		tmp = hcl_reallocmem(hcl, hcl->code.bc.ptr, HCL_SIZEOF(*tmp) * newcapa);
-		if (!tmp) return -1;
+		tmp = (hcl_oob_t*)hcl_reallocmem(hcl, hcl->code.bc.ptr, HCL_SIZEOF(*tmp) * newcapa);
+		if (HCL_UNLIKELY(!tmp)) return -1;
+
+		tmp2 = (hcl_oow_t*)hcl_reallocmem(hcl, hcl->code.locptr, HCL_SIZEOF(*tmp2) * newcapa);
+		if (HCL_UNLIKELY(!tmp2))
+		{
+			hcl_freemem (hcl, tmp);
+			return -1;
+		}
+		HCL_MEMSET (&tmp2[hcl->code.bc.capa], 0, HCL_SIZEOF(*tmp2) * (newcapa - hcl->code.bc.capa));
 
 		hcl->code.bc.ptr = tmp;
 		hcl->code.bc.capa = newcapa;
+		hcl->code.locptr = tmp2;
 	}
 
-	hcl->code.bc.ptr[hcl->code.bc.len++] = bc;
+	hcl->code.bc.ptr[hcl->code.bc.len] = bc;
+
+	if (srcloc)
+	{
+		hcl->code.locptr[hcl->code.bc.len] = srcloc->line;
+	}
+
+	hcl->code.bc.len++;
 	return 0;
 }
 
 int hcl_emitbyteinstruction (hcl_t* hcl, hcl_oob_t bc)
 {
-	return emit_byte_instruction(hcl, bc);
+	return emit_byte_instruction(hcl, bc, HCL_NULL);
 }
 
 static int emit_single_param_instruction (hcl_t* hcl, int cmd, hcl_oow_t param_1)
@@ -313,7 +330,7 @@ static int emit_single_param_instruction (hcl_t* hcl, int cmd, hcl_oow_t param_1
 	return -1;
 
 write_short:
-	if (emit_byte_instruction(hcl, bc) <= -1) return -1;
+	if (emit_byte_instruction(hcl, bc, HCL_NULL) <= -1) return -1;
 	return 0;
 
 write_long:
@@ -323,12 +340,12 @@ write_long:
 		return -1;
 	}
 #if (HCL_HCL_CODE_LONG_PARAM_SIZE == 2)
-	if (emit_byte_instruction(hcl, bc) <= -1 ||
-	    emit_byte_instruction(hcl, (param_1 >> 8) & 0xFF) <= -1 ||
-	    emit_byte_instruction(hcl, param_1 & 0xFF) <= -1) return -1;
+	if (emit_byte_instruction(hcl, bc, HCL_NULL) <= -1 ||
+	    emit_byte_instruction(hcl, (param_1 >> 8) & 0xFF, HCL_NULL) <= -1 ||
+	    emit_byte_instruction(hcl, param_1 & 0xFF, HCL_NULL) <= -1) return -1;
 #else
-	if (emit_byte_instruction(hcl, bc) <= -1 ||
-	    emit_byte_instruction(hcl, param_1) <= -1) return -1;
+	if (emit_byte_instruction(hcl, bc, HCL_NULL) <= -1 ||
+	    emit_byte_instruction(hcl, param_1, HCL_NULL) <= -1) return -1;
 #endif
 	return 0;
 
@@ -339,15 +356,15 @@ write_long2:
 		return -1;
 	}
 #if (HCL_HCL_CODE_LONG_PARAM_SIZE == 2)
-	if (emit_byte_instruction(hcl, bc) <= -1 ||
-	    emit_byte_instruction(hcl, (param_1 >> 24) & 0xFF) <= -1 ||
-	    emit_byte_instruction(hcl, (param_1 >> 16) & 0xFF) <= -1 ||
-	    emit_byte_instruction(hcl, (param_1 >>  8) & 0xFF) <= -1 ||
-	    emit_byte_instruction(hcl, param_1 & 0xFF) <= -1) return -1;
+	if (emit_byte_instruction(hcl, bc, HCL_NULL) <= -1 ||
+	    emit_byte_instruction(hcl, (param_1 >> 24) & 0xFF, HCL_NULL) <= -1 ||
+	    emit_byte_instruction(hcl, (param_1 >> 16) & 0xFF, HCL_NULL) <= -1 ||
+	    emit_byte_instruction(hcl, (param_1 >>  8) & 0xFF, HCL_NULL) <= -1 ||
+	    emit_byte_instruction(hcl, param_1 & 0xFF, HCL_NULL) <= -1) return -1;
 #else
-	if (emit_byte_instruction(hcl, bc) <= -1 ||
-	    emit_byte_instruction(hcl, (param_1 >> 8) & 0xFF) <= -1 ||
-	    emit_byte_instruction(hcl, param_1 & 0xFF) <= -1) return -1;
+	if (emit_byte_instruction(hcl, bc, HCL_NULL) <= -1 ||
+	    emit_byte_instruction(hcl, (param_1 >> 8) & 0xFF, HCL_NULL) <= -1 ||
+	    emit_byte_instruction(hcl, param_1 & 0xFF, HCL_NULL) <= -1) return -1;
 #endif
 	return 0;
 }
@@ -379,8 +396,12 @@ static int emit_double_param_instruction (hcl_t* hcl, int cmd, hcl_oow_t param_1
 				goto write_long;
 			}
 
-
-		case HCL_CODE_MAKE_FUNCTION: /* this is quad-param instruction. you should emit two more parameters after the call to this function */
+		/* MAKE_FUNCTION is a quad-parameter instruction. 
+		 * The caller must emit two more parameters after the call to this function.
+		 * however the instruction format is the same up to the second
+		 * parameters between MAKE_FUNCTION and MAKE_BLOCK.
+		 */
+		case HCL_CODE_MAKE_FUNCTION: 
 		case HCL_CODE_MAKE_BLOCK:
 			bc = cmd;
 			goto write_long;
@@ -390,8 +411,8 @@ static int emit_double_param_instruction (hcl_t* hcl, int cmd, hcl_oow_t param_1
 	return -1;
 
 write_short:
-	if (emit_byte_instruction(hcl, bc) <= -1 ||
-	    emit_byte_instruction(hcl, param_2) <= -1) return -1;
+	if (emit_byte_instruction(hcl, bc, HCL_NULL) <= -1 ||
+	    emit_byte_instruction(hcl, param_2, HCL_NULL) <= -1) return -1;
 	return 0;
 
 write_long:
@@ -401,15 +422,15 @@ write_long:
 		return -1;
 	}
 #if (HCL_HCL_CODE_LONG_PARAM_SIZE == 2)
-	if (emit_byte_instruction(hcl, bc) <= -1 ||
-	    emit_byte_instruction(hcl, param_1 >> 8) <= -1 ||
-	    emit_byte_instruction(hcl, param_1 & 0xFF) <= -1 ||
-	    emit_byte_instruction(hcl, param_2 >> 8) <= -1 ||
-	    emit_byte_instruction(hcl, param_2 & 0xFF) <= -1) return -1;
+	if (emit_byte_instruction(hcl, bc, HCL_NULL) <= -1 ||
+	    emit_byte_instruction(hcl, param_1 >> 8, HCL_NULL) <= -1 ||
+	    emit_byte_instruction(hcl, param_1 & 0xFF, HCL_NULL) <= -1 ||
+	    emit_byte_instruction(hcl, param_2 >> 8, HCL_NULL) <= -1 ||
+	    emit_byte_instruction(hcl, param_2 & 0xFF, HCL_NULL) <= -1) return -1;
 #else
-	if (emit_byte_instruction(hcl, bc) <= -1 ||
-	    emit_byte_instruction(hcl, param_1) <= -1 ||
-	    emit_byte_instruction(hcl, param_2) <= -1) return -1;
+	if (emit_byte_instruction(hcl, bc, HCL_NULL) <= -1 ||
+	    emit_byte_instruction(hcl, param_1, HCL_NULL) <= -1 ||
+	    emit_byte_instruction(hcl, param_2, HCL_NULL) <= -1) return -1;
 #endif
 	return 0;
 }
@@ -423,10 +444,10 @@ static HCL_INLINE int emit_long_param (hcl_t* hcl, hcl_oow_t param)
 	}
 
 #if (HCL_HCL_CODE_LONG_PARAM_SIZE == 2)
-	return (emit_byte_instruction(hcl, param >> 8) <= -1 ||
-	        emit_byte_instruction(hcl, param & 0xFF) <= -1)? -1: 0;
+	return (emit_byte_instruction(hcl, param >> 8, HCL_NULL) <= -1 ||
+	        emit_byte_instruction(hcl, param & 0xFF, HCL_NULL) <= -1)? -1: 0;
 #else
-	return emit_byte_instruction(hcl, param_1);
+	return emit_byte_instruction(hcl, param_1, HCL_NULL);
 #endif
 }
 
@@ -442,16 +463,16 @@ static int emit_push_literal (hcl_t* hcl, hcl_oop_t obj)
 		switch (i)
 		{
 			case -1:
-				return emit_byte_instruction(hcl, HCL_CODE_PUSH_NEGONE);
+				return emit_byte_instruction(hcl, HCL_CODE_PUSH_NEGONE, HCL_NULL);
 
 			case 0:
-				return emit_byte_instruction(hcl, HCL_CODE_PUSH_ZERO);
+				return emit_byte_instruction(hcl, HCL_CODE_PUSH_ZERO, HCL_NULL);
 
 			case 1:
-				return emit_byte_instruction(hcl, HCL_CODE_PUSH_ONE);
+				return emit_byte_instruction(hcl, HCL_CODE_PUSH_ONE, HCL_NULL);
 
 			case 2:
-				return emit_byte_instruction(hcl, HCL_CODE_PUSH_TWO);
+				return emit_byte_instruction(hcl, HCL_CODE_PUSH_TWO, HCL_NULL);
 		}
 
 		if (i >= 0 && i <= MAX_CODE_PARAM)
@@ -657,6 +678,7 @@ enum
 	COP_COMPILE_ARRAY_LIST,
 	COP_COMPILE_BYTEARRAY_LIST,
 	COP_COMPILE_DIC_LIST,
+	COP_COMPILE_QLIST, /* compile data list */
 
 	COP_SUBCOMPILE_ELIF,
 	COP_SUBCOMPILE_ELSE,
@@ -666,9 +688,11 @@ enum
 	COP_EMIT_MAKE_ARRAY,
 	COP_EMIT_MAKE_BYTEARRAY,
 	COP_EMIT_MAKE_DIC,
+	COP_EMIT_MAKE_DLIST,
 	COP_EMIT_POP_INTO_ARRAY,
 	COP_EMIT_POP_INTO_BYTEARRAY,
 	COP_EMIT_POP_INTO_DIC,
+	COP_EMIT_POP_INTO_DLIST,
 
 	COP_EMIT_LAMBDA,
 	COP_EMIT_POP_STACKTOP,
@@ -800,7 +824,7 @@ static int compile_break (hcl_t* hcl, hcl_oop_t src)
 			 * function call, i generate PUSH_NIL so nil becomes a return value.
 			 *     (set x (until #f (break)))
 			 * x will get nill. */
-			if (emit_byte_instruction (hcl, HCL_CODE_PUSH_NIL) <= -1) return -1;
+			if (emit_byte_instruction (hcl, HCL_CODE_PUSH_NIL, HCL_NULL) <= -1) return -1;
 
 /* TODO: study if supporting expression after break is good like return. (break (+ 10 20)) */
 			HCL_ASSERT (hcl, hcl->code.bc.len < HCL_SMOOI_MAX);
@@ -1072,8 +1096,8 @@ static int compile_lambda (hcl_t* hcl, hcl_oop_t src, int defun)
 		/* make_function nargs ntmprs lfbase lfsize */
 		if (emit_double_param_instruction(hcl, HCL_CODE_MAKE_FUNCTION, nargs, ntmprs) <= -1) return -1;
 		lfbase_pos = hcl->code.bc.len;
-		if (emit_long_param(hcl, hcl->code.lit.len - hcl->c->blk.info[hcl->c->blk.depth - 1].lfbase) <= -1) return -1; /* lfbase */
-		lfsize_pos = hcl->code.bc.len;
+		if (emit_long_param(hcl, hcl->code.lit.len - hcl->c->blk.info[hcl->c->blk.depth - 1].lfbase) <= -1) return -1; /* literal frame base */
+		lfsize_pos = hcl->code.bc.len; /* literal frame size */
 		if (emit_long_param(hcl, 0) <= -1) return -1;
 	}
 	else
@@ -1408,6 +1432,40 @@ static int compile_cons_dic_expression (hcl_t* hcl, hcl_oop_t obj)
 	return 0;
 }
 
+static int compile_cons_qlist_expression (hcl_t* hcl, hcl_oop_t obj)
+{
+	/* #( 1 2  3 ) 
+	 * #(1 (+ 2 3) 5)
+	 * */
+		
+	hcl_ooi_t nargs;
+	hcl_cframe_t* cf;
+
+	/* NOTE: cframe management functions don't use the object memory.
+	 *       many operations can be performed without taking GC into account */
+	SWITCH_TOP_CFRAME (hcl, COP_EMIT_MAKE_DLIST, HCL_SMOOI_TO_OOP(0));
+
+	nargs = hcl_countcons(hcl, obj);
+	if (nargs > MAX_CODE_PARAM) 
+	{
+		/* TODO: change to syntax error */
+		hcl_setsynerrbfmt (hcl, HCL_SYNERR_ARGFLOOD, HCL_NULL, HCL_NULL, "too many(%zd) elements into array - %O", nargs, obj); 
+		return -1;
+	}
+
+	/* redundant cdr check is performed inside compile_object_list() */
+	PUSH_SUBCFRAME (hcl, COP_COMPILE_QLIST, obj);
+	cf = GET_SUBCFRAME(hcl);
+/*	cf->u.qlist.index = 0;*/
+
+	/* patch the argument count in the operand field of the COP_EMIT_MAKE_ARRAY frame */
+	cf = GET_TOP_CFRAME(hcl);
+	HCL_ASSERT (hcl, cf->opcode == COP_EMIT_MAKE_DLIST);
+	cf->operand = HCL_SMOOI_TO_OOP(nargs);
+
+	return 0;
+}
+
 static int compile_cons_xlist_expression (hcl_t* hcl, hcl_oop_t obj)
 {
 	hcl_oop_t car;
@@ -1697,7 +1755,10 @@ static int compile_object (hcl_t* hcl)
 					if (compile_cons_dic_expression(hcl, cf->operand) <= -1) return -1;
 					break;
 
-				/* TODO: QLIST? */
+				case  HCL_CONCODE_QLIST:
+					if (compile_cons_qlist_expression(hcl, cf->operand) <= -1) return -1;
+					break;
+
 				default:
 					if (compile_cons_xlist_expression(hcl, cf->operand) <= -1) return -1;
 					break;
@@ -1980,6 +2041,53 @@ static int compile_dic_list (hcl_t* hcl)
 	return 0;
 }
 
+static int compile_qlist (hcl_t* hcl)
+{
+	hcl_cframe_t* cf;
+	hcl_oop_t coperand;
+
+	cf = GET_TOP_CFRAME(hcl);
+	HCL_ASSERT (hcl, cf->opcode == COP_COMPILE_QLIST);
+
+	coperand = cf->operand;
+
+	if (HCL_IS_NIL(hcl, coperand))
+	{
+		POP_CFRAME (hcl);
+	}
+	else
+	{
+		hcl_oop_t car, cdr;
+		hcl_ooi_t oldidx;
+
+		if (!HCL_IS_CONS(hcl, coperand))
+		{
+			hcl_setsynerrbfmt (
+				hcl, HCL_SYNERR_DOTBANNED, HCL_NULL, HCL_NULL, 
+ 				"redundant cdr in the qlist list - %O", coperand); /* TODO: error location */
+			return -1;
+		}
+
+		car = HCL_CONS_CAR(coperand);
+		cdr = HCL_CONS_CDR(coperand);
+
+		/*oldidx = cf->u.qlist.index;*/
+
+		SWITCH_TOP_CFRAME (hcl, COP_COMPILE_OBJECT, car);
+		if (!HCL_IS_NIL(hcl, cdr))
+		{
+			PUSH_SUBCFRAME (hcl, COP_COMPILE_QLIST, cdr);
+			cf = GET_SUBCFRAME(hcl);
+			/*cf->u.qlist_list.index = oldidx + 1;*/
+		}
+
+		PUSH_SUBCFRAME (hcl, COP_EMIT_POP_INTO_DLIST, HCL_SMOOI_TO_OOP(oldidx));
+	}
+
+	return 0;
+}
+
+
 /* ========================================================================= */
 
 static HCL_INLINE int patch_nearest_post_if_body (hcl_t* hcl)
@@ -1997,7 +2105,7 @@ static HCL_INLINE int patch_nearest_post_if_body (hcl_t* hcl)
 	if (hcl->code.bc.len <= cf->u.post_if.body_pos)
 	{
 		/* the if body is empty. */
-		if (emit_byte_instruction (hcl, HCL_CODE_PUSH_NIL) <= -1) return -1;
+		if (emit_byte_instruction (hcl, HCL_CODE_PUSH_NIL, HCL_NULL) <= -1) return -1;
 	}
 
 	HCL_ASSERT (hcl, hcl->code.bc.len < HCL_SMOOI_MAX);
@@ -2021,7 +2129,7 @@ static HCL_INLINE int patch_nearest_post_if_body (hcl_t* hcl)
 
 	/* beginning of the elif/else block code */
 	/* to drop the result of the conditional when the conditional is false */
-	if (emit_byte_instruction (hcl, HCL_CODE_POP_STACKTOP) <= -1) return -1; 
+	if (emit_byte_instruction (hcl, HCL_CODE_POP_STACKTOP, HCL_NULL) <= -1) return -1; 
 
 	/* this is the actual beginning */
 	HCL_ASSERT (hcl, hcl->code.bc.len < HCL_SMOOI_MAX);
@@ -2132,7 +2240,7 @@ static HCL_INLINE int subcompile_and_expr (hcl_t* hcl)
 	jump_inst_pos = hcl->code.bc.len;
 
 	if (emit_single_param_instruction(hcl, HCL_CODE_JUMP_FORWARD_IF_FALSE, MAX_CODE_JUMP) <= -1) return -1;
-	if (emit_byte_instruction(hcl, HCL_CODE_POP_STACKTOP) <= -1) return -1; 
+	if (emit_byte_instruction(hcl, HCL_CODE_POP_STACKTOP, HCL_NULL) <= -1) return -1; 
 
 	expr = HCL_CONS_CAR(obj);
 	obj = HCL_CONS_CDR(obj);
@@ -2199,7 +2307,7 @@ static HCL_INLINE int subcompile_or_expr (hcl_t* hcl)
 	jump_inst_pos = hcl->code.bc.len;
 
 	if (emit_single_param_instruction(hcl, HCL_CODE_JUMP_FORWARD_IF_TRUE, MAX_CODE_JUMP) <= -1) return -1;
-	if (emit_byte_instruction(hcl, HCL_CODE_POP_STACKTOP) <= -1) return -1; 
+	if (emit_byte_instruction(hcl, HCL_CODE_POP_STACKTOP, HCL_NULL) <= -1) return -1; 
 
 	expr = HCL_CONS_CAR(obj);
 	obj = HCL_CONS_CDR(obj);
@@ -2252,7 +2360,7 @@ static HCL_INLINE int post_if_cond (hcl_t* hcl)
 	if (emit_single_param_instruction (hcl, HCL_CODE_JUMP_FORWARD_IF_FALSE, MAX_CODE_JUMP) <= -1) return -1;
 
 	/* to drop the result of the conditional when it is true */
-	if (emit_byte_instruction (hcl, HCL_CODE_POP_STACKTOP) <= -1) return -1; 
+	if (emit_byte_instruction (hcl, HCL_CODE_POP_STACKTOP, HCL_NULL) <= -1) return -1; 
 
 	HCL_ASSERT (hcl, hcl->code.bc.len < HCL_SMOOI_MAX);
 	body_pos = hcl->code.bc.len;
@@ -2279,7 +2387,7 @@ static HCL_INLINE int post_if_body (hcl_t* hcl)
 	if (hcl->code.bc.len <= cf->u.post_if.body_pos)
 	{
 		/* if body is empty */
-		if (emit_byte_instruction (hcl, HCL_CODE_PUSH_NIL) <= -1) return -1;
+		if (emit_byte_instruction (hcl, HCL_CODE_PUSH_NIL, HCL_NULL) <= -1) return -1;
 	}
 
 	/* HCL_CODE_LONG_PARAM_SIZE + 1 => size of the long JUMP_FORWARD_IF_FALSE instruction */
@@ -2324,7 +2432,7 @@ static HCL_INLINE int post_while_cond (hcl_t* hcl)
 	}
 
 	if (emit_single_param_instruction (hcl, jump_inst, MAX_CODE_JUMP) <= -1) return -1;
-	if (emit_byte_instruction (hcl, HCL_CODE_POP_STACKTOP) <= -1) return -1;
+	if (emit_byte_instruction (hcl, HCL_CODE_POP_STACKTOP, HCL_NULL) <= -1) return -1;
 
 	HCL_ASSERT (hcl, hcl->code.bc.len < HCL_SMOOI_MAX);
 	body_pos = hcl->code.bc.len;
@@ -2359,7 +2467,7 @@ static HCL_INLINE int post_while_body (hcl_t* hcl)
 		 *   pop_stacktop
 		 * this check prevents another pop_stacktop between 1) and 2)
 		 */
-		if (emit_byte_instruction (hcl, HCL_CODE_POP_STACKTOP) <= -1) return -1;
+		if (emit_byte_instruction (hcl, HCL_CODE_POP_STACKTOP, HCL_NULL) <= -1) return -1;
 	}
 
 	HCL_ASSERT (hcl, hcl->code.bc.len < HCL_SMOOI_MAX);
@@ -2470,6 +2578,21 @@ static HCL_INLINE int emit_make_dic (hcl_t* hcl)
 	return n;
 }
 
+static HCL_INLINE int emit_make_dlist (hcl_t* hcl)
+{
+	hcl_cframe_t* cf;
+	int n;
+
+	cf = GET_TOP_CFRAME(hcl);
+	HCL_ASSERT (hcl, cf->opcode == COP_EMIT_MAKE_DLIST);
+	HCL_ASSERT (hcl, HCL_OOP_IS_SMOOI(cf->operand));
+
+	n = emit_single_param_instruction (hcl, HCL_CODE_MAKE_DLIST, HCL_OOP_TO_SMOOI(cf->operand));
+
+	POP_CFRAME (hcl);
+	return n;
+}
+
 static HCL_INLINE int emit_pop_into_array (hcl_t* hcl)
 {
 	hcl_cframe_t* cf;
@@ -2508,7 +2631,22 @@ static HCL_INLINE int emit_pop_into_dic (hcl_t* hcl)
 	cf = GET_TOP_CFRAME(hcl);
 	HCL_ASSERT (hcl, cf->opcode == COP_EMIT_POP_INTO_DIC);
 
-	n = emit_byte_instruction (hcl, HCL_CODE_POP_INTO_DIC);
+	n = emit_byte_instruction (hcl, HCL_CODE_POP_INTO_DIC, HCL_NULL);
+
+	POP_CFRAME (hcl);
+	return n;
+}
+
+static HCL_INLINE int emit_pop_into_dlist (hcl_t* hcl)
+{
+	hcl_cframe_t* cf;
+	int n;
+
+	cf = GET_TOP_CFRAME(hcl);
+	HCL_ASSERT (hcl, cf->opcode == COP_EMIT_POP_INTO_DLIST);
+	HCL_ASSERT (hcl, HCL_OOP_IS_SMOOI(cf->operand));
+
+	n = emit_single_param_instruction (hcl, HCL_CODE_POP_INTO_DLIST, HCL_OOP_TO_SMOOI(cf->operand));
 
 	POP_CFRAME (hcl);
 	return n;
@@ -2539,11 +2677,11 @@ static HCL_INLINE int emit_lambda (hcl_t* hcl)
  	{
 		/* no body in lambda - (lambda (a b c)) */
 /* TODO: is this correct??? */
-		if (emit_byte_instruction(hcl, HCL_CODE_PUSH_NIL) <= -1) return -1;
+		if (emit_byte_instruction(hcl, HCL_CODE_PUSH_NIL, HCL_NULL) <= -1) return -1;
 		block_code_size++;
 	}
 
-	if (emit_byte_instruction(hcl, HCL_CODE_RETURN_FROM_BLOCK) <= -1) return -1;
+	if (emit_byte_instruction(hcl, HCL_CODE_RETURN_FROM_BLOCK, HCL_NULL) <= -1) return -1;
 	block_code_size++;
 
 	if (block_code_size > MAX_CODE_JUMP * 2)
@@ -2570,7 +2708,7 @@ static HCL_INLINE int emit_pop_stacktop (hcl_t* hcl)
 	HCL_ASSERT (hcl, cf->opcode == COP_EMIT_POP_STACKTOP);
 	HCL_ASSERT (hcl, HCL_IS_NIL(hcl, cf->operand));
 
-	n = emit_byte_instruction(hcl, HCL_CODE_POP_STACKTOP);
+	n = emit_byte_instruction(hcl, HCL_CODE_POP_STACKTOP, HCL_NULL);
 
 	POP_CFRAME (hcl);
 	return n;
@@ -2585,7 +2723,7 @@ static HCL_INLINE int emit_return (hcl_t* hcl)
 	HCL_ASSERT (hcl, cf->opcode == COP_EMIT_RETURN);
 	HCL_ASSERT (hcl, HCL_OOP_IS_SMOOI(cf->operand));
 
-	n = emit_byte_instruction(hcl, (HCL_OOP_TO_SMOOI(cf->operand) == 0? HCL_CODE_RETURN_FROM_BLOCK: HCL_CODE_RETURN_STACKTOP));
+	n = emit_byte_instruction(hcl, (HCL_OOP_TO_SMOOI(cf->operand) == 0? HCL_CODE_RETURN_FROM_BLOCK: HCL_CODE_RETURN_STACKTOP), HCL_NULL);
 
 	POP_CFRAME (hcl);
 	return n;
@@ -2631,7 +2769,6 @@ static HCL_INLINE int emit_set (hcl_t* hcl)
 }
 
 /* ========================================================================= */
-
 
 int hcl_compile (hcl_t* hcl, hcl_oop_t obj)
 {
@@ -2720,6 +2857,10 @@ int hcl_compile (hcl_t* hcl, hcl_oop_t obj)
 				if (compile_dic_list(hcl) <= -1) goto oops;
 				break;
 
+			case COP_COMPILE_QLIST:
+				if (compile_qlist(hcl)  <= -1) goto oops;
+				break;
+
 			case COP_EMIT_CALL:
 				if (emit_call(hcl) <= -1) goto oops;
 				break;
@@ -2736,12 +2877,20 @@ int hcl_compile (hcl_t* hcl, hcl_oop_t obj)
 				if (emit_make_dic(hcl) <= -1) goto oops;
 				break;
 
+			case COP_EMIT_MAKE_DLIST:
+				if (emit_make_dlist(hcl) <= -1) goto oops;
+				break;
+
 			case COP_EMIT_POP_INTO_ARRAY:
 				if (emit_pop_into_array(hcl) <= -1) goto oops;
 				break;
 
 			case COP_EMIT_POP_INTO_BYTEARRAY:
 				if (emit_pop_into_bytearray(hcl) <= -1) goto oops;
+				break;
+
+			case COP_EMIT_POP_INTO_DLIST:
+				if (emit_pop_into_dlist(hcl) <= -1) goto oops;
 				break;
 
 			case COP_EMIT_POP_INTO_DIC:
@@ -2819,7 +2968,7 @@ int hcl_compile (hcl_t* hcl, hcl_oop_t obj)
 
 	/* emit the pop instruction to clear the final result */
 /* TODO: for interactive use, this value must be accessible by the executor... how to do it? */
-	if (emit_byte_instruction (hcl, HCL_CODE_POP_STACKTOP) <= -1) goto oops;
+	if (emit_byte_instruction(hcl, HCL_CODE_POP_STACKTOP, HCL_NULL) <= -1) goto oops;
 
 	HCL_ASSERT (hcl, GET_TOP_CFRAME_INDEX(hcl) < 0);
 	HCL_ASSERT (hcl, hcl->c->tv.size == 0);

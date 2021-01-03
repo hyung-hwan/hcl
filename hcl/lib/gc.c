@@ -176,7 +176,7 @@ static HCL_INLINE void gc_ms_mark (hcl_t* hcl, hcl_oop_t oop)
 
 	HCL_OBJ_SET_FLAGS_MOVED(oop, 1); /* mark */
 
-	gc_ms_mark (hcl, (hcl_oop_t)HCL_OBJ_GET_CLASS(oop)); /* TODO: remove recursion */
+	/*gc_ms_mark (hcl, (hcl_oop_t)HCL_OBJ_GET_CLASS(oop));*/ /* TODO: remove recursion */
 
 	if (HCL_OBJ_GET_FLAGS_TYPE(oop) == HCL_OBJ_TYPE_OOP)
 	{
@@ -226,7 +226,7 @@ static HCL_INLINE void gc_ms_scan_stack (hcl_t* hcl)
 	{
 		oop = hcl->gci.stack.ptr[--hcl->gci.stack.len];
 
-		gc_ms_mark_object (hcl, (hcl_oop_t)HCL_OBJ_GET_CLASS(oop));
+		/*gc_ms_mark_object (hcl, (hcl_oop_t)HCL_OBJ_GET_CLASS(oop));*/
 
 		if (HCL_OBJ_GET_FLAGS_TYPE(oop) == HCL_OBJ_TYPE_OOP)
 		{
@@ -809,6 +809,21 @@ int hcl_ignite (hcl_t* hcl)
 		if (HCL_UNLIKELY(!hcl->code.bc.ptr)) return -1;
 		HCL_ASSERT (hcl, hcl->code.bc.len == 0);
 		hcl->code.bc.capa = HCL_BC_BUFFER_INIT;
+	}
+
+	if (!hcl->code.locptr)
+	{
+		hcl->code.locptr = (hcl_oow_t*)hcl_allocmem(hcl, HCL_SIZEOF(*hcl->code.locptr) * HCL_BC_BUFFER_INIT);
+		if (HCL_UNLIKELY(!hcl->code.locptr)) 
+		{
+			/* bc.ptr and locptr go together. so free bc.ptr if locptr allocation fails */
+			hcl_freemem (hcl, hcl->code.bc.ptr);
+			hcl->code.bc.ptr = HCL_NULL;
+			hcl->code.bc.capa = 0;
+			return -1;
+		}
+
+		HCL_MEMSET (hcl->code.locptr, 0, HCL_SIZEOF(*hcl->code.locptr) * HCL_BC_BUFFER_INIT);
 	}
 
 	/* TODO: move code.lit.arr creation to hcl_init() after swithching to hcl_allocmem? */
