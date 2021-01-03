@@ -554,7 +554,7 @@ static HCL_INLINE int _insert_cframe (hcl_t* hcl, hcl_ooi_t index, int opcode, h
 
 		newcapa = HCL_ALIGN (hcl->c->cfs.top + 256, 256); /* TODO: adjust this capacity */
 		tmp = (hcl_cframe_t*)hcl_reallocmem (hcl, hcl->c->cfs.ptr, newcapa * HCL_SIZEOF(hcl_cframe_t));
-		if (!tmp) 
+		if (HCL_UNLIKELY(!tmp)) 
 		{
 			hcl->c->cfs.top--;
 			return -1;
@@ -584,7 +584,7 @@ static int insert_cframe (hcl_t* hcl, hcl_ooi_t index, int opcode, hcl_oop_t ope
 		return -1;
 	}
 
-	return _insert_cframe (hcl, index, opcode, operand);
+	return _insert_cframe(hcl, index, opcode, operand);
 }
 
 static int push_cframe (hcl_t* hcl, int opcode, hcl_oop_t operand)
@@ -595,7 +595,7 @@ static int push_cframe (hcl_t* hcl, int opcode, hcl_oop_t operand)
 		return -1;
 	}
 
-	return _insert_cframe (hcl, hcl->c->cfs.top + 1, opcode, operand);
+	return _insert_cframe(hcl, hcl->c->cfs.top + 1, opcode, operand);
 }
 
 static HCL_INLINE void pop_cframe (hcl_t* hcl)
@@ -643,7 +643,7 @@ static int push_subcframe (hcl_t* hcl, int opcode, hcl_oop_t operand)
 	cf->opcode = opcode;
 	cf->operand = operand;
 
-	return push_cframe (hcl, tmp.opcode, tmp.operand);
+	return push_cframe(hcl, tmp.opcode, tmp.operand);
 }
 
 static HCL_INLINE hcl_cframe_t* find_cframe_from_top (hcl_t* hcl, int opcode)
@@ -1779,7 +1779,7 @@ static int compile_object (hcl_t* hcl)
 	return 0;
 
 literal:
-	if (emit_push_literal (hcl, cf->operand) <= -1) return -1;
+	if (emit_push_literal(hcl, cf->operand) <= -1) return -1;
 
 done:
 	POP_CFRAME (hcl);

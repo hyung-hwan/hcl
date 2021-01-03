@@ -181,6 +181,60 @@ struct hcl_iolink_t
 	hcl_iolink_t* link;
 };
 
+typedef enum hcl_concode_t hcl_concode_t;
+enum hcl_cnode_type_t
+{
+	HCL_CNODE_CHARLIT,
+	HCL_CNODE_STRLIT,
+	HCL_CNODE_NUMLIT,
+	HCL_CNODE_RADNUMLIT,
+	HCL_CNODE_FPDECLIT,
+	HCL_CNODE_SMPTRLIT,
+	HCL_CNODE_ERRORLIT,
+	HCL_CNODE_NIL,
+	HCL_CNODE_TRUE,
+	HCL_CNODE_FALSE,
+
+	HCL_CNODE_AND = 1,
+	HCL_CNODE_BREAK,
+	HCL_CNODE_DEFUN,
+	HCL_CNODE_DO,
+	HCL_CNODE_ELIF,
+	HCL_CNODE_ELSE,
+	HCL_CNODE_IF,
+	HCL_CNODE_LAMBDA,
+	HCL_CNODE_OR,
+	HCL_CNODE_RETURN,
+	HCL_CNODE_RETURN_FROM_HOME,
+	HCL_CNODE_SET,
+	HCL_CNODE_UNTIL,
+	HCL_CNODE_WHILE,
+
+	HCL_CNODE_XLIST = 0,  /* () - executable list */
+	HCL_CNODE_ARRAY,      /* [] */
+	HCL_CNODE_BYTEARRAY,  /* #[] */
+	HCL_CNODE_DIC,        /* {} */
+	HCL_CNODE_QLIST       /* #() - data list */
+};
+typedef enum hcl_cnode_type_t hcl_cnode_type_t;
+
+/* NOTE: hcl_cnode_t used by the built-in compiler is not an OOP object */
+struct hcl_cnode_t
+{
+	hcl_cnode_type_t type;
+	hcl_ioloc_t loc;
+
+	union
+	{
+		struct
+		{
+			hcl_ooch_t* ptr;
+			hcl_oow_t len;
+		} strlit;
+	} u;
+};
+typedef struct hcl_cnode_t hcl_cnode_t;
+
 /* NOTE: hcl_cframe_t used by the built-in compiler is not an OOP object */
 struct hcl_cframe_t
 {
@@ -221,7 +275,6 @@ struct hcl_cframe_t
 		} lambda;
 	} u;
 };
-
 typedef struct hcl_cframe_t hcl_cframe_t;
 
 struct hcl_blk_info_t

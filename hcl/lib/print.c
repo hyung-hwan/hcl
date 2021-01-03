@@ -84,7 +84,6 @@ enum
 	WORD_FALSE,
 
 	WORD_SET,
-	WORD_CFRAME,
 	WORD_PRIM,
 
 	WORD_FUNCTION,
@@ -654,10 +653,6 @@ next:
 			if (hcl_bfmt_out(fmtout, " |") <= -1) return -1;
 			break;
 		}
-
-		case HCL_BRAND_CFRAME:
-			word_index = WORD_CFRAME;
-			goto print_word;
 
 		case HCL_BRAND_PRIM:
 			word_index = WORD_PRIM;

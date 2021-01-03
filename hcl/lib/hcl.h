@@ -1675,7 +1675,6 @@ enum hcl_brand_t
 	HCL_BRAND_DIC,
 	HCL_BRAND_FPDEC, /* fixed-point decimal */
 
-	HCL_BRAND_CFRAME,/* compiler frame */
 	HCL_BRAND_PRIM,
 
 	HCL_BRAND_FUNCTION,
@@ -1691,6 +1690,7 @@ typedef enum hcl_brand_t hcl_brand_t;
 enum hcl_syncode_t
 {
 	/* SYNCODE 0 means it's not a syncode object. so it begins with 1 */
+	/* these enumerators can be set in the SYNCODE flags for a symbol */
 	HCL_SYNCODE_AND = 1,
 	HCL_SYNCODE_BREAK,
 	HCL_SYNCODE_DEFUN,
@@ -1710,7 +1710,7 @@ typedef enum hcl_syncode_t hcl_syncode_t;
 
 enum hcl_concode_t
 {
-	/* these can be set in the SYNCODE flags for cons cells */
+	/* these can be set in the SYNCODE flags for a cons cell */
 	HCL_CONCODE_XLIST = 0,  /* () - executable list */
 	HCL_CONCODE_ARRAY,      /* [] */
 	HCL_CONCODE_BYTEARRAY,  /* #[] */
