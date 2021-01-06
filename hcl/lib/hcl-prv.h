@@ -140,7 +140,7 @@ enum hcl_iotok_type_t
 	HCL_IOTOK_RADNUMLIT,
 	HCL_IOTOK_FPDECLIT,
 	HCL_IOTOK_SMPTRLIT,
-	HCL_IOTOK_ERRORLIT,
+	HCL_IOTOK_ERRLIT,
 	HCL_IOTOK_NIL,
 	HCL_IOTOK_TRUE,
 	HCL_IOTOK_FALSE,
@@ -181,7 +181,6 @@ struct hcl_iolink_t
 	hcl_iolink_t* link;
 };
 
-typedef enum hcl_concode_t hcl_concode_t;
 enum hcl_cnode_type_t
 {
 	HCL_CNODE_CHARLIT,
@@ -190,7 +189,7 @@ enum hcl_cnode_type_t
 	HCL_CNODE_RADNUMLIT,
 	HCL_CNODE_FPDECLIT,
 	HCL_CNODE_SMPTRLIT,
-	HCL_CNODE_ERRORLIT,
+	HCL_CNODE_ERRLIT,
 	HCL_CNODE_NIL,
 	HCL_CNODE_TRUE,
 	HCL_CNODE_FALSE,
@@ -228,9 +227,17 @@ struct hcl_cnode_t
 	{
 		struct
 		{
+			hcl_ooch_t v;
+		} charlit;
+		struct
+		{
 			hcl_ooch_t* ptr;
 			hcl_oow_t len;
 		} strlit;
+		struct
+		{
+			hcl_ooi_t v;
+		} errlit;
 	} u;
 };
 typedef struct hcl_cnode_t hcl_cnode_t;

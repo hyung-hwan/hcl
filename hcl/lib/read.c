@@ -799,7 +799,7 @@ static int get_sharp_token (hcl_t* hcl)
 
 		case 'e':
 			if (get_radix_number(hcl, c, 10) <= -1) return -1;
-			SET_TOKEN_TYPE (hcl, HCL_IOTOK_ERRORLIT);
+			SET_TOKEN_TYPE (hcl, HCL_IOTOK_ERRLIT);
 			break;
 
 		case 'p':
@@ -2030,7 +2030,7 @@ static int read_object (hcl_t* hcl)
 				break;
 			}
 
-			case HCL_IOTOK_ERRORLIT:
+			case HCL_IOTOK_ERRLIT:
 			{
 				hcl_oow_t i;
 				hcl_ooi_t v = 0;
@@ -2043,7 +2043,7 @@ static int read_object (hcl_t* hcl)
 
 					if (v > HCL_ERROR_MAX)
 					{
-						hcl_setsynerr (hcl, HCL_SYNERR_ERRORLIT, TOKEN_LOC(hcl), TOKEN_NAME(hcl));
+						hcl_setsynerr (hcl, HCL_SYNERR_ERRLIT, TOKEN_LOC(hcl), TOKEN_NAME(hcl));
 						return -1;
 					}
 				}

@@ -103,7 +103,7 @@ enum hcl_synerrnum_t
 	HCL_SYNERR_CHARLIT,       /* wrong character literal */
 	HCL_SYNERR_NUMLIT ,       /* invalid numeric literal */
 	HCL_SYNERR_NUMRANGE,      /* number range error */
-	HCL_SYNERR_ERRORLIT,      /* wrong error literal */
+	HCL_SYNERR_ERRLIT,        /* wrong error literal */
 	HCL_SYNERR_SMPTRLIT,      /* wrong smptr literal */
 	HCL_SYNERR_MSEGIDENT,     /* wrong multi-segment identifier */
 
