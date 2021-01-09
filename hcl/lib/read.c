@@ -26,10 +26,8 @@
 
 #include "hcl-prv.h"
 
-
 static int begin_include (hcl_t* hcl);
 static int end_include (hcl_t* hcl);
-
 
 #define BUFFER_ALIGN 128
 #define BALIT_BUFFER_ALIGN 128
@@ -45,7 +43,7 @@ static struct voca_t
 {
 	hcl_oow_t len;
 	hcl_ooch_t str[11];
-} vocas[] = 
+} vocas[] =
 {
 	{  8, { '#','i','n','c','l','u','d','e'                               } },
 	{ 11, { '#','\\','b','a','c','k','s','p','a','c','e'                  } },
@@ -122,13 +120,13 @@ static int string_to_ooi (hcl_t* hcl, hcl_oocs_t* str, int radixed, hcl_ooi_t* n
 	{
 		HCL_ASSERT (hcl, ptr < end);
 
-		if (*ptr != '#') 
+		if (*ptr != '#')
 		{
 			hcl_seterrbfmt (hcl, HCL_EINVAL, "radixed number not starting with # - %*.js", str->len, str->ptr);
 			return -1;
 		}
 		ptr++; /* skip '#' */
-		
+
 		if (*ptr == 'x') base = 16;
 		else if (*ptr == 'o') base = 8;
 		else if (*ptr == 'b') base = 2;
@@ -147,7 +145,7 @@ static int string_to_ooi (hcl_t* hcl, hcl_oocs_t* str, int radixed, hcl_ooi_t* n
 	while (ptr < end && (v = CHAR_TO_NUM(*ptr, base)) < base)
 	{
 		value = value * base + v;
-		if (value < old_value) 
+		if (value < old_value)
 		{
 			/* overflow must have occurred */
 			hcl_seterrbfmt (hcl, HCL_ERANGE, "number too big - %.*js", str->len, str->ptr);
@@ -214,13 +212,13 @@ static hcl_oop_t string_to_num (hcl_t* hcl, hcl_oocs_t* str, int radixed)
 	{
 		HCL_ASSERT (hcl, ptr < end);
 
-		if (*ptr != '#') 
+		if (*ptr != '#')
 		{
 			hcl_seterrbfmt(hcl, HCL_EINVAL, "radixed number not starting with # - %.*js", str->len, str->ptr);
 			return HCL_NULL;
 		}
 		ptr++; /* skip '#' */
-		
+
 		if (*ptr == 'x') base = 16;
 		else if (*ptr == 'o') base = 8;
 		else if (*ptr == 'b') base = 2;
@@ -438,12 +436,12 @@ static int get_char (hcl_t* hcl)
 		return 0;
 	}
 
-	if (hcl->c->curinp->b.state == -1) 
+	if (hcl->c->curinp->b.state == -1)
 	{
 		hcl->c->curinp->b.state = 0;
 		return -1;
 	}
-	else if (hcl->c->curinp->b.state == 1) 
+	else if (hcl->c->curinp->b.state == 1)
 	{
 		hcl->c->curinp->b.state = 0;
 		goto return_eof;
@@ -463,7 +461,7 @@ static int get_char (hcl_t* hcl)
 			hcl->c->lxc = hcl->c->curinp->lxc;
 
 			/* indicate that EOF has been read. lxc.c is also set to EOF. */
-			return 0; 
+			return 0;
 		}
 
 		hcl->c->curinp->b.pos = 0;
@@ -476,9 +474,9 @@ static int get_char (hcl_t* hcl)
 		 * to be read is still in the buffer (hcl->c->curinp->buf).
 		 * hcl->cu->curinp->colm has been incremented when the previous
 		 * character has been read. */
-		if (hcl->c->curinp->line > 1 && hcl->c->curinp->colm == 2 && hcl->c->curinp->nl != hcl->c->curinp->lxc.c) 
+		if (hcl->c->curinp->line > 1 && hcl->c->curinp->colm == 2 && hcl->c->curinp->nl != hcl->c->curinp->lxc.c)
 		{
-			/* most likely, it's the second character in '\r\n' or '\n\r' 
+			/* most likely, it's the second character in '\r\n' or '\n\r'
 			 * sequence. let's not update the line and column number. */
 			/*hcl->c->curinp->colm = 1;*/
 		}
@@ -516,13 +514,13 @@ static int skip_comment (hcl_t* hcl)
 
 	/* attempt to handle #! or ## */
 
-	lc = hcl->c->lxc; /* save the last character */ 
+	lc = hcl->c->lxc; /* save the last character */
 	GET_CHAR_TO (hcl, c); /* read a following character */
 
-	if (c == '!' || c == '#') 
+	if (c == '!' || c == '#')
 	{
 	single_line_comment:
-		do 
+		do
 		{
 			GET_CHAR_TO (hcl, c);
 			if (c == HCL_OOCI_EOF)
@@ -534,7 +532,7 @@ static int skip_comment (hcl_t* hcl)
 				GET_CHAR (hcl); /* keep the first meaningful character in lxc */
 				break;
 			}
-		} 
+		}
 		while (1);
 
 		return 1; /* single line comment led by ## or #! or ; */
@@ -574,9 +572,9 @@ static int get_string (hcl_t* hcl, hcl_ooch_t end_char, hcl_ooch_t esc_char, int
 				/* more octal digits */
 				c_acc = c_acc * 8 + c - '0';
 				digit_count++;
-				if (digit_count >= escaped) 
+				if (digit_count >= escaped)
 				{
-					/* should i limit the max to 0xFF/0377? 
+					/* should i limit the max to 0xFF/0377?
 					 * if (c_acc > 0377) c_acc = 0377;*/
 					ADD_TOKEN_CHAR (hcl, c_acc);
 					escaped = 0;
@@ -595,7 +593,7 @@ static int get_string (hcl_t* hcl, hcl_ooch_t end_char, hcl_ooch_t esc_char, int
 			{
 				c_acc = c_acc * 16 + c - '0';
 				digit_count++;
-				if (digit_count >= escaped) 
+				if (digit_count >= escaped)
 				{
 					ADD_TOKEN_CHAR (hcl, c_acc);
 					escaped = 0;
@@ -606,7 +604,7 @@ static int get_string (hcl_t* hcl, hcl_ooch_t end_char, hcl_ooch_t esc_char, int
 			{
 				c_acc = c_acc * 16 + c - 'A' + 10;
 				digit_count++;
-				if (digit_count >= escaped) 
+				if (digit_count >= escaped)
 				{
 					ADD_TOKEN_CHAR (hcl, c_acc);
 					escaped = 0;
@@ -617,7 +615,7 @@ static int get_string (hcl_t* hcl, hcl_ooch_t end_char, hcl_ooch_t esc_char, int
 			{
 				c_acc = c_acc * 16 + c - 'a' + 10;
 				digit_count++;
-				if (digit_count >= escaped) 
+				if (digit_count >= escaped)
 				{
 					ADD_TOKEN_CHAR (hcl, c_acc);
 					escaped = 0;
@@ -630,7 +628,7 @@ static int get_string (hcl_t* hcl, hcl_ooch_t end_char, hcl_ooch_t esc_char, int
 
 				rc = (escaped == 2)? 'x':
 				     (escaped == 4)? 'u': 'U';
-				if (digit_count == 0) 
+				if (digit_count == 0)
 					ADD_TOKEN_CHAR (hcl, rc);
 				else ADD_TOKEN_CHAR (hcl, c_acc);
 
@@ -660,7 +658,7 @@ static int get_string (hcl_t* hcl, hcl_ooch_t end_char, hcl_ooch_t esc_char, int
 			else if (c == 'r') c = '\r';
 			else if (c == 't') c = '\t';
 			else if (c == 'v') c = '\v';
-			else if (c >= '0' && c <= '7' && !regex) 
+			else if (c >= '0' && c <= '7' && !regex)
 			{
 				/* i don't support the octal notation for a regular expression.
 				 * it conflicts with the backreference notation between \1 and \7 inclusive. */
@@ -669,7 +667,7 @@ static int get_string (hcl_t* hcl, hcl_ooch_t end_char, hcl_ooch_t esc_char, int
 				c_acc = c - '0';
 				continue;
 			}
-			else if (c == 'x') 
+			else if (c == 'x')
 			{
 				escaped = 2;
 				digit_count = 0;
@@ -686,7 +684,7 @@ static int get_string (hcl_t* hcl, hcl_ooch_t end_char, hcl_ooch_t esc_char, int
 			}
 		#endif
 		#if (HCL_SIZEOF_OOCH_T >= 4)
-			else if (c == 'U') 
+			else if (c == 'U')
 			{
 				escaped = 8;
 				digit_count = 0;
@@ -694,12 +692,12 @@ static int get_string (hcl_t* hcl, hcl_ooch_t end_char, hcl_ooch_t esc_char, int
 				continue;
 			}
 		#endif
-			else if (regex) 
+			else if (regex)
 			{
 				/* if the following character doesn't compose a proper
-				 * escape sequence, keep the escape character. 
-				 * an unhandled escape sequence can be handled 
-				 * outside this function since the escape character 
+				 * escape sequence, keep the escape character.
+				 * an unhandled escape sequence can be handled
+				 * outside this function since the escape character
 				 * is preserved.*/
 				ADD_TOKEN_CHAR (hcl, esc_char);
 			}
@@ -724,7 +722,7 @@ static int get_radix_number (hcl_t* hcl, hcl_ooci_t rc, int radix)
 
 	if (CHAR_TO_NUM(c, radix) >= radix)
 	{
-		hcl_setsynerrbfmt (hcl, HCL_SYNERR_NUMLIT, TOKEN_LOC(hcl), TOKEN_NAME(hcl), 
+		hcl_setsynerrbfmt (hcl, HCL_SYNERR_NUMLIT, TOKEN_LOC(hcl), TOKEN_NAME(hcl),
 			"no digit after radix specifier in %.*js", hcl->c->tok.name.len, hcl->c->tok.name.ptr);
 		return -1;
 	}
@@ -767,7 +765,7 @@ static int get_sharp_token (hcl_t* hcl)
 
 	/*
 	 * #bBBBB binary
-	 * #oOOOO octal 
+	 * #oOOOO octal
 	 * #xXXXX hexadecimal
 	 * #eDDD   error
 	 * #pHHH   smptr
@@ -824,7 +822,7 @@ static int get_sharp_token (hcl_t* hcl)
 			{
 				ADD_TOKEN_CHAR (hcl, c);
 				GET_CHAR_TO (hcl, c);
-			} 
+			}
 			while (!is_delimiter(c));
 
 			if (TOKEN_NAME_LEN(hcl) >= 4)
@@ -855,7 +853,7 @@ static int get_sharp_token (hcl_t* hcl)
 
 						c = c * 16 + CHAR_TO_NUM(hcl->c->tok.name.ptr[i], 16); /* don't care if it is for 'p' */
 					}
-					
+
 				}
 			#if (HCL_SIZEOF_OOCH_T >= 2)
 				else if (TOKEN_NAME_CHAR(hcl, 2) == 'u')
@@ -948,7 +946,7 @@ static int get_sharp_token (hcl_t* hcl)
 			break;
 
 		default:
-			if (is_delimiter(c)) 
+			if (is_delimiter(c))
 			{
 				/* EOF, whitespace, etc */
 				hcl_setsynerrbfmt (hcl, HCL_SYNERR_HASHLIT, TOKEN_LOC(hcl), TOKEN_NAME(hcl),
@@ -962,7 +960,7 @@ static int get_sharp_token (hcl_t* hcl)
 			{
 				ADD_TOKEN_CHAR (hcl, c);
 				GET_CHAR_TO (hcl, c);
-			} 
+			}
 			while (!is_delimiter(c));
 
 			if (does_token_name_match (hcl, VOCA_INCLUDE))
@@ -986,7 +984,7 @@ static int get_sharp_token (hcl_t* hcl)
 static hcl_iotok_type_t classify_ident_token (hcl_t* hcl, const hcl_oocs_t* v)
 {
 	hcl_oow_t i;
-	struct 
+	struct
 	{
 		hcl_oow_t len;
 		hcl_ooch_t name[10];
@@ -1014,13 +1012,13 @@ static int get_token (hcl_t* hcl)
 retry:
 	GET_CHAR (hcl);
 
-	do 
+	do
 	{
 		/* skip spaces */
 		while (is_spacechar(hcl->c->lxc.c)) GET_CHAR (hcl);
 		/* the first character after the last space is in hcl->c->lxc */
 		if ((n = skip_comment(hcl)) <= -1) return -1;
-	} 
+	}
 	while (n >= 1);
 
 	/* clear the token name, reset its location */
@@ -1075,7 +1073,7 @@ retry:
 			SET_TOKEN_TYPE (hcl, HCL_IOTOK_RBRACE);
 			break;
 
-		case '|': 
+		case '|':
 			ADD_TOKEN_CHAR (hcl, c);
 			SET_TOKEN_TYPE (hcl, HCL_IOTOK_VBAR);
 			break;
@@ -1109,7 +1107,7 @@ retry:
 			SET_TOKEN_TYPE (hcl, HCL_IOTOK_CHARLIT);
 			break;
 
-		case '#':  
+		case '#':
 			if (get_sharp_token(hcl) <= -1) return -1;
 			break;
 
@@ -1117,7 +1115,7 @@ retry:
 		case '-':
 			oldc = c;
 			GET_CHAR_TO (hcl, c);
-			if(is_digitchar(c)) 
+			if(is_digitchar(c))
 			{
 				unget_char (hcl, &hcl->c->lxc);
 				c = oldc;
@@ -1153,7 +1151,7 @@ retry:
 						goto ident;
 				}
 			}
-			else 
+			else
 			{
 				unget_char (hcl, &hcl->c->lxc);
 				c = oldc;
@@ -1211,7 +1209,7 @@ retry:
 					hcl_iotok_type_t type;
 
 					type = classify_ident_token(hcl, TOKEN_NAME(hcl));
-					if (type != HCL_IOTOK_IDENT) 
+					if (type != HCL_IOTOK_IDENT)
 					{
 						SET_TOKEN_TYPE (hcl, type);
 						unget_char (hcl, &hcl->c->lxc);
@@ -1240,7 +1238,7 @@ retry:
 
 						seg.ptr = &TOKEN_NAME_CHAR(hcl,start);
 						seg.len = TOKEN_NAME_LEN(hcl) - start;
-						if (classify_ident_token(hcl, &seg) != HCL_IOTOK_IDENT) 
+						if (classify_ident_token(hcl, &seg) != HCL_IOTOK_IDENT)
 						{
 							hcl_setsynerr (hcl, HCL_SYNERR_MSEGIDENT, TOKEN_LOC(hcl), TOKEN_NAME(hcl));
 							return -1;
@@ -1334,7 +1332,7 @@ static int begin_include (hcl_t* hcl)
 	/*arg->nl = '\0';*/
 	arg->includer = hcl->c->curinp;
 
-	if (hcl->c->reader(hcl, HCL_IO_OPEN, arg) <= -1) 
+	if (hcl->c->reader(hcl, HCL_IO_OPEN, arg) <= -1)
 	{
 		hcl_setsynerrbfmt (hcl, HCL_SYNERR_INCLUDE, TOKEN_LOC(hcl), TOKEN_NAME(hcl), "unable to include %js", io_name);
 		goto oops;
@@ -1354,13 +1352,13 @@ static int begin_include (hcl_t* hcl)
 	hcl->c->curinp = arg;
 	/* hcl->c->depth.incl++; */
 
-	/* read in the first character in the included file. 
+	/* read in the first character in the included file.
 	 * so the next call to get_token() sees the character read
 	 * from this file. */
-	if (get_token(hcl) <= -1) 
+	if (get_token(hcl) <= -1)
 	{
-		end_include (hcl); 
-		/* i don't jump to oops since i've called 
+		end_include (hcl);
+		/* i don't jump to oops since i've called
 		 * end_include() which frees hcl->c->curinp/arg */
 		return -1;
 	}
@@ -1386,8 +1384,8 @@ static int end_include (hcl_t* hcl)
 
 	/* if closing has failed, still destroy the
 	 * sio structure first as normal and return
-	 * the failure below. this way, the caller 
-	 * does not call HCL_IO_CLOSE on 
+	 * the failure below. this way, the caller
+	 * does not call HCL_IO_CLOSE on
 	 * hcl->c->curinp again. */
 
 	cur = hcl->c->curinp;
@@ -1415,16 +1413,16 @@ static HCL_INLINE hcl_oop_t enter_list (hcl_t* hcl, int flagv)
 	/* upon entering a list, it pushes a frame of 4 slots.
 	 * rsa[0] stores the first element in the list.
 	 * rsa[1] stores the last element in the list.
-	 * both are updated in chain_to_list() as items are added. 
+	 * both are updated in chain_to_list() as items are added.
 	 * rsa[2] stores the flag value.
-	 * rsa[3] stores the pointer to the previous top frame. 
+	 * rsa[3] stores the pointer to the previous top frame.
 	 * rsa[4] stores the number of elements in the list */
 	rsa = (hcl_oop_oop_t)hcl_makearray(hcl, 5, 0);
 	if (!rsa) return HCL_NULL;
 
 	rsa->slot[2] = HCL_SMOOI_TO_OOP(flagv);
 	rsa->slot[3] = hcl->c->r.s; /* push */
-	hcl->c->r.s = (hcl_oop_t)rsa; 
+	hcl->c->r.s = (hcl_oop_t)rsa;
 
 	rsa->slot[4] = HCL_SMOOI_TO_OOP(0);
 
@@ -1500,8 +1498,8 @@ done:
 	*oldflagv = fv;
 	if (HCL_IS_NIL(hcl,hcl->c->r.s))
 	{
-		/* the stack is empty after popping. 
-		 * it is back to the top level. 
+		/* the stack is empty after popping.
+		 * it is back to the top level.
 		 * the top level can never be quoted. */
 		*flagv = 0;
 	}
@@ -1523,13 +1521,13 @@ done:
 			case HCL_CONCODE_ARRAY:
 				return (hcl_oop_t)hcl_makearray(hcl, 0, 0);
 			case HCL_CONCODE_BYTEARRAY:
-				return (hcl_oop_t)hcl_makebytearray(hcl, HCL_NULL, 0); 
+				return (hcl_oop_t)hcl_makebytearray(hcl, HCL_NULL, 0);
 			case HCL_CONCODE_DIC:
 				return (hcl_oop_t)hcl_makedic(hcl, 100); /* TODO: default dictionary size for empty definition? */
 
 			/* NOTE: empty xlist will get translated to #nil.
 			 *       this is useful when used in the lambda expression to express an empty argument. also in defun.
-			 *      (lambda () ...) is equivalent to  (lambda #nil ...) 
+			 *      (lambda () ...) is equivalent to  (lambda #nil ...)
 			 *      (defun x() ...) */
 		}
 	}
@@ -1582,7 +1580,7 @@ static HCL_INLINE int can_comma_list (hcl_t* hcl)
 	{
 		if (count & 1) return 0;
 	}
-	else if (LIST_FLAG_GET_CONCODE(flagv) != HCL_CONCODE_ARRAY && 
+	else if (LIST_FLAG_GET_CONCODE(flagv) != HCL_CONCODE_ARRAY &&
 	         LIST_FLAG_GET_CONCODE(flagv) != HCL_CONCODE_BYTEARRAY)
 	{
 		return 0;
@@ -1650,11 +1648,11 @@ static hcl_oop_t chain_to_list (hcl_t* hcl, hcl_oop_t obj)
 
 	if (flagv & CLOSED)
 	{
-		/* the list has already been closed and cannot add more items 
+		/* the list has already been closed and cannot add more items
 		 * for instance,  see this faulty expression [1 2 . 3 4 ].
 		 * you can have only 1 item  after the period. this condition
 		 * can only be triggered by a wrong qlist where a period is
-		 * allowed. so i can safely hard-code the error code to 
+		 * allowed. so i can safely hard-code the error code to
 		 * HCL_SYNERR_RBRACK. */
 		hcl_setsynerr (hcl, HCL_SYNERR_RBRACK, TOKEN_LOC(hcl), TOKEN_NAME(hcl));
 		return HCL_NULL;
@@ -1686,7 +1684,7 @@ static hcl_oop_t chain_to_list (hcl_t* hcl, hcl_oop_t obj)
 
 		if ((flagv & JSON) && count > 0 && !(flagv & (COMMAED | COLONED)))
 		{
-			/* there is no separator between array/dictionary elements 
+			/* there is no separator between array/dictionary elements
 			 * for instance, [1 2] { 10 20 } */
 			hcl_setsynerr (hcl, HCL_SYNERR_NOSEP, TOKEN_LOC(hcl), HCL_NULL);
 			return HCL_NULL;
@@ -1760,7 +1758,7 @@ static int get_symbol_array_literal (hcl_t* hcl, hcl_oop_t* xlit)
 	hcl_oow_t i;
 
 	/* if the program is not buggy, salit.size must be 0 here. */
-	HCL_ASSERT (hcl, hcl->c->r.salit.size == 0); 
+	HCL_ASSERT (hcl, hcl->c->r.salit.size == 0);
 	hcl->c->r.salit.size = 0; /* i want to set it to 0 in case it's buggy */
 
 	HCL_ASSERT (hcl, TOKEN_TYPE(hcl) == HCL_IOTOK_VBAR);
@@ -1812,13 +1810,13 @@ static int read_object (hcl_t* hcl)
 	/* this function read an s-expression non-recursively
 	 * by manipulating its own stack. */
 
-	int level = 0, array_level = 0, flagv = 0; 
+	int level = 0, array_level = 0, flagv = 0;
 	hcl_oop_t obj;
 
 	while (1)
 	{
 	redo:
-		switch (TOKEN_TYPE(hcl)) 
+		switch (TOKEN_TYPE(hcl))
 		{
 			default:
 				hcl_setsynerr (hcl, HCL_SYNERR_ILTOK, TOKEN_LOC(hcl), TOKEN_NAME(hcl));
@@ -1876,7 +1874,7 @@ static int read_object (hcl_t* hcl)
 					return -1;
 				}
 
-				/* push some data to simulate recursion into 
+				/* push some data to simulate recursion into
 				 * a list literal or an array literal */
 				if (enter_list(hcl, flagv) == HCL_NULL) return -1;
 				level++;
@@ -1891,9 +1889,9 @@ static int read_object (hcl_t* hcl)
 				{
 					/* cannot have a period:
 					 *   1. at the top level - not inside ()
-					 *   2. at the beginning of a list 
+					 *   2. at the beginning of a list
 					 *   3. inside an  #(), #[], #{}, () */
-					hcl_setsynerr (hcl, HCL_SYNERR_DOTBANNED, TOKEN_LOC(hcl), HCL_NULL); 
+					hcl_setsynerr (hcl, HCL_SYNERR_DOTBANNED, TOKEN_LOC(hcl), HCL_NULL);
 					return -1;
 				}
 
@@ -1903,7 +1901,7 @@ static int read_object (hcl_t* hcl)
 			case HCL_IOTOK_COLON:
 				if (level <= 0 || !can_colon_list(hcl))
 				{
-					hcl_setsynerr (hcl, HCL_SYNERR_COLONBANNED, TOKEN_LOC(hcl), HCL_NULL); 
+					hcl_setsynerr (hcl, HCL_SYNERR_COLONBANNED, TOKEN_LOC(hcl), HCL_NULL);
 					return -1;
 				}
 
@@ -1913,7 +1911,7 @@ static int read_object (hcl_t* hcl)
 			case HCL_IOTOK_COMMA:
 				if (level <= 0 || !can_comma_list(hcl))
 				{
-					hcl_setsynerr (hcl, HCL_SYNERR_COMMABANNED, TOKEN_LOC(hcl), HCL_NULL); 
+					hcl_setsynerr (hcl, HCL_SYNERR_COMMABANNED, TOKEN_LOC(hcl), HCL_NULL);
 					return -1;
 				}
 
@@ -1924,7 +1922,7 @@ static int read_object (hcl_t* hcl)
 			case HCL_IOTOK_RBRACK: /* bytearray #[], array[] */
 			case HCL_IOTOK_RBRACE: /* dictionary {} */
 			{
-				static struct 
+				static struct
 				{
 					int             closer;
 					hcl_synerrnum_t synerr;
@@ -1942,7 +1940,7 @@ static int read_object (hcl_t* hcl)
 
 				if (level <= 0)
 				{
-					hcl_setsynerr (hcl, HCL_SYNERR_UNBALPBB, TOKEN_LOC(hcl), HCL_NULL); 
+					hcl_setsynerr (hcl, HCL_SYNERR_UNBALPBB, TOKEN_LOC(hcl), HCL_NULL);
 					return -1;
 				}
 
@@ -1957,21 +1955,21 @@ static int read_object (hcl_t* hcl)
 #if 0
 				if ((flagv & QUOTED) || level <= 0)
 				{
-					/* the right parenthesis can never appear while 
-					 * 'quoted' is true. 'quoted' is set to false when 
-					 * entering a normal list. 'quoted' is set to true 
+					/* the right parenthesis can never appear while
+					 * 'quoted' is true. 'quoted' is set to false when
+					 * entering a normal list. 'quoted' is set to true
 					 * when entering a quoted list. a quoted list does
 					 * not have an explicit right parenthesis.
-					 * so the right parenthesis can only pair up with 
+					 * so the right parenthesis can only pair up with
 					 * the left parenthesis for the normal list.
 					 *
 					 * For example, '(1 2 3 ') 5 6)
 					 *
-					 * this condition is triggerred when the first ) is 
+					 * this condition is triggerred when the first ) is
 					 * met after the second quote.
 					 *
-					 * also it is illegal to have the right parenthesis 
-					 * with no opening(left) parenthesis, which is 
+					 * also it is illegal to have the right parenthesis
+					 * with no opening(left) parenthesis, which is
 					 * indicated by level<=0.
 					 */
 					hcl_setsynerr (hcl, HCL_SYNERR_LPAREN, TOKEN_LOC(hcl), TOKEN_NAME(hcl));
@@ -2083,14 +2081,14 @@ static int read_object (hcl_t* hcl)
 				obj = hcl_makesymbol(hcl, TOKEN_NAME_PTR(hcl), TOKEN_NAME_LEN(hcl));
 				if (obj && !hcl_getatsysdic(hcl, obj))
 				{
-					/* query the module for information if it is the first time 
+					/* query the module for information if it is the first time
 					 * when the dotted symbol is seen */
 
 					hcl_pfbase_t* pfbase;
 					hcl_mod_t* mod;
 					hcl_oop_t val;
 					unsigned int kernel_bits;
-					
+
 					pfbase = hcl_querymod(hcl, TOKEN_NAME_PTR(hcl), TOKEN_NAME_LEN(hcl), &mod);
 					if (!pfbase)
 					{
@@ -2151,7 +2149,7 @@ static int read_object (hcl_t* hcl)
 			/* if so, append the element read into the quote list */
 			if (chain_to_list(hcl, obj) == HCL_NULL) return -1;
 
-			/* exit out of the quoted list. the quoted list can have 
+			/* exit out of the quoted list. the quoted list can have
 			 * one element only. */
 			obj = leave_list(hcl, &flagv, &oldflagv);
 
@@ -2178,7 +2176,7 @@ static int read_object (hcl_t* hcl)
 	HCL_ASSERT (hcl, level == 0);
 	HCL_ASSERT (hcl, array_level == 0);
 
-	hcl->c->r.e = obj; 
+	hcl->c->r.e = obj;
 	return 0;
 }
 
@@ -2195,7 +2193,7 @@ static HCL_INLINE int __read (hcl_t* hcl)
 
 hcl_oop_t hcl_read (hcl_t* hcl)
 {
-	HCL_ASSERT (hcl, hcl->c && hcl->c->reader); 
+	HCL_ASSERT (hcl, hcl->c && hcl->c->reader);
 	if (__read(hcl) <= -1) return HCL_NULL;
 	return hcl->c->r.e;
 }
@@ -2306,7 +2304,7 @@ int hcl_attachio (hcl_t* hcl, hcl_ioimpl_t reader, hcl_ioimpl_t printer)
 		if (!cbp) return -1;
 
 		hcl->c = (hcl_compiler_t*)hcl_callocmem(hcl, HCL_SIZEOF(*hcl->c));
-		if (!hcl->c) 
+		if (!hcl->c)
 		{
 			hcl_deregcb (hcl, cbp);
 			return -1;
@@ -2338,7 +2336,7 @@ int hcl_attachio (hcl_t* hcl, hcl_ioimpl_t reader, hcl_ioimpl_t printer)
 	hcl->c->reader = reader;
 	hcl->c->nungots = 0;
 
-	/* The name field and the includer field are HCL_NULL 
+	/* The name field and the includer field are HCL_NULL
 	 * for the main stream */
 	HCL_MEMSET (&hcl->c->inarg, 0, HCL_SIZEOF(hcl->c->inarg));
 	hcl->c->inarg.line = 1;
@@ -2350,18 +2348,18 @@ int hcl_attachio (hcl_t* hcl, hcl_ioimpl_t reader, hcl_ioimpl_t printer)
 
 	HCL_MEMSET (&hcl->c->outarg, 0, HCL_SIZEOF(hcl->c->outarg));
 	n = hcl->c->printer(hcl, HCL_IO_OPEN, &hcl->c->outarg);
-	if (n <= -1) 
+	if (n <= -1)
 	{
 		hcl->c->reader (hcl, HCL_IO_CLOSE, &hcl->c->inarg);
 		goto oops;
 	}
-	
+
 	/* the stream is open. set it as the current input stream */
 	hcl->c->curinp = &hcl->c->inarg;
 	return 0;
 
 oops:
-	if (cbp) 
+	if (cbp)
 	{
 		hcl_deregcb (hcl, cbp);
 		hcl_freemem (hcl, hcl->c);
@@ -2386,7 +2384,7 @@ void hcl_flushio (hcl_t* hcl)
 void hcl_detachio (hcl_t* hcl)
 {
 	/* an error occurred and control has reached here
-	 * probably, some included files might not have been 
+	 * probably, some included files might not have been
 	 * closed. close them */
 
 	if (hcl->c)

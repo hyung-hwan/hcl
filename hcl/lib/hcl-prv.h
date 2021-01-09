@@ -236,6 +236,21 @@ struct hcl_cnode_t
 		} strlit;
 		struct
 		{
+			hcl_ooch_t* ptr;
+			hcl_oow_t len;
+		} numlit;
+		struct
+		{
+			hcl_ooch_t* ptr;
+			hcl_oow_t len;
+		} radnumlit;
+		struct
+		{
+			hcl_ooch_t* ptr;
+			hcl_oow_t len;
+		} fpdeclit;
+		struct
+		{
 			hcl_ooi_t v;
 		} errlit;
 	} u;
@@ -1209,6 +1224,19 @@ int hcl_emitbyteinstruction (
 	hcl_t*     hcl,
 	hcl_oob_t  bc
 );
+
+/* ========================================================================= */
+/* cnode.c                                                                   */
+/* ========================================================================= */
+hcl_cnode_t* hcl_makecnodenil (hcl_t* hcl, const hcl_ioloc_t* loc);
+hcl_cnode_t* hcl_makecnodetrue (hcl_t* hcl, const hcl_ioloc_t* loc);
+hcl_cnode_t* hcl_makecnodefalse (hcl_t* hcl, const hcl_ioloc_t* loc);
+hcl_cnode_t* hcl_makecnodecharlit (hcl_t* hcl, const hcl_ioloc_t* loc, const hcl_ooch_t ch);
+hcl_cnode_t* hcl_makecnodestrlit (hcl_t* hcl, const hcl_ioloc_t* loc, const hcl_ooch_t* ptr, hcl_oow_t len);
+hcl_cnode_t* hcl_makecnodenumlit (hcl_t* hcl, const hcl_ioloc_t* loc, const hcl_ooch_t* ptr, hcl_oow_t len);
+hcl_cnode_t* hcl_makecnoderadnumlit (hcl_t* hcl, const hcl_ioloc_t* loc, const hcl_ooch_t* ptr, hcl_oow_t len);
+hcl_cnode_t* hcl_makecnodefpdeclit (hcl_t* hcl, const hcl_ioloc_t* loc, const hcl_ooch_t* ptr, hcl_oow_t len);
+hcl_cnode_t* hcl_makecnodeerrlit (hcl_t* hcl, const hcl_ioloc_t* loc, hcl_ooi_t v);
 
 #if defined(__cplusplus)
 }

@@ -24,6 +24,8 @@
     THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include "hcl-prv.h"
+
 static hcl_cnode_t* make_cnode (hcl_t* hcl, hcl_cnode_type_t type, const hcl_ioloc_t* loc, hcl_oow_t extra_space)
 {
 	hcl_cnode_t* cnode;
@@ -59,20 +61,59 @@ hcl_cnode_t* hcl_makecnodecharlit (hcl_t* hcl, const hcl_ioloc_t* loc, const hcl
 	return c;
 }
 
+
+
+hcl_cnode_t* hcl_makecnodenumlit (hcl_t* hcl, const hcl_ioloc_t* loc, const hcl_ooch_t* ptr, hcl_oow_t len)
+{
+	hcl_cnode_t* c =  make_cnode(hcl, HCL_CNODE_NUMLIT, loc, HCL_SIZEOF(*ptr) * (len + 1));
+	if (HCL_UNLIKELY(!c)) return HCL_NULL;
+
+	c->u.numlit.ptr = (hcl_ooch_t*)(c + 1);
+	c->u.numlit.len = len;
+	hcl_copy_oochars (c->u.numlit.ptr, ptr, len);
+	c->u.numlit.ptr[len] = '\0';
+	return c;
+}
+
+hcl_cnode_t* hcl_makecnoderadnumlit (hcl_t* hcl, const hcl_ioloc_t* loc, const hcl_ooch_t* ptr, hcl_oow_t len)
+{
+	hcl_cnode_t* c =  make_cnode(hcl, HCL_CNODE_RADNUMLIT, loc, HCL_SIZEOF(*ptr) * (len + 1));
+	if (HCL_UNLIKELY(!c)) return HCL_NULL;
+
+	c->u.radnumlit.ptr = (hcl_ooch_t*)(c + 1);
+	c->u.radnumlit.len = len;
+	hcl_copy_oochars (c->u.radnumlit.ptr, ptr, len);
+	c->u.radnumlit.ptr[len] = '\0';
+	return c;
+}
+
+hcl_cnode_t* hcl_makecnodefpdeclit (hcl_t* hcl, const hcl_ioloc_t* loc, const hcl_ooch_t* ptr, hcl_oow_t len)
+{
+	hcl_cnode_t* c =  make_cnode(hcl, HCL_CNODE_FPDECLIT, loc, HCL_SIZEOF(*ptr) * (len + 1));
+	if (HCL_UNLIKELY(!c)) return HCL_NULL;
+
+	c->u.fpdeclit.ptr = (hcl_ooch_t*)(c + 1);
+	c->u.fpdeclit.len = len;
+	hcl_copy_oochars (c->u.fpdeclit.ptr, ptr, len);
+	c->u.fpdeclit.ptr[len] = '\0';
+	return c;
+}
+
 hcl_cnode_t* hcl_makecnodestrlit (hcl_t* hcl, const hcl_ioloc_t* loc, const hcl_ooch_t* ptr, hcl_oow_t len)
 {
 	hcl_cnode_t* c =  make_cnode(hcl, HCL_CNODE_STRLIT, loc, HCL_SIZEOF(*ptr) * (len + 1));
 	if (HCL_UNLIKELY(!c)) return HCL_NULL;
 
-	c->u.strlit.ptr = (hawk_ooch_t*)(c + 1);
+	c->u.strlit.ptr = (hcl_ooch_t*)(c + 1);
 	c->u.strlit.len = len;
-	hawk_copy_bchars (c->u.strlit.ptr, c->u.strlit.len, ptr, len);	
+	hcl_copy_oochars (c->u.strlit.ptr, ptr, len);
+	c->u.strlit.ptr[len] = '\0';
 	return c;
 }
 
 hcl_cnode_t* hcl_makecnodeerrlit (hcl_t* hcl, const hcl_ioloc_t* loc, hcl_ooi_t v)
 {
-	hcl_cnode_t* c =  make_cnode(hcl, HCL_CNODE_ERRLIT, loc, HCL_SIZEOF(*ptr) * (len + 1));
+	hcl_cnode_t* c =  make_cnode(hcl, HCL_CNODE_ERRLIT, loc, 0);
 	if (HCL_UNLIKELY(!c)) return HCL_NULL;
 
 	c->u.errlit.v = v;

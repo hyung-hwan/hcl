@@ -391,7 +391,7 @@ CFLAGS_COMMON =
 ##################################################
 # STATIC MODULES BUILT INTO MAIN LIBRARY
 ##################################################
-@ENABLE_STATIC_MODULE_TRUE@LDFLAGS_COMMON = -L$(libdir) -version-info 1:0:0 -no-undefined
+@ENABLE_STATIC_MODULE_TRUE@LDFLAGS_COMMON = -L$(libdir)
 @ENABLE_STATIC_MODULE_FALSE@LIBADD_COMMON = -lhcl
 @ENABLE_STATIC_MODULE_TRUE@LIBADD_COMMON = 
 @ENABLE_STATIC_MODULE_TRUE@noinst_LTLIBRARIES = libhcl-arr.la \
