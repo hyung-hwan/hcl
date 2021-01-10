@@ -1693,7 +1693,7 @@ static hcl_oop_t chain_to_list (hcl_t* hcl, hcl_oop_t obj)
 		hcl_pushvolat (hcl, (hcl_oop_t*)&rsa);
 		cons = hcl_makecons(hcl, obj, hcl->_nil);
 		hcl_popvolat (hcl);
-		if (!cons) return HCL_NULL;
+		if (HCL_UNLIKELY(!cons)) return HCL_NULL;
 
 		if (HCL_IS_NIL(hcl, rsa->slot[0]))
 		{

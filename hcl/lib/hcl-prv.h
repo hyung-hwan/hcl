@@ -218,6 +218,7 @@ enum hcl_cnode_type_t
 typedef enum hcl_cnode_type_t hcl_cnode_type_t;
 
 /* NOTE: hcl_cnode_t used by the built-in compiler is not an OOP object */
+typedef struct hcl_cnode_t hcl_cnode_t;
 struct hcl_cnode_t
 {
 	hcl_cnode_type_t type;
@@ -251,11 +252,19 @@ struct hcl_cnode_t
 		} fpdeclit;
 		struct
 		{
+			hcl_oow_t v;
+		} smptrlit;
+		struct
+		{
 			hcl_ooi_t v;
 		} errlit;
+		struct
+		{
+			hcl_cnode_t* car;
+			hcl_cnode_t* cdr;
+		} cons;
 	} u;
 };
-typedef struct hcl_cnode_t hcl_cnode_t;
 
 /* NOTE: hcl_cframe_t used by the built-in compiler is not an OOP object */
 struct hcl_cframe_t
@@ -968,7 +977,7 @@ hcl_oop_t hcl_divints (
 	hcl_t*     hcl,
 	hcl_oop_t  x,
 	hcl_oop_t  y,
-	int         modulo,
+	int        modulo,
 	hcl_oop_t* rem
 );
 
@@ -1236,7 +1245,9 @@ hcl_cnode_t* hcl_makecnodestrlit (hcl_t* hcl, const hcl_ioloc_t* loc, const hcl_
 hcl_cnode_t* hcl_makecnodenumlit (hcl_t* hcl, const hcl_ioloc_t* loc, const hcl_ooch_t* ptr, hcl_oow_t len);
 hcl_cnode_t* hcl_makecnoderadnumlit (hcl_t* hcl, const hcl_ioloc_t* loc, const hcl_ooch_t* ptr, hcl_oow_t len);
 hcl_cnode_t* hcl_makecnodefpdeclit (hcl_t* hcl, const hcl_ioloc_t* loc, const hcl_ooch_t* ptr, hcl_oow_t len);
+hcl_cnode_t* hcl_makecnodesmptrlit (hcl_t* hcl, const hcl_ioloc_t* loc, hcl_oow_t v);
 hcl_cnode_t* hcl_makecnodeerrlit (hcl_t* hcl, const hcl_ioloc_t* loc, hcl_ooi_t v);
+hcl_cnode_t* hcl_makecnodecons (hcl_t* hcl, const hcl_ioloc_t* loc, hcl_cnode_t* car, hcl_cnode_t* cdr);
 
 #if defined(__cplusplus)
 }

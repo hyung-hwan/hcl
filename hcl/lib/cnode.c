@@ -7,10 +7,10 @@
     modification, are permitted provided that the following conditions
     are met:
     1. Redistributions of source code must retain the above copyright
-       notice, this list of conditions and the following disclaimer.
+	  notice, this list of conditions and the following disclaimer.
     2. Redistributions in binary form must reproduce the above copyright
-       notice, this list of conditions and the following disclaimer in the
-       documentation and/or other materials provided with the distribution.
+	  notice, this list of conditions and the following disclaimer in the
+	  documentation and/or other materials provided with the distribution.
 
     THIS SOFTWARE IS PROVIDED BY THE AUTHOR "AS IS" AND ANY EXPRESS OR
     IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
@@ -61,8 +61,6 @@ hcl_cnode_t* hcl_makecnodecharlit (hcl_t* hcl, const hcl_ioloc_t* loc, const hcl
 	return c;
 }
 
-
-
 hcl_cnode_t* hcl_makecnodenumlit (hcl_t* hcl, const hcl_ioloc_t* loc, const hcl_ooch_t* ptr, hcl_oow_t len)
 {
 	hcl_cnode_t* c =  make_cnode(hcl, HCL_CNODE_NUMLIT, loc, HCL_SIZEOF(*ptr) * (len + 1));
@@ -91,7 +89,6 @@ hcl_cnode_t* hcl_makecnodefpdeclit (hcl_t* hcl, const hcl_ioloc_t* loc, const hc
 {
 	hcl_cnode_t* c =  make_cnode(hcl, HCL_CNODE_FPDECLIT, loc, HCL_SIZEOF(*ptr) * (len + 1));
 	if (HCL_UNLIKELY(!c)) return HCL_NULL;
-
 	c->u.fpdeclit.ptr = (hcl_ooch_t*)(c + 1);
 	c->u.fpdeclit.len = len;
 	hcl_copy_oochars (c->u.fpdeclit.ptr, ptr, len);
@@ -103,7 +100,6 @@ hcl_cnode_t* hcl_makecnodestrlit (hcl_t* hcl, const hcl_ioloc_t* loc, const hcl_
 {
 	hcl_cnode_t* c =  make_cnode(hcl, HCL_CNODE_STRLIT, loc, HCL_SIZEOF(*ptr) * (len + 1));
 	if (HCL_UNLIKELY(!c)) return HCL_NULL;
-
 	c->u.strlit.ptr = (hcl_ooch_t*)(c + 1);
 	c->u.strlit.len = len;
 	hcl_copy_oochars (c->u.strlit.ptr, ptr, len);
@@ -111,12 +107,27 @@ hcl_cnode_t* hcl_makecnodestrlit (hcl_t* hcl, const hcl_ioloc_t* loc, const hcl_
 	return c;
 }
 
+hcl_cnode_t* hcl_makecnodesmptrlit (hcl_t* hcl, const hcl_ioloc_t*  loc, hcl_oow_t v)
+{
+	hcl_cnode_t* c =  make_cnode(hcl, HCL_CNODE_ERRLIT, loc, 0);
+	if (HCL_UNLIKELY(!c)) return HCL_NULL;
+	c->u.smptrlit.v = v;
+	return c;
+}
+
 hcl_cnode_t* hcl_makecnodeerrlit (hcl_t* hcl, const hcl_ioloc_t* loc, hcl_ooi_t v)
 {
 	hcl_cnode_t* c =  make_cnode(hcl, HCL_CNODE_ERRLIT, loc, 0);
 	if (HCL_UNLIKELY(!c)) return HCL_NULL;
-
 	c->u.errlit.v = v;
 	return c;
 }
 
+hcl_cnode_t* hcl_makecnodecons (hcl_t* hcl, const hcl_ioloc_t* loc, hcl_cnode_t* car, hcl_cnode_t* cdr)
+{
+	hcl_cnode_t* c =  make_cnode(hcl, HCL_CNODE_ERRLIT, loc, 0);
+	if (HCL_UNLIKELY(!c)) return HCL_NULL;
+	c->u.cons.car = car;
+	c->u.cons.cdr = cdr;
+	return c;
+}

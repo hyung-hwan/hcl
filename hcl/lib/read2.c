@@ -1635,7 +1635,7 @@ static HCL_INLINE void clear_comma_colon_flag (hcl_t* hcl)
 	rsa->slot[2] = HCL_SMOOI_TO_OOP(flagv);
 }
 
-static hcl_oop_t chain_to_list (hcl_t* hcl, hcl_oop_t obj)
+static hcl_oop_t chain_to_list (hcl_t* hcl, hcl_cnode_t* obj)
 {
 	hcl_oop_oop_t rsa;
 	int flagv;
@@ -1690,9 +1690,9 @@ static hcl_oop_t chain_to_list (hcl_t* hcl, hcl_oop_t obj)
 		}
 
 		hcl_pushvolat (hcl, (hcl_oop_t*)&rsa);
-		cons = hcl_makecons(hcl, obj, hcl->_nil);
+		cons = hcl_makecnodecons(hcl, &obj->loc, obj, HCL_NULL);
 		hcl_popvolat (hcl);
-		if (!cons) return HCL_NULL;
+		if (HCL_UNLIKELY(!cons)) return HCL_NULL;
 
 		if (HCL_IS_NIL(hcl, rsa->slot[0]))
 		{
@@ -2027,7 +2027,7 @@ static int read_object (hcl_t* hcl)
 					return -1;
 				}
 
-				obj = HCL_SMPTR_TO_OOP(v);
+				cnode = hcl_makecnodesmptrlit(hcl, TOKEN_LOC(hcl), v);
 				break;
 			}
 
@@ -2058,17 +2058,14 @@ static int read_object (hcl_t* hcl)
 				break;
 
 			case HCL_IOTOK_NUMLIT:
-				//obj = string_to_num(hcl, TOKEN_NAME(hcl), TOKEN_TYPE(hcl) == HCL_IOTOK_RADNUMLIT);
 				cnode = hcl_makecnodenumlit(hcl, TOKEN_LOC(hcl), TOKEN_NAME_PTR(hcl), TOKEN_NAME_LEN(hcl));
 				break;
 
 			case HCL_IOTOK_RADNUMLIT:
-				//obj = string_to_num(hcl, TOKEN_NAME(hcl), TOKEN_TYPE(hcl) == HCL_IOTOK_RADNUMLIT);
 				cnode = hcl_makecnoderadnumlit(hcl, TOKEN_LOC(hcl), TOKEN_NAME_PTR(hcl), TOKEN_NAME_LEN(hcl));
 				break;
 
 			case HCL_IOTOK_FPDECLIT:
-				//obj = string_to_fpdec(hcl, TOKEN_NAME(hcl), TOKEN_LOC(hcl));
 				cnode = hcl_makecnodefpdeclit(hcl, TOKEN_LOC(hcl), TOKEN_NAME_PTR(hcl), TOKEN_NAME_LEN(hcl));
 				break;
 
