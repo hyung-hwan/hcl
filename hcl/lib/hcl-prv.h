@@ -183,6 +183,8 @@ struct hcl_iolink_t
 
 enum hcl_cnode_type_t
 {
+	HCL_CNODE_RSN, /* internally used */
+
 	HCL_CNODE_CHARLIT,
 	HCL_CNODE_STRLIT,
 	HCL_CNODE_NUMLIT,
@@ -226,6 +228,13 @@ struct hcl_cnode_t
 
 	union
 	{
+		struct
+		{
+			hcl_cnode_t* head;
+			hcl_cnode_t* tail;
+			hcl_oow_t count;
+			hcl_cnode_t* rsn_par; /* parent item in the stack */
+		} rsn; /* reader stack node */
 		struct
 		{
 			hcl_ooch_t v;
@@ -1237,6 +1246,7 @@ int hcl_emitbyteinstruction (
 /* ========================================================================= */
 /* cnode.c                                                                   */
 /* ========================================================================= */
+hcl_cnode_t* hcl_makecnodersn (hcl_t* hcl, const hcl_ioloc_t* loc);
 hcl_cnode_t* hcl_makecnodenil (hcl_t* hcl, const hcl_ioloc_t* loc);
 hcl_cnode_t* hcl_makecnodetrue (hcl_t* hcl, const hcl_ioloc_t* loc);
 hcl_cnode_t* hcl_makecnodefalse (hcl_t* hcl, const hcl_ioloc_t* loc);

@@ -13,7 +13,7 @@
        documentation and/or other materials provided with the distribution.
 
     THIS SOFTWARE IS PROVIDED BY THE AUTHOR "AS IS" AND ANY EXPRESS OR
-    IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WAfRRANTIES
+    IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
     OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.
     IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY DIRECT, INDIRECT,
     INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT
@@ -1405,8 +1405,9 @@ static int end_include (hcl_t* hcl)
 }
 
 
-static HCL_INLINE hcl_oop_t enter_list (hcl_t* hcl, int flagv)
+static HCL_INLINE hcl_cnode_t* enter_list (hcl_t* hcl, int flagv)
 {
+#if 0
 	hcl_oop_oop_t rsa;
 
 	/* upon entering a list, it pushes a frame of 4 slots.
@@ -1426,6 +1427,15 @@ static HCL_INLINE hcl_oop_t enter_list (hcl_t* hcl, int flagv)
 	rsa->slot[4] = HCL_SMOOI_TO_OOP(0);
 
 	return hcl->c->r.s;
+#else
+	hcl_cnode_t* rsn;
+	rsn = hcl_makecnodersn(hcl, loc)
+	if (HCL_UNLIKELY(!rsn)) return HCL_NULL
+	rsn->flags = flagv;
+	rsn->rsn_par = hcl->c->r.st; /* push */
+	hcl->c.r.st = rsn;
+	return rsn; /* returns the stack top */
+#endif
 }
 
 static HCL_INLINE hcl_oop_t leave_list (hcl_t* hcl, int* flagv, int* oldflagv)
