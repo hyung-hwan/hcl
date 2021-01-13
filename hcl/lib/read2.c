@@ -1404,212 +1404,42 @@ static int end_include (hcl_t* hcl)
 	return 1; /* ended the included file successfully */
 }
 
-
-static HCL_INLINE hcl_cnode_t* enter_list (hcl_t* hcl, const hcl_ioloc_t* loc, int flagv)
+static HCL_INLINE int enter_list (hcl_t* hcl, const hcl_ioloc_t* loc, int flagv)
 {
-#if 0
-	hcl_oop_oop_t rsa;
-
-	/* upon entering a list, it pushes a frame of 4 slots.
-	 * rsa[0] stores the first element in the list.
-	 * rsa[1] stores the last element in the list.
-	 * both are updated in chain_to_list() as items are added.
-	 * rsa[2] stores the flag value.
-	 * rsa[3] stores the pointer to the previous top frame.
-	 * rsa[4] stores the number of elements in the list */
-	rsa = (hcl_oop_oop_t)hcl_makearray(hcl, 5, 0);
-	if (HCL_UNLIKELY(!rsa)) return HCL_NULL;
-
-	rsa->slot[2] = HCL_SMOOI_TO_OOP(flagv);
-	rsa->slot[3] = hcl->c->r.s; /* push */
-	hcl->c->r.s = (hcl_oop_t)rsa;
-
-	rsa->slot[4] = HCL_SMOOI_TO_OOP(0);
-
-	return hcl->c->r.s;
-#else
-	hcl_cnode_t* rsn;
-	rsn = hcl_makecnodersn(hcl, loc);
-	if (HCL_UNLIKELY(!rsn)) return HCL_NULL;
-	rsn->u.rsn.flagv = flagv;
-	rsn->u.rsn.count = 0;
-	rsn->u.rsn.rsn_par = hcl->c->r.st; /* push */
-	hcl->c->r.st = rsn;
-	return rsn; /* returns the stack top */
-#endif
+	hcl_rstl_t* rstl;
+	rstl = hcl_callocmem(hcl, HCL_SIZEOF(*rstl));
+	if (HCL_UNLIKELY(!rstl)) return -1;
+	rstl->loc = *loc;
+	rstl->flagv = flagv;
+	rstl->prev = hcl->c->r.st; /* push */
+	hcl->c->r.st = rstl;
+	return 0;
 }
 
-static HCL_INLINE hcl_oop_t leave_list (hcl_t* hcl, int* flagv, int* oldflagv)
+static HCL_INLINE hcl_cnode_t* leave_list (hcl_t* hcl, int* flagv, int* oldflagv)
 {
-#if 0
-	hcl_oop_oop_t rsa;
-	hcl_oop_t head;
+	hcl_rstl_t* rstl;
+	hcl_cnode_t* head, * list;
+	hcl_ioloc_t loc;
 	int fv, concode;
 
 	/* the stack must not be empty - cannot leave a list without entering it */
-	HCL_ASSERT (hcl, !HCL_IS_NIL(hcl,hcl->c->r.s));
+	HCL_ASSERT (hcl, hcl->c->r.st != HCL_NULL);
+	rstl = hcl->c->r.st; /* get the stack top */
 
-	rsa = (hcl_oop_oop_t)hcl->c->r.s;
-
-	head = rsa->slot[0];
-	HCL_ASSERT (hcl, HCL_OOP_IS_SMOOI(rsa->slot[2]));
-	fv = HCL_OOP_TO_SMOOI(rsa->slot[2]);
+	head = rstl->head;
+	fv = rstl->flagv;
+	loc = rstl->loc;
 	concode = LIST_FLAG_GET_CONCODE(fv);
 
-	hcl->c->r.s = rsa->slot[3]; /* pop off  */
-	rsa->slot[3] = hcl->_nil;
+	hcl->c->r.st = rstl->prev; /* pop off  */
+	hcl_freemem (hcl, rstl); /* dispose of the stack node */
 
 	if (fv & (COMMAED | COLONED))
 	{
 		hcl_setsynerr (hcl, ((fv & COMMAED)? HCL_SYNERR_COMMANOVALUE: HCL_SYNERR_COLONNOVALUE), TOKEN_LOC(hcl), HCL_NULL);
 		return HCL_NULL;
 	}
-
-#if 0
-	/* TODO: literalize the list if all the elements are all literals */
-	if (concode == HCL_CONCODE_ARRAY || concode == HCL_CONCODE_BYTEARRAY /*|| concode == HCL_CONCODE_DIC*/)
-	{
-		/* convert a list to an array */
-		hcl_oop_oop_t arr;
-		hcl_oop_t ptr;
-		hcl_oow_t count;
-
-		ptr = head;
-		count = 0;
-		while (ptr != hcl->_nil)
-		{
-			hcl_oop_t car;
-			HCL_ASSERT (hcl, HCL_OBJ_GET_FLAGS_BRAND(ptr) == HCL_BRAND_CONS);
-			car = HCL_CONS_CAR(ptr);
-
-			if (!HCL_OOP_IS_NUMERIC(car)) goto done;  /* TODO: check if the element is a literal properly here */
-
-			ptr = HCL_CONS_CDR(ptr);
-			count++;
-		}
-
-		hcl_pushvolat (hcl, &head);
-		arr = (hcl_oop_oop_t)hcl_makearray(hcl, count, 0);
-		hcl_popvolat (hcl);
-		if (!arr) return HCL_NULL;
-
-		ptr = head;
-		count = 0;
-		while (ptr != hcl->_nil)
-		{
-			arr->slot[count++] = HCL_CONS_CAR(ptr);
-			ptr = HCL_CONS_CDR(ptr);
-		}
-
-		head = (hcl_oop_t)arr;
-	}
-done:
-#endif
-
-	*oldflagv = fv;
-	if (HCL_IS_NIL(hcl,hcl->c->r.s))
-	{
-		/* the stack is empty after popping.
-		 * it is back to the top level.
-		 * the top level can never be quoted. */
-		*flagv = 0;
-	}
-	else
-	{
-		/* restore the flag for the outer returning level */
-		rsa = (hcl_oop_oop_t)hcl->c->r.s;
-		HCL_ASSERT (hcl, HCL_OOP_IS_SMOOI(rsa->slot[2]));
-		*flagv = HCL_OOP_TO_SMOOI(rsa->slot[2]);
-	}
-
-	/* return the head of the list being left */
-	if (HCL_IS_NIL(hcl,head))
-	{
-		/* the list is empty. literalize the empty list according to
-		 * the list opener. for a list, it is same as #nil. */
-		switch (concode)
-		{
-			case HCL_CONCODE_ARRAY:
-				return (hcl_oop_t)hcl_makearray(hcl, 0, 0);
-			case HCL_CONCODE_BYTEARRAY:
-				return (hcl_oop_t)hcl_makebytearray(hcl, HCL_NULL, 0);
-			case HCL_CONCODE_DIC:
-				return (hcl_oop_t)hcl_makedic(hcl, 100); /* TODO: default dictionary size for empty definition? */
-
-			/* NOTE: empty xlist will get translated to #nil.
-			 *       this is useful when used in the lambda expression to express an empty argument. also in defun.
-			 *      (lambda () ...) is equivalent to  (lambda #nil ...)
-			 *      (defun x() ...) */
-		}
-	}
-
-	if (HCL_IS_CONS(hcl,head)) HCL_OBJ_SET_FLAGS_SYNCODE(head, concode);
-	return head;
-#else
-	hcl_cnode_t* stt;
-	hcl_cnode_t* head;
-	int fv, concode;
-
-	/* the stack must not be empty - cannot leave a list without entering it */
-	HCL_ASSERT (hcl, !HCL_IS_NIL(hcl,hcl->c->r.s));
-
-	stt = hcl->c->r.st;
-	HCL_ASSERT (hcl, stt->type == HCL_CNODE_RSN);
-
-
-	head = stt->u.rsn.head;
-	fv = stt->u.rsn.flagv;
-	concode = LIST_FLAG_GET_CONCODE(fv);
-
-	hcl->c->r.st = stt->u.rsn.rsn_par; /* pop off  */
-	stt->u.rsn.rsn_par = HCL_NULL;
-
-	if (fv & (COMMAED | COLONED))
-	{
-		hcl_setsynerr (hcl, ((fv & COMMAED)? HCL_SYNERR_COMMANOVALUE: HCL_SYNERR_COLONNOVALUE), TOKEN_LOC(hcl), HCL_NULL);
-		return HCL_NULL;
-	}
-
-#if 0
-	/* TODO: literalize the list if all the elements are all literals */
-	if (concode == HCL_CONCODE_ARRAY || concode == HCL_CONCODE_BYTEARRAY /*|| concode == HCL_CONCODE_DIC*/)
-	{
-		/* convert a list to an array */
-		hcl_oop_oop_t arr;
-		hcl_oop_t ptr;
-		hcl_oow_t count;
-
-		ptr = head;
-		count = 0;
-		while (ptr != hcl->_nil)
-		{
-			hcl_oop_t car;
-			HCL_ASSERT (hcl, HCL_OBJ_GET_FLAGS_BRAND(ptr) == HCL_BRAND_CONS);
-			car = HCL_CONS_CAR(ptr);
-
-			if (!HCL_OOP_IS_NUMERIC(car)) goto done;  /* TODO: check if the element is a literal properly here */
-
-			ptr = HCL_CONS_CDR(ptr);
-			count++;
-		}
-
-		hcl_pushvolat (hcl, &head);
-		arr = (hcl_oop_oop_t)hcl_makearray(hcl, count, 0);
-		hcl_popvolat (hcl);
-		if (!arr) return HCL_NULL;
-
-		ptr = head;
-		count = 0;
-		while (ptr != hcl->_nil)
-		{
-			arr->slot[count++] = HCL_CONS_CAR(ptr);
-			ptr = HCL_CONS_CDR(ptr);
-		}
-
-		head = (hcl_oop_t)arr;
-	}
-done:
-#endif
 
 	*oldflagv = fv;
 	if (!hcl->c->r.st)
@@ -1622,148 +1452,99 @@ done:
 	else
 	{
 		/* restore the flag for the outer returning level */
-		stt = hcl->c->r.st;
-		HCL_ASSERT (hcl, stt->type == HCL_CNODE_RSN);
-		*flagv = stt->u.rsn.flagv;
+		*flagv = hcl->c->r.st->flagv;
 	}
 
-#if 0
 	/* return the head of the list being left */
-	if (!head)
-	{
-		/* the list is empty. literalize the empty list according to
-		 * the list opener. for a list, it is same as #nil. */
-		switch (concode)
-		{
-			case HCL_CONCODE_ARRAY:
-				return (hcl_oop_t)hcl_makearray(hcl, 0, 0);
-			case HCL_CONCODE_BYTEARRAY:
-				return (hcl_oop_t)hcl_makebytearray(hcl, HCL_NULL, 0);
-			case HCL_CONCODE_DIC:
-				return (hcl_oop_t)hcl_makedic(hcl, 100); /* TODO: default dictionary size for empty definition? */
 
-			/* NOTE: empty xlist will get translated to #nil.
-			 *       this is useful when used in the lambda expression to express an empty argument. also in defun.
-			 *      (lambda () ...) is equivalent to  (lambda #nil ...)
-			 *      (defun x() ...) */
-		}
-	}
-#endif
-
-	if (head->type == HCL_CNODE_CONS) head->type = HCL_CNODE_CONS + concode;
-	return head;
-#endif
+	/* NOTE: empty xlist will get translated to #nil.
+	 *       this is useful when used in the lambda expression to express an empty argument. also in defun.
+	 *      (lambda () ...) is equivalent to  (lambda #nil ...)
+	 *      (defun x() ...) */
+	list = hcl_makecnodelist(hcl, &loc, concode, head);
+	if (HCL_UNLIKELY(!list)) hcl_freecnode (hcl, head);
+	return list;
 }
 
 static HCL_INLINE int can_dot_list (hcl_t* hcl)
 {
-	hcl_oop_oop_t rsa;
-	int flagv;
-	hcl_ooi_t count;
+	hcl_rstl_t* rstl;
 
-	HCL_ASSERT (hcl, !HCL_IS_NIL(hcl,hcl->c->r.s));
+	HCL_ASSERT (hcl, hcl->c->r.st != HCL_NULL);
+	rstl = hcl->c->r.st;
 
 	/* mark the state that a dot has appeared in the list */
-	rsa = (hcl_oop_oop_t)hcl->c->r.s;
-	HCL_ASSERT (hcl, HCL_OOP_IS_SMOOI(rsa->slot[2]));
-	flagv = HCL_OOP_TO_SMOOI(rsa->slot[2]);
-	count = HCL_OOP_TO_SMOOI(rsa->slot[4]);
+	if (rstl->count <= 0) return 0;
+	if (LIST_FLAG_GET_CONCODE(rstl->flagv) != HCL_CONCODE_QLIST) return 0;
 
-	if (count <= 0) return 0;
-	if (LIST_FLAG_GET_CONCODE(flagv) != HCL_CONCODE_QLIST) return 0;
-
-	flagv |= DOTTED;
-	rsa->slot[2] = HCL_SMOOI_TO_OOP(flagv);
+	rstl->flagv |= DOTTED;
 	return 1;
 }
 
 static HCL_INLINE int can_comma_list (hcl_t* hcl)
 {
-	hcl_oop_oop_t rsa;
-	int flagv;
-	hcl_ooi_t count;
+	hcl_rstl_t* rstl;
 
-	HCL_ASSERT (hcl, !HCL_IS_NIL(hcl,hcl->c->r.s));
+	HCL_ASSERT (hcl, hcl->c->r.st != HCL_NULL);
+	rstl = hcl->c->r.st;
 
-	rsa = (hcl_oop_oop_t)hcl->c->r.s;
-	HCL_ASSERT (hcl, HCL_OOP_IS_SMOOI(rsa->slot[2]));
-	flagv = HCL_OOP_TO_SMOOI(rsa->slot[2]);
-	count = HCL_OOP_TO_SMOOI(rsa->slot[4]);
+	if (rstl->count <= 0) return 0;
+	if (rstl->count == 1) rstl->flagv |= JSON;
+	else if (!(rstl->flagv & JSON)) return 0;
+	if (rstl->flagv & (COMMAED | COLONED)) return 0;
 
-	if (count <= 0) return 0;
-	if (count == 1) flagv |= JSON;
-	else if (!(flagv & JSON)) return 0;
-	if (flagv & (COMMAED | COLONED)) return 0;
-
-	if (LIST_FLAG_GET_CONCODE(flagv) == HCL_CONCODE_DIC)
+	if (LIST_FLAG_GET_CONCODE(rstl->flagv) == HCL_CONCODE_DIC)
 	{
-		if (count & 1) return 0;
+		if (rstl->count & 1) return 0;
 	}
-	else if (LIST_FLAG_GET_CONCODE(flagv) != HCL_CONCODE_ARRAY &&
-	         LIST_FLAG_GET_CONCODE(flagv) != HCL_CONCODE_BYTEARRAY)
+	else if (LIST_FLAG_GET_CONCODE(rstl->flagv) != HCL_CONCODE_ARRAY &&
+	         LIST_FLAG_GET_CONCODE(rstl->flagv) != HCL_CONCODE_BYTEARRAY)
 	{
 		return 0;
 	}
 
-	flagv |= COMMAED;
-	rsa->slot[2] = HCL_SMOOI_TO_OOP(flagv);
+	rstl->flagv |= COMMAED;
 	return 1;
 }
 
 static HCL_INLINE int can_colon_list (hcl_t* hcl)
 {
-	hcl_oop_oop_t rsa;
-	int flagv;
-	hcl_ooi_t count;
+	hcl_rstl_t* rstl;
 
-	HCL_ASSERT (hcl, !HCL_IS_NIL(hcl,hcl->c->r.s));
+	HCL_ASSERT (hcl, hcl->c->r.st != HCL_NULL);
+	rstl = hcl->c->r.st;
 
 	/* mark the state that a colon has appeared in the list */
-	rsa = (hcl_oop_oop_t)hcl->c->r.s;
-	HCL_ASSERT (hcl, HCL_OOP_IS_SMOOI(rsa->slot[2]));
-	flagv = HCL_OOP_TO_SMOOI(rsa->slot[2]);
-	count = HCL_OOP_TO_SMOOI(rsa->slot[4]);
+	if (rstl->count <= 0) return 0;
+	if (rstl->count == 1) rstl->flagv |= JSON;
+	else if (!(rstl->flagv & JSON)) return 0;
 
-	if (count <= 0) return 0;
-	if (count == 1) flagv |= JSON;
-	else if (!(flagv & JSON)) return 0;
+	if (rstl->flagv & (COMMAED | COLONED)) return 0;
 
-	if (flagv & (COMMAED | COLONED)) return 0;
+	if (LIST_FLAG_GET_CONCODE(rstl->flagv) != HCL_CONCODE_DIC) return 0;
 
-	if (LIST_FLAG_GET_CONCODE(flagv) != HCL_CONCODE_DIC) return 0;
+	if (!(rstl->count & 1)) return 0;
 
-	count = HCL_OOP_TO_SMOOI(rsa->slot[4]);
-	if (!(count & 1)) return 0;
-
-	flagv |= COLONED;
-	rsa->slot[2] = HCL_SMOOI_TO_OOP(flagv);
+	rstl->flagv |= COLONED;
 	return 1;
 }
 
 static HCL_INLINE void clear_comma_colon_flag (hcl_t* hcl)
 {
-	hcl_oop_oop_t rsa;
-	int flagv;
-
-	HCL_ASSERT (hcl, !HCL_IS_NIL(hcl,hcl->c->r.s));
-
-	rsa = (hcl_oop_oop_t)hcl->c->r.s;
-	HCL_ASSERT (hcl, HCL_OOP_IS_SMOOI(rsa->slot[2]));
-	flagv = HCL_OOP_TO_SMOOI(rsa->slot[2]);
-
-	flagv &= ~(COMMAED | COLONED);
-	rsa->slot[2] = HCL_SMOOI_TO_OOP(flagv);
+	hcl_rstl_t* rstl;
+	HCL_ASSERT (hcl, hcl->c->r.st != HCL_NULL);
+	rstl = hcl->c->r.st;
+	rstl->flagv &= ~(COMMAED | COLONED);
 }
 
 static hcl_cnode_t* chain_to_list (hcl_t* hcl, hcl_cnode_t* obj)
 {
-	hcl_cnode_t* stt;
+	hcl_rstl_t* rstl;
 	int flagv;
 
-	stt = hcl->c->r.st;
-	HCL_ASSERT (hcl, stt != HCL_NULL);
-	HCL_ASSERT (hcl, stt->type == HCL_CNODE_RSN);
-	flagv = stt->u.rsn.flagv;
+	HCL_ASSERT (hcl, hcl->c->r.st != HCL_NULL);
+	rstl = hcl->c->r.st;
+	flagv = rstl->flagv;
 
 	if (flagv & CLOSED)
 	{
@@ -1780,27 +1561,28 @@ static hcl_cnode_t* chain_to_list (hcl_t* hcl, hcl_cnode_t* obj)
 	{
 		hcl_cnode_t* tail;
 		/* the list must not be empty to have reached the dotted state */
-		HCL_ASSERT (hcl, stt->u.rsn.head != HCL_NULL);
-		HCL_ASSERT (hcl, stt->u.rsn.tail != HCL_NULL);
-		HCL_ASSERT (hcl, stt->u.rsn.count > 0);
+		HCL_ASSERT (hcl, rstl->head != HCL_NULL);
+		HCL_ASSERT (hcl, rstl->tail != HCL_NULL);
+		HCL_ASSERT (hcl, rstl->count > 0);
 
 		/* chain the object via 'cdr' of the tail cell */
-		tail = stt->u.rsn.tail;
-		HCL_ASSERT (hcl, tail->type >= HCL_CNODE_CONS && tail->type <= HCL_CNODE_CONS_QLIST);
+		tail = rstl->tail;
+		HCL_ASSERT (hcl, tail != HCL_NULL);
+		HCL_ASSERT (hcl, tail->type == HCL_CNODE_CONS);
 		tail->u.cons.cdr = obj;
 
 		/* update the flag to CLOSED so that you can have more than
 		 * one item after the dot. */
 		flagv |= CLOSED;
-		stt->u.rsn.flagv = flagv;
+		rstl->flagv = flagv;
 /* TODO: check overflow on count??? */
-		stt->u.rsn.count++;
+		rstl->count++;
 	}
 	else
 	{
 		hcl_cnode_t* cons, * tail;
 
-		if ((flagv & JSON) && stt->u.rsn.count > 0 && !(flagv & (COMMAED | COLONED)))
+		if ((flagv & JSON) && rstl->count > 0 && !(flagv & (COMMAED | COLONED)))
 		{
 			/* there is no separator between array/dictionary elements
 			 * for instance, [1 2] { 10 20 } */
@@ -1811,79 +1593,83 @@ static hcl_cnode_t* chain_to_list (hcl_t* hcl, hcl_cnode_t* obj)
 		cons = hcl_makecnodecons(hcl, &obj->loc, obj, HCL_NULL);
 		if (HCL_UNLIKELY(!cons)) return HCL_NULL;
 
-		if (!stt->u.rsn.head)
+		if (rstl->count <= 0)
 		{
 			/* the list head is not set yet. it is the first
 			 * element added to the list. let both head and tail
 			 * point to the new cons cell */
-			HCL_ASSERT (hcl, stt->u.rsn.tail == HCL_NULL);
-			HCL_ASSERT (hcl, stt->u.rsn.count == 0);
+			HCL_ASSERT (hcl, rstl->tail == HCL_NULL);
+			HCL_ASSERT (hcl, rstl->head == HCL_NULL);
 
-			stt->u.rsn.head = cons;
-			stt->u.rsn.tail = cons;
+			rstl->head = cons;
+			rstl->tail = cons;
 		}
 		else
 		{
 			/* the new cons cell is not the first element.
 			 * append it to the list */
-			tail = stt->u.rsn.tail;
-			HCL_ASSERT (hcl, tail->type >= HCL_CNODE_CONS && tail->type <= HCL_CNODE_CONS_QLIST);
+			tail = rstl->tail;
+			HCL_ASSERT (hcl, tail->type == HCL_CNODE_CONS);
 			tail->u.cons.cdr = obj;
-			stt->u.rsn.tail = cons;
+			rstl->tail = cons;
 		}
 
 /* TODO: check overflow on count??? */
-		stt->u.rsn.count++;
+		rstl->count++;
 	}
 
 	return obj;
 }
 
-static int add_to_symbol_array_literal_buffer (hcl_t* hcl, hcl_oop_t b)
+static hcl_cnode_t* read_vlist (hcl_t* hcl)
 {
-	if (hcl->c->r.salit.size >= hcl->c->r.salit.capa)
-	{
-		hcl_oop_t* tmp;
-		hcl_oow_t new_capa;
-
-		new_capa = HCL_ALIGN (hcl->c->r.salit.size + 1, SALIT_BUFFER_ALIGN);
-		tmp = (hcl_oop_t*)hcl_reallocmem (hcl, hcl->c->r.salit.ptr, new_capa * HCL_SIZEOF(*tmp));
-		if (!tmp) return -1;
-
-		hcl->c->r.salit.capa = new_capa;
-		hcl->c->r.salit.ptr = tmp;
-	}
-
-/* TODO: overflow check of hcl->c->r.tvlit_count itself */
-	hcl->c->r.salit.ptr[hcl->c->r.salit.size++] = b;
-	return 0;
-}
-
-static int get_symbol_array_literal (hcl_t* hcl, hcl_oop_t* xlit)
-{
-	hcl_oop_t sa, sym;
-	hcl_oow_t i;
-
-	/* if the program is not buggy, salit.size must be 0 here. */
-	HCL_ASSERT (hcl, hcl->c->r.salit.size == 0);
-	hcl->c->r.salit.size = 0; /* i want to set it to 0 in case it's buggy */
+	hcl_cnode_t* l;
+	hcl_cnode_t* ve;
 
 	HCL_ASSERT (hcl, TOKEN_TYPE(hcl) == HCL_IOTOK_VBAR);
+
+	l = hcl_makecnodelist(hcl, TOKEN_LOC(hcl), HCL_CONCODE_VLIST, HCL_NULL);
+	if (HCL_UNLIKELY(!l)) goto oops;
+
 	GET_TOKEN_WITH_GOTO(hcl, oops);
 
 	while (TOKEN_TYPE(hcl) == HCL_IOTOK_IDENT /* || TOKEN_TYPE(hcl) == HCL_IOTOK_IDENT_DOTTED */)
 	{
-		sym = hcl_makesymbol(hcl, TOKEN_NAME_PTR(hcl), TOKEN_NAME_LEN(hcl));
-		if (!sym) goto oops;
+		hcl_cnode_t* sym, * cons;
 
+		sym = hcl_makecnodesymbol(hcl, TOKEN_LOC(hcl), 0, TOKEN_NAME_PTR(hcl), TOKEN_NAME_LEN(hcl));
+		if (HCL_UNLIKELY(!sym)) goto oops;
+
+#if 0
 		if (HCL_OBJ_GET_FLAGS_SYNCODE(sym) || HCL_OBJ_GET_FLAGS_KERNEL(sym))
 		{
 			hcl_setsynerrbfmt (hcl, HCL_SYNERR_BANNEDVARNAME, HCL_NULL, HCL_NULL,
 				"special symbol not to be declared as a variable - %O", sym); /* TOOD: error location */
 			goto oops;
 		}
+		/* TODO: exclude special symbols.... or do the above check in the compiler code?? */
+#endif
 
-		if (add_to_symbol_array_literal_buffer(hcl, sym) <= -1) goto oops;
+		cons = hcl_makecnodecons(hcl, &sym->loc, sym, HCL_NULL);
+		if (HCL_UNLIKELY(!cons)) 
+		{
+			hcl_freesinglecnode (hcl, sym); /* manual disposal because sym is not chained to the list */
+			goto oops;
+		}
+
+
+		if (!l->u.list.head)
+		{
+			l->u.list.head = cons;
+			ve = cons;
+		}
+		else
+		{
+			HCL_ASSERT (hcl, ve->type == HCL_CNODE_CONS);
+			ve->u.cons.cdr = cons;
+			ve = cons;
+		}
+
 		GET_TOKEN_WITH_GOTO (hcl, oops);
 	}
 
@@ -1893,23 +1679,11 @@ static int get_symbol_array_literal (hcl_t* hcl, hcl_oop_t* xlit)
 		goto oops;
 	}
 
-	sa = hcl_makearray(hcl, hcl->c->r.salit.size, 0);
-	if (!sa) goto oops;
-
-	for (i = 0; i < hcl->c->r.salit.size; i++)
-		((hcl_oop_oop_t)sa)->slot[i] = hcl->c->r.salit.ptr[i];
-
-	/* switch array to symbol array. this is special-purpose. */
-	HCL_OBJ_SET_FLAGS_BRAND (sa, HCL_BRAND_SYMBOL_ARRAY);
-
-	*xlit = sa;
-
-	hcl->c->r.salit.size = 0; /* reset literal count... */
-	return 0;
+	return l;
 
 oops:
-	hcl->c->r.salit.size = 0; /* reset literal count... */
-	return -1;
+	if (l) hcl_freecnode (hcl, l);
+	return HCL_NULL;
 }
 
 static int read_object (hcl_t* hcl)
@@ -1947,17 +1721,17 @@ static int read_object (hcl_t* hcl)
 
 			case HCL_IOTOK_LBRACK: /* [] */
 				flagv = 0;
-				LIST_FLAG_SET_CONCODE (flagv, HCL_CNODE_CONS_ARRAY - HCL_CNODE_CONS);
+				LIST_FLAG_SET_CONCODE (flagv, HCL_CONCODE_ARRAY);
 				goto start_list;
 
 			case HCL_IOTOK_BAPAREN: /* #[] */
 				flagv = 0;
-				LIST_FLAG_SET_CONCODE (flagv, HCL_CNODE_CONS_BYTEARRAY - HCL_CNODE_CONS);
+				LIST_FLAG_SET_CONCODE (flagv, HCL_CONCODE_BYTEARRAY);
 				goto start_list;
 
 			case HCL_IOTOK_LBRACE: /* {} */
 				flagv = 0;
-				LIST_FLAG_SET_CONCODE (flagv, HCL_CNODE_CONS_DIC - HCL_CNODE_CONS);
+				LIST_FLAG_SET_CONCODE (flagv, HCL_CONCODE_DIC);
 				goto start_list;
 
 			case HCL_IOTOK_QLPAREN: /* #() */
@@ -1966,13 +1740,13 @@ static int read_object (hcl_t* hcl)
 				return -1;
 #else
 				flagv = 0;
-				LIST_FLAG_SET_CONCODE (flagv, HCL_CNODE_CONS_QLIST - HCL_CNODE_CONS);
+				LIST_FLAG_SET_CONCODE (flagv, HCL_CONCODE_QLIST);
 				goto start_list;
 #endif
 
 			case HCL_IOTOK_LPAREN: /* () */
 				flagv = 0;
-				LIST_FLAG_SET_CONCODE (flagv, HCL_CNODE_CONS_XLIST - HCL_CNODE_CONS);
+				LIST_FLAG_SET_CONCODE (flagv, HCL_CONCODE_XLIST);
 			start_list:
 				if (level >= HCL_TYPE_MAX(int))
 				{
@@ -1983,7 +1757,7 @@ static int read_object (hcl_t* hcl)
 
 				/* push some data to simulate recursion into
 				 * a list literal or an array literal */
-				if (enter_list(hcl, TOKEN_LOC(hcl), flagv) == HCL_NULL) return -1;
+				if (enter_list(hcl, TOKEN_LOC(hcl), flagv) <= -1) return -1;
 				level++;
 				if (LIST_FLAG_GET_CONCODE(flagv) == HCL_CONCODE_ARRAY) array_level++;
 
@@ -2086,19 +1860,19 @@ static int read_object (hcl_t* hcl)
 				obj = leave_list(hcl, &flagv, &oldflagv);
 
 				level--;
-				if (LIST_FLAG_GET_CONCODE(oldflagv) == (HCL_CNODE_CONS_ARRAY - HCL_CNODE_CONS)) array_level--;
+				if (LIST_FLAG_GET_CONCODE(oldflagv) == HCL_CONCODE_ARRAY) array_level--;
 				break;
 			}
 
 			case HCL_IOTOK_VBAR:
 /* TODO: think wheter to allow | | inside a quoted list... */
 /* TODO: revise this part ... */
-				if (array_level > 0)
+				if (array_level > 0) /* TODO: this check is wrong... i think .. */
 				{
 					hcl_setsynerr (hcl, HCL_SYNERR_VBARBANNED, TOKEN_LOC(hcl), TOKEN_NAME(hcl));
 					return -1;
 				}
-				if (get_symbol_array_literal(hcl, &obj) <= -1) return -1; // TOOD: more consistenc errir handling...
+				obj = read_vlist(hcl);
 				break;
 
 			case HCL_IOTOK_NIL:
@@ -2184,11 +1958,13 @@ static int read_object (hcl_t* hcl)
 				break;
 
 			case HCL_IOTOK_IDENT:
-				obj = hcl_makecnodesymbol(hcl, TOKEN_LOC(hcl), TOKEN_NAME_PTR(hcl), TOKEN_NAME_LEN(hcl));
+				obj = hcl_makecnodesymbol(hcl, TOKEN_LOC(hcl), 0, TOKEN_NAME_PTR(hcl), TOKEN_NAME_LEN(hcl));
 				break;
 
 			case HCL_IOTOK_IDENT_DOTTED:
-				obj = hcl_makesymbol(hcl, TOKEN_NAME_PTR(hcl), TOKEN_NAME_LEN(hcl));
+				obj = hcl_makecnodesymbol(hcl, TOKEN_LOC(hcl), 1, TOKEN_NAME_PTR(hcl), TOKEN_NAME_LEN(hcl));
+#if 0
+// DO THIS IN THE COMPILER CODE
 				if (obj && !hcl_getatsysdic(hcl, obj))
 				{
 					/* query the module for information if it is the first time
@@ -2243,6 +2019,7 @@ static int read_object (hcl_t* hcl)
 					 * to a different value */
 					HCL_OBJ_SET_FLAGS_KERNEL (obj, kernel_bits);
 				}
+#endif
 				break;
 		}
 
@@ -2257,7 +2034,11 @@ static int read_object (hcl_t* hcl)
 			HCL_ASSERT (hcl, level > 0);
 
 			/* if so, append the element read into the quote list */
-			if (chain_to_list(hcl, obj) == HCL_NULL) return -1;
+			if (chain_to_list(hcl, obj) == HCL_NULL) 
+			{
+				hcl_freecnode (hcl, obj);
+				return -1;
+			}
 
 			/* exit out of the quoted list. the quoted list can have
 			 * one element only. */
@@ -2266,7 +2047,7 @@ static int read_object (hcl_t* hcl)
 			/* one level up toward the top */
 			level--;
 
-			if (LIST_FLAG_GET_CONCODE(oldflagv) == (HCL_CNODE_CONS_ARRAY - HCL_CNODE_CONS)) array_level--;
+			if (LIST_FLAG_GET_CONCODE(oldflagv) == HCL_CONCODE_ARRAY) array_level--;
 		}
 #endif
 
@@ -2275,7 +2056,11 @@ static int read_object (hcl_t* hcl)
 
 		/* if not, append the element read into the current list.
 		 * if we are not at the top level, we must be in a list */
-		if (chain_to_list(hcl, obj) == HCL_NULL) return -1;
+		if (chain_to_list(hcl, obj) == HCL_NULL) 
+		{
+			hcl_freecnode (hcl, obj);
+			return -1;
+		}
 		clear_comma_colon_flag (hcl);
 
 		/* read the next token */

@@ -38,11 +38,6 @@ static hcl_cnode_t* make_cnode (hcl_t* hcl, hcl_cnode_type_t type, const hcl_iol
 	return cnode;
 }
 
-hcl_cnode_t* hcl_makecnodersn (hcl_t* hcl, const hcl_ioloc_t* loc)
-{
-	return make_cnode(hcl, HCL_CNODE_RSN, loc, 0);
-}
-
 hcl_cnode_t* hcl_makecnodenil (hcl_t* hcl, const hcl_ioloc_t* loc)
 {
 	return make_cnode(hcl, HCL_CNODE_NIL, loc, 0);
@@ -66,10 +61,11 @@ hcl_cnode_t* hcl_makecnodecharlit (hcl_t* hcl, const hcl_ioloc_t* loc, const hcl
 	return c;
 }
 
-hcl_cnode_t* hcl_makecnodesymbol (hcl_t* hcl, const hcl_ioloc_t* loc, const hcl_ooch_t* ptr, hcl_oow_t len)
+hcl_cnode_t* hcl_makecnodesymbol (hcl_t* hcl, const hcl_ioloc_t* loc, int dotted, const hcl_ooch_t* ptr, hcl_oow_t len)
 {
 	hcl_cnode_t* c =  make_cnode(hcl, HCL_CNODE_SYMBOL, loc, HCL_SIZEOF(*ptr) * (len + 1));
 	if (HCL_UNLIKELY(!c)) return HCL_NULL;
+	c->u.symbol.dotted = dotted;
 	c->u.symbol.ptr = (hcl_ooch_t*)(c + 1);
 	c->u.symbol.len = len;
 	hcl_copy_oochars (c->u.symbol.ptr, ptr, len);
@@ -145,4 +141,58 @@ hcl_cnode_t* hcl_makecnodecons (hcl_t* hcl, const hcl_ioloc_t* loc, hcl_cnode_t*
 	c->u.cons.car = car;
 	c->u.cons.cdr = cdr;
 	return c;
+}
+
+hcl_cnode_t* hcl_makecnodelist (hcl_t* hcl, const hcl_ioloc_t* loc, hcl_concode_t type, hcl_cnode_t* head)
+{
+	hcl_cnode_t* c =  make_cnode(hcl, HCL_CNODE_LIST, loc, 0);
+	if (HCL_UNLIKELY(!c)) return HCL_NULL;
+	c->u.list.type = type;
+	c->u.list.head = head;
+	return c;
+}
+
+void hcl_freesinglecnode (hcl_t* hcl, hcl_cnode_t* c)
+{
+	hcl_freemem (hcl, c);
+}
+
+void hcl_freecnode (hcl_t* hcl, hcl_cnode_t* c)
+{
+redo:
+	switch (c->type)
+	{
+		case HCL_CNODE_LIST:
+		{
+			hcl_cnode_t* tmp;
+			tmp = c->u.list.head;
+			hcl_freemem (hcl, c);
+			if (tmp)
+			{
+				c = tmp;
+				goto redo;
+			}
+			break;
+		}
+
+		case HCL_CNODE_CONS:
+		{
+			hcl_cnode_t* tmp1, * tmp2;
+
+			tmp1 = c->u.cons.car;
+			tmp2 = c->u.cons.cdr;
+
+			hcl_freemem (hcl, c);
+			hcl_freecnode (hcl, tmp1); /* TODO: remove recursion? */
+
+			if (tmp2)
+			{
+				c = tmp2;
+				goto redo;
+			}
+		}
+
+		default:
+			hcl_freemem (hcl, c);
+	}
 }

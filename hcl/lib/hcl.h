@@ -1715,7 +1715,8 @@ enum hcl_concode_t
 	HCL_CONCODE_ARRAY,      /* [] */
 	HCL_CONCODE_BYTEARRAY,  /* #[] */
 	HCL_CONCODE_DIC,        /* {} */
-	HCL_CONCODE_QLIST       /* #() - data list */
+	HCL_CONCODE_QLIST,      /* #() - data list */
+	HCL_CONCODE_VLIST       /* | | - symbol list */
 };
 typedef enum hcl_concode_t hcl_concode_t;
 

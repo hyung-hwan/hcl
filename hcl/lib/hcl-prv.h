@@ -183,8 +183,6 @@ struct hcl_iolink_t
 
 enum hcl_cnode_type_t
 {
-	HCL_CNODE_RSN, /* internally used */
-
 	HCL_CNODE_CHARLIT,
 	HCL_CNODE_SYMBOL,
 	HCL_CNODE_STRLIT,
@@ -212,13 +210,8 @@ enum hcl_cnode_type_t
 	HCL_CNODE_UNTIL,
 	HCL_CNODE_WHILE,
 
-
-	HCL_CNODE_CONS,            /* generic member cons. the beginning of a list may have the following */
-	HCL_CNODE_CONS_XLIST,      /* () - executable list */
-	HCL_CNODE_CONS_ARRAY,      /* [] */
-	HCL_CNODE_CONS_BYTEARRAY,  /* #[] */
-	HCL_CNODE_CONS_DIC,        /* {} */
-	HCL_CNODE_CONS_QLIST       /* #() - data list */
+	HCL_CNODE_CONS,
+	HCL_CNODE_LIST
 };
 typedef enum hcl_cnode_type_t hcl_cnode_type_t;
 
@@ -233,18 +226,11 @@ struct hcl_cnode_t
 	{
 		struct
 		{
-			hcl_cnode_t* head;
-			hcl_cnode_t* tail;
-			int flagv;
-			unsigned int count;
-			hcl_cnode_t* rsn_par; /* parent item in the stack. must point to hcl_cnode_t* of the HCL_CNODE_RSN type. */
-		} rsn; /* reader stack node */
-		struct
-		{
 			hcl_ooch_t v;
 		} charlit;
 		struct
 		{
+			int dotted;
 			hcl_ooch_t* ptr;
 			hcl_oow_t len;
 		} symbol;
@@ -281,6 +267,11 @@ struct hcl_cnode_t
 			hcl_cnode_t* car;
 			hcl_cnode_t* cdr;
 		} cons;
+		struct
+		{
+			hcl_cnode_t* head; /* its type must be HCL_CNODE_CONS */
+			hcl_concode_t type;
+		} list;
 	} u;
 };
 
@@ -333,6 +324,17 @@ struct hcl_blk_info_t
 };
 typedef struct hcl_blk_info_t hcl_blk_info_t;
 
+typedef struct hcl_rstl_t hcl_rstl_t;
+struct hcl_rstl_t /* reader stack for list reading */
+{
+	hcl_cnode_t* head;
+	hcl_cnode_t* tail;
+	hcl_ioloc_t loc;
+	int flagv;
+	hcl_oow_t count;
+	hcl_rstl_t* prev;
+};
+
 struct hcl_compiler_t
 {
 	/* output handler */
@@ -375,7 +377,7 @@ struct hcl_compiler_t
 		hcl_oop_t s;  /* stack for reading */
 		hcl_oop_t e;  /* last object read */
 
-		hcl_cnode_t* st; /* stack for reading with cnode */
+		hcl_rstl_t* st;
 		hcl_cnode_t* ecn; /* last object cnode read */
 
 		struct
@@ -1258,20 +1260,21 @@ int hcl_emitbyteinstruction (
 /* ========================================================================= */
 /* cnode.c                                                                   */
 /* ========================================================================= */
-hcl_cnode_t* hcl_makecnodersn (hcl_t* hcl, const hcl_ioloc_t* loc);
 hcl_cnode_t* hcl_makecnodenil (hcl_t* hcl, const hcl_ioloc_t* loc);
 hcl_cnode_t* hcl_makecnodetrue (hcl_t* hcl, const hcl_ioloc_t* loc);
 hcl_cnode_t* hcl_makecnodefalse (hcl_t* hcl, const hcl_ioloc_t* loc);
 hcl_cnode_t* hcl_makecnodecharlit (hcl_t* hcl, const hcl_ioloc_t* loc, const hcl_ooch_t ch);
-hcl_cnode_t* hcl_makecnodesymbol (hcl_t* hcl, const hcl_ioloc_t* loc, const hcl_ooch_t* ptr, hcl_oow_t len);
+hcl_cnode_t* hcl_makecnodesymbol (hcl_t* hcl, const hcl_ioloc_t* loc, int dotted, const hcl_ooch_t* ptr, hcl_oow_t len);
 hcl_cnode_t* hcl_makecnodestrlit (hcl_t* hcl, const hcl_ioloc_t* loc, const hcl_ooch_t* ptr, hcl_oow_t len);
 hcl_cnode_t* hcl_makecnodenumlit (hcl_t* hcl, const hcl_ioloc_t* loc, const hcl_ooch_t* ptr, hcl_oow_t len);
 hcl_cnode_t* hcl_makecnoderadnumlit (hcl_t* hcl, const hcl_ioloc_t* loc, const hcl_ooch_t* ptr, hcl_oow_t len);
 hcl_cnode_t* hcl_makecnodefpdeclit (hcl_t* hcl, const hcl_ioloc_t* loc, const hcl_ooch_t* ptr, hcl_oow_t len);
 hcl_cnode_t* hcl_makecnodesmptrlit (hcl_t* hcl, const hcl_ioloc_t* loc, hcl_oow_t v);
 hcl_cnode_t* hcl_makecnodeerrlit (hcl_t* hcl, const hcl_ioloc_t* loc, hcl_ooi_t v);
-
 hcl_cnode_t* hcl_makecnodecons (hcl_t* hcl, const hcl_ioloc_t* loc, hcl_cnode_t* car, hcl_cnode_t* cdr);
+hcl_cnode_t* hcl_makecnodelist (hcl_t* hcl, const hcl_ioloc_t* loc, hcl_concode_t type, hcl_cnode_t* head);
+void hcl_freesinglecnode (hcl_t* hcl, hcl_cnode_t* c);
+void hcl_freecnode (hcl_t* hcl, hcl_cnode_t* c);
 
 #if defined(__cplusplus)
 }
