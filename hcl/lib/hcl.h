@@ -1368,6 +1368,7 @@ struct hcl_synerr_t
 
 #if defined(HCL_INCLUDE_COMPILER)
 typedef struct hcl_compiler_t hcl_compiler_t;
+typedef struct hcl_cnode_t hcl_cnode_t;
 #endif
 
 #define HCL_ERRMSG_CAPA (2048)
@@ -1974,6 +1975,10 @@ HCL_EXPORT void hcl_flushio (
 );
 
 HCL_EXPORT hcl_oop_t hcl_read (
+	hcl_t*       hcl
+);
+
+HCL_EXPORT hcl_cnode_t* hcl_read2 (
 	hcl_t*       hcl
 );
 

@@ -810,7 +810,7 @@ static int handle_logopt (hcl_t* hcl, const hcl_bch_t* str)
 #if defined(HCL_BUILD_DEBUG)
 static int handle_dbgopt (hcl_t* hcl, const hcl_bch_t* str)
 {
-	xtn_t* xtn = (xtn_t*)hcl_getxtn(hcl);
+	/*xtn_t* xtn = (xtn_t*)hcl_getxtn(hcl);*/
 	const hcl_bch_t* cm, * flt;
 	hcl_oow_t len;
 	hcl_bitmask_t trait, dbgopt = 0;
@@ -1171,6 +1171,48 @@ hcl_logufmt (hcl, HCL_LOG_WARN, fmt, ustr, 0x6789);
 	trait |= HCL_TRAIT_INTERACTIVE;
 	hcl_setoption (hcl, HCL_TRAIT, &trait);
 }
+#endif
+
+
+
+#if 0
+////////////////////////////
+{
+hcl_cnode_t* xx;
+while (1)
+{
+	xx = hcl_read2(hcl);
+	if (!xx)
+	{
+		if (hcl->errnum == HCL_EFINIS)
+		{
+			/* end of input */
+			break;
+		}
+		else if (hcl->errnum == HCL_ESYNERR)
+		{
+			print_synerr (hcl);
+			if (xtn->reader_istty && hcl_getsynerrnum(hcl) != HCL_SYNERR_EOF) 
+			{
+				/* TODO: drain remaining data in the reader including the actual inputstream and buffered data in hcl */	
+			}
+			continue;
+		}
+		else
+		{
+			hcl_logbfmt (hcl, HCL_LOG_STDERR, "ERROR: cannot read object - [%d] %js\n", hcl_geterrnum(hcl), hcl_geterrmsg(hcl));
+		}
+		goto oops;
+	}
+	else
+	{
+		hcl_logbfmt (hcl, HCL_LOG_STDERR, "OK: got cnode - %p\n", xx);
+		hcl_freecnode (hcl, xx);
+	}
+}
+
+}
+////////////////////////////
 #endif
 
 	while (1)

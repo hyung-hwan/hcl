@@ -414,7 +414,7 @@ static HCL_INLINE int add_token_char (hcl_t* hcl, hcl_ooch_t c)
 
 	tmp.ptr = &c;
 	tmp.len = 1;
-	return copy_string_to (hcl, &tmp, TOKEN_NAME(hcl), &TOKEN_NAME_CAPA(hcl), 1, '\0');
+	return copy_string_to(hcl, &tmp, TOKEN_NAME(hcl), &TOKEN_NAME_CAPA(hcl), 1, '\0');
 }
 
 static HCL_INLINE void unget_char (hcl_t* hcl, const hcl_iolxc_t* c)
@@ -1438,6 +1438,7 @@ static HCL_INLINE hcl_cnode_t* leave_list (hcl_t* hcl, int* flagv, int* oldflagv
 	if (fv & (COMMAED | COLONED))
 	{
 		hcl_setsynerr (hcl, ((fv & COMMAED)? HCL_SYNERR_COMMANOVALUE: HCL_SYNERR_COLONNOVALUE), TOKEN_LOC(hcl), HCL_NULL);
+		if (head) hcl_freecnode (hcl, head);
 		return HCL_NULL;
 	}
 
@@ -1455,12 +1456,12 @@ static HCL_INLINE hcl_cnode_t* leave_list (hcl_t* hcl, int* flagv, int* oldflagv
 		*flagv = hcl->c->r.st->flagv;
 	}
 
-	/* return the head of the list being left */
-
 	/* NOTE: empty xlist will get translated to #nil.
 	 *       this is useful when used in the lambda expression to express an empty argument. also in defun.
 	 *      (lambda () ...) is equivalent to  (lambda #nil ...)
 	 *      (defun x() ...) */
+
+	/* [NOTE] the head is NULL if the list is empty */
 	list = hcl_makecnodelist(hcl, &loc, concode, head);
 	if (HCL_UNLIKELY(!list)) hcl_freecnode (hcl, head);
 	return list;
@@ -1537,7 +1538,7 @@ static HCL_INLINE void clear_comma_colon_flag (hcl_t* hcl)
 	rstl->flagv &= ~(COMMAED | COLONED);
 }
 
-static hcl_cnode_t* chain_to_list (hcl_t* hcl, hcl_cnode_t* obj)
+static int chain_to_list (hcl_t* hcl, hcl_cnode_t* obj)
 {
 	hcl_rstl_t* rstl;
 	int flagv;
@@ -1555,7 +1556,7 @@ static hcl_cnode_t* chain_to_list (hcl_t* hcl, hcl_cnode_t* obj)
 		 * allowed. so i can safely hard-code the error code to
 		 * HCL_SYNERR_RBRACK. */
 		hcl_setsynerr (hcl, HCL_SYNERR_RBRACK, TOKEN_LOC(hcl), TOKEN_NAME(hcl));
-		return HCL_NULL;
+		return -1;
 	}
 	else if (flagv & DOTTED)
 	{
@@ -1587,11 +1588,11 @@ static hcl_cnode_t* chain_to_list (hcl_t* hcl, hcl_cnode_t* obj)
 			/* there is no separator between array/dictionary elements
 			 * for instance, [1 2] { 10 20 } */
 			hcl_setsynerr (hcl, HCL_SYNERR_NOSEP, TOKEN_LOC(hcl), HCL_NULL);
-			return HCL_NULL;
+			return -1;
 		}
 
 		cons = hcl_makecnodecons(hcl, &obj->loc, obj, HCL_NULL);
-		if (HCL_UNLIKELY(!cons)) return HCL_NULL;
+		if (HCL_UNLIKELY(!cons)) return -1;
 
 		if (rstl->count <= 0)
 		{
@@ -1610,7 +1611,7 @@ static hcl_cnode_t* chain_to_list (hcl_t* hcl, hcl_cnode_t* obj)
 			 * append it to the list */
 			tail = rstl->tail;
 			HCL_ASSERT (hcl, tail->type == HCL_CNODE_CONS);
-			tail->u.cons.cdr = obj;
+			tail->u.cons.cdr = cons;
 			rstl->tail = cons;
 		}
 
@@ -1618,7 +1619,7 @@ static hcl_cnode_t* chain_to_list (hcl_t* hcl, hcl_cnode_t* obj)
 		rstl->count++;
 	}
 
-	return obj;
+	return 0;
 }
 
 static hcl_cnode_t* read_vlist (hcl_t* hcl)
@@ -1686,13 +1687,13 @@ oops:
 	return HCL_NULL;
 }
 
-static int read_object (hcl_t* hcl)
+static hcl_cnode_t* read_object (hcl_t* hcl)
 {
 	/* this function read an s-expression non-recursively
 	 * by manipulating its own stack. */
 
 	int level = 0, array_level = 0, flagv = 0;
-	hcl_cnode_t* obj;
+	hcl_cnode_t* obj = HCL_NULL;
 
 	while (1)
 	{
@@ -1701,11 +1702,11 @@ static int read_object (hcl_t* hcl)
 		{
 			default:
 				hcl_setsynerr (hcl, HCL_SYNERR_ILTOK, TOKEN_LOC(hcl), TOKEN_NAME(hcl));
-				return -1;
+				goto oops;
 
 			case HCL_IOTOK_EOF:
 				hcl_setsynerr (hcl, HCL_SYNERR_EOF, TOKEN_LOC(hcl), TOKEN_NAME(hcl));
-				return -1;
+				goto oops;
 
 			case HCL_IOTOK_INCLUDE:
 				/* TODO: should i limit where #include can be specified?
@@ -1714,9 +1715,9 @@ static int read_object (hcl_t* hcl)
 				if (TOKEN_TYPE(hcl) != HCL_IOTOK_STRLIT)
 				{
 					hcl_setsynerr (hcl, HCL_SYNERR_STRING, TOKEN_LOC(hcl), TOKEN_NAME(hcl));
-					return -1;
+					goto oops;
 				}
-				if (begin_include(hcl) <= -1) return -1;
+				if (begin_include(hcl) <= -1) goto oops;
 				goto redo;
 
 			case HCL_IOTOK_LBRACK: /* [] */
@@ -1737,7 +1738,7 @@ static int read_object (hcl_t* hcl)
 			case HCL_IOTOK_QLPAREN: /* #() */
 #if 1
 				hcl_setsynerr (hcl, HCL_SYNERR_ILTOK, TOKEN_LOC(hcl), TOKEN_NAME(hcl));
-				return -1;
+				goto oops;
 #else
 				flagv = 0;
 				LIST_FLAG_SET_CONCODE (flagv, HCL_CONCODE_QLIST);
@@ -1752,17 +1753,17 @@ static int read_object (hcl_t* hcl)
 				{
 					/* the nesting level has become too deep */
 					hcl_setsynerr (hcl, HCL_SYNERR_NESTING, TOKEN_LOC(hcl), TOKEN_NAME(hcl));
-					return -1;
+					goto oops;
 				}
 
 				/* push some data to simulate recursion into
 				 * a list literal or an array literal */
-				if (enter_list(hcl, TOKEN_LOC(hcl), flagv) <= -1) return -1;
+				if (enter_list(hcl, TOKEN_LOC(hcl), flagv) <= -1) goto oops;
 				level++;
 				if (LIST_FLAG_GET_CONCODE(flagv) == HCL_CONCODE_ARRAY) array_level++;
 
 				/* read the next token */
-				GET_TOKEN (hcl);
+				GET_TOKEN_WITH_GOTO (hcl, oops);
 				goto redo;
 
 			case HCL_IOTOK_DOT:
@@ -1773,30 +1774,30 @@ static int read_object (hcl_t* hcl)
 					 *   2. at the beginning of a list
 					 *   3. inside an  #(), #[], #{}, () */
 					hcl_setsynerr (hcl, HCL_SYNERR_DOTBANNED, TOKEN_LOC(hcl), HCL_NULL);
-					return -1;
+					goto oops;
 				}
 
-				GET_TOKEN (hcl);
+				GET_TOKEN_WITH_GOTO (hcl, oops);
 				goto redo;
 
 			case HCL_IOTOK_COLON:
 				if (level <= 0 || !can_colon_list(hcl))
 				{
 					hcl_setsynerr (hcl, HCL_SYNERR_COLONBANNED, TOKEN_LOC(hcl), HCL_NULL);
-					return -1;
+					goto oops;
 				}
 
-				GET_TOKEN (hcl);
+				GET_TOKEN_WITH_GOTO (hcl, oops);
 				goto redo;
 
 			case HCL_IOTOK_COMMA:
 				if (level <= 0 || !can_comma_list(hcl))
 				{
 					hcl_setsynerr (hcl, HCL_SYNERR_COMMABANNED, TOKEN_LOC(hcl), HCL_NULL);
-					return -1;
+					goto oops;
 				}
 
-				GET_TOKEN (hcl);
+				GET_TOKEN_WITH_GOTO (hcl, oops);
 				goto redo;
 
 			case HCL_IOTOK_RPAREN: /* xlist (), qlist #() */
@@ -1822,7 +1823,7 @@ static int read_object (hcl_t* hcl)
 				if (level <= 0)
 				{
 					hcl_setsynerr (hcl, HCL_SYNERR_UNBALPBB, TOKEN_LOC(hcl), HCL_NULL);
-					return -1;
+					goto oops;
 				}
 
 				concode = LIST_FLAG_GET_CONCODE(flagv);
@@ -1830,7 +1831,7 @@ static int read_object (hcl_t* hcl)
 				if (req[concode].closer != TOKEN_TYPE(hcl))
 				{
 					hcl_setsynerr (hcl, req[concode].synerr, TOKEN_LOC(hcl), TOKEN_NAME(hcl));
-					return -1;
+					goto oops;
 				}
 
 #if 0
@@ -1854,7 +1855,7 @@ static int read_object (hcl_t* hcl)
 					 * indicated by level<=0.
 					 */
 					hcl_setsynerr (hcl, HCL_SYNERR_LPAREN, TOKEN_LOC(hcl), TOKEN_NAME(hcl));
-					return -1;
+					goto oops;
 				}
 #endif
 				obj = leave_list(hcl, &flagv, &oldflagv);
@@ -1870,7 +1871,7 @@ static int read_object (hcl_t* hcl)
 				if (array_level > 0) /* TODO: this check is wrong... i think .. */
 				{
 					hcl_setsynerr (hcl, HCL_SYNERR_VBARBANNED, TOKEN_LOC(hcl), TOKEN_NAME(hcl));
-					return -1;
+					goto oops;
 				}
 				obj = read_vlist(hcl);
 				break;
@@ -1902,7 +1903,7 @@ static int read_object (hcl_t* hcl)
 				if (!HCL_IN_SMPTR_RANGE(v))
 				{
 					hcl_setsynerr (hcl, HCL_SYNERR_SMPTRLIT, TOKEN_LOC(hcl), TOKEN_NAME(hcl));
-					return -1;
+					goto oops;
 				}
 
 				obj = hcl_makecnodesmptrlit(hcl, TOKEN_LOC(hcl), v);
@@ -1923,7 +1924,7 @@ static int read_object (hcl_t* hcl)
 					if (v > HCL_ERROR_MAX)
 					{
 						hcl_setsynerr (hcl, HCL_SYNERR_ERRLIT, TOKEN_LOC(hcl), TOKEN_NAME(hcl));
-						return -1;
+						goto oops;
 					}
 				}
 
@@ -1979,7 +1980,7 @@ static int read_object (hcl_t* hcl)
 					if (!pfbase)
 					{
 						/* TODO switch to syntax error */
-						return -1;
+						goto oops;
 					}
 
 					hcl_pushvolat (hcl, &obj);
@@ -2005,13 +2006,13 @@ static int read_object (hcl_t* hcl)
 						default:
 							hcl_popvolat (hcl);
 							hcl_seterrbfmt (hcl, HCL_EINVAL, "invalid pfbase type - %d\n", pfbase->type);
-							return -1;
+							goto oops;
 					}
 
 					if (!val || !hcl_putatsysdic(hcl, obj, val))
 					{
 						hcl_popvolat (hcl);
-						return -1;
+						goto oops;
 					}
 					hcl_popvolat (hcl);
 
@@ -2023,7 +2024,7 @@ static int read_object (hcl_t* hcl)
 				break;
 		}
 
-		if (!obj) return -1;
+		if (!obj) goto oops;
 
 #if 0
 		/* check if the element is read for a quoted list */
@@ -2034,11 +2035,7 @@ static int read_object (hcl_t* hcl)
 			HCL_ASSERT (hcl, level > 0);
 
 			/* if so, append the element read into the quote list */
-			if (chain_to_list(hcl, obj) == HCL_NULL) 
-			{
-				hcl_freecnode (hcl, obj);
-				return -1;
-			}
+			if (chain_to_list(hcl, obj) <= -1) goto oops;
 
 			/* exit out of the quoted list. the quoted list can have
 			 * one element only. */
@@ -2056,43 +2053,38 @@ static int read_object (hcl_t* hcl)
 
 		/* if not, append the element read into the current list.
 		 * if we are not at the top level, we must be in a list */
-		if (chain_to_list(hcl, obj) == HCL_NULL) 
-		{
-			hcl_freecnode (hcl, obj);
-			return -1;
-		}
+		if (chain_to_list(hcl, obj) <= -1) goto oops;
 		clear_comma_colon_flag (hcl);
 
 		/* read the next token */
-		GET_TOKEN (hcl);
+		GET_TOKEN_WITH_GOTO (hcl, oops);
 	}
 
 	/* upon exit, we must be at the top level */
 	HCL_ASSERT (hcl, level == 0);
 	HCL_ASSERT (hcl, array_level == 0);
 
-	hcl->c->r.ecn = obj;
-	return 0;
+	return obj;
+
+oops:
+	if (obj) hcl_freecnode (hcl, obj);
+	return HCL_NULL;
 }
 
-static HCL_INLINE int __read (hcl_t* hcl)
+hcl_cnode_t* hcl_read2 (hcl_t* hcl)
 {
-	if (get_token(hcl) <= -1) return -1;
+	HCL_ASSERT (hcl, hcl->c && hcl->c->reader);
+	if (get_token(hcl) <= -1) return HCL_NULL;
 	if (TOKEN_TYPE(hcl) == HCL_IOTOK_EOF)
 	{
 		hcl_seterrnum (hcl, HCL_EFINIS);
-		return -1;
+		return HCL_NULL;
 	}
 	return read_object(hcl);
 }
 
-hcl_oop_t hcl_read (hcl_t* hcl)
-{
-	HCL_ASSERT (hcl, hcl->c && hcl->c->reader);
-	if (__read(hcl) <= -1) return HCL_NULL;
-	return hcl->c->r.e;
-}
 
+#if 0
 /* ========================================================================= */
 
 /* TODO: rename compiler to something else that can include reader, printer, and compiler
@@ -2329,3 +2321,4 @@ int hcl_unreadchar (hcl_t* hcl, const hcl_iolxc_t* c)
 	unget_char (hcl, c);
 	return 0;
 }
+#endif

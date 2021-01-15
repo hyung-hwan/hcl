@@ -167,8 +167,9 @@ redo:
 			hcl_cnode_t* tmp;
 			tmp = c->u.list.head;
 			hcl_freemem (hcl, c);
-			if (tmp)
+			if (tmp) /* it's not set for an empty list */
 			{
+				
 				c = tmp;
 				goto redo;
 			}
@@ -182,7 +183,10 @@ redo:
 			tmp1 = c->u.cons.car;
 			tmp2 = c->u.cons.cdr;
 
+			HCL_ASSERT (hcl, tmp1 != HCL_NULL);
 			hcl_freemem (hcl, c);
+
+
 			hcl_freecnode (hcl, tmp1); /* TODO: remove recursion? */
 
 			if (tmp2)
@@ -190,9 +194,12 @@ redo:
 				c = tmp2;
 				goto redo;
 			}
+
+			break;
 		}
 
 		default:
 			hcl_freemem (hcl, c);
+			break;
 	}
 }

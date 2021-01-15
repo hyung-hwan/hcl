@@ -216,7 +216,6 @@ enum hcl_cnode_type_t
 typedef enum hcl_cnode_type_t hcl_cnode_type_t;
 
 /* NOTE: hcl_cnode_t used by the built-in compiler is not an OOP object */
-typedef struct hcl_cnode_t hcl_cnode_t;
 struct hcl_cnode_t
 {
 	hcl_cnode_type_t type;
@@ -376,9 +375,7 @@ struct hcl_compiler_t
 	{
 		hcl_oop_t s;  /* stack for reading */
 		hcl_oop_t e;  /* last object read */
-
 		hcl_rstl_t* st;
-		hcl_cnode_t* ecn; /* last object cnode read */
 
 		struct
 		{

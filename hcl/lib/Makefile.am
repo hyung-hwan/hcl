@@ -66,6 +66,7 @@ libhcl_la_SOURCES = \
 	bigint.c \
 	cnode.c \
 	comp.c \
+	comp2.c \
 	debug.c \
 	decode.c \
 	dic.c \
@@ -83,6 +84,7 @@ libhcl_la_SOURCES = \
 	prim.c \
 	print.c \
 	rbt.c \
+	read.c \
 	read2.c \
 	sym.c \
 	utf8.c \
