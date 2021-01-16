@@ -1658,7 +1658,6 @@ static hcl_cnode_t* read_vlist (hcl_t* hcl)
 			goto oops;
 		}
 
-
 		if (!l->u.list.head)
 		{
 			l->u.list.head = cons;
@@ -1711,7 +1710,7 @@ static hcl_cnode_t* read_object (hcl_t* hcl)
 			case HCL_IOTOK_INCLUDE:
 				/* TODO: should i limit where #include can be specified?
 				 *       disallow it inside a list literal or an array literal? */
-				GET_TOKEN (hcl);
+				GET_TOKEN_WITH_GOTO (hcl, oops);
 				if (TOKEN_TYPE(hcl) != HCL_IOTOK_STRLIT)
 				{
 					hcl_setsynerr (hcl, HCL_SYNERR_STRING, TOKEN_LOC(hcl), TOKEN_NAME(hcl));
@@ -1964,63 +1963,6 @@ static hcl_cnode_t* read_object (hcl_t* hcl)
 
 			case HCL_IOTOK_IDENT_DOTTED:
 				obj = hcl_makecnodesymbol(hcl, TOKEN_LOC(hcl), 1, TOKEN_NAME_PTR(hcl), TOKEN_NAME_LEN(hcl));
-#if 0
-// DO THIS IN THE COMPILER CODE
-				if (obj && !hcl_getatsysdic(hcl, obj))
-				{
-					/* query the module for information if it is the first time
-					 * when the dotted symbol is seen */
-
-					hcl_pfbase_t* pfbase;
-					hcl_mod_t* mod;
-					hcl_oop_t val;
-					unsigned int kernel_bits;
-
-					pfbase = hcl_querymod(hcl, TOKEN_NAME_PTR(hcl), TOKEN_NAME_LEN(hcl), &mod);
-					if (!pfbase)
-					{
-						/* TODO switch to syntax error */
-						goto oops;
-					}
-
-					hcl_pushvolat (hcl, &obj);
-					switch (pfbase->type)
-					{
-						case HCL_PFBASE_FUNC:
-							kernel_bits = 2;
-							val = hcl_makeprim(hcl, pfbase->handler, pfbase->minargs, pfbase->maxargs, mod);
-							break;
-
-						case HCL_PFBASE_VAR:
-							kernel_bits = 1;
-							val = hcl->_nil;
-							break;
-
-						case HCL_PFBASE_CONST:
-							/* TODO: create a value from the pfbase information. it needs to get extended first
-							 * can i make use of pfbase->handler type-cast to a differnt type? */
-							kernel_bits = 2;
-							val = hcl->_nil;
-							break;
-
-						default:
-							hcl_popvolat (hcl);
-							hcl_seterrbfmt (hcl, HCL_EINVAL, "invalid pfbase type - %d\n", pfbase->type);
-							goto oops;
-					}
-
-					if (!val || !hcl_putatsysdic(hcl, obj, val))
-					{
-						hcl_popvolat (hcl);
-						goto oops;
-					}
-					hcl_popvolat (hcl);
-
-					/* make this dotted symbol special that it can't get changed
-					 * to a different value */
-					HCL_OBJ_SET_FLAGS_KERNEL (obj, kernel_bits);
-				}
-#endif
 				break;
 		}
 
@@ -2054,6 +1996,12 @@ static hcl_cnode_t* read_object (hcl_t* hcl)
 		/* if not, append the element read into the current list.
 		 * if we are not at the top level, we must be in a list */
 		if (chain_to_list(hcl, obj) <= -1) goto oops;
+
+		/* because it has been chained to the list, it belongs to the current stack top. 
+		 * mark that obj is not stand-alone by nullifying it. without this, if a jump
+		 * is made to oops, the momory block pointed to by obj may get freed twice. */
+		obj = HCL_NULL; 
+
 		clear_comma_colon_flag (hcl);
 
 		/* read the next token */
@@ -2064,10 +2012,23 @@ static hcl_cnode_t* read_object (hcl_t* hcl)
 	HCL_ASSERT (hcl, level == 0);
 	HCL_ASSERT (hcl, array_level == 0);
 
+	HCL_ASSERT (hcl, hcl->c->r.st == HCL_NULL);
+	HCL_ASSERT (hcl, obj != HCL_NULL);
 	return obj;
 
 oops:
 	if (obj) hcl_freecnode (hcl, obj);
+
+	/* clean up the reader stack for a list */
+	while (hcl->c->r.st)
+	{
+		hcl_rstl_t* rstl;
+		rstl = hcl->c->r.st;
+		hcl->c->r.st = rstl->prev;
+		if (rstl->head) hcl_freecnode (hcl, rstl->head);
+		hcl_freemem (hcl, rstl);
+	}
+
 	return HCL_NULL;
 }
 
