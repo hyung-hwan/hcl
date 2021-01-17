@@ -95,6 +95,7 @@ typedef enum hcl_errnum_t hcl_errnum_t;
 enum hcl_synerrnum_t
 {
 	HCL_SYNERR_NOERR,
+	HCL_SYNERR_INTERN,        /* internal error */
 	HCL_SYNERR_ILCHR,         /* illegal character */
 	HCL_SYNERR_ILTOK,         /* invalid token */
 	HCL_SYNERR_CMTNC,         /* comment not closed */
@@ -106,6 +107,7 @@ enum hcl_synerrnum_t
 	HCL_SYNERR_ERRLIT,        /* wrong error literal */
 	HCL_SYNERR_SMPTRLIT,      /* wrong smptr literal */
 	HCL_SYNERR_MSEGIDENT,     /* wrong multi-segment identifier */
+	HCL_SYNERR_RADIX,         /* invalid radix for a numeric literal */
 
 	HCL_SYNERR_EOF,           /* sudden end of input */
 	HCL_SYNERR_LPAREN,        /* ( expected */

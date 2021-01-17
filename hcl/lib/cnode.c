@@ -61,15 +61,25 @@ hcl_cnode_t* hcl_makecnodecharlit (hcl_t* hcl, const hcl_ioloc_t* loc, const hcl
 	return c;
 }
 
-hcl_cnode_t* hcl_makecnodesymbol (hcl_t* hcl, const hcl_ioloc_t* loc, int dotted, const hcl_ooch_t* ptr, hcl_oow_t len)
+hcl_cnode_t* hcl_makecnodesymbol (hcl_t* hcl, const hcl_ioloc_t* loc, const hcl_ooch_t* ptr, hcl_oow_t len)
 {
 	hcl_cnode_t* c =  make_cnode(hcl, HCL_CNODE_SYMBOL, loc, HCL_SIZEOF(*ptr) * (len + 1));
 	if (HCL_UNLIKELY(!c)) return HCL_NULL;
-	c->u.symbol.dotted = dotted;
 	c->u.symbol.ptr = (hcl_ooch_t*)(c + 1);
 	c->u.symbol.len = len;
 	hcl_copy_oochars (c->u.symbol.ptr, ptr, len);
 	c->u.symbol.ptr[len] = '\0';
+	return c;
+}
+
+hcl_cnode_t* hcl_makecnodedsymbol (hcl_t* hcl, const hcl_ioloc_t* loc, const hcl_ooch_t* ptr, hcl_oow_t len)
+{
+	hcl_cnode_t* c =  make_cnode(hcl, HCL_CNODE_DSYMBOL, loc, HCL_SIZEOF(*ptr) * (len + 1));
+	if (HCL_UNLIKELY(!c)) return HCL_NULL;
+	c->u.dsymbol.ptr = (hcl_ooch_t*)(c + 1);
+	c->u.dsymbol.len = len;
+	hcl_copy_oochars (c->u.dsymbol.ptr, ptr, len);
+	c->u.dsymbol.ptr[len] = '\0';
 	return c;
 }
 

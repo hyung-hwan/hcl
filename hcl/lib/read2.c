@@ -1638,7 +1638,7 @@ static hcl_cnode_t* read_vlist (hcl_t* hcl)
 	{
 		hcl_cnode_t* sym, * cons;
 
-		sym = hcl_makecnodesymbol(hcl, TOKEN_LOC(hcl), 0, TOKEN_NAME_PTR(hcl), TOKEN_NAME_LEN(hcl));
+		sym = hcl_makecnodesymbol(hcl, TOKEN_LOC(hcl), TOKEN_NAME_PTR(hcl), TOKEN_NAME_LEN(hcl));
 		if (HCL_UNLIKELY(!sym)) goto oops;
 
 #if 0
@@ -1958,11 +1958,11 @@ static hcl_cnode_t* read_object (hcl_t* hcl)
 				break;
 
 			case HCL_IOTOK_IDENT:
-				obj = hcl_makecnodesymbol(hcl, TOKEN_LOC(hcl), 0, TOKEN_NAME_PTR(hcl), TOKEN_NAME_LEN(hcl));
+				obj = hcl_makecnodesymbol(hcl, TOKEN_LOC(hcl), TOKEN_NAME_PTR(hcl), TOKEN_NAME_LEN(hcl));
 				break;
 
 			case HCL_IOTOK_IDENT_DOTTED:
-				obj = hcl_makecnodesymbol(hcl, TOKEN_LOC(hcl), 1, TOKEN_NAME_PTR(hcl), TOKEN_NAME_LEN(hcl));
+				obj = hcl_makecnodedsymbol(hcl, TOKEN_LOC(hcl), TOKEN_NAME_PTR(hcl), TOKEN_NAME_LEN(hcl));
 				break;
 		}
 
@@ -2045,6 +2045,14 @@ hcl_cnode_t* hcl_read2 (hcl_t* hcl)
 }
 
 
+/* TODO:
+hcl_cnodetoobj (hcl_t* hcl, hcl_cnode_t* x)
+{
+ * drop location information and compose object ??
+ * is it doable? can convert a dotted symbol to a proper value? 
+}
+*/
+ 
 #if 0
 /* ========================================================================= */
 

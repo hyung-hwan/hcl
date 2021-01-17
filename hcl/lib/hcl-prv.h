@@ -185,6 +185,7 @@ enum hcl_cnode_type_t
 {
 	HCL_CNODE_CHARLIT,
 	HCL_CNODE_SYMBOL,
+	HCL_CNODE_DSYMBOL, /* dotted symbol */
 	HCL_CNODE_STRLIT,
 	HCL_CNODE_NUMLIT,
 	HCL_CNODE_RADNUMLIT,
@@ -195,6 +196,7 @@ enum hcl_cnode_type_t
 	HCL_CNODE_TRUE,
 	HCL_CNODE_FALSE,
 
+#if 0
 	HCL_CNODE_AND,
 	HCL_CNODE_BREAK,
 	HCL_CNODE_DEFUN,
@@ -209,6 +211,7 @@ enum hcl_cnode_type_t
 	HCL_CNODE_SET,
 	HCL_CNODE_UNTIL,
 	HCL_CNODE_WHILE,
+#endif
 
 	HCL_CNODE_CONS,
 	HCL_CNODE_LIST
@@ -227,32 +230,14 @@ struct hcl_cnode_t
 		{
 			hcl_ooch_t v;
 		} charlit;
-		struct
-		{
-			int dotted;
-			hcl_ooch_t* ptr;
-			hcl_oow_t len;
-		} symbol;
-		struct
-		{
-			hcl_ooch_t* ptr;
-			hcl_oow_t len;
-		} strlit;
-		struct
-		{
-			hcl_ooch_t* ptr;
-			hcl_oow_t len;
-		} numlit;
-		struct
-		{
-			hcl_ooch_t* ptr;
-			hcl_oow_t len;
-		} radnumlit;
-		struct
-		{
-			hcl_ooch_t* ptr;
-			hcl_oow_t len;
-		} fpdeclit;
+
+		hcl_oocs_t symbol;
+		hcl_oocs_t dsymbol;
+		hcl_oocs_t strlit;
+		hcl_oocs_t numlit;
+		hcl_oocs_t radnumlit;
+		hcl_oocs_t fpdeclit;
+
 		struct
 		{
 			hcl_oow_t v;
@@ -279,6 +264,7 @@ struct hcl_cframe_t
 {
 	int       opcode;
 	hcl_oop_t operand;
+
 	union
 	{
 		struct
@@ -316,6 +302,48 @@ struct hcl_cframe_t
 };
 typedef struct hcl_cframe_t hcl_cframe_t;
 
+struct hcl_cframe2_t
+{
+	int          opcode;
+	hcl_cnode_t* operand;
+
+	union
+	{
+		struct
+		{
+			int var_type;
+		} set;
+
+		struct
+		{
+			hcl_ooi_t cond_pos;
+			hcl_ooi_t body_pos;
+		} post_while;
+
+		struct
+		{
+			hcl_ooi_t body_pos;
+		} post_if;
+
+		struct
+		{
+			hcl_ooi_t index;
+		} array_list;
+
+		struct
+		{
+			hcl_ooi_t index;
+		} bytearray_list;
+
+		struct
+		{
+			hcl_ooi_t lfbase_pos;
+			hcl_ooi_t lfsize_pos;
+		} lambda;
+	} u;
+};
+typedef struct hcl_cframe2_t hcl_cframe2_t;
+
 struct hcl_blk_info_t
 {
 	hcl_oow_t tmprcnt;
@@ -332,6 +360,14 @@ struct hcl_rstl_t /* reader stack for list reading */
 	int flagv;
 	hcl_oow_t count;
 	hcl_rstl_t* prev;
+};
+
+
+typedef struct hcl_oocx_t hcl_oocx_t;
+struct hcl_oocx_t
+{
+	hcl_oocs_t s;
+	hcl_oow_t capa;
 };
 
 struct hcl_compiler_t
@@ -400,6 +436,13 @@ struct hcl_compiler_t
 		hcl_ooi_t     top;
 		hcl_oow_t     capa;
 	} cfs;
+
+	struct
+	{
+		hcl_cframe2_t* ptr;
+		hcl_ooi_t     top;
+		hcl_oow_t     capa;
+	} cfs2;
 	/* == END COMPILER STACK == */
 
 	struct
@@ -408,6 +451,8 @@ struct hcl_compiler_t
 		hcl_oow_t size;
 		hcl_oow_t capa;
 	} tv; /* temporary variables including arguments */
+
+	hcl_oocx_t tv2;
 
 	struct
 	{
@@ -802,7 +847,7 @@ void* hcl_callocheapmem (
 	hcl_oow_t    size
 );
 
-void* hcl_callocheapmem_noerr (
+void* hcl_callocheapmem_noseterr (
 	hcl_t*       hcl,
 	hcl_heap_t*  heap,
 	hcl_oow_t    size
@@ -901,8 +946,13 @@ hcl_oow_t hcl_getobjpayloadbytes (
 );
 
 void hcl_gc_ms_sweep_lazy (
-	hcl_t*    moo,
+	hcl_t*    hcl,
 	hcl_oow_t allocsize
+);
+
+int hcl_getsyncodebyoocs_noseterr (
+	hcl_t*            hcl,
+	const hcl_oocs_t* name
 );
 
 /* ========================================================================= */
@@ -1261,7 +1311,8 @@ hcl_cnode_t* hcl_makecnodenil (hcl_t* hcl, const hcl_ioloc_t* loc);
 hcl_cnode_t* hcl_makecnodetrue (hcl_t* hcl, const hcl_ioloc_t* loc);
 hcl_cnode_t* hcl_makecnodefalse (hcl_t* hcl, const hcl_ioloc_t* loc);
 hcl_cnode_t* hcl_makecnodecharlit (hcl_t* hcl, const hcl_ioloc_t* loc, const hcl_ooch_t ch);
-hcl_cnode_t* hcl_makecnodesymbol (hcl_t* hcl, const hcl_ioloc_t* loc, int dotted, const hcl_ooch_t* ptr, hcl_oow_t len);
+hcl_cnode_t* hcl_makecnodesymbol (hcl_t* hcl, const hcl_ioloc_t* loc, const hcl_ooch_t* ptr, hcl_oow_t len);
+hcl_cnode_t* hcl_makecnodedsymbol (hcl_t* hcl, const hcl_ioloc_t* loc, const hcl_ooch_t* ptr, hcl_oow_t len);
 hcl_cnode_t* hcl_makecnodestrlit (hcl_t* hcl, const hcl_ioloc_t* loc, const hcl_ooch_t* ptr, hcl_oow_t len);
 hcl_cnode_t* hcl_makecnodenumlit (hcl_t* hcl, const hcl_ioloc_t* loc, const hcl_ooch_t* ptr, hcl_oow_t len);
 hcl_cnode_t* hcl_makecnoderadnumlit (hcl_t* hcl, const hcl_ioloc_t* loc, const hcl_ooch_t* ptr, hcl_oow_t len);

@@ -2770,7 +2770,7 @@ static HCL_INLINE int emit_set (hcl_t* hcl)
 
 /* ========================================================================= */
 
-int hcl_compile2 (hcl_t* hcl, hcl_oop_t obj)
+int hcl_compile (hcl_t* hcl, hcl_oop_t obj)
 {
 	hcl_oow_t saved_bc_len, saved_lit_len;
 	hcl_bitmask_t log_default_type_mask;

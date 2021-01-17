@@ -2256,6 +2256,14 @@ static void fini_compiler (hcl_t* hcl)
 			hcl->c->cfs.capa = 0;
 		}
 
+		if (hcl->c->cfs2.ptr)
+		{
+			hcl_freemem (hcl, hcl->c->cfs2.ptr);
+			hcl->c->cfs2.ptr = HCL_NULL;
+			hcl->c->cfs2.top = -1;
+			hcl->c->cfs2.capa = 0;
+		}
+
 		if (hcl->c->tv.ptr)
 		{
 			hcl_freemem (hcl, hcl->c->tv.ptr);
@@ -2317,6 +2325,7 @@ int hcl_attachio (hcl_t* hcl, hcl_ioimpl_t reader, hcl_ioimpl_t printer)
 		hcl->c->r.e = hcl->_nil;
 
 		hcl->c->cfs.top = -1;
+		hcl->c->cfs2.top = -1;
 		hcl->c->blk.depth = -1;
 	}
 	else if (hcl->c->reader || hcl->c->printer)

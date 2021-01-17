@@ -62,7 +62,7 @@ void* hcl_allocbytes (hcl_t* hcl, hcl_oow_t size)
 
 	if (hcl->gci.lazy_sweep) hcl_gc_ms_sweep_lazy (hcl, allocsize);
 
-	gch = (hcl_gchdr_t*)hcl_callocheapmem_noerr(hcl, hcl->heap, allocsize); 
+	gch = (hcl_gchdr_t*)hcl_callocheapmem_noseterr(hcl, hcl->heap, allocsize); 
 	if (!gch)
 	{
 		if (HCL_UNLIKELY(hcl->option.trait & HCL_TRAIT_NOGC)) goto calloc_heapmem_fail;
@@ -71,7 +71,7 @@ void* hcl_allocbytes (hcl_t* hcl, hcl_oow_t size)
 		hcl_gc (hcl, 0);
 		if (hcl->gci.lazy_sweep) hcl_gc_ms_sweep_lazy (hcl, allocsize);
 
-		gch = (hcl_gchdr_t*)hcl_callocheapmem_noerr(hcl, hcl->heap, allocsize); 
+		gch = (hcl_gchdr_t*)hcl_callocheapmem_noseterr(hcl, hcl->heap, allocsize); 
 		if (HCL_UNLIKELY(!gch)) 
 		{
 		sweep_the_rest:

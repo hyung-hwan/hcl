@@ -89,6 +89,7 @@ static hcl_ooch_t* errstr[] =
 static char* synerrstr[] = 
 {
 	"no error",
+	"internal error",
 	"illegal character",
 	"illegal token",
 	"comment not closed",
@@ -100,6 +101,7 @@ static char* synerrstr[] =
 	"wrong error literal",
 	"wrong smptr literal",
 	"wrong multi-segment identifer",
+	"invalid radix for a numeric literal",
 
 	"sudden end of input",
 	"( expected",

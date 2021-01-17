@@ -73,6 +73,192 @@ literals -->
 
 ------------------------------ */
 
+static int copy_string_to (hcl_t* hcl, const hcl_oocs_t* src, hcl_oocx_t* dst, int append, hcl_ooch_t delim_char)
+{
+	hcl_oow_t len, pos;
+
+	if (append)
+	{
+		pos = dst->s.len;
+		len = dst->s.len + src->len;
+		if (delim_char != '\0') len++;
+	}
+	else
+	{
+		pos = 0;
+		len = src->len;
+	}
+
+	if (len >= dst->capa)
+	{
+		hcl_ooch_t* tmp;
+		hcl_oow_t capa;
+
+		capa = HCL_ALIGN(len + 1, TV_BUFFER_ALIGN);
+
+		tmp = (hcl_ooch_t*)hcl_reallocmem(hcl, dst->s.ptr, HCL_SIZEOF(*tmp) * capa);
+		if (HCL_UNLIKELY(!tmp)) return -1;
+
+		dst->s.ptr = tmp;
+		dst->capa = capa - 1;
+	}
+
+	if (append && delim_char != '\0') dst->s.ptr[pos++] = delim_char;
+	hcl_copy_oochars (&dst->s.ptr[pos], src->ptr, src->len);
+	dst->s.ptr[len] = '\0';
+	dst->s.len = len;
+	return 0;
+}
+
+static int find_word_in_string (const hcl_oocs_t* haystack, const hcl_oocs_t* name, int last, hcl_oow_t* xindex)
+{
+	/* this function is inefficient. but considering the typical number
+	 * of arguments and temporary variables, the inefficiency can be 
+	 * ignored in my opinion. the overhead to maintain the reverse lookup
+	 * table from a name to an index should be greater than this simple
+	 * inefficient lookup */
+
+	hcl_ooch_t* t, * e;
+	hcl_oow_t index, i, found;
+
+	t = haystack->ptr;
+	e = t + haystack->len;
+	index = 0;
+	found = HCL_TYPE_MAX(hcl_oow_t);
+
+	while (t < e)
+	{
+		while (t < e && *t == ' ') t++;
+
+		for (i = 0; i < name->len; i++)
+		{
+			if (t >= e || name->ptr[i] != *t) goto unmatched;
+			t++;
+		}
+		if (t >= e || *t == ' ') 
+		{
+			if (last)
+			{
+				found = index;
+			}
+			else
+			{
+				if (xindex) *xindex = index;
+				return 0;
+			}
+		}
+
+	unmatched:
+		while (t < e)
+		{
+			if (*t == ' ')
+			{
+				t++;
+				break;
+			}
+			t++;
+		}
+
+		index++;
+	}
+
+	if (found != HCL_TYPE_MAX(hcl_oow_t)) 
+	{
+		if (xindex) *xindex = found;
+		return 0;
+	}
+
+	return -1;
+}
+
+
+static int add_temporary_variable (hcl_t* hcl, const hcl_oocs_t* name, hcl_oow_t dup_check_start)
+{
+#if 0
+	hcl_oow_t i;
+
+	HCL_ASSERT (hcl, HCL_IS_SYMBOL (hcl, name));
+
+	for (i = dup_check_start; i < hcl->c->tv.size; i++)
+	{
+		HCL_ASSERT (hcl, HCL_IS_SYMBOL (hcl, hcl->c->tv.ptr[i]));
+		if (hcl->c->tv.ptr[i] == name)
+		{
+			hcl_seterrnum (hcl, HCL_EEXIST);
+			return -1;
+		}
+	}
+
+	if (hcl->c->tv.size >= hcl->c->tv.capa)
+	{
+		hcl_oop_t* tmp;
+		hcl_oow_t newcapa;
+
+		newcapa = HCL_ALIGN (hcl->c->tv.capa + 1, TV_BUFFER_ALIGN); /* TODO: set a better resizing policy */
+		tmp = (hcl_oop_t*)hcl_reallocmem(hcl, hcl->c->tv.ptr, newcapa);
+		if (HCL_UNLIKELY(!tmp)) return -1;
+
+		hcl->c->tv.capa = newcapa;
+		hcl->c->tv.ptr = tmp;
+	}
+
+	hcl->c->tv.ptr[hcl->c->tv.size++] = name;
+	return 0;
+#else
+	/* TODO: dupcheck??? */
+	return copy_string_to(hcl, name, &hcl->c->tv2, 1, ' ');
+#endif
+}
+
+static int find_temporary_variable_backward (hcl_t* hcl, const hcl_oocs_t* name, hcl_oow_t* index)
+{
+#if  0
+	hcl_oow_t i;
+
+	HCL_ASSERT (hcl, HCL_IS_SYMBOL (hcl, name));
+	for (i = hcl->c->tv.size; i > 0; )
+	{
+		--i;
+		HCL_ASSERT (hcl, HCL_IS_SYMBOL (hcl, hcl->c->tv.ptr[i]));
+		if (hcl->c->tv.ptr[i] == name)
+		{
+			*index = i;
+			return 0;
+		}
+	}
+	
+	hcl_seterrnum (hcl, HCL_ENOENT);
+	return -1;
+#else
+	/* find the last element */
+	return find_word_in_string(&hcl->c->tv2.s, name, 1, index);
+#endif
+}
+
+static int store_temporary_variable_count_for_block (hcl_t* hcl, hcl_oow_t tmpr_count, hcl_oow_t lfbase)
+{
+	HCL_ASSERT (hcl, hcl->c->blk.depth >= 0);
+
+	if (hcl->c->blk.depth >= hcl->c->blk.info_capa)
+	{
+		hcl_blk_info_t* tmp;
+		hcl_oow_t newcapa;
+
+		newcapa = HCL_ALIGN (hcl->c->blk.depth + 1, BLK_INFO_BUFFER_ALIGN);
+		tmp = (hcl_blk_info_t*)hcl_reallocmem(hcl, hcl->c->blk.info, newcapa * HCL_SIZEOF(*tmp));
+		if (!tmp) return -1;
+
+		hcl->c->blk.info_capa = newcapa;
+		hcl->c->blk.info = tmp;
+	}
+
+	hcl->c->blk.info[hcl->c->blk.depth].tmprcnt = tmpr_count;
+	hcl->c->blk.info[hcl->c->blk.depth].lfbase = lfbase;
+	return 0;
+}
+
+/* ========================================================================= */
+
 static int add_literal (hcl_t* hcl, hcl_oop_t obj, hcl_oow_t* index)
 {
 	hcl_oow_t capa, i, lfbase = 0;
@@ -110,80 +296,6 @@ static int add_literal (hcl_t* hcl, hcl_oop_t obj, hcl_oow_t* index)
 	return 0;
 }
 
-static int add_temporary_variable (hcl_t* hcl, hcl_oop_t name, hcl_oow_t dup_check_start)
-{
-	hcl_oow_t i;
-
-	HCL_ASSERT (hcl, HCL_IS_SYMBOL (hcl, name));
-
-	for (i = dup_check_start; i < hcl->c->tv.size; i++)
-	{
-		HCL_ASSERT (hcl, HCL_IS_SYMBOL (hcl, hcl->c->tv.ptr[i]));
-		if (hcl->c->tv.ptr[i] == name)
-		{
-			hcl_seterrnum (hcl, HCL_EEXIST);
-			return -1;
-		}
-	}
-
-	if (hcl->c->tv.size >= hcl->c->tv.capa)
-	{
-		hcl_oop_t* tmp;
-		hcl_oow_t newcapa;
-
-		newcapa = HCL_ALIGN (hcl->c->tv.capa + 1, TV_BUFFER_ALIGN); /* TODO: set a better resizing policy */
-		tmp = (hcl_oop_t*)hcl_reallocmem (hcl, hcl->c->tv.ptr, newcapa);
-		if (!tmp) return -1;
-
-		hcl->c->tv.capa = newcapa;
-		hcl->c->tv.ptr = tmp;
-	}
-
-	hcl->c->tv.ptr[hcl->c->tv.size++] = name;
-	return 0;
-}
-
-static int find_temporary_variable_backward (hcl_t* hcl, hcl_oop_t name, hcl_oow_t* index)
-{
-	hcl_oow_t i;
-
-	HCL_ASSERT (hcl, HCL_IS_SYMBOL (hcl, name));
-	for (i = hcl->c->tv.size; i > 0; )
-	{
-		--i;
-		HCL_ASSERT (hcl, HCL_IS_SYMBOL (hcl, hcl->c->tv.ptr[i]));
-		if (hcl->c->tv.ptr[i] == name)
-		{
-			*index = i;
-			return 0;
-		}
-	}
-	
-	hcl_seterrnum (hcl, HCL_ENOENT);
-	return -1;
-}
-
-static int store_temporary_variable_count_for_block (hcl_t* hcl, hcl_oow_t tmpr_count, hcl_oow_t lfbase)
-{
-	HCL_ASSERT (hcl, hcl->c->blk.depth >= 0);
-
-	if (hcl->c->blk.depth >= hcl->c->blk.info_capa)
-	{
-		hcl_blk_info_t* tmp;
-		hcl_oow_t newcapa;
-
-		newcapa = HCL_ALIGN (hcl->c->blk.depth + 1, BLK_INFO_BUFFER_ALIGN);
-		tmp = (hcl_blk_info_t*)hcl_reallocmem (hcl, hcl->c->blk.info, newcapa * HCL_SIZEOF(*tmp));
-		if (!tmp) return -1;
-
-		hcl->c->blk.info_capa = newcapa;
-		hcl->c->blk.info = tmp;
-	}
-
-	hcl->c->blk.info[hcl->c->blk.depth].tmprcnt = tmpr_count;
-	hcl->c->blk.info[hcl->c->blk.depth].lfbase = lfbase;
-	return 0;
-}
 
 /* ========================================================================= */
 
@@ -240,10 +352,12 @@ static int emit_byte_instruction (hcl_t* hcl, hcl_oob_t bc, const hcl_ioloc_t* s
 	return 0;
 }
 
+/* 
+COMMENTED OUT TEMPORARILY
 int hcl_emitbyteinstruction (hcl_t* hcl, hcl_oob_t bc)
 {
 	return emit_byte_instruction(hcl, bc, HCL_NULL);
-}
+}*/
 
 static int emit_single_param_instruction (hcl_t* hcl, int cmd, hcl_oow_t param_1)
 {
@@ -537,48 +651,80 @@ static HCL_INLINE void patch_long_param (hcl_t* hcl, hcl_ooi_t ip, hcl_oow_t par
 #endif
 }
 
-/* ========================================================================= */
-static HCL_INLINE int _insert_cframe (hcl_t* hcl, hcl_ooi_t index, int opcode, hcl_oop_t operand)
+static int emit_indexed_variable_access (hcl_t* hcl, hcl_oow_t index, hcl_oob_t baseinst1, hcl_oob_t baseinst2)
 {
-	hcl_cframe_t* tmp;
+	if (hcl->c->blk.depth >= 0)
+	{
+		hcl_oow_t i;
+
+		/* if a temporary variable is accessed inside a block,
+		 * use a special instruction to indicate it */
+		HCL_ASSERT (hcl, index < hcl->c->blk.info[hcl->c->blk.depth].tmprcnt);
+		for (i = hcl->c->blk.depth; i > 0; i--) /* excluded the top level -- TODO: change this code depending on global variable handling */
+		{
+			if (index >= hcl->c->blk.info[i - 1].tmprcnt)
+			{
+				hcl_oow_t ctx_offset, index_in_ctx;
+				ctx_offset = hcl->c->blk.depth - i;
+				index_in_ctx = index - hcl->c->blk.info[i - 1].tmprcnt;
+				/* ctx_offset 0 means the current context.
+				 *            1 means current->home.
+				 *            2 means current->home->home. 
+				 * index_in_ctx is a relative index within the context found.
+				 */
+				if (emit_double_param_instruction(hcl, baseinst1, ctx_offset, index_in_ctx) <= -1) return -1;
+				return 0;
+			}
+		}
+	}
+
+	/* TODO: top-level... verify this. this will vary depending on how i implement the top-level and global variables... */
+	if (emit_single_param_instruction (hcl, baseinst2, index) <= -1) return -1;
+	return 0;
+}
+
+/* ========================================================================= */
+static HCL_INLINE int _insert_cframe (hcl_t* hcl, hcl_ooi_t index, int opcode, hcl_cnode_t* operand)
+{
+	hcl_cframe2_t* tmp;
 
 	HCL_ASSERT (hcl, index >= 0);
 	
-	hcl->c->cfs.top++;
-	HCL_ASSERT (hcl, hcl->c->cfs.top >= 0);
-	HCL_ASSERT (hcl, index <= hcl->c->cfs.top);
+	hcl->c->cfs2.top++;
+	HCL_ASSERT (hcl, hcl->c->cfs2.top >= 0);
+	HCL_ASSERT (hcl, index <= hcl->c->cfs2.top);
 
-	if ((hcl_oow_t)hcl->c->cfs.top >= hcl->c->cfs.capa)
+	if ((hcl_oow_t)hcl->c->cfs2.top >= hcl->c->cfs2.capa)
 	{
 		hcl_oow_t newcapa;
 
-		newcapa = HCL_ALIGN (hcl->c->cfs.top + 256, 256); /* TODO: adjust this capacity */
-		tmp = (hcl_cframe_t*)hcl_reallocmem (hcl, hcl->c->cfs.ptr, newcapa * HCL_SIZEOF(hcl_cframe_t));
+		newcapa = HCL_ALIGN (hcl->c->cfs2.top + 256, 256); /* TODO: adjust this capacity */
+		tmp = (hcl_cframe2_t*)hcl_reallocmem (hcl, hcl->c->cfs2.ptr, newcapa * HCL_SIZEOF(*tmp));
 		if (HCL_UNLIKELY(!tmp)) 
 		{
-			hcl->c->cfs.top--;
+			hcl->c->cfs2.top--;
 			return -1;
 		}
 
-		hcl->c->cfs.capa = newcapa;
-		hcl->c->cfs.ptr = tmp;
+		hcl->c->cfs2.capa = newcapa;
+		hcl->c->cfs2.ptr = tmp;
 	}
 
-	if (index < hcl->c->cfs.top)
+	if (index < hcl->c->cfs2.top)
 	{
-		HCL_MEMMOVE (&hcl->c->cfs.ptr[index + 1], &hcl->c->cfs.ptr[index], (hcl->c->cfs.top - index) * HCL_SIZEOF(*tmp));
+		HCL_MEMMOVE (&hcl->c->cfs2.ptr[index + 1], &hcl->c->cfs2.ptr[index], (hcl->c->cfs2.top - index) * HCL_SIZEOF(*tmp));
 	}
 
-	tmp = &hcl->c->cfs.ptr[index];
+	tmp = &hcl->c->cfs2.ptr[index];
 	tmp->opcode = opcode;
 	tmp->operand = operand;
 	/* leave tmp->u untouched/uninitialized */
 	return 0;
 }
 
-static int insert_cframe (hcl_t* hcl, hcl_ooi_t index, int opcode, hcl_oop_t operand)
+static int insert_cframe (hcl_t* hcl, hcl_ooi_t index, int opcode, hcl_cnode_t* operand)
 {
-	if (hcl->c->cfs.top == HCL_TYPE_MAX(hcl_ooi_t))
+	if (hcl->c->cfs2.top == HCL_TYPE_MAX(hcl_ooi_t))
 	{
 		hcl_seterrnum (hcl, HCL_EFRMFLOOD);
 		return -1;
@@ -587,21 +733,21 @@ static int insert_cframe (hcl_t* hcl, hcl_ooi_t index, int opcode, hcl_oop_t ope
 	return _insert_cframe(hcl, index, opcode, operand);
 }
 
-static int push_cframe (hcl_t* hcl, int opcode, hcl_oop_t operand)
+static int push_cframe (hcl_t* hcl, int opcode, hcl_cnode_t* operand)
 {
-	if (hcl->c->cfs.top == HCL_TYPE_MAX(hcl_ooi_t))
+	if (hcl->c->cfs2.top == HCL_TYPE_MAX(hcl_ooi_t))
 	{
 		hcl_seterrnum (hcl, HCL_EFRMFLOOD);
 		return -1;
 	}
 
-	return _insert_cframe(hcl, hcl->c->cfs.top + 1, opcode, operand);
+	return _insert_cframe(hcl, hcl->c->cfs2.top + 1, opcode, operand);
 }
 
 static HCL_INLINE void pop_cframe (hcl_t* hcl)
 {
-	HCL_ASSERT (hcl, hcl->c->cfs.top >= 0);
-	hcl->c->cfs.top--;
+	HCL_ASSERT (hcl, hcl->c->cfs2.top >= 0);
+	hcl->c->cfs2.top--;
 }
 
 #define PUSH_CFRAME(hcl,opcode,operand) \
@@ -612,31 +758,31 @@ static HCL_INLINE void pop_cframe (hcl_t* hcl)
 
 #define POP_CFRAME(hcl) pop_cframe(hcl)
 
-#define POP_ALL_CFRAMES(hcl) (hcl->c->cfs.top = -1)
+#define POP_ALL_CFRAMES(hcl) (hcl->c->cfs2.top = -1)
 
-#define GET_TOP_CFRAME_INDEX(hcl) (hcl->c->cfs.top)
+#define GET_TOP_CFRAME_INDEX(hcl) (hcl->c->cfs2.top)
 
-#define GET_TOP_CFRAME(hcl) (&hcl->c->cfs.ptr[hcl->c->cfs.top])
+#define GET_TOP_CFRAME(hcl) (&hcl->c->cfs2.ptr[hcl->c->cfs2.top])
 
-#define GET_CFRAME(hcl,index) (&hcl->c->cfs.ptr[index])
+#define GET_CFRAME(hcl,index) (&hcl->c->cfs2.ptr[index])
 
 #define SWITCH_TOP_CFRAME(hcl,_opcode,_operand) \
 	do { \
-		hcl_cframe_t* _cf = GET_TOP_CFRAME(hcl); \
+		hcl_cframe2_t* _cf = GET_TOP_CFRAME(hcl); \
 		_cf->opcode = _opcode; \
 		_cf->operand = _operand; \
 	} while (0);
 
 #define SWITCH_CFRAME(hcl,_index,_opcode,_operand) \
 	do { \
-		hcl_cframe_t* _cf = GET_CFRAME(hcl,_index); \
+		hcl_cframe2_t* _cf = GET_CFRAME(hcl,_index); \
 		_cf->opcode = _opcode; \
 		_cf->operand = _operand; \
 	} while (0);
 
-static int push_subcframe (hcl_t* hcl, int opcode, hcl_oop_t operand)
+static int push_subcframe (hcl_t* hcl, int opcode, hcl_cnode_t* operand)
 {
-	hcl_cframe_t* cf, tmp;
+	hcl_cframe2_t* cf, tmp;
 
 	cf = GET_TOP_CFRAME(hcl);
 	tmp = *cf;
@@ -646,14 +792,14 @@ static int push_subcframe (hcl_t* hcl, int opcode, hcl_oop_t operand)
 	return push_cframe(hcl, tmp.opcode, tmp.operand);
 }
 
-static HCL_INLINE hcl_cframe_t* find_cframe_from_top (hcl_t* hcl, int opcode)
+static HCL_INLINE hcl_cframe2_t* find_cframe_from_top (hcl_t* hcl, int opcode)
 {
-	hcl_cframe_t* cf;
+	hcl_cframe2_t* cf;
 	hcl_ooi_t i;
 
-	for (i = hcl->c->cfs.top; i >= 0; i--)
+	for (i = hcl->c->cfs2.top; i >= 0; i--)
 	{
-		cf = &hcl->c->cfs.ptr[i];
+		cf = &hcl->c->cfs2.ptr[i];
 		if (cf->opcode == opcode) return cf;
 	}
 
@@ -663,7 +809,7 @@ static HCL_INLINE hcl_cframe_t* find_cframe_from_top (hcl_t* hcl, int opcode)
 #define PUSH_SUBCFRAME(hcl,opcode,operand) \
 	do { if (push_subcframe(hcl,opcode,operand) <= -1) return -1; } while(0)
 
-#define GET_SUBCFRAME(hcl) (&hcl->c->cfs.ptr[hcl->c->cfs.top - 1])
+#define GET_SUBCFRAME(hcl) (&hcl->c->cfs2.ptr[hcl->c->cfs2.top - 1])
 
 enum 
 {
@@ -717,7 +863,8 @@ enum
 };
 
 /* ========================================================================= */
-static int compile_and (hcl_t* hcl, hcl_oop_t src)
+#if 0
+static int compile_and (hcl_t* hcl, hcl_cnode_t* src)
 {
 	hcl_oop_t expr, obj;
 
@@ -729,18 +876,18 @@ static int compile_and (hcl_t* hcl, hcl_oop_t src)
 	if (HCL_IS_NIL(hcl, obj))
 	{
 		/* no value */
-		hcl_setsynerrbfmt (hcl, HCL_SYNERR_ARGCOUNT, HCL_NULL, HCL_NULL,
+		hcl_setsynerrbfmt (hcl, HCL_SYNERR_ARGCOUNT, src->loc, HCL_NULL,
 			"no expression specified in and - %O", src); /* TODO: error location */
 		return -1;
 	}
 	else if (!HCL_IS_CONS(hcl, obj))
 	{
-		hcl_setsynerrbfmt (hcl, HCL_SYNERR_DOTBANNED, HCL_NULL, HCL_NULL,
+		hcl_setsynerrbfmt (hcl, HCL_SYNERR_DOTBANNED, src->loc, HCL_NULL,
 			"redundant cdr in and - %O", src); /* TODO: error location */
 		return -1;
 	}
 
-/* TODO: optimization - eat away all truee expressions */
+/* TODO: optimization - eat away all true expressions */
 	expr = HCL_CONS_CAR(obj);
 	obj = HCL_CONS_CDR(obj);
 
@@ -809,10 +956,10 @@ static int compile_break (hcl_t* hcl, hcl_oop_t src)
 		return -1;
 	}
 
-	for (i = hcl->c->cfs.top; i >= 0; --i)
+	for (i = hcl->c->cfs2.top; i >= 0; --i)
 	{
-		const hcl_cframe_t* tcf;
-		tcf = &hcl->c->cfs.ptr[i];
+		const hcl_cframe2_t* tcf;
+		tcf = &hcl->c->cfs2.ptr[i];
 
 		if (tcf->opcode == COP_EMIT_LAMBDA) break; /* seems to cross lambda boundary */
 
@@ -846,7 +993,7 @@ static int compile_break (hcl_t* hcl, hcl_oop_t src)
 static int compile_if (hcl_t* hcl, hcl_oop_t src)
 {
 	hcl_oop_t obj, cond;
-	hcl_cframe_t* cf;
+	hcl_cframe2_t* cf;
 
 	HCL_ASSERT (hcl, HCL_IS_CONS(hcl, src));
 	HCL_ASSERT (hcl, HCL_CONS_CAR(src) == hcl->_if);
@@ -994,7 +1141,7 @@ static int compile_lambda (hcl_t* hcl, hcl_oop_t src, int defun)
 				return -1;
 			}
 
-			if (add_temporary_variable (hcl, arg, tv_dup_start) <= -1) 
+			if (add_temporary_variable(hcl, arg, tv_dup_start) <= -1) 
 			{
 				if (hcl->errnum == HCL_EEXIST)
 				{
@@ -1116,7 +1263,7 @@ static int compile_lambda (hcl_t* hcl, hcl_oop_t src, int defun)
 	if (defun)
 	{
 		hcl_oow_t index;
-		hcl_cframe_t* cf;
+		hcl_cframe2_t* cf;
 
 		if (find_temporary_variable_backward(hcl, defun_name, &index) <= -1)
 		{
@@ -1139,7 +1286,7 @@ static int compile_lambda (hcl_t* hcl, hcl_oop_t src, int defun)
 
 	if (hcl->option.trait & HCL_TRAIT_INTERACTIVE)
 	{
-		hcl_cframe_t* cf;
+		hcl_cframe2_t* cf;
 		cf = GET_SUBCFRAME (hcl);
 		cf->u.lambda.lfbase_pos = lfbase_pos;
 		cf->u.lambda.lfsize_pos = lfsize_pos;
@@ -1189,7 +1336,7 @@ static int compile_return (hcl_t* hcl, hcl_oop_t src, int mode)
 
 static int compile_set (hcl_t* hcl, hcl_oop_t src)
 {
-	hcl_cframe_t* cf;
+	hcl_cframe2_t* cf;
 	hcl_oop_t obj, var, val;
 	hcl_oow_t index;
 
@@ -1305,7 +1452,7 @@ static int compile_while (hcl_t* hcl, hcl_oop_t src, int next_cop)
 	 * (until (xxxx) ... ) */
 	hcl_oop_t obj, cond;
 	hcl_oow_t cond_pos;
-	hcl_cframe_t* cf;
+	hcl_cframe2_t* cf;
 
 	HCL_ASSERT (hcl, HCL_IS_CONS(hcl, src));
 	HCL_ASSERT (hcl, HCL_CONS_CAR(src) == hcl->_until || HCL_CONS_CAR(src) == hcl->_while);
@@ -1347,7 +1494,7 @@ static int compile_cons_array_expression (hcl_t* hcl, hcl_oop_t obj)
 {
 	/* [ ] */
 	hcl_ooi_t nargs;
-	hcl_cframe_t* cf;
+	hcl_cframe2_t* cf;
 
 	/* NOTE: cframe management functions don't use the object memory.
 	 *       many operations can be performed without taking GC into account */
@@ -1378,7 +1525,7 @@ static int compile_cons_bytearray_expression (hcl_t* hcl, hcl_oop_t obj)
 {
 	/* #[ ] - e.g. #[1, 2, 3] or #[ 1 2 3 ] */
 	hcl_ooi_t nargs;
-	hcl_cframe_t* cf;
+	hcl_cframe2_t* cf;
 
 	/* NOTE: cframe management functions don't use the object memory.
 	 *       many operations can be performed without taking GC into account */
@@ -1409,7 +1556,7 @@ static int compile_cons_dic_expression (hcl_t* hcl, hcl_oop_t obj)
 {
 	/* { } - e.g. {1:2, 3:4,"abc":def, "hwaddr":"00:00:00:01"} or { 1 2 3 4 } */
 	hcl_ooi_t nargs;
-	hcl_cframe_t* cf;
+	hcl_cframe2_t* cf;
 
 	SWITCH_TOP_CFRAME (hcl, COP_EMIT_MAKE_DIC, HCL_SMOOI_TO_OOP(0));
 
@@ -1439,7 +1586,7 @@ static int compile_cons_qlist_expression (hcl_t* hcl, hcl_oop_t obj)
 	 * */
 		
 	hcl_ooi_t nargs;
-	hcl_cframe_t* cf;
+	hcl_cframe2_t* cf;
 
 	/* NOTE: cframe management functions don't use the object memory.
 	 *       many operations can be performed without taking GC into account */
@@ -1465,10 +1612,12 @@ static int compile_cons_qlist_expression (hcl_t* hcl, hcl_oop_t obj)
 
 	return 0;
 }
+#endif // QQQQQ
 
-static int compile_cons_xlist_expression (hcl_t* hcl, hcl_oop_t obj)
+static int compile_cons_xlist_expression (hcl_t* hcl, hcl_cnode_t* obj)
 {
-	hcl_oop_t car;
+	hcl_cnode_t* head;
+	hcl_cnode_t* car;
 	int syncode; /* syntax code of the first element */
 
 	/* a valid function call
@@ -1479,10 +1628,18 @@ static int compile_cons_xlist_expression (hcl_t* hcl, hcl_oop_t obj)
 	 * if the name is another function call, i can't know if the 
 	 * function name will be valid at the compile time.
 	 */
-	HCL_ASSERT (hcl, HCL_IS_CONS_CONCODED(hcl, obj, HCL_CONCODE_XLIST));
+	HCL_ASSERT (hcl, obj->type == HCL_CNODE_LIST);
+	HCL_ASSERT (hcl, obj->u.list.type == HCL_CONCODE_XLIST);
 
-	car = HCL_CONS_CAR(obj);
-	if (HCL_IS_SYMBOL(hcl,car) && (syncode = HCL_OBJ_GET_FLAGS_SYNCODE(car)))
+	head = obj->u.list.head;
+	if (!head)
+	{
+		/* empty list */
+	}
+
+	HCL_ASSERT (hcl, head->type == HCL_CNODE_CONS);
+	car = head->u.cons.car;
+	if (car->type == HCL_CNODE_SYMBOL && (syncode = hcl_getsyncodebyoocs_noseterr(hcl, &car->u.symbol)) > 0)
 	{
 		switch (syncode)
 		{
@@ -1491,7 +1648,7 @@ static int compile_cons_xlist_expression (hcl_t* hcl, hcl_oop_t obj)
 				break;
 
 			case HCL_SYNCODE_BREAK:
-				/* break */
+				/* (break) */
 				if (compile_break(hcl, obj) <= -1) return -1;
 				break;
 
@@ -1550,17 +1707,18 @@ static int compile_cons_xlist_expression (hcl_t* hcl, hcl_oop_t obj)
 
 			default:
 				HCL_DEBUG3 (hcl, "Internal error - unknown syncode %d at %s:%d\n", syncode, __FILE__, __LINE__);
-				hcl_seterrnum (hcl, HCL_EINTERN);
+				hcl_setsynerrbfmt (hcl, HCL_SYNERR_INTERN, &car->loc, HCL_NULL, "internal error - unknown syncode %d", syncode);
 				return -1;
 		}
 	}
-	else if (HCL_IS_SYMBOL(hcl,car) || HCL_IS_CONS_CONCODED(hcl,car,HCL_CONCODE_XLIST))
+	//else if (car->type == HCL_CNODE_SYMBOL || HCL_IS_CONS_CONCODED(hcl,car,HCL_CONCODE_XLIST))
+	else if (car->type == HCL_CNODE_SYMBOL || (car->type == HCL_CNODE_LIST && car->u.list.type == HCL_CONCODE_XLIST))
 	{
 		/* normal function call 
 		 *  (<operator> <operand1> ...) */
 		hcl_ooi_t nargs;
 		hcl_ooi_t oldtop;
-		hcl_cframe_t* cf;
+		hcl_cframe2_t* cf;
 		hcl_oop_t cdr;
 		hcl_oop_cons_t sdc;
 
@@ -1640,63 +1798,34 @@ static int compile_cons_xlist_expression (hcl_t* hcl, hcl_oop_t obj)
 	return 0;
 }
 
-static int emit_indexed_variable_access (hcl_t* hcl, hcl_oow_t index, hcl_oob_t baseinst1, hcl_oob_t baseinst2)
-{
-	if (hcl->c->blk.depth >= 0)
-	{
-		hcl_oow_t i;
-
-		/* if a temporary variable is accessed inside a block,
-		 * use a special instruction to indicate it */
-		HCL_ASSERT (hcl, index < hcl->c->blk.info[hcl->c->blk.depth].tmprcnt);
-		for (i = hcl->c->blk.depth; i > 0; i--) /* excluded the top level -- TODO: change this code depending on global variable handling */
-		{
-			if (index >= hcl->c->blk.info[i - 1].tmprcnt)
-			{
-				hcl_oow_t ctx_offset, index_in_ctx;
-				ctx_offset = hcl->c->blk.depth - i;
-				index_in_ctx = index - hcl->c->blk.info[i - 1].tmprcnt;
-				/* ctx_offset 0 means the current context.
-				 *            1 means current->home.
-				 *            2 means current->home->home. 
-				 * index_in_ctx is a relative index within the context found.
-				 */
-				if (emit_double_param_instruction(hcl, baseinst1, ctx_offset, index_in_ctx) <= -1) return -1;
-				return 0;
-			}
-		}
-	}
-
-	/* TODO: top-level... verify this. this will vary depending on how i implement the top-level and global variables... */
-	if (emit_single_param_instruction (hcl, baseinst2, index) <= -1) return -1;
-	return 0;
-}
-
-static HCL_INLINE int compile_symbol (hcl_t* hcl, hcl_oop_t obj)
+static HCL_INLINE int compile_symbol (hcl_t* hcl, hcl_cnode_t* obj)
 {
 	hcl_oow_t index;
 
-	HCL_ASSERT (hcl, HCL_IS_SYMBOL(hcl, obj));
+	HCL_ASSERT (hcl, obj->type == HCL_CNODE_SYMBOL);
 
-	if (HCL_OBJ_GET_FLAGS_SYNCODE(obj))
+	if (hcl_getsyncodebyoocs_noseterr(hcl, &obj->u.symbol) > 0)
 	{
-		hcl_setsynerrbfmt (hcl, HCL_SYNERR_BANNEDVARNAME, HCL_NULL, HCL_NULL,
-			"special symbol not to be used as a variable name - %O", obj); /* TOOD: error location */
+		hcl_setsynerrbfmt (hcl, HCL_SYNERR_BANNEDVARNAME, &obj->loc, HCL_NULL,
+			"special symbol not to be used as a variable name - %.*js", obj->u.symbol.len, obj->u.symbol.ptr);
 		return -1;
 	}
 
 	/* check if a symbol is a local variable */
-	if (find_temporary_variable_backward(hcl, obj, &index) <= -1)
+	if (find_temporary_variable_backward(hcl, &obj->u.symbol, &index) <= -1)
 	{
-		hcl_oop_t cons;
+		hcl_oop_t sym, cons;
 /* TODO: if i require all variables to be declared, this part is not needed and should handle it as an error */
 /* TODO: change the scheme... allow declaration??? */
 		/* global variable */
-		cons = (hcl_oop_t)hcl_getatsysdic(hcl, obj);
+		sym = hcl_makesymbol(hcl, obj->u.symbol.ptr, obj->u.symbol.len);
+		if (HCL_UNLIKELY(!sym)) return -1;
+
+		cons = (hcl_oop_t)hcl_getatsysdic(hcl, sym);
 		if (!cons) 
 		{
-			cons = (hcl_oop_t)hcl_putatsysdic(hcl, obj, hcl->_nil);
-			if (!cons) return -1;
+			cons = (hcl_oop_t)hcl_putatsysdic(hcl, sym, hcl->_nil);
+			if (HCL_UNLIKELY(!cons)) return -1;
 		}
 
 		/* add the entire cons pair to the literal frame */
@@ -1712,74 +1841,211 @@ static HCL_INLINE int compile_symbol (hcl_t* hcl, hcl_oop_t obj)
 	}
 }
 
+static hcl_oop_t string_to_num (hcl_t* hcl, hcl_oocs_t* str, const hcl_ioloc_t* loc, int radixed)
+{
+	int negsign, base;
+	const hcl_ooch_t* ptr, * end;
+
+	negsign = 0;
+	ptr = str->ptr,
+	end = str->ptr + str->len;
+
+	HCL_ASSERT (hcl, ptr < end);
+
+	if (*ptr == '+' || *ptr == '-')
+	{
+		negsign = *ptr - '+';
+		ptr++;
+	}
+
+#if 0
+	if (radixed)
+	{
+		/* 16r1234, 2r1111 */
+		HCL_ASSERT (hcl, ptr < end);
+
+		base = 0;
+		do
+		{
+			base = base * 10 + CHAR_TO_NUM(*ptr, 10);
+			ptr++;
+		}
+		while (*ptr != 'r');
+
+		ptr++;
+	}
+	else base = 10;
+#else
+	if (radixed)
+	{
+		/* #xFF80, #b1111 */
+		HCL_ASSERT (hcl, ptr < end);
+
+		if (*ptr != '#')
+		{
+			hcl_setsynerrbfmt(hcl, HCL_SYNERR_RADIX, loc, HCL_NULL, "radixed number not starting with # - %.*js", str->len, str->ptr);
+			return HCL_NULL;
+		}
+		ptr++; /* skip '#' */
+
+		if (*ptr == 'x') base = 16;
+		else if (*ptr == 'o') base = 8;
+		else if (*ptr == 'b') base = 2;
+		else
+		{
+			hcl_setsynerrbfmt (hcl, HCL_SYNERR_RADIX, loc, HCL_NULL, "invalid radix specifier - %c", *ptr);
+			return HCL_NULL;
+		}
+		ptr++;
+	}
+	else base = 10;
+#endif
+
+/* TODO: handle floating point numbers ... etc */
+	if (negsign) base = -base;
+	return hcl_strtoint(hcl, ptr, end - ptr, base);
+}
+
+static hcl_oop_t string_to_fpdec (hcl_t* hcl, hcl_oocs_t* str, const hcl_ioloc_t* loc)
+{
+	hcl_oow_t pos;
+	hcl_oow_t scale = 0;
+	hcl_oop_t v;
+
+	pos = str->len;
+	while (pos > 0)
+	{
+		pos--;
+		if (str->ptr[pos] == '.')
+		{
+			scale = str->len - pos - 1;
+			if (scale > HCL_SMOOI_MAX)
+			{
+				hcl_setsynerrbfmt (hcl, HCL_SYNERR_NUMRANGE, loc, str, "too many digits after decimal point");
+				return HCL_NULL;
+			}
+
+			HCL_ASSERT (hcl, scale > 0);
+			/*if (scale > 0)*/ HCL_MEMMOVE (&str->ptr[pos], &str->ptr[pos + 1], scale * HCL_SIZEOF(str->ptr[0])); /* remove the decimal point */
+			break;
+		}
+	}
+
+	/* if no decimal point is included or no digit after the point , you must not call this function */
+	HCL_ASSERT (hcl, scale > 0);
+
+	v = hcl_strtoint(hcl, str->ptr, str->len - 1, 10);
+	if (HCL_UNLIKELY(!v)) return HCL_NULL;
+
+	return hcl_makefpdec(hcl, v, scale);
+}
+
+
 static int compile_object (hcl_t* hcl)
 {
-	hcl_cframe_t* cf;
+	hcl_cframe2_t* cf;
+	hcl_cnode_t* oprnd;
+	hcl_oop_t lit;
 
 	cf = GET_TOP_CFRAME(hcl);
 	HCL_ASSERT (hcl, cf->opcode == COP_COMPILE_OBJECT);
 
-	if (HCL_OOP_IS_NUMERIC(cf->operand)) goto literal;
-
-	switch (HCL_OBJ_GET_FLAGS_BRAND(cf->operand))
+	oprnd = cf->operand;
+	switch (oprnd->type)
 	{
-		case HCL_BRAND_NIL:
+		case HCL_CNODE_NIL:
 			EMIT_BYTE_INSTRUCTION (hcl, HCL_CODE_PUSH_NIL);
 			goto done;
 
-		case HCL_BRAND_TRUE:
+		case HCL_CNODE_TRUE:
 			EMIT_BYTE_INSTRUCTION (hcl, HCL_CODE_PUSH_TRUE);
 			goto done;
 
-		case HCL_BRAND_FALSE:
+		case HCL_CNODE_FALSE:
 			EMIT_BYTE_INSTRUCTION (hcl, HCL_CODE_PUSH_FALSE);
 			goto done;
 
-		case HCL_BRAND_SYMBOL:
-			if (compile_symbol(hcl, cf->operand) <= -1) return -1;
+		case HCL_CNODE_CHARLIT:
+			lit = HCL_CHAR_TO_OOP(oprnd->u.charlit.v);
+			goto literal;
+
+		case HCL_CNODE_STRLIT:
+			lit = hcl_makestring(hcl, oprnd->u.strlit.ptr, oprnd->u.strlit.len, 0);
+			if (HCL_UNLIKELY(!lit)) return -1;
+			goto literal;
+
+		case HCL_CNODE_NUMLIT:
+			lit = string_to_num(hcl, &oprnd->u.numlit, &oprnd->loc, 0);
+			if (HCL_UNLIKELY(!lit)) return -1;
+			goto literal;
+
+		case HCL_CNODE_RADNUMLIT:
+			lit = string_to_num(hcl, &oprnd->u.radnumlit, &oprnd->loc, 1);
+			if (HCL_UNLIKELY(!lit)) return -1;
+			goto literal;
+
+		case HCL_CNODE_FPDECLIT:
+			lit = string_to_fpdec(hcl, &oprnd->u.fpdeclit, &oprnd->loc);
+			if (HCL_UNLIKELY(!lit)) return -1;
+			goto literal;
+
+		case HCL_CNODE_SMPTRLIT:
+			lit = HCL_SMPTR_TO_OOP(oprnd->u.smptrlit.v);
+			goto literal;
+
+		case HCL_CNODE_ERRLIT:
+			lit = HCL_ERROR_TO_OOP(oprnd->u.errlit.v);
+			goto literal;
+
+		case HCL_CNODE_SYMBOL:
+			if (compile_symbol(hcl, oprnd) <= -1) return -1;
 			goto done;
 
-		case HCL_BRAND_CONS:
+#if 0
+		case  HCL_CNODE_DSYMBOL:
+			if (compile_dsymbol(hcl, oprnd) <= -1) return -1;
+			goto done;
+#endif
+
+		case HCL_CNODE_LIST:
 		{
-			switch (HCL_OBJ_GET_FLAGS_SYNCODE(cf->operand))
+			switch (oprnd->u.list.type)
 			{
+				case HCL_CONCODE_XLIST:
+					if (compile_cons_xlist_expression(hcl, oprnd) <= -1) return -1;
+					break;
 				case HCL_CONCODE_ARRAY:
-					if (compile_cons_array_expression(hcl, cf->operand) <= -1) return -1;
+					//if (compile_cons_array_expression(hcl, oprnd) <= -1) return -1;
 					break;
-
 				case HCL_CONCODE_BYTEARRAY:
-					if (compile_cons_bytearray_expression(hcl, cf->operand) <= -1) return -1;
+					//if (compile_cons_bytearray_expression(hcl, oprnd) <= -1) return -1;
 					break;
-
 				case HCL_CONCODE_DIC:
-					if (compile_cons_dic_expression(hcl, cf->operand) <= -1) return -1;
+					//if (compile_cons_dic_expression(hcl, oprnd) <= -1) return -1;
 					break;
-
-				case  HCL_CONCODE_QLIST:
-					if (compile_cons_qlist_expression(hcl, cf->operand) <= -1) return -1;
+				case HCL_CONCODE_QLIST:
+					//if (compile_cons_qlist_expression(hcl, oprnd) <= -1) return -1;
 					break;
+				case HCL_CONCODE_VLIST:
+					hcl_setsynerrbfmt (hcl, HCL_SYNERR_VARDCLBANNED, &oprnd->loc, HCL_NULL, "variable declaration disallowed");
+					return -1;
 
 				default:
-					if (compile_cons_xlist_expression(hcl, cf->operand) <= -1) return -1;
-					break;
+					hcl_setsynerrbfmt (hcl, HCL_SYNERR_INTERN, &oprnd->loc, HCL_NULL, "internal error - unknown list type %d ", oprnd->u.list.type);
+					return -1;
 			}
-			break;
 		}
 
-		case HCL_BRAND_SYMBOL_ARRAY:
-			hcl_setsynerrbfmt (
-				hcl, HCL_SYNERR_VARDCLBANNED, HCL_NULL, HCL_NULL,
-				"variable declaration disallowed - %O", cf->operand); /* TODO: error location */
+		case HCL_CNODE_CONS: /* this type can never start a list.  it should never be seen here. */
+		//default:
+			hcl_setsynerrbfmt (hcl, HCL_SYNERR_INTERN, &oprnd->loc, HCL_NULL, "internal error - unexpected object type %d ", oprnd->type);
 			return -1;
-
-		default:
-			goto literal;
 	}
 
 	return 0;
 
 literal:
-	if (emit_push_literal(hcl, cf->operand) <= -1) return -1;
+	if (emit_push_literal(hcl, lit) <= -1) return -1;
 
 done:
 	POP_CFRAME (hcl);
@@ -1788,8 +2054,8 @@ done:
 
 static int compile_object_list (hcl_t* hcl)
 {
-	hcl_cframe_t* cf;
-	hcl_oop_t coperand;
+	hcl_cframe2_t* cf;
+	hcl_oop_t coprnd;
 	int cop;
 
 	cf = GET_TOP_CFRAME(hcl);
@@ -1800,9 +2066,9 @@ static int compile_object_list (hcl_t* hcl)
 	                 cf->opcode == COP_COMPILE_OBJECT_LIST_TAIL);
 
 	cop = cf->opcode;
-	coperand = cf->operand;
+	coprnd = cf->operand;
 
-	if (HCL_IS_NIL(hcl, coperand))
+	if (HCL_IS_NIL(hcl, coprnd))
 	{
 		POP_CFRAME (hcl);
 	}
@@ -1813,9 +2079,9 @@ static int compile_object_list (hcl_t* hcl)
 		if (cop != COP_COMPILE_ARGUMENT_LIST)
 		{
 			/* eliminate unnecessary non-function calls. keep the last one */
-			while (HCL_IS_CONS(hcl, coperand))
+			while (HCL_IS_CONS(hcl, coprnd))
 			{
-				cdr = HCL_CONS_CDR(coperand);
+				cdr = HCL_CONS_CDR(coprnd);
 				if (HCL_IS_NIL(hcl,cdr)) break; /* keep the last one */
 
 				if (HCL_IS_CONS(hcl, cdr))
@@ -1826,35 +2092,35 @@ static int compile_object_list (hcl_t* hcl)
 					if (HCL_IS_SYMBOL(hcl, car) && HCL_OBJ_GET_FLAGS_SYNCODE(car)) break;
 				}
 
-				car = HCL_CONS_CAR(coperand);
+				car = HCL_CONS_CAR(coprnd);
 				if (HCL_IS_CONS(hcl, car) || (HCL_IS_SYMBOL(hcl, car) && HCL_OBJ_GET_FLAGS_SYNCODE(car))) break;
-				coperand = cdr;
+				coprnd = cdr;
 			}
 
-			HCL_ASSERT (hcl, !HCL_IS_NIL(hcl, coperand));
+			HCL_ASSERT (hcl, !HCL_IS_NIL(hcl, coprnd));
 		}
 
-		if (!HCL_IS_CONS(hcl, coperand))
+		if (!HCL_IS_CONS(hcl, coprnd))
 		{
 			hcl_setsynerrbfmt (
 				hcl, HCL_SYNERR_DOTBANNED, HCL_NULL, HCL_NULL,
-				"redundant cdr in the object list - %O", coperand); /* TODO: error location */
+				"redundant cdr in the object list - %O", coprnd); /* TODO: error location */
 			return -1;
 		}
 
-		car = HCL_CONS_CAR(coperand);
-		cdr = HCL_CONS_CDR(coperand);
+		car = HCL_CONS_CAR(coprnd);
+		cdr = HCL_CONS_CDR(coprnd);
 
 		if (cop == COP_COMPILE_IF_OBJECT_LIST || cop == COP_COMPILE_IF_OBJECT_LIST_TAIL)
 		{
 			if (car == hcl->_elif)
 			{
-				SWITCH_TOP_CFRAME (hcl, COP_SUBCOMPILE_ELIF, coperand);
+				SWITCH_TOP_CFRAME (hcl, COP_SUBCOMPILE_ELIF, coprnd);
 				goto done;
 			}
 			else if (car == hcl->_else)
 			{
-				SWITCH_TOP_CFRAME (hcl, COP_SUBCOMPILE_ELSE, coperand);
+				SWITCH_TOP_CFRAME (hcl, COP_SUBCOMPILE_ELSE, coprnd);
 				goto done;
 			}
 		}
@@ -1896,15 +2162,15 @@ done:
 
 static int compile_array_list (hcl_t* hcl)
 {
-	hcl_cframe_t* cf;
-	hcl_oop_t coperand;
+	hcl_cframe2_t* cf;
+	hcl_oop_t coprnd;
 
 	cf = GET_TOP_CFRAME(hcl);
 	HCL_ASSERT (hcl, cf->opcode == COP_COMPILE_ARRAY_LIST);
 
-	coperand = cf->operand;
+	coprnd = cf->operand;
 
-	if (HCL_IS_NIL(hcl, coperand))
+	if (HCL_IS_NIL(hcl, coprnd))
 	{
 		POP_CFRAME (hcl);
 	}
@@ -1913,16 +2179,16 @@ static int compile_array_list (hcl_t* hcl)
 		hcl_oop_t car, cdr;
 		hcl_ooi_t oldidx;
 
-		if (!HCL_IS_CONS(hcl, coperand))
+		if (!HCL_IS_CONS(hcl, coprnd))
 		{
 			hcl_setsynerrbfmt (
 				hcl, HCL_SYNERR_DOTBANNED, HCL_NULL, HCL_NULL, 
- 				"redundant cdr in the array list - %O", coperand); /* TODO: error location */
+ 				"redundant cdr in the array list - %O", coprnd); /* TODO: error location */
 			return -1;
 		}
 
-		car = HCL_CONS_CAR(coperand);
-		cdr = HCL_CONS_CDR(coperand);
+		car = HCL_CONS_CAR(coprnd);
+		cdr = HCL_CONS_CDR(coprnd);
 
 		oldidx = cf->u.array_list.index;
 
@@ -1943,15 +2209,15 @@ static int compile_array_list (hcl_t* hcl)
 
 static int compile_bytearray_list (hcl_t* hcl)
 {
-	hcl_cframe_t* cf;
-	hcl_oop_t coperand;
+	hcl_cframe2_t* cf;
+	hcl_oop_t coprnd;
 
 	cf = GET_TOP_CFRAME(hcl);
 	HCL_ASSERT (hcl, cf->opcode == COP_COMPILE_BYTEARRAY_LIST);
 
-	coperand = cf->operand;
+	coprnd = cf->operand;
 
-	if (HCL_IS_NIL(hcl, coperand))
+	if (HCL_IS_NIL(hcl, coprnd))
 	{
 		POP_CFRAME (hcl);
 	}
@@ -1960,16 +2226,16 @@ static int compile_bytearray_list (hcl_t* hcl)
 		hcl_oop_t car, cdr;
 		hcl_ooi_t oldidx;
 
-		if (!HCL_IS_CONS(hcl, coperand))
+		if (!HCL_IS_CONS(hcl, coprnd))
 		{
 			hcl_setsynerrbfmt (
 				hcl, HCL_SYNERR_DOTBANNED, HCL_NULL, HCL_NULL, 
- 				"redundant cdr in the byte-array list - %O", coperand); /* TODO: error location */
+ 				"redundant cdr in the byte-array list - %O", coprnd); /* TODO: error location */
 			return -1;
 		}
 
-		car = HCL_CONS_CAR(coperand);
-		cdr = HCL_CONS_CDR(coperand);
+		car = HCL_CONS_CAR(coprnd);
+		cdr = HCL_CONS_CDR(coprnd);
 
 		oldidx = cf->u.bytearray_list.index;
 
@@ -1990,15 +2256,15 @@ static int compile_bytearray_list (hcl_t* hcl)
 
 static int compile_dic_list (hcl_t* hcl)
 {
-	hcl_cframe_t* cf;
-	hcl_oop_t coperand;
+	hcl_cframe2_t* cf;
+	hcl_oop_t coprnd;
 
 	cf = GET_TOP_CFRAME(hcl);
 	HCL_ASSERT (hcl, cf->opcode == COP_COMPILE_DIC_LIST);
 
-	coperand = cf->operand;
+	coprnd = cf->operand;
 
-	if (HCL_IS_NIL(hcl, coperand))
+	if (HCL_IS_NIL(hcl, coprnd))
 	{
 		POP_CFRAME (hcl);
 	}
@@ -2006,16 +2272,16 @@ static int compile_dic_list (hcl_t* hcl)
 	{
 		hcl_oop_t car, cdr, cadr, cddr;
 
-		if (!HCL_IS_CONS(hcl, coperand))
+		if (!HCL_IS_CONS(hcl, coprnd))
 		{
 			hcl_setsynerrbfmt (
 				hcl, HCL_SYNERR_DOTBANNED, HCL_NULL, HCL_NULL, 
- 				"redundant cdr in the dictionary list - %O", coperand); /* TODO: error location */
+ 				"redundant cdr in the dictionary list - %O", coprnd); /* TODO: error location */
 			return -1;
 		}
 
-		car = HCL_CONS_CAR(coperand);
-		cdr = HCL_CONS_CDR(coperand);
+		car = HCL_CONS_CAR(coprnd);
+		cdr = HCL_CONS_CDR(coprnd);
 
 		SWITCH_TOP_CFRAME (hcl, COP_COMPILE_OBJECT, car);
 		if (HCL_IS_NIL(hcl, cdr))
@@ -2043,15 +2309,15 @@ static int compile_dic_list (hcl_t* hcl)
 
 static int compile_qlist (hcl_t* hcl)
 {
-	hcl_cframe_t* cf;
-	hcl_oop_t coperand;
+	hcl_cframe2_t* cf;
+	hcl_oop_t coprnd;
 
 	cf = GET_TOP_CFRAME(hcl);
 	HCL_ASSERT (hcl, cf->opcode == COP_COMPILE_QLIST);
 
-	coperand = cf->operand;
+	coprnd = cf->operand;
 
-	if (HCL_IS_NIL(hcl, coperand))
+	if (HCL_IS_NIL(hcl, coprnd))
 	{
 		POP_CFRAME (hcl);
 	}
@@ -2060,16 +2326,16 @@ static int compile_qlist (hcl_t* hcl)
 		hcl_oop_t car, cdr;
 		hcl_ooi_t oldidx;
 
-		if (!HCL_IS_CONS(hcl, coperand))
+		if (!HCL_IS_CONS(hcl, coprnd))
 		{
 			hcl_setsynerrbfmt (
 				hcl, HCL_SYNERR_DOTBANNED, HCL_NULL, HCL_NULL, 
- 				"redundant cdr in the qlist list - %O", coperand); /* TODO: error location */
+ 				"redundant cdr in the qlist list - %O", coprnd); /* TODO: error location */
 			return -1;
 		}
 
-		car = HCL_CONS_CAR(coperand);
-		cdr = HCL_CONS_CDR(coperand);
+		car = HCL_CONS_CAR(coprnd);
+		cdr = HCL_CONS_CDR(coprnd);
 
 		/*oldidx = cf->u.qlist.index;*/
 
@@ -2094,7 +2360,7 @@ static HCL_INLINE int patch_nearest_post_if_body (hcl_t* hcl)
 {
 	hcl_ooi_t jump_inst_pos, body_pos;
 	hcl_ooi_t jip, jump_offset;
-	hcl_cframe_t* cf;
+	hcl_cframe2_t* cf;
 
 	cf = find_cframe_from_top (hcl, COP_POST_IF_BODY);
 	HCL_ASSERT (hcl, cf != HCL_NULL);
@@ -2147,7 +2413,7 @@ static HCL_INLINE int patch_nearest_post_if_body (hcl_t* hcl)
 static HCL_INLINE int subcompile_elif (hcl_t* hcl)
 {
 	hcl_oop_t obj, cond, src;
-	hcl_cframe_t* cf;
+	hcl_cframe2_t* cf;
 
 	cf = GET_TOP_CFRAME(hcl);
 	HCL_ASSERT (hcl, cf->opcode == COP_SUBCOMPILE_ELIF);
@@ -2186,7 +2452,7 @@ static HCL_INLINE int subcompile_elif (hcl_t* hcl)
 static HCL_INLINE int subcompile_else (hcl_t* hcl)
 {
 	hcl_oop_t obj, src;
-	hcl_cframe_t* cf;
+	hcl_cframe2_t* cf;
 
 	cf = GET_TOP_CFRAME(hcl);
 	HCL_ASSERT (hcl, cf->opcode == COP_SUBCOMPILE_ELSE);
@@ -2214,7 +2480,7 @@ static HCL_INLINE int subcompile_else (hcl_t* hcl)
 static HCL_INLINE int subcompile_and_expr (hcl_t* hcl)
 {
 	hcl_oop_t obj, expr;
-	hcl_cframe_t* cf;
+	hcl_cframe2_t* cf;
 	hcl_ooi_t jump_inst_pos;
 	
 	cf = GET_TOP_CFRAME(hcl);
@@ -2258,7 +2524,7 @@ static HCL_INLINE int subcompile_and_expr (hcl_t* hcl)
 
 static HCL_INLINE int post_and_expr (hcl_t* hcl)
 {
-	hcl_cframe_t* cf;
+	hcl_cframe2_t* cf;
 	hcl_ooi_t jip;
 	hcl_oow_t jump_offset;
 
@@ -2281,7 +2547,7 @@ static HCL_INLINE int post_and_expr (hcl_t* hcl)
 static HCL_INLINE int subcompile_or_expr (hcl_t* hcl)
 {
 	hcl_oop_t obj, expr;
-	hcl_cframe_t* cf;
+	hcl_cframe2_t* cf;
 	hcl_ooi_t jump_inst_pos;
 	
 	cf = GET_TOP_CFRAME(hcl);
@@ -2325,7 +2591,7 @@ static HCL_INLINE int subcompile_or_expr (hcl_t* hcl)
 
 static HCL_INLINE int post_or_expr (hcl_t* hcl)
 {
-	hcl_cframe_t* cf;
+	hcl_cframe2_t* cf;
 	hcl_ooi_t jip;
 	hcl_oow_t jump_offset;
 
@@ -2347,7 +2613,7 @@ static HCL_INLINE int post_or_expr (hcl_t* hcl)
 
 static HCL_INLINE int post_if_cond (hcl_t* hcl)
 {
-	hcl_cframe_t* cf;
+	hcl_cframe2_t* cf;
 	hcl_ooi_t jump_inst_pos;
 	hcl_ooi_t body_pos;
 
@@ -2374,7 +2640,7 @@ static HCL_INLINE int post_if_cond (hcl_t* hcl)
 
 static HCL_INLINE int post_if_body (hcl_t* hcl)
 {
-	hcl_cframe_t* cf;
+	hcl_cframe2_t* cf;
 	hcl_ooi_t jip;
 	hcl_oow_t jump_offset;
 
@@ -2408,7 +2674,7 @@ static HCL_INLINE int post_if_body (hcl_t* hcl)
 /* ========================================================================= */
 static HCL_INLINE int post_while_cond (hcl_t* hcl)
 {
-	hcl_cframe_t* cf;
+	hcl_cframe2_t* cf;
 	hcl_ooi_t jump_inst_pos;
 	hcl_ooi_t cond_pos, body_pos;
 	int jump_inst, next_cop;
@@ -2447,7 +2713,7 @@ static HCL_INLINE int post_while_cond (hcl_t* hcl)
 
 static HCL_INLINE int post_while_body (hcl_t* hcl)
 {
-	hcl_cframe_t* cf;
+	hcl_cframe2_t* cf;
 	hcl_ooi_t jip;
 	hcl_ooi_t jump_offset;
 
@@ -2494,7 +2760,7 @@ static HCL_INLINE int post_while_body (hcl_t* hcl)
 
 static int update_break (hcl_t* hcl)
 {
-	hcl_cframe_t* cf;
+	hcl_cframe2_t* cf;
 	hcl_ooi_t jip, jump_offset;
 
 	cf = GET_TOP_CFRAME(hcl);
@@ -2520,7 +2786,7 @@ static int update_break (hcl_t* hcl)
 
 static HCL_INLINE int emit_call (hcl_t* hcl)
 {
-	hcl_cframe_t* cf;
+	hcl_cframe2_t* cf;
 	int n;
 
 	cf = GET_TOP_CFRAME(hcl);
@@ -2535,7 +2801,7 @@ static HCL_INLINE int emit_call (hcl_t* hcl)
 
 static HCL_INLINE int emit_make_array (hcl_t* hcl)
 {
-	hcl_cframe_t* cf;
+	hcl_cframe2_t* cf;
 	int n;
 
 	cf = GET_TOP_CFRAME(hcl);
@@ -2550,7 +2816,7 @@ static HCL_INLINE int emit_make_array (hcl_t* hcl)
 
 static HCL_INLINE int emit_make_bytearray (hcl_t* hcl)
 {
-	hcl_cframe_t* cf;
+	hcl_cframe2_t* cf;
 	int n;
 
 	cf = GET_TOP_CFRAME(hcl);
@@ -2565,7 +2831,7 @@ static HCL_INLINE int emit_make_bytearray (hcl_t* hcl)
 
 static HCL_INLINE int emit_make_dic (hcl_t* hcl)
 {
-	hcl_cframe_t* cf;
+	hcl_cframe2_t* cf;
 	int n;
 
 	cf = GET_TOP_CFRAME(hcl);
@@ -2580,7 +2846,7 @@ static HCL_INLINE int emit_make_dic (hcl_t* hcl)
 
 static HCL_INLINE int emit_make_dlist (hcl_t* hcl)
 {
-	hcl_cframe_t* cf;
+	hcl_cframe2_t* cf;
 	int n;
 
 	cf = GET_TOP_CFRAME(hcl);
@@ -2595,7 +2861,7 @@ static HCL_INLINE int emit_make_dlist (hcl_t* hcl)
 
 static HCL_INLINE int emit_pop_into_array (hcl_t* hcl)
 {
-	hcl_cframe_t* cf;
+	hcl_cframe2_t* cf;
 	int n;
 
 	cf = GET_TOP_CFRAME(hcl);
@@ -2610,7 +2876,7 @@ static HCL_INLINE int emit_pop_into_array (hcl_t* hcl)
 
 static HCL_INLINE int emit_pop_into_bytearray (hcl_t* hcl)
 {
-	hcl_cframe_t* cf;
+	hcl_cframe2_t* cf;
 	int n;
 
 	cf = GET_TOP_CFRAME(hcl);
@@ -2625,7 +2891,7 @@ static HCL_INLINE int emit_pop_into_bytearray (hcl_t* hcl)
 
 static HCL_INLINE int emit_pop_into_dic (hcl_t* hcl)
 {
-	hcl_cframe_t* cf;
+	hcl_cframe2_t* cf;
 	int n;
 
 	cf = GET_TOP_CFRAME(hcl);
@@ -2639,7 +2905,7 @@ static HCL_INLINE int emit_pop_into_dic (hcl_t* hcl)
 
 static HCL_INLINE int emit_pop_into_dlist (hcl_t* hcl)
 {
-	hcl_cframe_t* cf;
+	hcl_cframe2_t* cf;
 	int n;
 
 	cf = GET_TOP_CFRAME(hcl);
@@ -2654,7 +2920,7 @@ static HCL_INLINE int emit_pop_into_dlist (hcl_t* hcl)
 
 static HCL_INLINE int emit_lambda (hcl_t* hcl)
 {
-	hcl_cframe_t* cf;
+	hcl_cframe2_t* cf;
 	hcl_oow_t block_code_size, lfsize;
 	hcl_ooi_t jip;
 
@@ -2701,7 +2967,7 @@ static HCL_INLINE int emit_lambda (hcl_t* hcl)
 
 static HCL_INLINE int emit_pop_stacktop (hcl_t* hcl)
 {
-	hcl_cframe_t* cf;
+	hcl_cframe2_t* cf;
 	int n;
 
 	cf = GET_TOP_CFRAME(hcl);
@@ -2716,7 +2982,7 @@ static HCL_INLINE int emit_pop_stacktop (hcl_t* hcl)
 
 static HCL_INLINE int emit_return (hcl_t* hcl)
 {
-	hcl_cframe_t* cf;
+	hcl_cframe2_t* cf;
 	int n;
 
 	cf = GET_TOP_CFRAME(hcl);
@@ -2731,18 +2997,19 @@ static HCL_INLINE int emit_return (hcl_t* hcl)
 
 static HCL_INLINE int emit_set (hcl_t* hcl)
 {
-	hcl_cframe_t* cf;
+	hcl_cframe2_t* cf;
 
 	cf = GET_TOP_CFRAME(hcl);
 	HCL_ASSERT (hcl, cf->opcode == COP_EMIT_SET);
-
 
 	if (cf->u.set.var_type == VAR_NAMED)
 	{
 		hcl_oow_t index;
 		hcl_oop_t cons;
 
-		HCL_ASSERT (hcl, HCL_IS_SYMBOL(hcl, cf->operand));
+		//HCL_ASSERT (hcl, HCL_IS_SYMBOL(hcl, cf->operand));
+		HCL_ASSERT (hcl, cf->operand->type == HCL_CNODE_SYMBOL);
+/* TODO: make a symbol now */
 
 		cons = (hcl_oop_t)hcl_getatsysdic(hcl, cf->operand);
 		if (!cons) 
@@ -2770,7 +3037,7 @@ static HCL_INLINE int emit_set (hcl_t* hcl)
 
 /* ========================================================================= */
 
-int hcl_compile (hcl_t* hcl, hcl_oop_t obj)
+int hcl_compile2 (hcl_t* hcl, hcl_cnode_t* obj)
 {
 	hcl_oow_t saved_bc_len, saved_lit_len;
 	hcl_bitmask_t log_default_type_mask;
@@ -2826,7 +3093,7 @@ int hcl_compile (hcl_t* hcl, hcl_oop_t obj)
 
 	while (GET_TOP_CFRAME_INDEX(hcl) >= 0)
 	{
-		hcl_cframe_t* cf;
+		hcl_cframe2_t* cf;
 
 		cf = GET_TOP_CFRAME(hcl);
 

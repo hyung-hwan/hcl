@@ -107,7 +107,7 @@ void* hcl_callocheapmem (hcl_t* hcl, hcl_heap_t* heap, hcl_oow_t size)
 	return ptr;
 }
 
-void* hcl_callocheapmem_noerr (hcl_t* hcl, hcl_heap_t* heap, hcl_oow_t size)
+void* hcl_callocheapmem_noseterr (hcl_t* hcl, hcl_heap_t* heap, hcl_oow_t size)
 {
 	void* ptr;
 	ptr = HCL_MMGR_ALLOC(&heap->xmmgr, size);

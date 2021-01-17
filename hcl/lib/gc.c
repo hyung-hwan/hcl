@@ -58,6 +58,7 @@ static struct
 
 /* ========================================================================= */
 
+
 static void compact_symbol_table (hcl_t* hcl, hcl_oop_t _nil)
 {
 	hcl_oop_char_t symbol;
@@ -836,4 +837,16 @@ int hcl_ignite (hcl_t* hcl)
 
 	hcl->p.e = hcl->_nil;
 	return 0;
+}
+
+
+int hcl_getsyncodebyoocs_noseterr (hcl_t* hcl, const hcl_oocs_t* name)
+{
+	hcl_oow_t i;
+	for (i = 0; i < HCL_COUNTOF(syminfo); i++)
+	{
+		if (hcl_comp_oochars(syminfo[i].ptr, syminfo[i].len, name->ptr, name->len) == 0) 
+			return syminfo[i].syncode;
+	}
+	return 0; /* 0 indicates no syntax code found */
 }

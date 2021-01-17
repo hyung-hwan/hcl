@@ -1207,6 +1207,24 @@ while (1)
 	else
 	{
 		hcl_logbfmt (hcl, HCL_LOG_STDERR, "OK: got cnode - %p\n", xx);
+
+		if (hcl_compile2(hcl, xx) <= -1) 
+		{
+			hcl_logbfmt (hcl, HCL_LOG_STDERR, "ERR: unable to compile - %p\n", xx);
+			if (hcl->errnum == HCL_ESYNERR)
+			{
+				print_synerr (hcl);
+			}
+			else
+			{
+				hcl_logbfmt (hcl, HCL_LOG_STDERR, "ERROR: cannot compile object - [%d] %js\n", hcl_geterrnum(hcl), hcl_geterrmsg(hcl));
+			}
+		}
+		else
+		{
+			hcl_decode (hcl, 0, hcl_getbclen(hcl));
+		}
+
 		hcl_freecnode (hcl, xx);
 	}
 }
