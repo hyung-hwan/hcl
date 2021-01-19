@@ -196,33 +196,38 @@ enum hcl_cnode_type_t
 	HCL_CNODE_TRUE,
 	HCL_CNODE_FALSE,
 
-#if 0
-	HCL_CNODE_AND,
-	HCL_CNODE_BREAK,
-	HCL_CNODE_DEFUN,
-	HCL_CNODE_DO,
-	HCL_CNODE_ELIF,
-	HCL_CNODE_ELSE,
-	HCL_CNODE_IF,
-	HCL_CNODE_LAMBDA,
-	HCL_CNODE_OR,
-	HCL_CNODE_RETURN,
-	HCL_CNODE_RETURN_FROM_HOME,
-	HCL_CNODE_SET,
-	HCL_CNODE_UNTIL,
-	HCL_CNODE_WHILE,
-#endif
-
 	HCL_CNODE_CONS,
 	HCL_CNODE_LIST
 };
 typedef enum hcl_cnode_type_t hcl_cnode_type_t;
 
+#define HCL_CNODE_GET_TYPE(x) ((x)->cn_type)
+#define HCL_CNODE_GET_LOC(x) (&(x)->cn_loc)
+#define HCL_CNODE_GET_TOK(x) (&(x)->cn_tok)
+#define HCL_CNODE_GET_TOKPTR(x) ((x)->cn_tok.ptr)
+#define HCL_CNODE_GET_TOKLEN(x) ((x)->cn_tok.len)
+
+#define HCL_CNODE_IS_SYMBOL(x) ((x)->cn_type == HCL_CNODE_SYMBOL)
+#define HCL_CNODE_IS_SYMBOL_SYNCODED(x, code) ((x)->cn_type == HCL_CNODE_SYMBOL && (x)->u.symbol.syncode == (code))
+#define HCL_CNODE_SYMBOL_SYNCODE(x) ((x)->u.symbol.syncode)
+
+#define HCL_CNODE_IS_CONS(x) ((x)->cn_type == HCL_CNODE_CONS)
+#define HCL_CNODE_IS_CONS_CONCODED(x, code) ((x)->cn_type == HCL_CNODE_CONS && (x)->u.cons.concode == (code))
+#define HCL_CNODE_CONS_CONCODE(x) ((x)->u.cons.concode)
+#define HCL_CNODE_CONS_CAR(x) ((x)->u.cons.car)
+#define HCL_CNODE_CONS_CDR(x) ((x)->u.cons.cdr)
+
+
+#define HCL_CNODE_IS_LIST(x) ((x)->cn_type == HCL_CNODE_LIST)
+#define HCL_CNODE_IS_LIST_CONCODED(x) ((x)->cn_type == HCL_CNODE_LIST && (x)->u.list.concode == (code))
+#define HCL_CNODE_LIST_CONCODE(x) ((x)->u.list.concode)
+
 /* NOTE: hcl_cnode_t used by the built-in compiler is not an OOP object */
 struct hcl_cnode_t
 {
-	hcl_cnode_type_t type;
-	hcl_ioloc_t loc;
+	hcl_cnode_type_t cn_type;
+	hcl_ioloc_t cn_loc;
+	hcl_oocs_t cn_tok;
 
 	union
 	{
@@ -231,12 +236,10 @@ struct hcl_cnode_t
 			hcl_ooch_t v;
 		} charlit;
 
-		hcl_oocs_t symbol;
-		hcl_oocs_t dsymbol;
-		hcl_oocs_t strlit;
-		hcl_oocs_t numlit;
-		hcl_oocs_t radnumlit;
-		hcl_oocs_t fpdeclit;
+		struct
+		{
+			hcl_syncode_t syncode; /* special if non-zero */
+		} symbol;
 
 		struct
 		{
@@ -248,13 +251,13 @@ struct hcl_cnode_t
 		} errlit;
 		struct
 		{
+			hcl_concode_t concode;
 			hcl_cnode_t* car;
 			hcl_cnode_t* cdr;
 		} cons;
 		struct
 		{
-			hcl_cnode_t* head; /* its type must be HCL_CNODE_CONS */
-			hcl_concode_t type;
+			hcl_concode_t concode;
 		} list;
 	} u;
 };
@@ -955,6 +958,18 @@ int hcl_getsyncodebyoocs_noseterr (
 	const hcl_oocs_t* name
 );
 
+int hcl_getsyncode_noseterr (
+	hcl_t*            hcl,
+	const hcl_ooch_t* ptr,
+	const hcl_oow_t   len
+);
+
+const hcl_ooch_t* hcl_getsyncodename_noseterr (
+	hcl_t*        hcl,
+	hcl_syncode_t syncode
+);
+
+
 /* ========================================================================= */
 /* utf8.c                                                                    */
 /* ========================================================================= */
@@ -1307,22 +1322,23 @@ int hcl_emitbyteinstruction (
 /* ========================================================================= */
 /* cnode.c                                                                   */
 /* ========================================================================= */
-hcl_cnode_t* hcl_makecnodenil (hcl_t* hcl, const hcl_ioloc_t* loc);
-hcl_cnode_t* hcl_makecnodetrue (hcl_t* hcl, const hcl_ioloc_t* loc);
-hcl_cnode_t* hcl_makecnodefalse (hcl_t* hcl, const hcl_ioloc_t* loc);
-hcl_cnode_t* hcl_makecnodecharlit (hcl_t* hcl, const hcl_ioloc_t* loc, const hcl_ooch_t ch);
-hcl_cnode_t* hcl_makecnodesymbol (hcl_t* hcl, const hcl_ioloc_t* loc, const hcl_ooch_t* ptr, hcl_oow_t len);
-hcl_cnode_t* hcl_makecnodedsymbol (hcl_t* hcl, const hcl_ioloc_t* loc, const hcl_ooch_t* ptr, hcl_oow_t len);
-hcl_cnode_t* hcl_makecnodestrlit (hcl_t* hcl, const hcl_ioloc_t* loc, const hcl_ooch_t* ptr, hcl_oow_t len);
-hcl_cnode_t* hcl_makecnodenumlit (hcl_t* hcl, const hcl_ioloc_t* loc, const hcl_ooch_t* ptr, hcl_oow_t len);
-hcl_cnode_t* hcl_makecnoderadnumlit (hcl_t* hcl, const hcl_ioloc_t* loc, const hcl_ooch_t* ptr, hcl_oow_t len);
-hcl_cnode_t* hcl_makecnodefpdeclit (hcl_t* hcl, const hcl_ioloc_t* loc, const hcl_ooch_t* ptr, hcl_oow_t len);
-hcl_cnode_t* hcl_makecnodesmptrlit (hcl_t* hcl, const hcl_ioloc_t* loc, hcl_oow_t v);
-hcl_cnode_t* hcl_makecnodeerrlit (hcl_t* hcl, const hcl_ioloc_t* loc, hcl_ooi_t v);
+hcl_cnode_t* hcl_makecnodenil (hcl_t* hcl, const hcl_ioloc_t* loc, const hcl_oocs_t* tok);
+hcl_cnode_t* hcl_makecnodetrue (hcl_t* hcl, const hcl_ioloc_t* loc, const  hcl_oocs_t* tok);
+hcl_cnode_t* hcl_makecnodefalse (hcl_t* hcl, const hcl_ioloc_t* loc, const  hcl_oocs_t* tok);
+hcl_cnode_t* hcl_makecnodecharlit (hcl_t* hcl, const hcl_ioloc_t* loc, const  hcl_oocs_t* tok, const hcl_ooch_t v);
+hcl_cnode_t* hcl_makecnodesymbol (hcl_t* hcl, const hcl_ioloc_t* loc, const  hcl_oocs_t* tok);
+hcl_cnode_t* hcl_makecnodedsymbol (hcl_t* hcl, const hcl_ioloc_t* loc, const  hcl_oocs_t* tok);
+hcl_cnode_t* hcl_makecnodestrlit (hcl_t* hcl, const hcl_ioloc_t* loc, const  hcl_oocs_t* tok);
+hcl_cnode_t* hcl_makecnodenumlit (hcl_t* hcl, const hcl_ioloc_t* loc, const  hcl_oocs_t* tok);
+hcl_cnode_t* hcl_makecnoderadnumlit (hcl_t* hcl, const hcl_ioloc_t* loc, const  hcl_oocs_t* tok);
+hcl_cnode_t* hcl_makecnodefpdeclit (hcl_t* hcl, const hcl_ioloc_t* loc, const  hcl_oocs_t* tok);
+hcl_cnode_t* hcl_makecnodesmptrlit (hcl_t* hcl, const hcl_ioloc_t* loc, const  hcl_oocs_t* tok, hcl_oow_t v);
+hcl_cnode_t* hcl_makecnodeerrlit (hcl_t* hcl, const hcl_ioloc_t* loc, const  hcl_oocs_t* tok, hcl_ooi_t v);
 hcl_cnode_t* hcl_makecnodecons (hcl_t* hcl, const hcl_ioloc_t* loc, hcl_cnode_t* car, hcl_cnode_t* cdr);
-hcl_cnode_t* hcl_makecnodelist (hcl_t* hcl, const hcl_ioloc_t* loc, hcl_concode_t type, hcl_cnode_t* head);
+hcl_cnode_t* hcl_makecnodelist (hcl_t* hcl, const hcl_ioloc_t* loc, hcl_concode_t type);
 void hcl_freesinglecnode (hcl_t* hcl, hcl_cnode_t* c);
 void hcl_freecnode (hcl_t* hcl, hcl_cnode_t* c);
+hcl_oow_t hcl_countcnodecons (hcl_t* hcl, hcl_cnode_t* cons);
 
 #if defined(__cplusplus)
 }

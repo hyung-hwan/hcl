@@ -66,6 +66,7 @@ libhcl_la_SOURCES = \
 	bigint.c \
 	cnode.c \
 	comp.c \
+	comp2.c \
 	debug.c \
 	decode.c \
 	dic.c \

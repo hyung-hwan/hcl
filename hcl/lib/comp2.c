@@ -35,12 +35,6 @@ enum
 #define TV_BUFFER_ALIGN 256
 #define BLK_INFO_BUFFER_ALIGN 128
 
-#define EMIT_BYTE_INSTRUCTION(hcl,code) \
-	do { if (emit_byte_instruction(hcl, code, HCL_NULL) <= -1) return -1; } while(0)
-
-#define EMIT_SINGLE_PARAM_INSTRUCTION(hcl,code) \
-	do { if (emit_byte_instruction(hcl, code, HCL_NULL) <= -1) return -1; } while(0)
-
 /* --------------------------------------------
 
                                                      
@@ -863,33 +857,31 @@ enum
 };
 
 /* ========================================================================= */
-#if 0
+
 static int compile_and (hcl_t* hcl, hcl_cnode_t* src)
 {
-	hcl_oop_t expr, obj;
+	hcl_cnode_t* obj, * expr;
 
-	HCL_ASSERT (hcl, HCL_IS_CONS(hcl, src));
-	HCL_ASSERT (hcl, HCL_CONS_CAR(src) == hcl->_and);
+	HCL_ASSERT (hcl, HCL_CNODE_IS_CONS(src));
+	HCL_ASSERT (hcl, HCL_CNODE_IS_SYMBOL_SYNCODED(HCL_CNODE_CONS_CAR(src), HCL_SYNCODE_AND));
 
-	obj = HCL_CONS_CDR(src);
+	obj = HCL_CNODE_CONS_CDR(src);
 
-	if (HCL_IS_NIL(hcl, obj))
+	if (!obj)
 	{
 		/* no value */
-		hcl_setsynerrbfmt (hcl, HCL_SYNERR_ARGCOUNT, src->loc, HCL_NULL,
-			"no expression specified in and - %O", src); /* TODO: error location */
+		hcl_setsynerrbfmt (hcl, HCL_SYNERR_ARGCOUNT, HCL_CNODE_GET_LOC(src), HCL_NULL, "no expression specified in and");
 		return -1;
 	}
-	else if (!HCL_IS_CONS(hcl, obj))
+	else if (!HCL_CNODE_IS_CONS(obj))
 	{
-		hcl_setsynerrbfmt (hcl, HCL_SYNERR_DOTBANNED, src->loc, HCL_NULL,
-			"redundant cdr in and - %O", src); /* TODO: error location */
+		hcl_setsynerrbfmt (hcl, HCL_SYNERR_DOTBANNED, HCL_CNODE_GET_LOC(obj), HCL_CNODE_GET_TOK(obj), "redundant cdr in and");
 		return -1;
 	}
 
 /* TODO: optimization - eat away all true expressions */
-	expr = HCL_CONS_CAR(obj);
-	obj = HCL_CONS_CDR(obj);
+	expr = HCL_CNODE_CONS_CAR(obj);
+	obj = HCL_CNODE_CONS_CDR(obj);
 
 	SWITCH_TOP_CFRAME (hcl, COP_COMPILE_OBJECT, expr); /* 1 */
 	PUSH_SUBCFRAME (hcl, COP_SUBCOMPILE_AND_EXPR, obj); /* 2 */
@@ -897,32 +889,30 @@ static int compile_and (hcl_t* hcl, hcl_cnode_t* src)
 	return 0;
 }
 
-static int compile_or (hcl_t* hcl, hcl_oop_t src)
+static int compile_or (hcl_t* hcl, hcl_cnode_t* src)
 {
-	hcl_oop_t expr, obj;
+	hcl_cnode_t* obj, * expr;
 
-	HCL_ASSERT (hcl, HCL_IS_CONS(hcl, src));
-	HCL_ASSERT (hcl, HCL_CONS_CAR(src) == hcl->_or);
+	HCL_ASSERT (hcl, HCL_CNODE_IS_CONS(src));
+	HCL_ASSERT (hcl, HCL_CNODE_IS_SYMBOL_SYNCODED(HCL_CNODE_CONS_CAR(src), HCL_SYNCODE_OR));
 
-	obj = HCL_CONS_CDR(src);
+	obj = HCL_CNODE_CONS_CDR(src);
 
-	if (HCL_IS_NIL(hcl, obj))
+	if (!obj)
 	{
 		/* no value */
-		hcl_setsynerrbfmt (hcl, HCL_SYNERR_ARGCOUNT, HCL_NULL, HCL_NULL,
-			"no expression specified in or - %O", src); /* TODO: error location */
+		hcl_setsynerrbfmt (hcl, HCL_SYNERR_ARGCOUNT, HCL_CNODE_GET_LOC(src), HCL_NULL, "no expression specified in or");
 		return -1;
 	}
-	else if (!HCL_IS_CONS(hcl, obj))
+	else if (!HCL_CNODE_IS_CONS(obj))
 	{
-		hcl_setsynerrbfmt (hcl, HCL_SYNERR_DOTBANNED, HCL_NULL, HCL_NULL,
-			"redundant cdr in or - %O", src); /* TODO: error location */
+		hcl_setsynerrbfmt (hcl, HCL_SYNERR_DOTBANNED, HCL_CNODE_GET_LOC(obj), HCL_CNODE_GET_TOK(obj), "redundant cdr in and");
 		return -1;
 	}
 
 /* TODO: optimization - eat away all false expressions */
-	expr = HCL_CONS_CAR(obj);
-	obj = HCL_CONS_CDR(obj);
+	expr = HCL_CNODE_CONS_CAR(obj);
+	obj = HCL_CNODE_CONS_CDR(obj);
 
 	SWITCH_TOP_CFRAME (hcl, COP_COMPILE_OBJECT, expr); /* 1 */
 	PUSH_SUBCFRAME (hcl, COP_SUBCOMPILE_OR_EXPR, obj); /* 2 */
@@ -930,28 +920,25 @@ static int compile_or (hcl_t* hcl, hcl_oop_t src)
 	return 0;
 }
 
-static int compile_break (hcl_t* hcl, hcl_oop_t src)
+static int compile_break (hcl_t* hcl, hcl_cnode_t* src)
 {
 	/* (break) */
-	hcl_oop_t obj;
+	hcl_cnode_t* obj;
 	hcl_ooi_t i;
 
-	HCL_ASSERT (hcl, HCL_IS_CONS(hcl, src));
-	HCL_ASSERT (hcl, HCL_CONS_CAR(src) == hcl->_break);
+	HCL_ASSERT (hcl, HCL_CNODE_IS_CONS(src));
+	HCL_ASSERT (hcl, HCL_CNODE_IS_SYMBOL_SYNCODED(HCL_CNODE_CONS_CAR(src), HCL_SYNCODE_BREAK));
 
-	obj = HCL_CONS_CDR(src);
-	if (!HCL_IS_NIL(hcl,obj))
+	obj = HCL_CNODE_CONS_CDR(src);
+	if (obj)
 	{
-		if (HCL_IS_CONS(hcl,obj))
+		if (HCL_CNODE_IS_CONS(obj))
 		{
-			hcl_setsynerrbfmt (hcl, HCL_SYNERR_ARGCOUNT, HCL_NULL, HCL_NULL,
-				"redundant argument in break - %O", src); /* TODO: error location */
+			hcl_setsynerrbfmt (hcl, HCL_SYNERR_ARGCOUNT, HCL_CNODE_GET_LOC(obj), HCL_NULL, "redundant argument in break");
 		}
 		else
 		{
-			hcl_setsynerrbfmt (hcl, HCL_SYNERR_DOTBANNED, HCL_NULL, HCL_NULL,
-				"redundant cdr in break - %O", src); /* TODO: error location */
-			return -1;
+			hcl_setsynerrbfmt (hcl, HCL_SYNERR_DOTBANNED, HCL_CNODE_GET_LOC(obj), HCL_CNODE_GET_TOK(obj), "redundant cdr in break");
 		}
 		return -1;
 	}
@@ -985,11 +972,11 @@ static int compile_break (hcl_t* hcl, hcl_oop_t src)
 		}
 	}
 
-	hcl_setsynerrbfmt (hcl, HCL_SYNERR_BREAK, HCL_NULL, HCL_NULL, 
-		"break outside loop - %O", src); /* TODO: error location */
+	hcl_setsynerrbfmt (hcl, HCL_SYNERR_BREAK, HCL_CNODE_GET_LOC(src), HCL_NULL, "break outside loop");
 	return -1;
 }
 
+#if 0
 static int compile_if (hcl_t* hcl, hcl_oop_t src)
 {
 	hcl_oop_t obj, cond;
@@ -1488,9 +1475,10 @@ static int compile_while (hcl_t* hcl, hcl_oop_t src, int next_cop)
 
 	return 0;
 }
+#endif
 /* ========================================================================= */
 
-static int compile_cons_array_expression (hcl_t* hcl, hcl_oop_t obj)
+static int compile_cons_array_expression (hcl_t* hcl, hcl_cnode_t* obj)
 {
 	/* [ ] */
 	hcl_ooi_t nargs;
@@ -1500,11 +1488,11 @@ static int compile_cons_array_expression (hcl_t* hcl, hcl_oop_t obj)
 	 *       many operations can be performed without taking GC into account */
 	SWITCH_TOP_CFRAME (hcl, COP_EMIT_MAKE_ARRAY, HCL_SMOOI_TO_OOP(0));
 
-	nargs = hcl_countcons(hcl, obj);
+	nargs = hcl_countcnodecons(hcl, obj);
 	if (nargs > MAX_CODE_PARAM) 
 	{
 		/* TODO: change to syntax error */
-		hcl_setsynerrbfmt (hcl, HCL_SYNERR_ARGFLOOD, HCL_NULL, HCL_NULL, "too many(%zd) elements into array - %O", nargs, obj); 
+		hcl_setsynerrbfmt (hcl, HCL_SYNERR_ARGFLOOD, HCL_CNODE_GET_LOC(obj), HCL_NULL, "too many(%zd) elements into array", nargs); 
 		return -1;
 	}
 
@@ -1521,7 +1509,7 @@ static int compile_cons_array_expression (hcl_t* hcl, hcl_oop_t obj)
 	return 0;
 }
 
-static int compile_cons_bytearray_expression (hcl_t* hcl, hcl_oop_t obj)
+static int compile_cons_bytearray_expression (hcl_t* hcl, hcl_cnode_t* obj)
 {
 	/* #[ ] - e.g. #[1, 2, 3] or #[ 1 2 3 ] */
 	hcl_ooi_t nargs;
@@ -1531,11 +1519,11 @@ static int compile_cons_bytearray_expression (hcl_t* hcl, hcl_oop_t obj)
 	 *       many operations can be performed without taking GC into account */
 	SWITCH_TOP_CFRAME (hcl, COP_EMIT_MAKE_BYTEARRAY, HCL_SMOOI_TO_OOP(0));
 
-	nargs = hcl_countcons(hcl, obj);
+	nargs = hcl_countcnodecons(hcl, obj);
 	if (nargs > MAX_CODE_PARAM) 
 	{
 		/* TODO: change to syntax error */
-		hcl_setsynerrbfmt (hcl, HCL_SYNERR_ARGFLOOD, HCL_NULL, HCL_NULL, "too many(%zd) elements into byte-array - %O", nargs, obj); 
+		hcl_setsynerrbfmt (hcl, HCL_SYNERR_ARGFLOOD, HCL_CNODE_GET_LOC(obj), HCL_NULL, "too many(%zd) elements into byte-array", nargs); 
 		return -1;
 	}
 
@@ -1552,7 +1540,7 @@ static int compile_cons_bytearray_expression (hcl_t* hcl, hcl_oop_t obj)
 	return 0;
 }
 
-static int compile_cons_dic_expression (hcl_t* hcl, hcl_oop_t obj)
+static int compile_cons_dic_expression (hcl_t* hcl, hcl_cnode_t* obj)
 {
 	/* { } - e.g. {1:2, 3:4,"abc":def, "hwaddr":"00:00:00:01"} or { 1 2 3 4 } */
 	hcl_ooi_t nargs;
@@ -1560,11 +1548,11 @@ static int compile_cons_dic_expression (hcl_t* hcl, hcl_oop_t obj)
 
 	SWITCH_TOP_CFRAME (hcl, COP_EMIT_MAKE_DIC, HCL_SMOOI_TO_OOP(0));
 
-	nargs = hcl_countcons(hcl, obj);
+	nargs = hcl_countcnodecons(hcl, obj);
 	if (nargs > MAX_CODE_PARAM) 
 	{
 		/* TODO: change to syntax error */
-		hcl_setsynerrbfmt (hcl, HCL_SYNERR_ARGFLOOD, HCL_NULL, HCL_NULL, "too many(%zd) elements into dictionary - %O", nargs, obj); 
+		hcl_setsynerrbfmt (hcl, HCL_SYNERR_ARGFLOOD, HCL_CNODE_GET_LOC(obj), HCL_NULL, "too many(%zd) elements into dictionary", nargs); 
 		return -1;
 	}
 
@@ -1579,7 +1567,8 @@ static int compile_cons_dic_expression (hcl_t* hcl, hcl_oop_t obj)
 	return 0;
 }
 
-static int compile_cons_qlist_expression (hcl_t* hcl, hcl_oop_t obj)
+#if 0
+static int compile_cons_qlist_expression (hcl_t* hcl, hcl_cnode_t* obj)
 {
 	/* #( 1 2  3 ) 
 	 * #(1 (+ 2 3) 5)
@@ -1592,11 +1581,11 @@ static int compile_cons_qlist_expression (hcl_t* hcl, hcl_oop_t obj)
 	 *       many operations can be performed without taking GC into account */
 	SWITCH_TOP_CFRAME (hcl, COP_EMIT_MAKE_DLIST, HCL_SMOOI_TO_OOP(0));
 
-	nargs = hcl_countcons(hcl, obj);
+	nargs = hcl_countcnodecons(hcl, obj);
 	if (nargs > MAX_CODE_PARAM) 
 	{
 		/* TODO: change to syntax error */
-		hcl_setsynerrbfmt (hcl, HCL_SYNERR_ARGFLOOD, HCL_NULL, HCL_NULL, "too many(%zd) elements into array - %O", nargs, obj); 
+		hcl_setsynerrbfmt (hcl, HCL_SYNERR_ARGFLOOD, HCL_NULL, HCL_NULL, "too many(%zd) elements into list - %O", nargs, obj); 
 		return -1;
 	}
 
@@ -1616,7 +1605,6 @@ static int compile_cons_qlist_expression (hcl_t* hcl, hcl_oop_t obj)
 
 static int compile_cons_xlist_expression (hcl_t* hcl, hcl_cnode_t* obj)
 {
-	hcl_cnode_t* head;
 	hcl_cnode_t* car;
 	int syncode; /* syntax code of the first element */
 
@@ -1628,18 +1616,10 @@ static int compile_cons_xlist_expression (hcl_t* hcl, hcl_cnode_t* obj)
 	 * if the name is another function call, i can't know if the 
 	 * function name will be valid at the compile time.
 	 */
-	HCL_ASSERT (hcl, obj->type == HCL_CNODE_LIST);
-	HCL_ASSERT (hcl, obj->u.list.type == HCL_CONCODE_XLIST);
+	HCL_ASSERT (hcl, HCL_CNODE_IS_CONS_CONCODED(obj, HCL_CONCODE_XLIST));
 
-	head = obj->u.list.head;
-	if (!head)
-	{
-		/* empty list */
-	}
-
-	HCL_ASSERT (hcl, head->type == HCL_CNODE_CONS);
-	car = head->u.cons.car;
-	if (car->type == HCL_CNODE_SYMBOL && (syncode = hcl_getsyncodebyoocs_noseterr(hcl, &car->u.symbol)) > 0)
+	car = HCL_CNODE_CONS_CAR(obj);
+	if (HCL_CNODE_IS_SYMBOL(car) && (syncode = HCL_CNODE_SYMBOL_SYNCODE(car)))
 	{
 		switch (syncode)
 		{
@@ -1652,6 +1632,7 @@ static int compile_cons_xlist_expression (hcl_t* hcl, hcl_cnode_t* obj)
 				if (compile_break(hcl, obj) <= -1) return -1;
 				break;
 
+#if  0
 			case HCL_SYNCODE_DEFUN:
 				if (compile_lambda(hcl, obj, 1) <= -1) return -1;
 				break;
@@ -1676,11 +1657,12 @@ static int compile_cons_xlist_expression (hcl_t* hcl, hcl_cnode_t* obj)
 				/* (lambda (x y) (+ x y)) */
 				if (compile_lambda(hcl, obj, 0) <= -1) return -1;
 				break;
-
+#endif
 			case HCL_SYNCODE_OR:
 				if (compile_or(hcl, obj) <= -1) return -1;
 				break;
 
+#if 0
 			case HCL_SYNCODE_SET:
 				/* (set x 10) 
 				 * (set x (lambda (x y) (+ x y)) */
@@ -1704,23 +1686,23 @@ static int compile_cons_xlist_expression (hcl_t* hcl, hcl_cnode_t* obj)
 			case HCL_SYNCODE_WHILE:
 				if (compile_while(hcl, obj, COP_POST_WHILE_COND) <= -1) return -1;
 				break;
+#endif
 
 			default:
 				HCL_DEBUG3 (hcl, "Internal error - unknown syncode %d at %s:%d\n", syncode, __FILE__, __LINE__);
-				hcl_setsynerrbfmt (hcl, HCL_SYNERR_INTERN, &car->loc, HCL_NULL, "internal error - unknown syncode %d", syncode);
+				hcl_setsynerrbfmt (hcl, HCL_SYNERR_INTERN, HCL_CNODE_GET_LOC(car), HCL_NULL, "internal error - unknown syncode %d", syncode);
 				return -1;
 		}
 	}
-	//else if (car->type == HCL_CNODE_SYMBOL || HCL_IS_CONS_CONCODED(hcl,car,HCL_CONCODE_XLIST))
-	else if (car->type == HCL_CNODE_SYMBOL || (car->type == HCL_CNODE_LIST && car->u.list.type == HCL_CONCODE_XLIST))
+	else if (HCL_CNODE_IS_SYMBOL(car) || HCL_CNODE_IS_CONS_CONCODED(car, HCL_CONCODE_XLIST))
 	{
 		/* normal function call 
 		 *  (<operator> <operand1> ...) */
 		hcl_ooi_t nargs;
 		hcl_ooi_t oldtop;
 		hcl_cframe2_t* cf;
-		hcl_oop_t cdr;
-		hcl_oop_cons_t sdc;
+		hcl_cnode_t* cdr;
+		hcl_cnode_t* sdc;
 
 		/* NOTE: cframe management functions don't use the object memory.
 		 *       many operations can be performed without taking GC into account */
@@ -1737,22 +1719,22 @@ static int compile_cons_xlist_expression (hcl_t* hcl, hcl_cnode_t* obj)
 		PUSH_CFRAME (hcl, COP_COMPILE_OBJECT, car);
 
 		/* compile <operand1> ... etc */
-		cdr = HCL_CONS_CDR(obj);
+		cdr = HCL_CNODE_CONS_CDR(obj);
 
-		if (HCL_IS_NIL(hcl, cdr)) 
+		if (!cdr) 
 		{
 			nargs = 0;
 		}
 		else
 		{
-			if (!HCL_IS_NIL(hcl, cdr) && !HCL_IS_CONS(hcl, cdr))
+			if (!HCL_CNODE_IS_CONS(cdr))
 			{
 				/* (funname . 10) */
-				hcl_setsynerrbfmt (hcl, HCL_SYNERR_DOTBANNED, HCL_NULL, HCL_NULL, "redundant cdr in function call - %O", obj); /* TODO: error location */
+				hcl_setsynerrbfmt (hcl, HCL_SYNERR_DOTBANNED, HCL_CNODE_GET_LOC(cdr), HCL_CNODE_GET_TOK(cdr), "redundant cdr in function call");
 				return -1;
 			}
 
-			nargs = hcl_countcons(hcl, cdr);
+			nargs = hcl_countcnodecons(hcl, cdr);
 			if (nargs > MAX_CODE_PARAM) 
 			{
 				hcl_setsynerrbfmt (hcl, HCL_SYNERR_ARGFLOOD, HCL_NULL, HCL_NULL, "too many(%zd) parameters in function call - %O", nargs, obj); 
@@ -1760,7 +1742,7 @@ static int compile_cons_xlist_expression (hcl_t* hcl, hcl_cnode_t* obj)
 			}
 		}
 
-		if (HCL_IS_SYMBOL(hcl, car))
+		if (HCL_CNODE_IS_SYMBOL(car))
 		{
 			/* only symbols are added to the system dictionary. 
 			 * perform this lookup only if car is a symbol */
@@ -1791,7 +1773,7 @@ static int compile_cons_xlist_expression (hcl_t* hcl, hcl_cnode_t* obj)
 	}
 	else
 	{
-		hcl_setsynerrbfmt (hcl, HCL_SYNERR_CALLABLE, HCL_NULL, HCL_NULL, "invalid callable %O in function call - %O", car, obj); /* error location */
+		hcl_setsynerrbfmt (hcl, HCL_SYNERR_CALLABLE, HCL_CNODE_GET_LOC(car), HCL_CNODE_GET_TOK(car), "invalid callable in function call");
 		return -1;
 	}
 
@@ -1802,23 +1784,23 @@ static HCL_INLINE int compile_symbol (hcl_t* hcl, hcl_cnode_t* obj)
 {
 	hcl_oow_t index;
 
-	HCL_ASSERT (hcl, obj->type == HCL_CNODE_SYMBOL);
+	HCL_ASSERT (hcl, HCL_CNODE_IS_SYMBOL(obj));
 
-	if (hcl_getsyncodebyoocs_noseterr(hcl, &obj->u.symbol) > 0)
+	if (hcl_getsyncodebyoocs_noseterr(hcl, HCL_CNODE_GET_TOK(obj)) > 0)
 	{
-		hcl_setsynerrbfmt (hcl, HCL_SYNERR_BANNEDVARNAME, &obj->loc, HCL_NULL,
-			"special symbol not to be used as a variable name - %.*js", obj->u.symbol.len, obj->u.symbol.ptr);
+		hcl_setsynerrbfmt (hcl, HCL_SYNERR_BANNEDVARNAME, HCL_CNODE_GET_LOC(obj), HCL_NULL,
+			"special symbol not to be used as a variable name - %.*js", HCL_CNODE_GET_TOKLEN(obj), HCL_CNODE_GET_TOKPTR(obj));
 		return -1;
 	}
 
 	/* check if a symbol is a local variable */
-	if (find_temporary_variable_backward(hcl, &obj->u.symbol, &index) <= -1)
+	if (find_temporary_variable_backward(hcl, HCL_CNODE_GET_TOK(obj), &index) <= -1)
 	{
 		hcl_oop_t sym, cons;
 /* TODO: if i require all variables to be declared, this part is not needed and should handle it as an error */
 /* TODO: change the scheme... allow declaration??? */
 		/* global variable */
-		sym = hcl_makesymbol(hcl, obj->u.symbol.ptr, obj->u.symbol.len);
+		sym = hcl_makesymbol(hcl, HCL_CNODE_GET_TOKPTR(obj), HCL_CNODE_GET_TOKLEN(obj));
 		if (HCL_UNLIKELY(!sym)) return -1;
 
 		cons = (hcl_oop_t)hcl_getatsysdic(hcl, sym);
@@ -1883,7 +1865,7 @@ static hcl_oop_t string_to_num (hcl_t* hcl, hcl_oocs_t* str, const hcl_ioloc_t* 
 
 		if (*ptr != '#')
 		{
-			hcl_setsynerrbfmt(hcl, HCL_SYNERR_RADIX, loc, HCL_NULL, "radixed number not starting with # - %.*js", str->len, str->ptr);
+			hcl_setsynerrbfmt(hcl, HCL_SYNERR_RADIX, loc, str, "radixed number not starting with #");
 			return HCL_NULL;
 		}
 		ptr++; /* skip '#' */
@@ -1893,7 +1875,7 @@ static hcl_oop_t string_to_num (hcl_t* hcl, hcl_oocs_t* str, const hcl_ioloc_t* 
 		else if (*ptr == 'b') base = 2;
 		else
 		{
-			hcl_setsynerrbfmt (hcl, HCL_SYNERR_RADIX, loc, HCL_NULL, "invalid radix specifier - %c", *ptr);
+			hcl_setsynerrbfmt (hcl, HCL_SYNERR_RADIX, loc, str, "invalid radix specifier %c", *ptr);
 			return HCL_NULL;
 		}
 		ptr++;
@@ -1940,7 +1922,6 @@ static hcl_oop_t string_to_fpdec (hcl_t* hcl, hcl_oocs_t* str, const hcl_ioloc_t
 	return hcl_makefpdec(hcl, v, scale);
 }
 
-
 static int compile_object (hcl_t* hcl)
 {
 	hcl_cframe2_t* cf;
@@ -1951,18 +1932,18 @@ static int compile_object (hcl_t* hcl)
 	HCL_ASSERT (hcl, cf->opcode == COP_COMPILE_OBJECT);
 
 	oprnd = cf->operand;
-	switch (oprnd->type)
+	switch (HCL_CNODE_GET_TYPE(oprnd))
 	{
 		case HCL_CNODE_NIL:
-			EMIT_BYTE_INSTRUCTION (hcl, HCL_CODE_PUSH_NIL);
+			if (emit_byte_instruction(hcl, HCL_CODE_PUSH_NIL, HCL_NULL) <= -1) return -1;
 			goto done;
 
 		case HCL_CNODE_TRUE:
-			EMIT_BYTE_INSTRUCTION (hcl, HCL_CODE_PUSH_TRUE);
+			if (emit_byte_instruction(hcl, HCL_CODE_PUSH_TRUE, HCL_NULL) <= -1) return -1;
 			goto done;
 
 		case HCL_CNODE_FALSE:
-			EMIT_BYTE_INSTRUCTION (hcl, HCL_CODE_PUSH_FALSE);
+			if (emit_byte_instruction(hcl, HCL_CODE_PUSH_FALSE, HCL_NULL) <= -1) return -1;
 			goto done;
 
 		case HCL_CNODE_CHARLIT:
@@ -1970,22 +1951,22 @@ static int compile_object (hcl_t* hcl)
 			goto literal;
 
 		case HCL_CNODE_STRLIT:
-			lit = hcl_makestring(hcl, oprnd->u.strlit.ptr, oprnd->u.strlit.len, 0);
+			lit = hcl_makestring(hcl, HCL_CNODE_GET_TOKPTR(oprnd), HCL_CNODE_GET_TOKLEN(oprnd), 0);
 			if (HCL_UNLIKELY(!lit)) return -1;
 			goto literal;
 
 		case HCL_CNODE_NUMLIT:
-			lit = string_to_num(hcl, &oprnd->u.numlit, &oprnd->loc, 0);
+			lit = string_to_num(hcl, HCL_CNODE_GET_TOK(oprnd), HCL_CNODE_GET_LOC(oprnd), 0);
 			if (HCL_UNLIKELY(!lit)) return -1;
 			goto literal;
 
 		case HCL_CNODE_RADNUMLIT:
-			lit = string_to_num(hcl, &oprnd->u.radnumlit, &oprnd->loc, 1);
+			lit = string_to_num(hcl, HCL_CNODE_GET_TOK(oprnd), HCL_CNODE_GET_LOC(oprnd), 1);
 			if (HCL_UNLIKELY(!lit)) return -1;
 			goto literal;
 
 		case HCL_CNODE_FPDECLIT:
-			lit = string_to_fpdec(hcl, &oprnd->u.fpdeclit, &oprnd->loc);
+			lit = string_to_fpdec(hcl, HCL_CNODE_GET_TOK(oprnd), HCL_CNODE_GET_LOC(oprnd));
 			if (HCL_UNLIKELY(!lit)) return -1;
 			goto literal;
 
@@ -2001,44 +1982,89 @@ static int compile_object (hcl_t* hcl)
 			if (compile_symbol(hcl, oprnd) <= -1) return -1;
 			goto done;
 
-#if 0
+#if 0	
+
+// TODO: ...
 		case  HCL_CNODE_DSYMBOL:
 			if (compile_dsymbol(hcl, oprnd) <= -1) return -1;
 			goto done;
 #endif
 
-		case HCL_CNODE_LIST:
+		case HCL_CNODE_CONS:
 		{
-			switch (oprnd->u.list.type)
+			switch (HCL_CNODE_CONS_CONCODE(oprnd))
 			{
 				case HCL_CONCODE_XLIST:
 					if (compile_cons_xlist_expression(hcl, oprnd) <= -1) return -1;
 					break;
 				case HCL_CONCODE_ARRAY:
-					//if (compile_cons_array_expression(hcl, oprnd) <= -1) return -1;
+					if (compile_cons_array_expression(hcl, oprnd) <= -1) return -1;
 					break;
 				case HCL_CONCODE_BYTEARRAY:
-					//if (compile_cons_bytearray_expression(hcl, oprnd) <= -1) return -1;
+					if (compile_cons_bytearray_expression(hcl, oprnd) <= -1) return -1;
 					break;
 				case HCL_CONCODE_DIC:
-					//if (compile_cons_dic_expression(hcl, oprnd) <= -1) return -1;
+					if (compile_cons_dic_expression(hcl, oprnd) <= -1) return -1;
 					break;
 				case HCL_CONCODE_QLIST:
+				#if 0
 					//if (compile_cons_qlist_expression(hcl, oprnd) <= -1) return -1;
-					break;
+					// break;
+				#else
+					hcl_setsynerrbfmt (hcl, HCL_SYNERR_INTERN, HCL_CNODE_GET_LOC(oprnd), HCL_NULL, "internal error - qlist not implemented");
+					return -1;
+				#endif
 				case HCL_CONCODE_VLIST:
-					hcl_setsynerrbfmt (hcl, HCL_SYNERR_VARDCLBANNED, &oprnd->loc, HCL_NULL, "variable declaration disallowed");
+					hcl_setsynerrbfmt (hcl, HCL_SYNERR_VARDCLBANNED, HCL_CNODE_GET_LOC(oprnd), HCL_NULL, "variable declaration disallowed");
 					return -1;
 
 				default:
-					hcl_setsynerrbfmt (hcl, HCL_SYNERR_INTERN, &oprnd->loc, HCL_NULL, "internal error - unknown list type %d ", oprnd->u.list.type);
+					hcl_setsynerrbfmt (hcl, HCL_SYNERR_INTERN, HCL_CNODE_GET_LOC(oprnd), HCL_NULL, "internal error - unknown cons type %d", HCL_CNODE_CONS_CONCODE(oprnd));
 					return -1;
 			}
+
+			break;
 		}
 
-		case HCL_CNODE_CONS: /* this type can never start a list.  it should never be seen here. */
-		//default:
-			hcl_setsynerrbfmt (hcl, HCL_SYNERR_INTERN, &oprnd->loc, HCL_NULL, "internal error - unexpected object type %d ", oprnd->type);
+		case HCL_CNODE_LIST:
+		{
+			/* empty list */
+			switch (HCL_CNODE_LIST_CONCODE(oprnd))
+			{
+				case HCL_CONCODE_XLIST:
+					hcl_setsynerrbfmt (hcl, HCL_SYNERR_VARDCLBANNED, HCL_CNODE_GET_LOC(oprnd), HCL_NULL, "empty executable list");
+					return -1;
+
+				case HCL_CONCODE_ARRAY:
+					if (emit_single_param_instruction(hcl, HCL_CODE_MAKE_ARRAY, 0) <= -1) return -1;
+					goto done;
+
+				case HCL_CONCODE_BYTEARRAY:
+					if (emit_single_param_instruction(hcl, HCL_CODE_MAKE_BYTEARRAY, 0) <= -1) return -1;
+					goto done;
+
+				case HCL_CONCODE_DIC:
+					if (emit_single_param_instruction(hcl, HCL_CODE_MAKE_DIC, 16) <= -1) return -1;
+					goto done;
+
+				case HCL_CONCODE_QLIST:
+					if (emit_byte_instruction(hcl, HCL_CODE_PUSH_NIL, HCL_NULL) <= -1) return -1;
+					goto done;
+
+				case HCL_CONCODE_VLIST:
+					hcl_setsynerrbfmt (hcl, HCL_SYNERR_VARDCLBANNED, HCL_CNODE_GET_LOC(oprnd), HCL_NULL, "variable declaration disallowed");
+					return -1;
+
+				default:
+					hcl_setsynerrbfmt (hcl, HCL_SYNERR_INTERN, HCL_CNODE_GET_LOC(oprnd), HCL_NULL, "internal error - unknown list type %d", HCL_CNODE_CONS_CONCODE(oprnd));
+					return -1;
+			}
+
+			break;
+		}
+
+		default:
+			hcl_setsynerrbfmt (hcl, HCL_SYNERR_INTERN, HCL_CNODE_GET_LOC(oprnd), HCL_CNODE_GET_TOK(oprnd), "internal error - unexpected object type %d", HCL_CNODE_GET_TYPE(oprnd));
 			return -1;
 	}
 
@@ -2055,7 +2081,7 @@ done:
 static int compile_object_list (hcl_t* hcl)
 {
 	hcl_cframe2_t* cf;
-	hcl_oop_t coprnd;
+	hcl_cnode_t* oprnd;
 	int cop;
 
 	cf = GET_TOP_CFRAME(hcl);
@@ -2066,68 +2092,66 @@ static int compile_object_list (hcl_t* hcl)
 	                 cf->opcode == COP_COMPILE_OBJECT_LIST_TAIL);
 
 	cop = cf->opcode;
-	coprnd = cf->operand;
+	oprnd = cf->operand;
 
-	if (HCL_IS_NIL(hcl, coprnd))
+	if (!oprnd)
 	{
 		POP_CFRAME (hcl);
 	}
 	else
 	{
-		hcl_oop_t car, cdr;
+		hcl_cnode_t* car, * cdr;
 
 		if (cop != COP_COMPILE_ARGUMENT_LIST)
 		{
 			/* eliminate unnecessary non-function calls. keep the last one */
-			while (HCL_IS_CONS(hcl, coprnd))
+			while (HCL_CNODE_IS_CONS(oprnd))
 			{
-				cdr = HCL_CONS_CDR(coprnd);
-				if (HCL_IS_NIL(hcl,cdr)) break; /* keep the last one */
+				cdr = HCL_CNODE_CONS_CDR(oprnd);
+				if (!cdr) break; /* keep the last one */
 
-				if (HCL_IS_CONS(hcl, cdr))
+				if (HCL_CNODE_IS_CONS(cdr))
 				{
 					/* look ahead */
 					/* keep the last one before elif or else... */
-					car = HCL_CONS_CAR(cdr);
-					if (HCL_IS_SYMBOL(hcl, car) && HCL_OBJ_GET_FLAGS_SYNCODE(car)) break;
+					car = HCL_CNODE_CONS_CAR(cdr);
+					if (HCL_CNODE_IS_SYMBOL(car) && HCL_CNODE_SYMBOL_SYNCODE(car)) break;
 				}
 
-				car = HCL_CONS_CAR(coprnd);
-				if (HCL_IS_CONS(hcl, car) || (HCL_IS_SYMBOL(hcl, car) && HCL_OBJ_GET_FLAGS_SYNCODE(car))) break;
-				coprnd = cdr;
+				car = HCL_CNODE_CONS_CAR(oprnd);
+				if (HCL_CNODE_IS_CONS(car) || (HCL_CNODE_IS_SYMBOL(car) && HCL_CNODE_SYMBOL_SYNCODE(car))) break;
+				oprnd = cdr;
 			}
 
-			HCL_ASSERT (hcl, !HCL_IS_NIL(hcl, coprnd));
+			HCL_ASSERT (hcl, oprnd != HCL_NULL);
 		}
 
-		if (!HCL_IS_CONS(hcl, coprnd))
+		if (!HCL_CNODE_IS_CONS(oprnd))
 		{
-			hcl_setsynerrbfmt (
-				hcl, HCL_SYNERR_DOTBANNED, HCL_NULL, HCL_NULL,
-				"redundant cdr in the object list - %O", coprnd); /* TODO: error location */
+			hcl_setsynerrbfmt (hcl, HCL_SYNERR_DOTBANNED, HCL_CNODE_GET_LOC(oprnd), HCL_CNODE_GET_TOK(oprnd), "redundant cdr in the object list");
 			return -1;
 		}
 
-		car = HCL_CONS_CAR(coprnd);
-		cdr = HCL_CONS_CDR(coprnd);
+		car = HCL_CNODE_CONS_CAR(oprnd);
+		cdr = HCL_CNODE_CONS_CDR(oprnd);
 
 		if (cop == COP_COMPILE_IF_OBJECT_LIST || cop == COP_COMPILE_IF_OBJECT_LIST_TAIL)
 		{
-			if (car == hcl->_elif)
+			if (HCL_CNODE_IS_SYMBOL_SYNCODED(car, HCL_SYNCODE_ELIF))
 			{
-				SWITCH_TOP_CFRAME (hcl, COP_SUBCOMPILE_ELIF, coprnd);
+				SWITCH_TOP_CFRAME (hcl, COP_SUBCOMPILE_ELIF, oprnd);
 				goto done;
 			}
-			else if (car == hcl->_else)
+			else if (HCL_CNODE_IS_SYMBOL_SYNCODED(car, HCL_SYNCODE_ELSE))
 			{
-				SWITCH_TOP_CFRAME (hcl, COP_SUBCOMPILE_ELSE, coprnd);
+				SWITCH_TOP_CFRAME (hcl, COP_SUBCOMPILE_ELSE, oprnd);
 				goto done;
 			}
 		}
 
 		SWITCH_TOP_CFRAME (hcl, COP_COMPILE_OBJECT, car);
 
-		if (!HCL_IS_NIL(hcl, cdr))
+		if (cdr)
 		{
 			/* there is a next statement to compile 
 			 *
@@ -2152,7 +2176,7 @@ static int compile_object_list (hcl_t* hcl)
 		{
 			/* emit POP_STACKTOP before evaluating the second objects 
 			 * and onwards. this goes above COP_COMPILE_OBJECT */
-			PUSH_CFRAME (hcl, COP_EMIT_POP_STACKTOP, hcl->_nil);
+			PUSH_CFRAME (hcl, COP_EMIT_POP_STACKTOP, HCL_NULL);
 		}
 	}
 
@@ -2163,37 +2187,35 @@ done:
 static int compile_array_list (hcl_t* hcl)
 {
 	hcl_cframe2_t* cf;
-	hcl_oop_t coprnd;
+	hcl_cnode_t* oprnd;
 
 	cf = GET_TOP_CFRAME(hcl);
 	HCL_ASSERT (hcl, cf->opcode == COP_COMPILE_ARRAY_LIST);
 
-	coprnd = cf->operand;
+	oprnd = cf->operand;
 
-	if (HCL_IS_NIL(hcl, coprnd))
+	if (!oprnd)
 	{
 		POP_CFRAME (hcl);
 	}
 	else
 	{
-		hcl_oop_t car, cdr;
+		hcl_cnode_t* car, * cdr;
 		hcl_ooi_t oldidx;
 
-		if (!HCL_IS_CONS(hcl, coprnd))
+		if (!HCL_CNODE_IS_CONS(oprnd))
 		{
-			hcl_setsynerrbfmt (
-				hcl, HCL_SYNERR_DOTBANNED, HCL_NULL, HCL_NULL, 
- 				"redundant cdr in the array list - %O", coprnd); /* TODO: error location */
+			hcl_setsynerrbfmt (hcl, HCL_SYNERR_DOTBANNED, HCL_CNODE_GET_LOC(oprnd), HCL_CNODE_GET_TOK(oprnd), "redundant cdr in the array list");
 			return -1;
 		}
 
-		car = HCL_CONS_CAR(coprnd);
-		cdr = HCL_CONS_CDR(coprnd);
+		car = HCL_CNODE_CONS_CAR(oprnd);
+		cdr = HCL_CNODE_CONS_CDR(oprnd);
 
 		oldidx = cf->u.array_list.index;
 
 		SWITCH_TOP_CFRAME (hcl, COP_COMPILE_OBJECT, car);
-		if (!HCL_IS_NIL(hcl, cdr))
+		if (cdr)
 		{
 			PUSH_SUBCFRAME (hcl, COP_COMPILE_ARRAY_LIST, cdr);
 			cf = GET_SUBCFRAME(hcl);
@@ -2210,37 +2232,35 @@ static int compile_array_list (hcl_t* hcl)
 static int compile_bytearray_list (hcl_t* hcl)
 {
 	hcl_cframe2_t* cf;
-	hcl_oop_t coprnd;
+	hcl_cnode_t* oprnd;
 
 	cf = GET_TOP_CFRAME(hcl);
 	HCL_ASSERT (hcl, cf->opcode == COP_COMPILE_BYTEARRAY_LIST);
 
-	coprnd = cf->operand;
+	oprnd = cf->operand;
 
-	if (HCL_IS_NIL(hcl, coprnd))
+	if (!oprnd)
 	{
 		POP_CFRAME (hcl);
 	}
 	else
 	{
-		hcl_oop_t car, cdr;
+		hcl_cnode_t* car, * cdr;
 		hcl_ooi_t oldidx;
 
-		if (!HCL_IS_CONS(hcl, coprnd))
+		if (!HCL_CNODE_IS_CONS(oprnd))
 		{
-			hcl_setsynerrbfmt (
-				hcl, HCL_SYNERR_DOTBANNED, HCL_NULL, HCL_NULL, 
- 				"redundant cdr in the byte-array list - %O", coprnd); /* TODO: error location */
+			hcl_setsynerrbfmt (hcl, HCL_SYNERR_DOTBANNED, HCL_CNODE_GET_LOC(oprnd), HCL_CNODE_GET_TOK(oprnd), "redundant cdr in the byte-array list");
 			return -1;
 		}
 
-		car = HCL_CONS_CAR(coprnd);
-		cdr = HCL_CONS_CDR(coprnd);
+		car = HCL_CNODE_CONS_CAR(oprnd);
+		cdr = HCL_CNODE_CONS_CDR(oprnd);
 
 		oldidx = cf->u.bytearray_list.index;
 
 		SWITCH_TOP_CFRAME (hcl, COP_COMPILE_OBJECT, car);
-		if (!HCL_IS_NIL(hcl, cdr))
+		if (cdr)
 		{
 			PUSH_SUBCFRAME (hcl, COP_COMPILE_BYTEARRAY_LIST, cdr);
 			cf = GET_SUBCFRAME(hcl);
@@ -2257,45 +2277,41 @@ static int compile_bytearray_list (hcl_t* hcl)
 static int compile_dic_list (hcl_t* hcl)
 {
 	hcl_cframe2_t* cf;
-	hcl_oop_t coprnd;
+	hcl_cnode_t* oprnd;
 
 	cf = GET_TOP_CFRAME(hcl);
 	HCL_ASSERT (hcl, cf->opcode == COP_COMPILE_DIC_LIST);
 
-	coprnd = cf->operand;
+	oprnd = cf->operand;
 
-	if (HCL_IS_NIL(hcl, coprnd))
+	if (!oprnd)
 	{
 		POP_CFRAME (hcl);
 	}
 	else
 	{
-		hcl_oop_t car, cdr, cadr, cddr;
+		hcl_cnode_t* car, * cdr, * cadr, * cddr;
 
-		if (!HCL_IS_CONS(hcl, coprnd))
+		if (!HCL_CNODE_IS_CONS(oprnd))
 		{
-			hcl_setsynerrbfmt (
-				hcl, HCL_SYNERR_DOTBANNED, HCL_NULL, HCL_NULL, 
- 				"redundant cdr in the dictionary list - %O", coprnd); /* TODO: error location */
+			hcl_setsynerrbfmt (hcl, HCL_SYNERR_DOTBANNED, HCL_CNODE_GET_LOC(oprnd), HCL_CNODE_GET_TOK(oprnd), "redundant cdr in the dictionary list");
 			return -1;
 		}
 
-		car = HCL_CONS_CAR(coprnd);
-		cdr = HCL_CONS_CDR(coprnd);
+		car = HCL_CNODE_CONS_CAR(oprnd);
+		cdr = HCL_CNODE_CONS_CDR(oprnd);
 
 		SWITCH_TOP_CFRAME (hcl, COP_COMPILE_OBJECT, car);
-		if (HCL_IS_NIL(hcl, cdr))
+		if (!cdr)
 		{
-			hcl_setsynerrbfmt (
-				hcl, HCL_SYNERR_UNBALKV, HCL_NULL, HCL_NULL,
-				"no value for key %O", car);
+			hcl_setsynerrbfmt (hcl, HCL_SYNERR_UNBALKV, HCL_CNODE_GET_LOC(car), HCL_NULL, "no value for key %.*js", HCL_CNODE_GET_TOKLEN(car), HCL_CNODE_GET_TOKPTR(car));
 			return -1;
 		}
 		
-		cadr = HCL_CONS_CAR(cdr);
-		cddr = HCL_CONS_CDR(cdr);
+		cadr = HCL_CNODE_CONS_CAR(cdr);
+		cddr = HCL_CNODE_CONS_CDR(cdr);
 
-		if (!HCL_IS_NIL(hcl, cddr))
+		if (cddr)
 		{
 			PUSH_SUBCFRAME (hcl, COP_COMPILE_DIC_LIST, cddr);
 		}
@@ -2310,37 +2326,39 @@ static int compile_dic_list (hcl_t* hcl)
 static int compile_qlist (hcl_t* hcl)
 {
 	hcl_cframe2_t* cf;
-	hcl_oop_t coprnd;
+	hcl_cnode_t* oprnd;
 
 	cf = GET_TOP_CFRAME(hcl);
 	HCL_ASSERT (hcl, cf->opcode == COP_COMPILE_QLIST);
 
-	coprnd = cf->operand;
+	oprnd = cf->operand;
 
-	if (HCL_IS_NIL(hcl, coprnd))
+	if (!oprnd)
 	{
 		POP_CFRAME (hcl);
 	}
 	else
 	{
-		hcl_oop_t car, cdr;
+		hcl_cnode_t* car, * cdr;
 		hcl_ooi_t oldidx;
 
-		if (!HCL_IS_CONS(hcl, coprnd))
+// TODO: correct this function in pair with compile_cons_qlist_expression()
+#if 0
+//qlist allows non-nil cdr...
+		if (!HCL_CNODE_IS_CONS(oprnd))
 		{
-			hcl_setsynerrbfmt (
-				hcl, HCL_SYNERR_DOTBANNED, HCL_NULL, HCL_NULL, 
- 				"redundant cdr in the qlist list - %O", coprnd); /* TODO: error location */
+			hcl_setsynerrbfmt (hcl, HCL_SYNERR_DOTBANNED, HCL_CNODE_GET_LOC(oprnd), HCL_CNODE_GET_TOK(oprnd), "redundant cdr in the q-list");
 			return -1;
 		}
+#endif
 
-		car = HCL_CONS_CAR(coprnd);
-		cdr = HCL_CONS_CDR(coprnd);
+		car = HCL_CNODE_CONS_CAR(oprnd);
+		cdr = HCL_CNODE_CONS_CDR(oprnd);
 
 		/*oldidx = cf->u.qlist.index;*/
 
 		SWITCH_TOP_CFRAME (hcl, COP_COMPILE_OBJECT, car);
-		if (!HCL_IS_NIL(hcl, cdr))
+		if (!cdr)
 		{
 			PUSH_SUBCFRAME (hcl, COP_COMPILE_QLIST, cdr);
 			cf = GET_SUBCFRAME(hcl);
@@ -2479,7 +2497,7 @@ static HCL_INLINE int subcompile_else (hcl_t* hcl)
 
 static HCL_INLINE int subcompile_and_expr (hcl_t* hcl)
 {
-	hcl_oop_t obj, expr;
+	hcl_cnode_t* obj, * expr;
 	hcl_cframe2_t* cf;
 	hcl_ooi_t jump_inst_pos;
 	
@@ -2489,16 +2507,15 @@ static HCL_INLINE int subcompile_and_expr (hcl_t* hcl)
 	obj = cf->operand;
 
 /* TODO: optimization - eat away all true expressions */
-	if (HCL_IS_NIL(hcl, obj))
+	if (!obj)
 	{
 		/* no more */
 		POP_CFRAME (hcl);
 		return 0;
 	}
-	else if (!HCL_IS_CONS(hcl, obj))
+	else if (!HCL_CNODE_IS_CONS(obj))
 	{
-		hcl_setsynerrbfmt (hcl, HCL_SYNERR_DOTBANNED, HCL_NULL, HCL_NULL,
-			"redundant cdr in and - %O", obj); /* TODO: error location */
+		hcl_setsynerrbfmt (hcl, HCL_SYNERR_DOTBANNED, HCL_CNODE_GET_LOC(obj), HCL_CNODE_GET_TOK(obj), "redundant cdr in and");
 		return -1;
 	}
 
@@ -2508,8 +2525,8 @@ static HCL_INLINE int subcompile_and_expr (hcl_t* hcl)
 	if (emit_single_param_instruction(hcl, HCL_CODE_JUMP_FORWARD_IF_FALSE, MAX_CODE_JUMP) <= -1) return -1;
 	if (emit_byte_instruction(hcl, HCL_CODE_POP_STACKTOP, HCL_NULL) <= -1) return -1; 
 
-	expr = HCL_CONS_CAR(obj);
-	obj = HCL_CONS_CDR(obj);
+	expr = HCL_CNODE_CONS_CAR(obj);
+	obj = HCL_CNODE_CONS_CDR(obj);
 
 	SWITCH_TOP_CFRAME (hcl, COP_COMPILE_OBJECT, expr); /* 1 */
 	
@@ -2546,7 +2563,7 @@ static HCL_INLINE int post_and_expr (hcl_t* hcl)
 
 static HCL_INLINE int subcompile_or_expr (hcl_t* hcl)
 {
-	hcl_oop_t obj, expr;
+	hcl_cnode_t* obj, * expr;
 	hcl_cframe2_t* cf;
 	hcl_ooi_t jump_inst_pos;
 	
@@ -2556,16 +2573,15 @@ static HCL_INLINE int subcompile_or_expr (hcl_t* hcl)
 	obj = cf->operand;
 
 /* TODO: optimization - eat away all false expressions */
-	if (HCL_IS_NIL(hcl, obj))
+	if (!obj)
 	{
 		/* no more */
 		POP_CFRAME (hcl);
 		return 0;
 	}
-	else if (!HCL_IS_CONS(hcl, obj))
+	else if (!HCL_CNODE_IS_CONS(obj))
 	{
-		hcl_setsynerrbfmt (hcl, HCL_SYNERR_DOTBANNED, HCL_NULL, HCL_NULL,
-			"redundant cdr in or - %O", obj); /* TODO: error location */
+		hcl_setsynerrbfmt (hcl, HCL_SYNERR_DOTBANNED, HCL_CNODE_GET_LOC(obj), HCL_CNODE_GET_TOK(obj), "redundant cdr in or");
 		return -1;
 	}
 
@@ -2575,8 +2591,8 @@ static HCL_INLINE int subcompile_or_expr (hcl_t* hcl)
 	if (emit_single_param_instruction(hcl, HCL_CODE_JUMP_FORWARD_IF_TRUE, MAX_CODE_JUMP) <= -1) return -1;
 	if (emit_byte_instruction(hcl, HCL_CODE_POP_STACKTOP, HCL_NULL) <= -1) return -1; 
 
-	expr = HCL_CONS_CAR(obj);
-	obj = HCL_CONS_CDR(obj);
+	expr = HCL_CNODE_CONS_CAR(obj);
+	obj = HCL_CNODE_CONS_CDR(obj);
 
 	SWITCH_TOP_CFRAME (hcl, COP_COMPILE_OBJECT, expr); /* 1 */
 	
@@ -3007,8 +3023,7 @@ static HCL_INLINE int emit_set (hcl_t* hcl)
 		hcl_oow_t index;
 		hcl_oop_t cons;
 
-		//HCL_ASSERT (hcl, HCL_IS_SYMBOL(hcl, cf->operand));
-		HCL_ASSERT (hcl, cf->operand->type == HCL_CNODE_SYMBOL);
+		HCL_ASSERT (hcl, HCL_CNODE_IS_SYMBOL(cf->operand));
 /* TODO: make a symbol now */
 
 		cons = (hcl_oop_t)hcl_getatsysdic(hcl, cf->operand);

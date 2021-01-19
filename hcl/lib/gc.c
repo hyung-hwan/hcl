@@ -840,6 +840,7 @@ int hcl_ignite (hcl_t* hcl)
 }
 
 
+
 int hcl_getsyncodebyoocs_noseterr (hcl_t* hcl, const hcl_oocs_t* name)
 {
 	hcl_oow_t i;
@@ -849,4 +850,25 @@ int hcl_getsyncodebyoocs_noseterr (hcl_t* hcl, const hcl_oocs_t* name)
 			return syminfo[i].syncode;
 	}
 	return 0; /* 0 indicates no syntax code found */
+}
+
+int hcl_getsyncode_noseterr (hcl_t* hcl, const hcl_ooch_t* ptr, const hcl_oow_t len)
+{
+	hcl_oow_t i;
+	for (i = 0; i < HCL_COUNTOF(syminfo); i++)
+	{
+		if (hcl_comp_oochars(syminfo[i].ptr, syminfo[i].len, ptr, len) == 0) 
+			return syminfo[i].syncode;
+	}
+	return 0; /* 0 indicates no syntax code found */
+}
+
+const hcl_ooch_t* hcl_getsyncodename_noseterr (hcl_t* hcl, hcl_syncode_t syncode)
+{
+	hcl_oow_t i;
+	for (i = 0; i < HCL_COUNTOF(syminfo); i++)
+	{
+		if (syncode == syminfo[i].syncode) return syminfo[i].ptr;
+	}
+	return HCL_NULL;
 }

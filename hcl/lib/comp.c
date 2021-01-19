@@ -804,7 +804,6 @@ static int compile_break (hcl_t* hcl, hcl_oop_t src)
 		{
 			hcl_setsynerrbfmt (hcl, HCL_SYNERR_DOTBANNED, HCL_NULL, HCL_NULL,
 				"redundant cdr in break - %O", src); /* TODO: error location */
-			return -1;
 		}
 		return -1;
 	}

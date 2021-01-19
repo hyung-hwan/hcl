@@ -151,14 +151,14 @@ am__DEPENDENCIES_5 = $(am__DEPENDENCIES_1) $(am__DEPENDENCIES_2) \
 	$(am__DEPENDENCIES_3) $(am__DEPENDENCIES_4)
 libhcl_la_DEPENDENCIES = $(am__DEPENDENCIES_5) $(am__append_6)
 am_libhcl_la_OBJECTS = libhcl_la-bigint.lo libhcl_la-cnode.lo \
-	libhcl_la-comp.lo libhcl_la-debug.lo libhcl_la-decode.lo \
-	libhcl_la-dic.lo libhcl_la-err.lo libhcl_la-exec.lo \
-	libhcl_la-fmt.lo libhcl_la-gc.lo libhcl_la-hcl.lo \
-	libhcl_la-heap.lo libhcl_la-number.lo libhcl_la-obj.lo \
-	libhcl_la-opt.lo libhcl_la-prim.lo libhcl_la-print.lo \
-	libhcl_la-rbt.lo libhcl_la-read.lo libhcl_la-read2.lo \
-	libhcl_la-sym.lo libhcl_la-utf8.lo libhcl_la-utl.lo \
-	libhcl_la-xma.lo
+	libhcl_la-comp.lo libhcl_la-comp2.lo libhcl_la-debug.lo \
+	libhcl_la-decode.lo libhcl_la-dic.lo libhcl_la-err.lo \
+	libhcl_la-exec.lo libhcl_la-fmt.lo libhcl_la-gc.lo \
+	libhcl_la-hcl.lo libhcl_la-heap.lo libhcl_la-number.lo \
+	libhcl_la-obj.lo libhcl_la-opt.lo libhcl_la-prim.lo \
+	libhcl_la-print.lo libhcl_la-rbt.lo libhcl_la-read.lo \
+	libhcl_la-read2.lo libhcl_la-sym.lo libhcl_la-utf8.lo \
+	libhcl_la-utl.lo libhcl_la-xma.lo
 libhcl_la_OBJECTS = $(am_libhcl_la_OBJECTS)
 AM_V_lt = $(am__v_lt_@AM_V@)
 am__v_lt_ = $(am__v_lt_@AM_DEFAULT_V@)
@@ -198,6 +198,7 @@ depcomp = $(SHELL) $(top_srcdir)/ac/depcomp
 am__maybe_remake_depfiles = depfiles
 am__depfiles_remade = ./$(DEPDIR)/libhcl_la-bigint.Plo \
 	./$(DEPDIR)/libhcl_la-cnode.Plo ./$(DEPDIR)/libhcl_la-comp.Plo \
+	./$(DEPDIR)/libhcl_la-comp2.Plo \
 	./$(DEPDIR)/libhcl_la-debug.Plo \
 	./$(DEPDIR)/libhcl_la-decode.Plo ./$(DEPDIR)/libhcl_la-dic.Plo \
 	./$(DEPDIR)/libhcl_la-err.Plo ./$(DEPDIR)/libhcl_la-exec.Plo \
@@ -440,6 +441,7 @@ libhcl_la_SOURCES = \
 	bigint.c \
 	cnode.c \
 	comp.c \
+	comp2.c \
 	debug.c \
 	decode.c \
 	dic.c \
@@ -578,6 +580,7 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libhcl_la-bigint.Plo@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libhcl_la-cnode.Plo@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libhcl_la-comp.Plo@am__quote@ # am--include-marker
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libhcl_la-comp2.Plo@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libhcl_la-debug.Plo@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libhcl_la-decode.Plo@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libhcl_la-dic.Plo@am__quote@ # am--include-marker
@@ -656,6 +659,13 @@ libhcl_la-comp.lo: comp.c
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='comp.c' object='libhcl_la-comp.lo' libtool=yes @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libhcl_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o libhcl_la-comp.lo `test -f 'comp.c' || echo '$(srcdir)/'`comp.c
+
+libhcl_la-comp2.lo: comp2.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libhcl_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT libhcl_la-comp2.lo -MD -MP -MF $(DEPDIR)/libhcl_la-comp2.Tpo -c -o libhcl_la-comp2.lo `test -f 'comp2.c' || echo '$(srcdir)/'`comp2.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/libhcl_la-comp2.Tpo $(DEPDIR)/libhcl_la-comp2.Plo
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='comp2.c' object='libhcl_la-comp2.lo' libtool=yes @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libhcl_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o libhcl_la-comp2.lo `test -f 'comp2.c' || echo '$(srcdir)/'`comp2.c
 
 libhcl_la-debug.lo: debug.c
 @am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libhcl_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT libhcl_la-debug.lo -MD -MP -MF $(DEPDIR)/libhcl_la-debug.Tpo -c -o libhcl_la-debug.lo `test -f 'debug.c' || echo '$(srcdir)/'`debug.c
@@ -1004,6 +1014,7 @@ distclean: distclean-am
 		-rm -f ./$(DEPDIR)/libhcl_la-bigint.Plo
 	-rm -f ./$(DEPDIR)/libhcl_la-cnode.Plo
 	-rm -f ./$(DEPDIR)/libhcl_la-comp.Plo
+	-rm -f ./$(DEPDIR)/libhcl_la-comp2.Plo
 	-rm -f ./$(DEPDIR)/libhcl_la-debug.Plo
 	-rm -f ./$(DEPDIR)/libhcl_la-decode.Plo
 	-rm -f ./$(DEPDIR)/libhcl_la-dic.Plo
@@ -1080,6 +1091,7 @@ maintainer-clean: maintainer-clean-am
 		-rm -f ./$(DEPDIR)/libhcl_la-bigint.Plo
 	-rm -f ./$(DEPDIR)/libhcl_la-cnode.Plo
 	-rm -f ./$(DEPDIR)/libhcl_la-comp.Plo
+	-rm -f ./$(DEPDIR)/libhcl_la-comp2.Plo
 	-rm -f ./$(DEPDIR)/libhcl_la-debug.Plo
 	-rm -f ./$(DEPDIR)/libhcl_la-decode.Plo
 	-rm -f ./$(DEPDIR)/libhcl_la-dic.Plo

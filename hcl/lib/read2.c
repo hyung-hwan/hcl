@@ -1461,10 +1461,15 @@ static HCL_INLINE hcl_cnode_t* leave_list (hcl_t* hcl, int* flagv, int* oldflagv
 	 *      (lambda () ...) is equivalent to  (lambda #nil ...)
 	 *      (defun x() ...) */
 
-	/* [NOTE] the head is NULL if the list is empty */
-	list = hcl_makecnodelist(hcl, &loc, concode, head);
-	if (HCL_UNLIKELY(!list)) hcl_freecnode (hcl, head);
-	return list;
+	if (head) 
+	{
+		HCL_ASSERT (hcl, HCL_CNODE_IS_CONS(head));
+		HCL_CNODE_CONS_CONCODE(head) = concode;
+		return head;
+	}
+
+	/* the list is empty */
+	return hcl_makecnodelist(hcl, &loc, concode);
 }
 
 static HCL_INLINE int can_dot_list (hcl_t* hcl)
@@ -1569,7 +1574,7 @@ static int chain_to_list (hcl_t* hcl, hcl_cnode_t* obj)
 		/* chain the object via 'cdr' of the tail cell */
 		tail = rstl->tail;
 		HCL_ASSERT (hcl, tail != HCL_NULL);
-		HCL_ASSERT (hcl, tail->type == HCL_CNODE_CONS);
+		HCL_ASSERT (hcl, HCL_CNODE_IS_CONS(tail));
 		tail->u.cons.cdr = obj;
 
 		/* update the flag to CLOSED so that you can have more than
@@ -1591,7 +1596,7 @@ static int chain_to_list (hcl_t* hcl, hcl_cnode_t* obj)
 			return -1;
 		}
 
-		cons = hcl_makecnodecons(hcl, &obj->loc, obj, HCL_NULL);
+		cons = hcl_makecnodecons(hcl, HCL_CNODE_GET_LOC(obj), obj, HCL_NULL);
 		if (HCL_UNLIKELY(!cons)) return -1;
 
 		if (rstl->count <= 0)
@@ -1610,7 +1615,7 @@ static int chain_to_list (hcl_t* hcl, hcl_cnode_t* obj)
 			/* the new cons cell is not the first element.
 			 * append it to the list */
 			tail = rstl->tail;
-			HCL_ASSERT (hcl, tail->type == HCL_CNODE_CONS);
+			HCL_ASSERT (hcl, HCL_CNODE_IS_CONS(tail));
 			tail->u.cons.cdr = cons;
 			rstl->tail = cons;
 		}
@@ -1624,13 +1629,13 @@ static int chain_to_list (hcl_t* hcl, hcl_cnode_t* obj)
 
 static hcl_cnode_t* read_vlist (hcl_t* hcl)
 {
-	hcl_cnode_t* l;
-	hcl_cnode_t* ve;
+	hcl_cnode_t* vh, * ve;
+	hcl_ioloc_t start_loc;
 
 	HCL_ASSERT (hcl, TOKEN_TYPE(hcl) == HCL_IOTOK_VBAR);
 
-	l = hcl_makecnodelist(hcl, TOKEN_LOC(hcl), HCL_CONCODE_VLIST, HCL_NULL);
-	if (HCL_UNLIKELY(!l)) goto oops;
+	vh = ve = HCL_NULL;
+	start_loc = *TOKEN_LOC(hcl);
 
 	GET_TOKEN_WITH_GOTO(hcl, oops);
 
@@ -1638,7 +1643,7 @@ static hcl_cnode_t* read_vlist (hcl_t* hcl)
 	{
 		hcl_cnode_t* sym, * cons;
 
-		sym = hcl_makecnodesymbol(hcl, TOKEN_LOC(hcl), TOKEN_NAME_PTR(hcl), TOKEN_NAME_LEN(hcl));
+		sym = hcl_makecnodesymbol(hcl, TOKEN_LOC(hcl), TOKEN_NAME(hcl));
 		if (HCL_UNLIKELY(!sym)) goto oops;
 
 #if 0
@@ -1651,21 +1656,21 @@ static hcl_cnode_t* read_vlist (hcl_t* hcl)
 		/* TODO: exclude special symbols.... or do the above check in the compiler code?? */
 #endif
 
-		cons = hcl_makecnodecons(hcl, &sym->loc, sym, HCL_NULL);
+		cons = hcl_makecnodecons(hcl, HCL_CNODE_GET_LOC(sym), sym, HCL_NULL);
 		if (HCL_UNLIKELY(!cons)) 
 		{
 			hcl_freesinglecnode (hcl, sym); /* manual disposal because sym is not chained to the list */
 			goto oops;
 		}
 
-		if (!l->u.list.head)
+		if (!vh)
 		{
-			l->u.list.head = cons;
+			vh = cons;
 			ve = cons;
 		}
 		else
 		{
-			HCL_ASSERT (hcl, ve->type == HCL_CNODE_CONS);
+			HCL_ASSERT (hcl, HCL_CNODE_IS_CONS(ve));
 			ve->u.cons.cdr = cons;
 			ve = cons;
 		}
@@ -1679,10 +1684,17 @@ static hcl_cnode_t* read_vlist (hcl_t* hcl)
 		goto oops;
 	}
 
-	return l;
+	if (vh)
+	{
+		HCL_ASSERT (hcl, HCL_CNODE_IS_CONS(vh));
+		HCL_CNODE_CONS_CONCODE(vh) = HCL_CONCODE_VLIST;
+		return vh;
+	}
+
+	return hcl_makecnodelist(hcl, &start_loc, HCL_CONCODE_VLIST);
 
 oops:
-	if (l) hcl_freecnode (hcl, l);
+	if (vh) hcl_freecnode (hcl, vh);
 	return HCL_NULL;
 }
 
@@ -1735,14 +1747,9 @@ static hcl_cnode_t* read_object (hcl_t* hcl)
 				goto start_list;
 
 			case HCL_IOTOK_QLPAREN: /* #() */
-#if 1
-				hcl_setsynerr (hcl, HCL_SYNERR_ILTOK, TOKEN_LOC(hcl), TOKEN_NAME(hcl));
-				goto oops;
-#else
 				flagv = 0;
 				LIST_FLAG_SET_CONCODE (flagv, HCL_CONCODE_QLIST);
 				goto start_list;
-#endif
 
 			case HCL_IOTOK_LPAREN: /* () */
 				flagv = 0;
@@ -1771,7 +1778,7 @@ static hcl_cnode_t* read_object (hcl_t* hcl)
 					/* cannot have a period:
 					 *   1. at the top level - not inside ()
 					 *   2. at the beginning of a list
-					 *   3. inside an  #(), #[], #{}, () */
+					 *   3. inside an array, byte-array, dictionary, xlist */
 					hcl_setsynerr (hcl, HCL_SYNERR_DOTBANNED, TOKEN_LOC(hcl), HCL_NULL);
 					goto oops;
 				}
@@ -1876,15 +1883,15 @@ static hcl_cnode_t* read_object (hcl_t* hcl)
 				break;
 
 			case HCL_IOTOK_NIL:
-				obj = hcl_makecnodenil(hcl, TOKEN_LOC(hcl));
+				obj = hcl_makecnodenil(hcl, TOKEN_LOC(hcl), TOKEN_NAME(hcl));
 				break;
 
 			case HCL_IOTOK_TRUE:
-				obj = hcl_makecnodetrue(hcl, TOKEN_LOC(hcl));
+				obj = hcl_makecnodetrue(hcl, TOKEN_LOC(hcl), TOKEN_NAME(hcl));
 				break;
 
 			case HCL_IOTOK_FALSE:
-				obj = hcl_makecnodefalse(hcl, TOKEN_LOC(hcl));
+				obj = hcl_makecnodefalse(hcl, TOKEN_LOC(hcl), TOKEN_NAME(hcl));
 				break;
 
 			case HCL_IOTOK_SMPTRLIT:
@@ -1905,7 +1912,7 @@ static hcl_cnode_t* read_object (hcl_t* hcl)
 					goto oops;
 				}
 
-				obj = hcl_makecnodesmptrlit(hcl, TOKEN_LOC(hcl), v);
+				obj = hcl_makecnodesmptrlit(hcl, TOKEN_LOC(hcl), TOKEN_NAME(hcl), v);
 				break;
 			}
 
@@ -1927,24 +1934,24 @@ static hcl_cnode_t* read_object (hcl_t* hcl)
 					}
 				}
 
-				obj = hcl_makecnodeerrlit(hcl, TOKEN_LOC(hcl), v);
+				obj = hcl_makecnodeerrlit(hcl, TOKEN_LOC(hcl), TOKEN_NAME(hcl), v);
 				break;
 			}
 
 			case HCL_IOTOK_CHARLIT:
-				obj = hcl_makecnodecharlit(hcl, TOKEN_LOC(hcl), TOKEN_NAME_CHAR(hcl, 0));
+				obj = hcl_makecnodecharlit(hcl, TOKEN_LOC(hcl), TOKEN_NAME(hcl), TOKEN_NAME_CHAR(hcl, 0));
 				break;
 
 			case HCL_IOTOK_NUMLIT:
-				obj = hcl_makecnodenumlit(hcl, TOKEN_LOC(hcl), TOKEN_NAME_PTR(hcl), TOKEN_NAME_LEN(hcl));
+				obj = hcl_makecnodenumlit(hcl, TOKEN_LOC(hcl), TOKEN_NAME(hcl));
 				break;
 
 			case HCL_IOTOK_RADNUMLIT:
-				obj = hcl_makecnoderadnumlit(hcl, TOKEN_LOC(hcl), TOKEN_NAME_PTR(hcl), TOKEN_NAME_LEN(hcl));
+				obj = hcl_makecnoderadnumlit(hcl, TOKEN_LOC(hcl), TOKEN_NAME(hcl));
 				break;
 
 			case HCL_IOTOK_FPDECLIT:
-				obj = hcl_makecnodefpdeclit(hcl, TOKEN_LOC(hcl), TOKEN_NAME_PTR(hcl), TOKEN_NAME_LEN(hcl));
+				obj = hcl_makecnodefpdeclit(hcl, TOKEN_LOC(hcl), TOKEN_NAME(hcl));
 				break;
 
 			/*
@@ -1954,15 +1961,15 @@ static hcl_cnode_t* read_object (hcl_t* hcl)
 			*/
 
 			case HCL_IOTOK_STRLIT:
-				obj = hcl_makecnodestrlit(hcl, TOKEN_LOC(hcl), TOKEN_NAME_PTR(hcl), TOKEN_NAME_LEN(hcl));
+				obj = hcl_makecnodestrlit(hcl, TOKEN_LOC(hcl), TOKEN_NAME(hcl));
 				break;
 
 			case HCL_IOTOK_IDENT:
-				obj = hcl_makecnodesymbol(hcl, TOKEN_LOC(hcl), TOKEN_NAME_PTR(hcl), TOKEN_NAME_LEN(hcl));
+				obj = hcl_makecnodesymbol(hcl, TOKEN_LOC(hcl), TOKEN_NAME(hcl));
 				break;
 
 			case HCL_IOTOK_IDENT_DOTTED:
-				obj = hcl_makecnodedsymbol(hcl, TOKEN_LOC(hcl), TOKEN_NAME_PTR(hcl), TOKEN_NAME_LEN(hcl));
+				obj = hcl_makecnodedsymbol(hcl, TOKEN_LOC(hcl), TOKEN_NAME(hcl));
 				break;
 		}
 

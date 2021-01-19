@@ -26,119 +26,99 @@
 
 #include "hcl-prv.h"
 
-static hcl_cnode_t* make_cnode (hcl_t* hcl, hcl_cnode_type_t type, const hcl_ioloc_t* loc, hcl_oow_t extra_space)
+static hcl_cnode_t* make_cnode (hcl_t* hcl, hcl_cnode_type_t type, const hcl_ioloc_t* loc, const hcl_oocs_t* tok)
 {
 	hcl_cnode_t* cnode;
+	hcl_oocs_t empty;
+	hcl_ooch_t dummy;
 
-	cnode = hcl_callocmem(hcl, HCL_SIZEOF(*cnode) + extra_space);
+	if (!tok) 
+	{
+		empty.ptr = &dummy;
+		empty.len = 0;
+		tok = &empty;
+	}
+	cnode = hcl_callocmem(hcl, HCL_SIZEOF(*cnode) + HCL_SIZEOF(*tok->ptr) * (tok->len + 1));
 	if (HCL_UNLIKELY(!cnode)) return HCL_NULL;
 
-	cnode->type = type;
-	cnode->loc = *loc;
+	cnode->cn_type = type;
+	cnode->cn_loc = *loc;
+
+	cnode->cn_tok.ptr = (hcl_ooch_t*)(cnode + 1);
+	cnode->cn_tok.len = tok->len;
+	hcl_copy_oochars (cnode->cn_tok.ptr, tok->ptr, tok->len);
+	cnode->cn_tok.ptr[tok->len] = '\0';
+
 	return cnode;
 }
 
-hcl_cnode_t* hcl_makecnodenil (hcl_t* hcl, const hcl_ioloc_t* loc)
+hcl_cnode_t* hcl_makecnodenil (hcl_t* hcl, const hcl_ioloc_t* loc, const  hcl_oocs_t* tok)
 {
-	return make_cnode(hcl, HCL_CNODE_NIL, loc, 0);
+	return make_cnode(hcl, HCL_CNODE_NIL, loc, tok);
 }
 
-hcl_cnode_t* hcl_makecnodetrue (hcl_t* hcl, const hcl_ioloc_t* loc)
+hcl_cnode_t* hcl_makecnodetrue (hcl_t* hcl, const hcl_ioloc_t* loc, const  hcl_oocs_t* tok)
 {
-	return make_cnode(hcl, HCL_CNODE_TRUE, loc, 0);
+	return make_cnode(hcl, HCL_CNODE_TRUE, loc, tok);
 }
 
-hcl_cnode_t* hcl_makecnodefalse (hcl_t* hcl, const hcl_ioloc_t* loc)
+hcl_cnode_t* hcl_makecnodefalse (hcl_t* hcl, const hcl_ioloc_t* loc, const  hcl_oocs_t* tok)
 {
-	return make_cnode(hcl, HCL_CNODE_FALSE, loc, 0);
+	return make_cnode(hcl, HCL_CNODE_FALSE, loc, tok);
 }
 
-hcl_cnode_t* hcl_makecnodecharlit (hcl_t* hcl, const hcl_ioloc_t* loc, const hcl_ooch_t ch)
+hcl_cnode_t* hcl_makecnodecharlit (hcl_t* hcl, const hcl_ioloc_t* loc, const  hcl_oocs_t* tok, const hcl_ooch_t v)
 {
-	hcl_cnode_t* c =  make_cnode(hcl, HCL_CNODE_CHARLIT, loc, 0);
+	hcl_cnode_t* c =  make_cnode(hcl, HCL_CNODE_CHARLIT, loc, tok);
 	if (HCL_UNLIKELY(!c)) return HCL_NULL;
-	c->u.charlit.v = ch;
+	c->u.charlit.v = v;
 	return c;
 }
 
-hcl_cnode_t* hcl_makecnodesymbol (hcl_t* hcl, const hcl_ioloc_t* loc, const hcl_ooch_t* ptr, hcl_oow_t len)
+hcl_cnode_t* hcl_makecnodesymbol (hcl_t* hcl, const hcl_ioloc_t* loc, const  hcl_oocs_t* tok)
 {
-	hcl_cnode_t* c =  make_cnode(hcl, HCL_CNODE_SYMBOL, loc, HCL_SIZEOF(*ptr) * (len + 1));
+	hcl_cnode_t* c =  make_cnode(hcl, HCL_CNODE_SYMBOL, loc, tok);
 	if (HCL_UNLIKELY(!c)) return HCL_NULL;
-	c->u.symbol.ptr = (hcl_ooch_t*)(c + 1);
-	c->u.symbol.len = len;
-	hcl_copy_oochars (c->u.symbol.ptr, ptr, len);
-	c->u.symbol.ptr[len] = '\0';
+	c->u.symbol.syncode = hcl_getsyncodebyoocs_noseterr(hcl, tok);
 	return c;
 }
 
-hcl_cnode_t* hcl_makecnodedsymbol (hcl_t* hcl, const hcl_ioloc_t* loc, const hcl_ooch_t* ptr, hcl_oow_t len)
+hcl_cnode_t* hcl_makecnodedsymbol (hcl_t* hcl, const hcl_ioloc_t* loc, const hcl_oocs_t* tok)
 {
-	hcl_cnode_t* c =  make_cnode(hcl, HCL_CNODE_DSYMBOL, loc, HCL_SIZEOF(*ptr) * (len + 1));
-	if (HCL_UNLIKELY(!c)) return HCL_NULL;
-	c->u.dsymbol.ptr = (hcl_ooch_t*)(c + 1);
-	c->u.dsymbol.len = len;
-	hcl_copy_oochars (c->u.dsymbol.ptr, ptr, len);
-	c->u.dsymbol.ptr[len] = '\0';
-	return c;
+	return make_cnode(hcl, HCL_CNODE_DSYMBOL, loc, tok);
 }
 
-hcl_cnode_t* hcl_makecnodestrlit (hcl_t* hcl, const hcl_ioloc_t* loc, const hcl_ooch_t* ptr, hcl_oow_t len)
+hcl_cnode_t* hcl_makecnodestrlit (hcl_t* hcl, const hcl_ioloc_t* loc, const hcl_oocs_t* tok)
 {
-	hcl_cnode_t* c =  make_cnode(hcl, HCL_CNODE_STRLIT, loc, HCL_SIZEOF(*ptr) * (len + 1));
-	if (HCL_UNLIKELY(!c)) return HCL_NULL;
-	c->u.strlit.ptr = (hcl_ooch_t*)(c + 1);
-	c->u.strlit.len = len;
-	hcl_copy_oochars (c->u.strlit.ptr, ptr, len);
-	c->u.strlit.ptr[len] = '\0';
-	return c;
+	return make_cnode(hcl, HCL_CNODE_STRLIT, loc, tok);
 }
 
-hcl_cnode_t* hcl_makecnodenumlit (hcl_t* hcl, const hcl_ioloc_t* loc, const hcl_ooch_t* ptr, hcl_oow_t len)
+hcl_cnode_t* hcl_makecnodenumlit (hcl_t* hcl, const hcl_ioloc_t* loc, const hcl_oocs_t* tok)
 {
-	hcl_cnode_t* c =  make_cnode(hcl, HCL_CNODE_NUMLIT, loc, HCL_SIZEOF(*ptr) * (len + 1));
-	if (HCL_UNLIKELY(!c)) return HCL_NULL;
-	c->u.numlit.ptr = (hcl_ooch_t*)(c + 1);
-	c->u.numlit.len = len;
-	hcl_copy_oochars (c->u.numlit.ptr, ptr, len);
-	c->u.numlit.ptr[len] = '\0';
-	return c;
+	return make_cnode(hcl, HCL_CNODE_NUMLIT, loc, tok);
 }
 
-hcl_cnode_t* hcl_makecnoderadnumlit (hcl_t* hcl, const hcl_ioloc_t* loc, const hcl_ooch_t* ptr, hcl_oow_t len)
+hcl_cnode_t* hcl_makecnoderadnumlit (hcl_t* hcl, const hcl_ioloc_t* loc, const hcl_oocs_t* tok)
 {
-	hcl_cnode_t* c =  make_cnode(hcl, HCL_CNODE_RADNUMLIT, loc, HCL_SIZEOF(*ptr) * (len + 1));
-	if (HCL_UNLIKELY(!c)) return HCL_NULL;
-
-	c->u.radnumlit.ptr = (hcl_ooch_t*)(c + 1);
-	c->u.radnumlit.len = len;
-	hcl_copy_oochars (c->u.radnumlit.ptr, ptr, len);
-	c->u.radnumlit.ptr[len] = '\0';
-	return c;
+	return make_cnode(hcl, HCL_CNODE_RADNUMLIT, loc, tok);
 }
 
-hcl_cnode_t* hcl_makecnodefpdeclit (hcl_t* hcl, const hcl_ioloc_t* loc, const hcl_ooch_t* ptr, hcl_oow_t len)
+hcl_cnode_t* hcl_makecnodefpdeclit (hcl_t* hcl, const hcl_ioloc_t* loc, const hcl_oocs_t* tok)
 {
-	hcl_cnode_t* c =  make_cnode(hcl, HCL_CNODE_FPDECLIT, loc, HCL_SIZEOF(*ptr) * (len + 1));
-	if (HCL_UNLIKELY(!c)) return HCL_NULL;
-	c->u.fpdeclit.ptr = (hcl_ooch_t*)(c + 1);
-	c->u.fpdeclit.len = len;
-	hcl_copy_oochars (c->u.fpdeclit.ptr, ptr, len);
-	c->u.fpdeclit.ptr[len] = '\0';
-	return c;
+	return make_cnode(hcl, HCL_CNODE_FPDECLIT, loc, tok);
 }
 
-hcl_cnode_t* hcl_makecnodesmptrlit (hcl_t* hcl, const hcl_ioloc_t*  loc, hcl_oow_t v)
+hcl_cnode_t* hcl_makecnodesmptrlit (hcl_t* hcl, const hcl_ioloc_t* loc, const hcl_oocs_t* tok, hcl_oow_t v)
 {
-	hcl_cnode_t* c =  make_cnode(hcl, HCL_CNODE_SMPTRLIT, loc, 0);
+	hcl_cnode_t* c =  make_cnode(hcl, HCL_CNODE_SMPTRLIT, loc, tok);
 	if (HCL_UNLIKELY(!c)) return HCL_NULL;
 	c->u.smptrlit.v = v;
 	return c;
 }
 
-hcl_cnode_t* hcl_makecnodeerrlit (hcl_t* hcl, const hcl_ioloc_t* loc, hcl_ooi_t v)
+hcl_cnode_t* hcl_makecnodeerrlit (hcl_t* hcl, const hcl_ioloc_t* loc, const hcl_oocs_t* tok, hcl_ooi_t v)
 {
-	hcl_cnode_t* c =  make_cnode(hcl, HCL_CNODE_ERRLIT, loc, 0);
+	hcl_cnode_t* c =  make_cnode(hcl, HCL_CNODE_ERRLIT, loc, tok);
 	if (HCL_UNLIKELY(!c)) return HCL_NULL;
 	c->u.errlit.v = v;
 	return c;
@@ -146,19 +126,18 @@ hcl_cnode_t* hcl_makecnodeerrlit (hcl_t* hcl, const hcl_ioloc_t* loc, hcl_ooi_t 
 
 hcl_cnode_t* hcl_makecnodecons (hcl_t* hcl, const hcl_ioloc_t* loc, hcl_cnode_t* car, hcl_cnode_t* cdr)
 {
-	hcl_cnode_t* c =  make_cnode(hcl, HCL_CNODE_CONS, loc, 0);
+	hcl_cnode_t* c =  make_cnode(hcl, HCL_CNODE_CONS, loc, HCL_NULL);
 	if (HCL_UNLIKELY(!c)) return HCL_NULL;
 	c->u.cons.car = car;
 	c->u.cons.cdr = cdr;
 	return c;
 }
 
-hcl_cnode_t* hcl_makecnodelist (hcl_t* hcl, const hcl_ioloc_t* loc, hcl_concode_t type, hcl_cnode_t* head)
+hcl_cnode_t* hcl_makecnodelist (hcl_t* hcl, const hcl_ioloc_t* loc, hcl_concode_t type)
 {
-	hcl_cnode_t* c =  make_cnode(hcl, HCL_CNODE_LIST, loc, 0);
+	hcl_cnode_t* c =  make_cnode(hcl, HCL_CNODE_LIST, loc, HCL_NULL);
 	if (HCL_UNLIKELY(!c)) return HCL_NULL;
-	c->u.list.type = type;
-	c->u.list.head = head;
+	c->u.list.concode = type;
 	return c;
 }
 
@@ -170,22 +149,8 @@ void hcl_freesinglecnode (hcl_t* hcl, hcl_cnode_t* c)
 void hcl_freecnode (hcl_t* hcl, hcl_cnode_t* c)
 {
 redo:
-	switch (c->type)
+	switch (c->cn_type)
 	{
-		case HCL_CNODE_LIST:
-		{
-			hcl_cnode_t* tmp;
-			tmp = c->u.list.head;
-			hcl_freemem (hcl, c);
-			if (tmp) /* it's not set for an empty list */
-			{
-				
-				c = tmp;
-				goto redo;
-			}
-			break;
-		}
-
 		case HCL_CNODE_CONS:
 		{
 			hcl_cnode_t* tmp1, * tmp2;
@@ -195,7 +160,6 @@ redo:
 
 			HCL_ASSERT (hcl, tmp1 != HCL_NULL);
 			hcl_freemem (hcl, c);
-
 
 			hcl_freecnode (hcl, tmp1); /* TODO: remove recursion? */
 
@@ -212,4 +176,22 @@ redo:
 			hcl_freemem (hcl, c);
 			break;
 	}
+}
+
+
+hcl_oow_t hcl_countcnodecons (hcl_t* hcl, hcl_cnode_t* cons)
+{
+	/* this function ignores the last cdr */
+	hcl_oow_t count = 1;
+
+	HCL_ASSERT (hcl, HCL_CNODE_IS_CONS(cons));
+	do
+	{
+		cons = HCL_CNODE_CONS_CDR(cons);
+		if (!cons) break;
+		count++;
+	}
+	while (1);
+
+	return count;
 }
