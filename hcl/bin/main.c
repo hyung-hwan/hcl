@@ -1175,7 +1175,7 @@ hcl_logufmt (hcl, HCL_LOG_WARN, fmt, ustr, 0x6789);
 
 
 
-#if 0
+#if 1
 ////////////////////////////
 {
 hcl_cnode_t* xx;

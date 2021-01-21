@@ -349,6 +349,7 @@ typedef struct hcl_cframe2_t hcl_cframe2_t;
 
 struct hcl_blk_info_t
 {
+	hcl_oow_t tmprlen;
 	hcl_oow_t tmprcnt;
 	hcl_oow_t lfbase;
 };
@@ -363,14 +364,6 @@ struct hcl_rstl_t /* reader stack for list reading */
 	int flagv;
 	hcl_oow_t count;
 	hcl_rstl_t* prev;
-};
-
-
-typedef struct hcl_oocx_t hcl_oocx_t;
-struct hcl_oocx_t
-{
-	hcl_oocs_t s;
-	hcl_oow_t capa;
 };
 
 struct hcl_compiler_t
@@ -455,7 +448,12 @@ struct hcl_compiler_t
 		hcl_oow_t capa;
 	} tv; /* temporary variables including arguments */
 
-	hcl_oocx_t tv2;
+	struct
+	{
+		hcl_oocs_t s; /* buffer */
+		hcl_oow_t capa; /* bufer capacity */
+		hcl_oow_t wcount; /* word count */
+	} tv2;
 
 	struct
 	{

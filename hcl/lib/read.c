@@ -2272,6 +2272,17 @@ static void fini_compiler (hcl_t* hcl)
 			hcl->c->tv.capa = 0;
 		}
 
+		if (hcl->c->tv2.s.ptr)
+		{
+			hcl_freemem (hcl, hcl->c->tv2.s.ptr);
+			hcl->c->tv2.s.ptr = HCL_NULL;
+			hcl->c->tv2.s.len = 0;
+			hcl->c->tv2.capa = 0;
+			hcl->c->tv2.wcount = 0;
+		}
+		HCL_ASSERT (hcl, hcl->c->tv2.capa == 0);
+		HCL_ASSERT (hcl, hcl->c->tv2.wcount == 0);
+
 		if (hcl->c->blk.info)
 		{
 			hcl_freemem (hcl, hcl->c->blk.info);

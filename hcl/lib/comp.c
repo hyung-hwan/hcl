@@ -2735,7 +2735,6 @@ static HCL_INLINE int emit_set (hcl_t* hcl)
 	cf = GET_TOP_CFRAME(hcl);
 	HCL_ASSERT (hcl, cf->opcode == COP_EMIT_SET);
 
-
 	if (cf->u.set.var_type == VAR_NAMED)
 	{
 		hcl_oow_t index;

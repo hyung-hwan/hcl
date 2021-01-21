@@ -67,14 +67,14 @@ literals -->
 
 ------------------------------ */
 
-static int copy_string_to (hcl_t* hcl, const hcl_oocs_t* src, hcl_oocx_t* dst, int append, hcl_ooch_t delim_char)
+static int copy_string_to (hcl_t* hcl, const hcl_oocs_t* src, hcl_oocs_t* dst, hcl_oow_t* dstcapa, int append, hcl_ooch_t delim_char)
 {
 	hcl_oow_t len, pos;
 
 	if (append)
 	{
-		pos = dst->s.len;
-		len = dst->s.len + src->len;
+		pos = dst->len;
+		len = dst->len + src->len;
 		if (delim_char != '\0') len++;
 	}
 	else
@@ -83,28 +83,28 @@ static int copy_string_to (hcl_t* hcl, const hcl_oocs_t* src, hcl_oocx_t* dst, i
 		len = src->len;
 	}
 
-	if (len >= dst->capa)
+	if (len >= *dstcapa)
 	{
 		hcl_ooch_t* tmp;
 		hcl_oow_t capa;
 
 		capa = HCL_ALIGN(len + 1, TV_BUFFER_ALIGN);
 
-		tmp = (hcl_ooch_t*)hcl_reallocmem(hcl, dst->s.ptr, HCL_SIZEOF(*tmp) * capa);
+		tmp = (hcl_ooch_t*)hcl_reallocmem(hcl, dst->ptr, HCL_SIZEOF(*tmp) * capa);
 		if (HCL_UNLIKELY(!tmp)) return -1;
 
-		dst->s.ptr = tmp;
-		dst->capa = capa - 1;
+		dst->ptr = tmp;
+		*dstcapa = capa - 1;
 	}
 
-	if (append && delim_char != '\0') dst->s.ptr[pos++] = delim_char;
-	hcl_copy_oochars (&dst->s.ptr[pos], src->ptr, src->len);
-	dst->s.ptr[len] = '\0';
-	dst->s.len = len;
+	if (append && delim_char != '\0') dst->ptr[pos++] = delim_char;
+	hcl_copy_oochars (&dst->ptr[pos], src->ptr, src->len);
+	dst->ptr[len] = '\0';
+	dst->len = len;
 	return 0;
 }
 
-static int find_word_in_string (const hcl_oocs_t* haystack, const hcl_oocs_t* name, int last, hcl_oow_t* xindex)
+static int __find_word_in_string (const hcl_oocs_t* haystack, const hcl_oocs_t* name, int last, hcl_oow_t* xindex)
 {
 	/* this function is inefficient. but considering the typical number
 	 * of arguments and temporary variables, the inefficiency can be 
@@ -138,7 +138,7 @@ static int find_word_in_string (const hcl_oocs_t* haystack, const hcl_oocs_t* na
 			else
 			{
 				if (xindex) *xindex = index;
-				return 0;
+				return 0; /* found */
 			}
 		}
 
@@ -159,77 +159,37 @@ static int find_word_in_string (const hcl_oocs_t* haystack, const hcl_oocs_t* na
 	if (found != HCL_TYPE_MAX(hcl_oow_t)) 
 	{
 		if (xindex) *xindex = found;
-		return 0;
+		return 0; /* foudn */
 	}
 
-	return -1;
+	return -1; /* not found */
 }
 
 
 static int add_temporary_variable (hcl_t* hcl, const hcl_oocs_t* name, hcl_oow_t dup_check_start)
 {
-#if 0
-	hcl_oow_t i;
+	hcl_oocs_t s;
+	int x;
 
-	HCL_ASSERT (hcl, HCL_IS_SYMBOL (hcl, name));
-
-	for (i = dup_check_start; i < hcl->c->tv.size; i++)
+	s.ptr = hcl->c->tv2.s.ptr + dup_check_start;
+	s.len = hcl->c->tv2.s.len - dup_check_start;
+	if (__find_word_in_string(&s, name, 0, HCL_NULL) >= 0)
 	{
-		HCL_ASSERT (hcl, HCL_IS_SYMBOL (hcl, hcl->c->tv.ptr[i]));
-		if (hcl->c->tv.ptr[i] == name)
-		{
-			hcl_seterrnum (hcl, HCL_EEXIST);
-			return -1;
-		}
+		hcl_seterrnum (hcl, HCL_EEXIST);
+		return -1;
 	}
-
-	if (hcl->c->tv.size >= hcl->c->tv.capa)
-	{
-		hcl_oop_t* tmp;
-		hcl_oow_t newcapa;
-
-		newcapa = HCL_ALIGN (hcl->c->tv.capa + 1, TV_BUFFER_ALIGN); /* TODO: set a better resizing policy */
-		tmp = (hcl_oop_t*)hcl_reallocmem(hcl, hcl->c->tv.ptr, newcapa);
-		if (HCL_UNLIKELY(!tmp)) return -1;
-
-		hcl->c->tv.capa = newcapa;
-		hcl->c->tv.ptr = tmp;
-	}
-
-	hcl->c->tv.ptr[hcl->c->tv.size++] = name;
-	return 0;
-#else
-	/* TODO: dupcheck??? */
-	return copy_string_to(hcl, name, &hcl->c->tv2, 1, ' ');
-#endif
+	x = copy_string_to(hcl, name, &hcl->c->tv2.s, &hcl->c->tv2.capa, 1, ' ');
+	if (HCL_LIKELY(x >= 0)) hcl->c->tv2.wcount++;
+	return x;
 }
 
 static int find_temporary_variable_backward (hcl_t* hcl, const hcl_oocs_t* name, hcl_oow_t* index)
 {
-#if  0
-	hcl_oow_t i;
-
-	HCL_ASSERT (hcl, HCL_IS_SYMBOL (hcl, name));
-	for (i = hcl->c->tv.size; i > 0; )
-	{
-		--i;
-		HCL_ASSERT (hcl, HCL_IS_SYMBOL (hcl, hcl->c->tv.ptr[i]));
-		if (hcl->c->tv.ptr[i] == name)
-		{
-			*index = i;
-			return 0;
-		}
-	}
-	
-	hcl_seterrnum (hcl, HCL_ENOENT);
-	return -1;
-#else
 	/* find the last element */
-	return find_word_in_string(&hcl->c->tv2.s, name, 1, index);
-#endif
+	return __find_word_in_string(&hcl->c->tv2.s, name, 1, index);
 }
 
-static int store_temporary_variable_count_for_block (hcl_t* hcl, hcl_oow_t tmpr_count, hcl_oow_t lfbase)
+static int store_temporary_variable_count_for_block (hcl_t* hcl, hcl_oow_t tmpr_count, hcl_oow_t tmpr_len, hcl_oow_t lfbase)
 {
 	HCL_ASSERT (hcl, hcl->c->blk.depth >= 0);
 
@@ -238,7 +198,7 @@ static int store_temporary_variable_count_for_block (hcl_t* hcl, hcl_oow_t tmpr_
 		hcl_blk_info_t* tmp;
 		hcl_oow_t newcapa;
 
-		newcapa = HCL_ALIGN (hcl->c->blk.depth + 1, BLK_INFO_BUFFER_ALIGN);
+		newcapa = HCL_ALIGN(hcl->c->blk.depth + 1, BLK_INFO_BUFFER_ALIGN);
 		tmp = (hcl_blk_info_t*)hcl_reallocmem(hcl, hcl->c->blk.info, newcapa * HCL_SIZEOF(*tmp));
 		if (!tmp) return -1;
 
@@ -246,6 +206,7 @@ static int store_temporary_variable_count_for_block (hcl_t* hcl, hcl_oow_t tmpr_
 		hcl->c->blk.info = tmp;
 	}
 
+	hcl->c->blk.info[hcl->c->blk.depth].tmprlen = tmpr_len;
 	hcl->c->blk.info[hcl->c->blk.depth].tmprcnt = tmpr_count;
 	hcl->c->blk.info[hcl->c->blk.depth].lfbase = lfbase;
 	return 0;
@@ -1025,191 +986,194 @@ static int compile_if (hcl_t* hcl, hcl_oop_t src)
  */
 	return 0;
 }
+#endif
 
-static int compile_lambda (hcl_t* hcl, hcl_oop_t src, int defun)
+static int compile_lambda (hcl_t* hcl, hcl_cnode_t* src, int defun)
 {
-	hcl_oop_t obj, args;
+	hcl_cnode_t* obj, * args;
 	hcl_oow_t nargs, ntmprs;
 	hcl_ooi_t jump_inst_pos, lfbase_pos, lfsize_pos;
-	hcl_oow_t saved_tv_count, tv_dup_start;
-	hcl_oop_t defun_name;
+	hcl_oow_t saved_tv_wcount, tv_dup_start;
+	hcl_cnode_t* defun_name;
 
-	HCL_ASSERT (hcl, HCL_IS_CONS(hcl, src));
+	HCL_ASSERT (hcl, HCL_CNODE_IS_CONS(src));
 
-	saved_tv_count = hcl->c->tv.size;
-	obj = HCL_CONS_CDR(src);
+	saved_tv_wcount = hcl->c->tv2.wcount; 
+	obj = HCL_CNODE_CONS_CDR(src);
 
 	if (defun)
 	{
-		HCL_ASSERT (hcl, HCL_CONS_CAR(src) == hcl->_defun);
+		HCL_ASSERT (hcl, HCL_CNODE_IS_SYMBOL_SYNCODED(HCL_CNODE_CONS_CAR(src), HCL_SYNCODE_DEFUN));
 
-		if (HCL_IS_NIL(hcl, obj))
+		if (!obj)
 		{
-			hcl_setsynerrbfmt (hcl, HCL_SYNERR_ARGNAMELIST, HCL_NULL, HCL_NULL,
-				"no defun name - %O", src); /* TODO: error location */
+			hcl_setsynerrbfmt (hcl, HCL_SYNERR_ARGNAMELIST, HCL_CNODE_GET_LOC(src), HCL_NULL, "no defun name");
 			return -1;
 		}
-		else if (!HCL_IS_CONS(hcl, obj))
+		else if (!HCL_CNODE_IS_CONS(obj))
 		{
-			hcl_setsynerrbfmt (hcl, HCL_SYNERR_DOTBANNED, HCL_NULL, HCL_NULL,
-				"redundant cdr in defun - %O", src); /* TODO: error location */
-			return -1;
-		}
-
-		defun_name = HCL_CONS_CAR(obj);
-		if (!HCL_IS_SYMBOL(hcl, defun_name))
-		{
-			hcl_setsynerrbfmt (hcl, HCL_SYNERR_VARNAME, HCL_NULL, HCL_NULL,
-				"defun name not a symbol - %O", defun_name); /* TODO: error location */
+			hcl_setsynerrbfmt (hcl, HCL_SYNERR_DOTBANNED, HCL_CNODE_GET_LOC(obj), HCL_CNODE_GET_TOK(obj), "redundant cdr in defun");
 			return -1;
 		}
 
-		if (HCL_OBJ_GET_FLAGS_SYNCODE(defun_name) || HCL_OBJ_GET_FLAGS_KERNEL(defun_name) >= 1)
+		defun_name = HCL_CNODE_CONS_CAR(obj);
+		if (!HCL_CNODE_IS_SYMBOL(defun_name))
 		{
-			hcl_setsynerrbfmt (hcl, HCL_SYNERR_BANNEDVARNAME, HCL_NULL, HCL_NULL, 
-				"special symbol not to be used as a defun name - %O", defun_name); /* TOOD: error location */
+			hcl_setsynerrbfmt (hcl, HCL_SYNERR_VARNAME, HCL_CNODE_GET_LOC(defun_name), HCL_CNODE_GET_TOK(defun_name), "defun name not a symbol");
 			return -1;
 		}
 
-		obj = HCL_CONS_CDR(obj);
+		if (HCL_CNODE_SYMBOL_SYNCODE(defun_name)) /*|| HCL_OBJ_GET_FLAGS_KERNEL(defun_name) >= 1) */
+		{
+			hcl_setsynerrbfmt (hcl, HCL_SYNERR_BANNEDVARNAME, HCL_CNODE_GET_LOC(defun_name), HCL_CNODE_GET_TOK(defun_name), "special symbol not to be used as a variable name");
+			return -1;
+		}
+
+		obj = HCL_CNODE_CONS_CDR(obj);
 	}
 	else
 	{
 		HCL_ASSERT (hcl, HCL_CONS_CAR(src) == hcl->_lambda);
 	}
 
-	if (HCL_IS_NIL(hcl, obj))
+	if (!obj)
 	{
-		hcl_setsynerrbfmt (hcl, HCL_SYNERR_ARGNAMELIST, HCL_NULL, HCL_NULL,
-			"no argument list in lambda - %O", src); /* TODO: error location */
+		hcl_setsynerrbfmt (hcl, HCL_SYNERR_ARGNAMELIST, HCL_CNODE_GET_LOC(src), HCL_NULL, "no argument list in lambda");
 		return -1;
 	}
-	else if (!HCL_IS_CONS(hcl, obj))
+	else if (!HCL_CNODE_IS_CONS(obj))
 	{
-		hcl_setsynerrbfmt (hcl, HCL_SYNERR_DOTBANNED, HCL_NULL, HCL_NULL,
-			"redundant cdr in lambda - %O", src); /* TODO: error location */
+		hcl_setsynerrbfmt (hcl, HCL_SYNERR_DOTBANNED, HCL_CNODE_GET_LOC(obj), HCL_CNODE_GET_TOK(obj), "redundant cdr in lambda");
 		return -1;
 	}
 
-	args = HCL_CONS_CAR(obj);
-	if (HCL_IS_NIL(hcl, args))
+	args = HCL_CNODE_CONS_CAR(obj);
+	if (!args)
 	{
 		/* no argument - (lambda () (+ 10 20)) */
 		nargs = 0;
 	}
 	else
 	{
-		hcl_oop_t arg, ptr;
+		hcl_cnode_t* arg, * dcl;
 
-		if (!HCL_IS_CONS(hcl, args))
+		if (!HCL_CNODE_IS_CONS(args))
 		{
-			hcl_setsynerrbfmt (hcl, HCL_SYNERR_ARGNAMELIST, HCL_NULL, HCL_NULL, 
-				"not a lambda argument list - %O", args); /* TODO: error location */
+			hcl_setsynerrbfmt (hcl, HCL_SYNERR_ARGNAMELIST, HCL_CNODE_GET_LOC(args), HCL_CNODE_GET_TOK(args), "not a lambda argument list");
 			return -1;
 		}
 
-		tv_dup_start = hcl->c->tv.size;
+		tv_dup_start = hcl->c->tv2.s.len;
 		nargs = 0;
-		ptr = args;
+		dcl = args;
 		do
 		{
-			arg = HCL_CONS_CAR(ptr);
-			if (!HCL_IS_SYMBOL(hcl, arg))
+			arg = HCL_CNODE_CONS_CAR(dcl);
+			if (!HCL_CNODE_IS_SYMBOL(arg))
 			{
-				hcl_setsynerrbfmt (hcl, HCL_SYNERR_ARGNAME, HCL_NULL, HCL_NULL,
-					"lambda argument not a symbol - %O", arg); /* TODO: error location */
+				hcl_setsynerrbfmt (hcl, HCL_SYNERR_ARGNAME, HCL_CNODE_GET_LOC(arg), HCL_CNODE_GET_TOK(arg), "lambda argument not a symbol");
 				return -1;
 			}
 
-			if (HCL_OBJ_GET_FLAGS_SYNCODE(arg) || HCL_OBJ_GET_FLAGS_KERNEL(arg) >= 2)
+			if (HCL_CNODE_IS_SYMBOL(arg) && HCL_CNODE_SYMBOL_SYNCODE(arg) /* || HCL_OBJ_GET_FLAGS_KERNEL(arg) >= 2 */)
 			{
-				hcl_setsynerrbfmt (hcl, HCL_SYNERR_BANNEDARGNAME, HCL_NULL, HCL_NULL,
-					"special symbol not to be declared as an argument - %O", arg); /* TOOD: error location */
+				hcl_setsynerrbfmt (hcl, HCL_SYNERR_BANNEDARGNAME, HCL_CNODE_GET_LOC(arg), HCL_CNODE_GET_TOK(arg), "special symbol not to be declared as an argument");
 				return -1;
 			}
 
-			if (add_temporary_variable(hcl, arg, tv_dup_start) <= -1) 
+			if (add_temporary_variable(hcl, HCL_CNODE_GET_TOK(arg), tv_dup_start) <= -1) 
 			{
 				if (hcl->errnum == HCL_EEXIST)
 				{
-					hcl_setsynerrbfmt (hcl, HCL_SYNERR_ARGNAMEDUP, HCL_NULL, HCL_NULL,
-						"lambda argument duplicate - %O", arg); /* TODO: error location */
+					hcl_setsynerrbfmt (hcl, HCL_SYNERR_ARGNAMEDUP, HCL_CNODE_GET_LOC(arg), HCL_CNODE_GET_TOK(arg), "lambda argument duplicate");
 				}
 				return -1;
 			}
 			nargs++;
 
-			ptr = HCL_CONS_CDR(ptr);
-			if (!HCL_IS_CONS(hcl, ptr)) 
+			dcl = HCL_CNODE_CONS_CDR(dcl);
+			if (!dcl) break;
+
+			if (!HCL_CNODE_IS_CONS(dcl)) 
 			{
-				if (!HCL_IS_NIL(hcl, ptr))
-				{
-					hcl_setsynerrbfmt (hcl, HCL_SYNERR_DOTBANNED, HCL_NULL, HCL_NULL,
-						"redundant cdr in lambda argument list - %O", args); /* TODO: error location */
-					return -1;
-				}
-				break;
+				hcl_setsynerrbfmt (hcl, HCL_SYNERR_DOTBANNED, HCL_CNODE_GET_LOC(dcl), HCL_CNODE_GET_TOK(dcl), "redundant cdr in lambda argument list");
+				return -1;
 			}
 		}
 		while (1);
 	}
 
-	HCL_ASSERT (hcl, nargs == hcl->c->tv.size - saved_tv_count);
+	HCL_ASSERT (hcl, nargs == hcl->c->tv2.wcount - saved_tv_wcount);
 	if (nargs > MAX_CODE_NBLKARGS) /*TODO: change this limit to max call argument count */
 	{
 		/* while an integer object is pused to indicate the number of
 		 * block arguments, evaluation which is done by message passing
 		 * limits the number of arguments that can be passed. so the
 		 * check is implemented */
-		hcl_setsynerrbfmt (hcl, HCL_SYNERR_ARGFLOOD, HCL_NULL, HCL_NULL, "too many(%zu) arguments - %O", nargs, args); 
+		hcl_setsynerrbfmt (hcl, HCL_SYNERR_ARGFLOOD, HCL_CNODE_GET_LOC(args), HCL_NULL, "too many(%zu) arguments", nargs); 
 		return -1;
 	}
 
 	ntmprs = nargs;  
-	obj = HCL_CONS_CDR(obj);
+	obj = HCL_CNODE_CONS_CDR(obj);
 
-	tv_dup_start = hcl->c->tv.size;
-	while (HCL_IS_CONS(hcl, obj))
+	tv_dup_start = hcl->c->tv2.s.len;
+	while (obj && HCL_CNODE_IS_CONS(obj))
 	{
-		hcl_oop_t dcl;
+		hcl_cnode_t* dcl;
 
-		dcl = HCL_CONS_CAR(obj);
-		if (HCL_IS_SYMBOL_ARRAY(hcl, dcl))
+		dcl = HCL_CNODE_CONS_CAR(obj);
+		if (HCL_CNODE_IS_CONS_CONCODED(dcl, HCL_CONCODE_VLIST))
 		{
-			hcl_oow_t i, sz;
-
-			sz = HCL_OBJ_GET_SIZE(dcl);
-			for (i = 0; i < sz; i++)
+			hcl_cnode_t* var;
+			do
 			{
-				if (HCL_OBJ_GET_FLAGS_SYNCODE(((hcl_oop_oop_t)dcl)->slot[i]) ||
-				    HCL_OBJ_GET_FLAGS_KERNEL(((hcl_oop_oop_t)dcl)->slot[i]) >= 2)
+				var = HCL_CNODE_CONS_CAR(dcl);
+			#if 0
+				if (!HCL_CNODE_IS_SYMBOL(var))
 				{
-					hcl_setsynerrbfmt (hcl, HCL_SYNERR_BANNEDVARNAME, HCL_NULL, HCL_NULL, 
-						"special symbol not to be declared as a variable - %O", obj); /* TOOD: error location */
+					hcl_setsynerrbfmt (hcl, HCL_SYNERR_ARGNAME, HCL_CNODE_GET_LOC(var), HCL_CNODE_GET_TOK(var), "local variable not a symbol");
 					return -1;
 				}
 
-				if (add_temporary_variable(hcl, ((hcl_oop_oop_t)dcl)->slot[i], tv_dup_start) <= -1) 
+				if (HCL_CNODE_IS_SYMBOL(var) && HCL_CNODE_SYMBOL_SYNCODE(var) /* || HCL_OBJ_GET_FLAGS_KERNEL(var) >= 2 */)
+				{
+					hcl_setsynerrbfmt (hcl, HCL_SYNERR_BANNEDARGNAME, HCL_CNODE_GET_LOC(var), HCL_CNODE_GET_TOK(var), "special symbol not to be declared as a local variable");
+					return -1;
+				}
+			#else
+				/* the above checks are not needed as the reader guarantees the followings */
+				HCL_ASSERT (hcl, HCL_CNODE_IS_SYMBOL(var) && !HCL_CNODE_SYMBOL_SYNCODE(var));
+			#endif
+
+				if (add_temporary_variable(hcl, HCL_CNODE_GET_TOK(var), tv_dup_start) <= -1) 
 				{
 					if (hcl->errnum == HCL_EEXIST)
 					{
-						hcl_setsynerrbfmt (hcl, HCL_SYNERR_VARNAMEDUP, HCL_NULL, HCL_NULL,
-							"local variable duplicate - %O", ((hcl_oop_oop_t)dcl)->slot[i]); /* TODO: error location */
+						hcl_setsynerrbfmt (hcl, HCL_SYNERR_ARGNAMEDUP, HCL_CNODE_GET_LOC(var), HCL_CNODE_GET_TOK(var), "duplicate local variable");
 					}
-
 					return -1;
 				}
-
 				ntmprs++;
-			}
 
-			obj = HCL_CONS_CDR(obj);
+				dcl = HCL_CNODE_CONS_CDR(dcl);
+				if (!dcl) break;
+
+				if (!HCL_CNODE_IS_CONS(dcl)) 
+				{
+					hcl_setsynerrbfmt (hcl, HCL_SYNERR_DOTBANNED, HCL_CNODE_GET_LOC(dcl), HCL_CNODE_GET_TOK(dcl), "redundant cdr in local variable list");
+					return -1;
+				}
+			}
+			while (1);
+
+			obj = HCL_CNODE_CONS_CDR(obj);
 		}
 		else break;
 	}
 
 	/* ntmprs: number of temporary variables including arguments */
-	HCL_ASSERT (hcl, ntmprs == hcl->c->tv.size - saved_tv_count);
+	HCL_ASSERT (hcl, ntmprs == hcl->c->tv2.wcount - saved_tv_wcount);
 	if (ntmprs > MAX_CODE_NBLKTMPRS)
 	{
 		hcl_setsynerrbfmt (hcl, HCL_SYNERR_VARFLOOD, HCL_NULL, HCL_NULL, "too many(%zu) variables - %O", ntmprs, args); 
@@ -1222,7 +1186,7 @@ static int compile_lambda (hcl_t* hcl, hcl_oop_t src, int defun)
 		return -1;
 	}
 	hcl->c->blk.depth++;
-	if (store_temporary_variable_count_for_block(hcl, hcl->c->tv.size, hcl->code.lit.len) <= -1) return -1;
+	if (store_temporary_variable_count_for_block(hcl, hcl->c->tv2.wcount, hcl->c->tv2.s.len, hcl->code.lit.len) <= -1) return -1;
 
 
 	if (hcl->option.trait & HCL_TRAIT_INTERACTIVE)
@@ -1252,7 +1216,7 @@ static int compile_lambda (hcl_t* hcl, hcl_oop_t src, int defun)
 		hcl_oow_t index;
 		hcl_cframe2_t* cf;
 
-		if (find_temporary_variable_backward(hcl, defun_name, &index) <= -1)
+		if (find_temporary_variable_backward(hcl, HCL_CNODE_GET_TOK(defun_name), &index) <= -1)
 		{
 			PUSH_SUBCFRAME (hcl, COP_EMIT_SET, defun_name); /* set doesn't evaluate the variable name */
 			cf = GET_SUBCFRAME(hcl);
@@ -1282,35 +1246,37 @@ static int compile_lambda (hcl_t* hcl, hcl_oop_t src, int defun)
 	return 0;
 }
 
-static int compile_return (hcl_t* hcl, hcl_oop_t src, int mode)
+static int compile_return (hcl_t* hcl, hcl_cnode_t* src, int mode)
 {
-	hcl_oop_t obj, val;
+	hcl_cnode_t* obj, * val;
 
-	HCL_ASSERT (hcl, HCL_IS_CONS(hcl, src));
-	HCL_ASSERT (hcl, HCL_CONS_CAR(src) == hcl->_return || HCL_CONS_CAR(src) == hcl->_return_from_home);
+	HCL_ASSERT (hcl, HCL_CNODE_IS_CONS(src));
+	HCL_ASSERT (hcl, HCL_CNODE_IS_SYMBOL_SYNCODED(HCL_CNODE_CONS_CAR(src), HCL_SYNCODE_RETURN) || HCL_CNODE_IS_SYMBOL_SYNCODED(HCL_CNODE_CONS_CAR(src), HCL_SYNCODE_RETURN_FROM_HOME));
 
-	obj = HCL_CONS_CDR(src);
+	obj = HCL_CNODE_CONS_CDR(src);
 
-/* TODO: error message - cater for return-from home */
-	if (HCL_IS_NIL(hcl, obj))
+	if (!obj)
 	{
 /* TODO: should i allow (return)? does it return the last value on the stack? */
 		/* no value */
-		hcl_setsynerrbfmt (hcl, HCL_SYNERR_ARGCOUNT, HCL_NULL, HCL_NULL, "no value specified in return - %O", src); /* TODO: error location */
+		hcl_cnode_t* tmp = HCL_CNODE_CONS_CAR(src);
+		hcl_setsynerrbfmt (hcl, HCL_SYNERR_ARGCOUNT, HCL_CNODE_GET_LOC(src), HCL_NULL, "no value specified in %.*js", HCL_CNODE_GET_TOKLEN(tmp), HCL_CNODE_GET_TOKPTR(tmp));
 		return -1;
 	}
-	else if (!HCL_IS_CONS(hcl, obj))
+	else if (!HCL_CNODE_IS_CONS(obj))
 	{
-		hcl_setsynerrbfmt (hcl, HCL_SYNERR_DOTBANNED, HCL_NULL, HCL_NULL, "redundant cdr in return - %O", src); /* TODO: error location */
+		hcl_cnode_t* tmp = HCL_CNODE_CONS_CAR(src);
+		hcl_setsynerrbfmt (hcl, HCL_SYNERR_DOTBANNED, HCL_CNODE_GET_LOC(obj), HCL_CNODE_GET_TOK(obj), "redundant cdr in %.*js", HCL_CNODE_GET_TOKLEN(tmp), HCL_CNODE_GET_TOKPTR(tmp));
 		return -1;
 	}
 
-	val = HCL_CONS_CAR(obj);
+	val = HCL_CNODE_CONS_CAR(obj);
 
-	obj = HCL_CONS_CDR(obj);
-	if (!HCL_IS_NIL(hcl, obj))
+	obj = HCL_CNODE_CONS_CDR(obj);
+	if (obj)
 	{
-		hcl_setsynerrbfmt (hcl, HCL_SYNERR_ARGCOUNT, HCL_NULL, HCL_NULL,  "more than 1 argument to return - %O", src); /* TODO: error location */
+		hcl_cnode_t* tmp = HCL_CNODE_CONS_CAR(src);
+		hcl_setsynerrbfmt (hcl, HCL_SYNERR_ARGCOUNT, HCL_CNODE_GET_LOC(obj), HCL_CNODE_GET_TOK(obj), "more than 1 argument to %.*js", HCL_CNODE_GET_TOKLEN(tmp), HCL_CNODE_GET_TOKPTR(tmp));
 		return -1;
 	}
 
@@ -1321,6 +1287,7 @@ static int compile_return (hcl_t* hcl, hcl_oop_t src, int mode)
 	return 0;
 }
 
+#if 0
 static int compile_set (hcl_t* hcl, hcl_oop_t src)
 {
 	hcl_cframe2_t* cf;
@@ -1632,11 +1599,11 @@ static int compile_cons_xlist_expression (hcl_t* hcl, hcl_cnode_t* obj)
 				if (compile_break(hcl, obj) <= -1) return -1;
 				break;
 
-#if  0
 			case HCL_SYNCODE_DEFUN:
 				if (compile_lambda(hcl, obj, 1) <= -1) return -1;
 				break;
 
+#if 0
 			case HCL_SYNCODE_DO:
 				if (compile_do(hcl, obj) <= -1) return -1;
 				break;
@@ -1668,6 +1635,7 @@ static int compile_cons_xlist_expression (hcl_t* hcl, hcl_cnode_t* obj)
 				 * (set x (lambda (x y) (+ x y)) */
 				if (compile_set(hcl, obj) <= -1) return -1;
 				break;
+#endif
 
 			case HCL_SYNCODE_RETURN:
 				/* (return 10)
@@ -1675,10 +1643,12 @@ static int compile_cons_xlist_expression (hcl_t* hcl, hcl_cnode_t* obj)
 				if (compile_return(hcl, obj, 0) <= -1) return -1;
 				break;
 
+
 			case HCL_SYNCODE_RETURN_FROM_HOME:
 				if (compile_return(hcl, obj, 1) <= -1) return -1;
 				break;
 
+#if  0
 			case HCL_SYNCODE_UNTIL:
 				if (compile_while(hcl, obj, COP_POST_UNTIL_COND) <= -1) return -1;
 				break;
@@ -1786,10 +1756,9 @@ static HCL_INLINE int compile_symbol (hcl_t* hcl, hcl_cnode_t* obj)
 
 	HCL_ASSERT (hcl, HCL_CNODE_IS_SYMBOL(obj));
 
-	if (hcl_getsyncodebyoocs_noseterr(hcl, HCL_CNODE_GET_TOK(obj)) > 0)
+	if (HCL_CNODE_SYMBOL_SYNCODE(obj))
 	{
-		hcl_setsynerrbfmt (hcl, HCL_SYNERR_BANNEDVARNAME, HCL_CNODE_GET_LOC(obj), HCL_NULL,
-			"special symbol not to be used as a variable name - %.*js", HCL_CNODE_GET_TOKLEN(obj), HCL_CNODE_GET_TOKPTR(obj));
+		hcl_setsynerrbfmt (hcl, HCL_SYNERR_BANNEDVARNAME, HCL_CNODE_GET_LOC(obj), HCL_CNODE_GET_TOK(obj), "special symbol not to be used as a variable name - %.*js");
 		return -1;
 	}
 
@@ -2950,7 +2919,8 @@ static HCL_INLINE int emit_lambda (hcl_t* hcl)
 		lfsize = hcl->code.lit.len - hcl->c->blk.info[hcl->c->blk.depth].lfbase;
 
 	hcl->c->blk.depth--;
-	hcl->c->tv.size = hcl->c->blk.info[hcl->c->blk.depth].tmprcnt;
+	hcl->c->tv2.s.len = hcl->c->blk.info[hcl->c->blk.depth].tmprlen;
+	hcl->c->tv2.wcount = hcl->c->blk.info[hcl->c->blk.depth].tmprcnt;
 
 	/* HCL_CODE_LONG_PARAM_SIZE + 1 => size of the long JUMP_FORWARD instruction */
 	block_code_size = hcl->code.bc.len - jip - (HCL_HCL_CODE_LONG_PARAM_SIZE + 1);
@@ -2988,7 +2958,7 @@ static HCL_INLINE int emit_pop_stacktop (hcl_t* hcl)
 
 	cf = GET_TOP_CFRAME(hcl);
 	HCL_ASSERT (hcl, cf->opcode == COP_EMIT_POP_STACKTOP);
-	HCL_ASSERT (hcl, HCL_IS_NIL(hcl, cf->operand));
+	HCL_ASSERT (hcl, cf->operand == HCL_NULL);
 
 	n = emit_byte_instruction(hcl, HCL_CODE_POP_STACKTOP, HCL_NULL);
 
@@ -3021,15 +2991,17 @@ static HCL_INLINE int emit_set (hcl_t* hcl)
 	if (cf->u.set.var_type == VAR_NAMED)
 	{
 		hcl_oow_t index;
-		hcl_oop_t cons;
+		hcl_oop_t cons, sym;
 
 		HCL_ASSERT (hcl, HCL_CNODE_IS_SYMBOL(cf->operand));
-/* TODO: make a symbol now */
 
-		cons = (hcl_oop_t)hcl_getatsysdic(hcl, cf->operand);
+		sym = hcl_makesymbol(hcl, HCL_CNODE_GET_TOKPTR(cf->operand), HCL_CNODE_GET_TOKLEN(cf->operand));
+		if (HCL_UNLIKELY(!sym)) return -1;
+
+		cons = (hcl_oop_t)hcl_getatsysdic(hcl, sym);
 		if (!cons) 
 		{
-			cons = (hcl_oop_t)hcl_putatsysdic(hcl, cf->operand, hcl->_nil);
+			cons = (hcl_oop_t)hcl_putatsysdic(hcl, sym, hcl->_nil);
 			if (!cons) return -1;
 		}
 
@@ -3065,7 +3037,8 @@ int hcl_compile2 (hcl_t* hcl, hcl_cnode_t* obj)
 	log_default_type_mask = hcl->log.default_type_mask;
 	hcl->log.default_type_mask |= HCL_LOG_COMPILER;
 
-	HCL_ASSERT (hcl, hcl->c->tv.size == 0);
+	HCL_ASSERT (hcl, hcl->c->tv2.s.len == 0);
+	HCL_ASSERT (hcl, hcl->c->tv2.wcount == 0);
 	HCL_ASSERT (hcl, hcl->c->blk.depth == -1);
 
 /* TODO: in case i implement all global variables as block arguments at the top level...what should i do? */
@@ -3102,7 +3075,7 @@ int hcl_compile2 (hcl_t* hcl, hcl_cnode_t* obj)
 	 *  @0         (a)
 	 *  @1         (set-a) 
 	 */
-	if (store_temporary_variable_count_for_block(hcl, hcl->c->tv.size, 0) <= -1) return -1;
+	if (store_temporary_variable_count_for_block(hcl, hcl->c->tv2.wcount, hcl->c->tv2.s.len, 0) <= -1) return -1;
 
 	PUSH_CFRAME (hcl, COP_COMPILE_OBJECT, obj);
 
@@ -3253,7 +3226,8 @@ int hcl_compile2 (hcl_t* hcl, hcl_cnode_t* obj)
 	if (emit_byte_instruction(hcl, HCL_CODE_POP_STACKTOP, HCL_NULL) <= -1) goto oops;
 
 	HCL_ASSERT (hcl, GET_TOP_CFRAME_INDEX(hcl) < 0);
-	HCL_ASSERT (hcl, hcl->c->tv.size == 0);
+	HCL_ASSERT (hcl, hcl->c->tv2.s.len == 0);
+	HCL_ASSERT (hcl, hcl->c->tv2.wcount == 0);
 	HCL_ASSERT (hcl, hcl->c->blk.depth == 0);
 	hcl->c->blk.depth--;
 
@@ -3269,7 +3243,8 @@ oops:
 	hcl->code.bc.len = saved_bc_len;
 	hcl->code.lit.len = saved_lit_len;
 
-	hcl->c->tv.size = 0;
+	hcl->c->tv2.s.len = 0;
+	hcl->c->tv2.wcount = 0;
 	hcl->c->blk.depth = -1;
 	return -1;
 }
