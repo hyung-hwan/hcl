@@ -211,6 +211,8 @@ typedef enum hcl_cnode_type_t hcl_cnode_type_t;
 #define HCL_CNODE_IS_SYMBOL_SYNCODED(x, code) ((x)->cn_type == HCL_CNODE_SYMBOL && (x)->u.symbol.syncode == (code))
 #define HCL_CNODE_SYMBOL_SYNCODE(x) ((x)->u.symbol.syncode)
 
+#define HCL_CNODE_IS_DSYMBOL(x) ((x)->cn_type == HCL_CNODE_DSYMBOL)
+
 #define HCL_CNODE_IS_CONS(x) ((x)->cn_type == HCL_CNODE_CONS)
 #define HCL_CNODE_IS_CONS_CONCODED(x, code) ((x)->cn_type == HCL_CNODE_CONS && (x)->u.cons.concode == (code))
 #define HCL_CNODE_CONS_CONCODE(x) ((x)->u.cons.concode)

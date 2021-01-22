@@ -1655,7 +1655,7 @@ static int compile_cons_xlist_expression (hcl_t* hcl, hcl_cnode_t* obj)
 				return -1;
 		}
 	}
-	else if (HCL_CNODE_IS_SYMBOL(car) || HCL_CNODE_IS_CONS_CONCODED(car, HCL_CONCODE_XLIST))
+	else if (HCL_CNODE_IS_SYMBOL(car)  || HCL_CNODE_IS_DSYMBOL(car) || HCL_CNODE_IS_CONS_CONCODED(car, HCL_CONCODE_XLIST))
 	{
 		/* normal function call 
 		 *  (<operator> <operand1> ...) */
@@ -1703,7 +1703,7 @@ static int compile_cons_xlist_expression (hcl_t* hcl, hcl_cnode_t* obj)
 			}
 		}
 
-		if (HCL_CNODE_IS_SYMBOL(car))
+		if (HCL_CNODE_IS_SYMBOL(car) || HCL_CNODE_IS_DSYMBOL(car))
 		{
 			/* only symbols are added to the system dictionary. 
 			 * perform this lookup only if car is a symbol */
@@ -1785,6 +1785,76 @@ static HCL_INLINE int compile_symbol (hcl_t* hcl, hcl_cnode_t* obj)
 
 static HCL_INLINE int compile_dsymbol (hcl_t* hcl, hcl_cnode_t* obj)
 {
+	hcl_oop_t sym, cons;
+	hcl_oow_t index;
+
+/* TODO: need a total revamp on the dotted symbols.
+ *       must differentiate module access and dictioary member access...
+ *       must implementate dictionary member access syntax... */
+
+	sym = hcl_makesymbol(hcl, HCL_CNODE_GET_TOKPTR(obj), HCL_CNODE_GET_TOKLEN(obj));
+	if (HCL_UNLIKELY(!sym)) return -1;
+	cons = (hcl_oop_t)hcl_getatsysdic(hcl, sym);
+	if (!cons)
+	{
+		/* query the module for information if it is the first time
+		 * when the dotted symbol is seen */
+
+		hcl_pfbase_t* pfbase;
+		hcl_mod_t* mod;
+		hcl_oop_t val;
+		unsigned int kernel_bits;
+
+		pfbase = hcl_querymod(hcl, HCL_CNODE_GET_TOKPTR(obj), HCL_CNODE_GET_TOKLEN(obj), &mod);
+		if (!pfbase)
+		{
+			/* TODO switch to syntax error */
+			hcl_setsynerrbfmt (hcl, HCL_SYNERR_VARNAME, HCL_CNODE_GET_LOC(obj), HCL_CNODE_GET_TOK(obj), "unknown dotted symbol");
+			return -1;
+		}
+
+		hcl_pushvolat (hcl, &sym);
+		switch (pfbase->type)
+		{
+			case HCL_PFBASE_FUNC:
+				kernel_bits = 2;
+				val = hcl_makeprim(hcl, pfbase->handler, pfbase->minargs, pfbase->maxargs, mod);
+				break;
+
+			case HCL_PFBASE_VAR:
+				kernel_bits = 1;
+				val = hcl->_nil;
+				break;
+
+			case HCL_PFBASE_CONST:
+				/* TODO: create a value from the pfbase information. it needs to get extended first
+				 * can i make use of pfbase->handler type-cast to a differnt type? */
+				kernel_bits = 2;
+				val = hcl->_nil;
+				break;
+
+			default:
+				hcl_popvolat (hcl);
+				hcl_seterrbfmt (hcl, HCL_EINVAL, "invalid pfbase type - %d\n", pfbase->type);
+				return -1;
+		}
+
+		if (!val || !(cons = (hcl_oop_t)hcl_putatsysdic(hcl, sym, val)))
+		{
+			hcl_popvolat (hcl);
+			return -1;
+		}
+		hcl_popvolat (hcl);
+
+		/* make this dotted symbol special that it can't get changed
+		 * to a different value */
+		HCL_OBJ_SET_FLAGS_KERNEL (sym, kernel_bits);
+	}
+
+	if (add_literal(hcl, cons, &index) <= -1 ||
+	    emit_single_param_instruction(hcl, HCL_CODE_PUSH_OBJECT_0, index) <= -1) return -1;
+
+	return 0;
 }
 
 static hcl_oop_t string_to_num (hcl_t* hcl, hcl_oocs_t* str, const hcl_ioloc_t* loc, int radixed)
