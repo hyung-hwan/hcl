@@ -543,7 +543,7 @@ int hcl_hashobj (hcl_t* hcl, hcl_oop_t obj, hcl_oow_t* xhv)
 					break;
 
 				case HCL_OBJ_TYPE_CHAR:
-					hv = hcl_hash_oochars (((hcl_oop_char_t)obj)->slot, HCL_OBJ_GET_SIZE(obj));
+					hv = hcl_hash_oochars(((hcl_oop_char_t)obj)->slot, HCL_OBJ_GET_SIZE(obj));
 					break;
 
 				case HCL_OBJ_TYPE_HALFWORD:

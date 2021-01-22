@@ -798,7 +798,7 @@ static pf_t builtin_prims[] =
 	{ 2, 2,                       pf_nql,             4,  { 'n','q','l','?' } },
 	{ 2, 2,                       pf_nqk,             4,  { 'n','q','k','?' } },
 
-	{ 1, 1,                       pf_is_null,         4,  { 'n','u','l','l','?' } },
+	{ 1, 1,                       pf_is_null,         5,  { 'n','u','l','l','?' } },
 	{ 1, 1,                       pf_is_boolean,      8,  { 'b','o','o','l','e','a','n','?' } },
 	{ 1, 1,                       pf_is_character,   10,  { 'c','h','a','r','a','c','t','e','r','?' } },
 	{ 1, 1,                       pf_is_error,        6,  { 'e','r','r','o','r','?' } },

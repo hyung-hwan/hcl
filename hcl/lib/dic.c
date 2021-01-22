@@ -128,7 +128,7 @@ static hcl_oop_cons_t find_or_upsert (hcl_t* hcl, hcl_oop_dic_t dic, hcl_oop_t k
 		HCL_ASSERT (hcl, HCL_IS_SYMBOL(hcl,ass->car));
 
 		if (HCL_OBJ_GET_SIZE(key) == HCL_OBJ_GET_SIZE(ass->car) &&
-		    hcl_equal_oochars(HCL_OBJ_GET_CHAR_SLOT(key), ((hcl_oop_char_t)ass->car)->slot, HCL_OBJ_GET_SIZE(key))) 
+		    hcl_equal_oochars(HCL_OBJ_GET_CHAR_SLOT(key), HCL_OBJ_GET_CHAR_SLOT(ass->car), HCL_OBJ_GET_SIZE(key))) 
 		{
 			/* the value of HCL_NULL indicates no insertion or update. */
 			if (value) ass->cdr = value; /* update */
@@ -228,6 +228,52 @@ oops:
 	return HCL_NULL;
 }
 
+static hcl_oop_cons_t lookupdic_noseterr (hcl_t* hcl, hcl_oop_dic_t dic, const hcl_oocs_t* name)
+{
+	/* this is special version of hcl_getatsysdic() that performs
+	 * lookup using a plain symbol specified */
+
+	hcl_oow_t index;
+	hcl_oop_cons_t ass;
+
+	HCL_ASSERT (hcl, HCL_OOP_IS_SMOOI(dic->tally));
+	HCL_ASSERT (hcl, HCL_IS_ARRAY(hcl,dic->bucket));
+
+	index = hcl_hash_oochars(name->ptr, name->len) % HCL_OBJ_GET_SIZE(dic->bucket);
+
+	while ((hcl_oop_t)(ass = (hcl_oop_cons_t)HCL_OBJ_GET_OOP_VAL(dic->bucket, index)) != hcl->_nil) 
+	{
+		HCL_ASSERT (hcl, HCL_IS_CONS(hcl,ass));
+		if (HCL_IS_SYMBOL(hcl, ass->car))
+		{
+			if (name->len == HCL_OBJ_GET_SIZE(ass->car) &&
+			    hcl_equal_oochars(name->ptr, HCL_OBJ_GET_CHAR_SLOT(ass->car), name->len)) 
+			{
+				return ass;
+			}
+		}
+
+		index = (index + 1) % HCL_OBJ_GET_SIZE(dic->bucket);
+	}
+
+
+	/* when value is HCL_NULL, perform no insertion */
+
+	/* hcl_seterrXXX() is not called here. the dictionary lookup is very frequent 
+	 * and so is lookup failure. for instance, hcl_findmethod() calls this over 
+	 * a class chain. there might be a failure at each class level. it's waste to
+	 * set the error information whenever the failure occurs.
+	 * the caller of this function must set the error information upon failure */
+	return HCL_NULL;
+}
+
+static HCL_INLINE hcl_oop_cons_t lookupdic (hcl_t* hcl, hcl_oop_dic_t dic, const hcl_oocs_t* name)
+{
+	hcl_oop_cons_t ass = lookupdic_noseterr(hcl, dic, name);
+	if (!ass) hcl_seterrbfmt(hcl, HCL_ENOENT, "unable to find %.*js in a dictionary", name->len, name->ptr);
+	return ass;
+}
+
 hcl_oop_cons_t hcl_putatsysdic (hcl_t* hcl, hcl_oop_t key, hcl_oop_t value)
 {
 #if defined(SYMBOL_ONLY_KEY)
@@ -242,6 +288,16 @@ hcl_oop_cons_t hcl_getatsysdic (hcl_t* hcl, hcl_oop_t key)
 	HCL_ASSERT (hcl, HCL_IS_SYMBOL(hcl,key));
 #endif
 	return find_or_upsert(hcl, hcl->sysdic, key, HCL_NULL);
+}
+
+hcl_oop_cons_t hcl_lookupsysdicforsymbol_noseterr (hcl_t* hcl, const hcl_oocs_t* name)
+{
+	return lookupdic_noseterr(hcl, hcl->sysdic, name);
+}
+
+hcl_oop_cons_t hcl_lookupsysdicforsymbol (hcl_t* hcl, const hcl_oocs_t* name)
+{
+	return lookupdic(hcl, hcl->sysdic, name);
 }
 
 int hcl_zapatsysdic (hcl_t* hcl, hcl_oop_t key)

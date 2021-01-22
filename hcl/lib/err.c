@@ -392,11 +392,19 @@ void hcl_setsynerrbfmt (hcl_t* hcl, hcl_synerrnum_t num, const hcl_ioloc_t* loc,
 
 	if (tgt) 
 	{
-		hcl->c->synerr.tgt = *tgt;
+		hcl_oow_t n;
+		n = hcl_copy_oochars_to_oocstr(hcl->c->synerr.tgt.val, HCL_COUNTOF(hcl->c->synerr.tgt.val), tgt->ptr, tgt->len);
+		if (n < tgt->len)
+		{
+			hcl->c->synerr.tgt.val[n - 1] = '.';
+			hcl->c->synerr.tgt.val[n - 2] = '.';
+			hcl->c->synerr.tgt.val[n - 3] = '.';
+		}
+		hcl->c->synerr.tgt.len = n;
 	}
 	else 
 	{
-		hcl->c->synerr.tgt.ptr = HCL_NULL;
+		hcl->c->synerr.tgt.val[0] = '\0';
 		hcl->c->synerr.tgt.len = 0;
 	}
 }
@@ -443,11 +451,19 @@ void hcl_setsynerrufmt (hcl_t* hcl, hcl_synerrnum_t num, const hcl_ioloc_t* loc,
 
 	if (tgt)
 	{
-		hcl->c->synerr.tgt = *tgt;
+		hcl_oow_t n;
+		n = hcl_copy_oochars_to_oocstr(hcl->c->synerr.tgt.val, HCL_COUNTOF(hcl->c->synerr.tgt.val), tgt->ptr, tgt->len);
+		if (n < tgt->len)
+		{
+			hcl->c->synerr.tgt.val[n - 1] = '.';
+			hcl->c->synerr.tgt.val[n - 2] = '.';
+			hcl->c->synerr.tgt.val[n - 3] = '.';
+		}
+		hcl->c->synerr.tgt.len = n;
 	}
 	else 
 	{
-		hcl->c->synerr.tgt.ptr = HCL_NULL;
+		hcl->c->synerr.tgt.val[0] = '\0';
 		hcl->c->synerr.tgt.len = 0;
 	}
 }

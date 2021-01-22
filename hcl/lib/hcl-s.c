@@ -1349,7 +1349,7 @@ static void reformat_synerr (hcl_t* hcl)
 		"%js%s%.*js at line %zu column %zu", 
 		orgmsg,
 		(synerr.tgt.len > 0? " near ": ""),
-		synerr.tgt.len, synerr.tgt.ptr,
+		synerr.tgt.len, synerr.tgt.val,
 		synerr.loc.line, synerr.loc.colm
 	);
 }

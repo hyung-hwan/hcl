@@ -945,7 +945,7 @@ static void print_synerr (hcl_t* hcl)
 
 	if (synerr.tgt.len > 0)
 	{
-		hcl_logbfmt (hcl, HCL_LOG_STDERR, " - %.*js", synerr.tgt.len, synerr.tgt.ptr);
+		hcl_logbfmt (hcl, HCL_LOG_STDERR, " - %.*js", synerr.tgt.len, synerr.tgt.val);
 	}
 
 	hcl_logbfmt (hcl, HCL_LOG_STDERR, "\n");
@@ -1173,44 +1173,51 @@ hcl_logufmt (hcl, HCL_LOG_WARN, fmt, ustr, 0x6789);
 }
 #endif
 
-
-
 #if 1
-////////////////////////////
-{
-hcl_cnode_t* xx;
-while (1)
-{
-	xx = hcl_read2(hcl);
-	if (!xx)
+	while (1)
 	{
-		if (hcl->errnum == HCL_EFINIS)
-		{
-			/* end of input */
-			break;
-		}
-		else if (hcl->errnum == HCL_ESYNERR)
-		{
-			print_synerr (hcl);
-			if (xtn->reader_istty && hcl_getsynerrnum(hcl) != HCL_SYNERR_EOF) 
-			{
-				/* TODO: drain remaining data in the reader including the actual inputstream and buffered data in hcl */	
-			}
-			continue;
-		}
-		else
-		{
-			hcl_logbfmt (hcl, HCL_LOG_STDERR, "ERROR: cannot read object - [%d] %js\n", hcl_geterrnum(hcl), hcl_geterrmsg(hcl));
-		}
-		goto oops;
-	}
-	else
-	{
-		hcl_logbfmt (hcl, HCL_LOG_STDERR, "OK: got cnode - %p\n", xx);
+		hcl_cnode_t* obj;
+		int n;
 
-		if (hcl_compile2(hcl, xx) <= -1) 
+		obj = hcl_read2(hcl);
+		if (!obj)
 		{
-			hcl_logbfmt (hcl, HCL_LOG_STDERR, "ERR: unable to compile - %p\n", xx);
+			if (hcl->errnum == HCL_EFINIS)
+			{
+				/* end of input */
+				break;
+			}
+			else if (hcl->errnum == HCL_ESYNERR)
+			{
+				print_synerr (hcl);
+				if (xtn->reader_istty && hcl_getsynerrnum(hcl) != HCL_SYNERR_EOF) 
+				{
+					/* TODO: drain remaining data in the reader including the actual inputstream and buffered data in hcl */	
+					continue;
+				}
+			}
+			else
+			{
+				hcl_logbfmt (hcl, HCL_LOG_STDERR, "ERROR: cannot read object - [%d] %js\n", hcl_geterrnum(hcl), hcl_geterrmsg(hcl));
+			}
+			goto oops;
+		}
+
+		if (xtn->reader_istty)
+		{
+			/* clear the byte code buffer */
+			/* TODO: create a proper function for this and call it */
+			hcl->code.bc.len = 0;
+			hcl->code.lit.len = 0;
+		}
+
+		if (verbose) hcl_prbfmt (hcl, "\n"); /* flush the output buffer by hcl_print above */
+
+		n = hcl_compile2(hcl, obj);
+		hcl_freecnode (hcl, obj); /* not needed any more */
+
+		if (n <= -1)
+		{
 			if (hcl->errnum == HCL_ESYNERR)
 			{
 				print_synerr (hcl);
@@ -1219,19 +1226,50 @@ while (1)
 			{
 				hcl_logbfmt (hcl, HCL_LOG_STDERR, "ERROR: cannot compile object - [%d] %js\n", hcl_geterrnum(hcl), hcl_geterrmsg(hcl));
 			}
+			/* carry on? */
+
+			if (!xtn->reader_istty) goto oops;
 		}
-		else
+		else if (xtn->reader_istty)
 		{
+			/* interactive mode */
+			hcl_oop_t retv;
+
 			hcl_decode (hcl, 0, hcl_getbclen(hcl));
+			HCL_LOG0 (hcl, HCL_LOG_MNEMONIC, "------------------------------------------\n");
+			g_hcl = hcl;
+			//setup_tick ();
+
+			retv = hcl_execute(hcl);
+
+			/* flush pending output data in the interactive mode(e.g. printf without a newline) */
+			hcl_flushio (hcl); 
+
+			if (!retv)
+			{
+				hcl_logbfmt (hcl, HCL_LOG_STDERR, "ERROR: cannot execute - [%d] %js\n", hcl_geterrnum(hcl), hcl_geterrmsg(hcl));
+			}
+			else
+			{
+				/* print the result in the interactive mode regardless 'verbose' */
+				hcl_logbfmt (hcl, HCL_LOG_STDOUT, "%O\n", retv);
+
+				/*
+				 * print the value of ERRSTR.
+				hcl_oop_cons_t cons = hcl_getatsysdic(hcl, xtn->sym_errstr);
+				if (cons)
+				{
+					HCL_ASSERT (hcl, HCL_IS_CONS(hcl, cons));
+					HCL_ASSERT (hcl, HCL_CONS_CAR(cons) == xtn->sym_errstr);
+					hcl_print (hcl, HCL_CONS_CDR(cons));
+				}
+				*/
+			}
+			//cancel_tick();
+			g_hcl = HCL_NULL;
 		}
-
-		hcl_freecnode (hcl, xx);
 	}
-}
-
-}
-////////////////////////////
-#endif
+#else
 
 	while (1)
 	{
@@ -1273,6 +1311,7 @@ count++;
 		{
 			if (xtn->reader_istty)
 			{
+				/* clear the byte code buffer */
 				/* TODO: create a proper function for this and call it */
 				hcl->code.bc.len = 0;
 				hcl->code.lit.len = 0;
@@ -1334,6 +1373,7 @@ count++;
 			}
 		}
 	}
+#endif
 
 	if (!xtn->reader_istty && hcl_getbclen(hcl) > 0)
 	{

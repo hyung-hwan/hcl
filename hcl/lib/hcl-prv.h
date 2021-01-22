@@ -321,11 +321,13 @@ struct hcl_cframe2_t
 		{
 			hcl_ooi_t cond_pos;
 			hcl_ooi_t body_pos;
+			hcl_ioloc_t start_loc;
 		} post_while;
 
 		struct
 		{
 			hcl_ooi_t body_pos;
+			hcl_ioloc_t start_loc;
 		} post_if;
 
 		struct
@@ -340,6 +342,7 @@ struct hcl_cframe2_t
 
 		struct
 		{
+			hcl_ioloc_t start_loc;
 			hcl_ooi_t lfbase_pos;
 			hcl_ooi_t lfsize_pos;
 		} lambda;

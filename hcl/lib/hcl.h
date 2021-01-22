@@ -1365,7 +1365,11 @@ struct hcl_synerr_t
 {
 	hcl_synerrnum_t num;
 	hcl_ioloc_t     loc;
-	hcl_oocs_t      tgt;
+	struct
+	{
+		hcl_ooch_t val[256];
+		hcl_oow_t len;
+	} tgt;
 };
 
 #if defined(HCL_INCLUDE_COMPILER)
@@ -2417,6 +2421,16 @@ HCL_EXPORT hcl_oop_cons_t hcl_putatsysdic (
 HCL_EXPORT hcl_oop_cons_t hcl_getatsysdic (
 	hcl_t*     hcl,
 	hcl_oop_t  key
+);
+
+hcl_oop_cons_t hcl_lookupsysdicforsymbol (
+	hcl_t*            hcl,
+	const hcl_oocs_t* name
+);
+
+hcl_oop_cons_t hcl_lookupsysdicforsymbol_noseterr (
+	hcl_t*            hcl,
+	const hcl_oocs_t* name
 );
 
 HCL_EXPORT int hcl_zapatsysdic (
