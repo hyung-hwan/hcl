@@ -2585,7 +2585,11 @@ static int execute (hcl_t* hcl)
 	while (1)
 	{
 		/* stop requested or no more runnable process */
-		if (hcl->abort_req || (!hcl->no_proc_switch && switch_process_if_needed(hcl) == 0)) break;
+		if (hcl->abort_req || (!hcl->no_proc_switch && switch_process_if_needed(hcl) == 0)) 
+		{
+/* TODO: if aborting, ensure to terminate all ongoing processes */
+			break;
+		}
 
 		if (HCL_UNLIKELY(hcl->ip >= HCL_FUNCTION_GET_CODE_SIZE(hcl->active_function)))
 		{
