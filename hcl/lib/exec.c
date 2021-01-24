@@ -2897,6 +2897,30 @@ static int execute (hcl_t* hcl)
 				hcl->ip += MAX_CODE_JUMP + b1;
 				break;
 
+			case HCL_CODE_JUMP_BACKWARD_IF_TRUE:
+				FETCH_PARAM_CODE_TO (hcl, b1);
+				LOG_INST_1 (hcl, "jump_backward_if_true %zu", b1);
+				if (HCL_STACK_GETTOP(hcl) != hcl->_false) hcl->ip -= b1;
+				break;
+
+			case HCL_CODE_JUMP2_BACKWARD_IF_TRUE:
+				FETCH_PARAM_CODE_TO (hcl, b1);
+				LOG_INST_1 (hcl, "jump2_backward_if_true %zu", b1);
+				if (HCL_STACK_GETTOP(hcl) != hcl->_false) hcl->ip -= MAX_CODE_JUMP + b1;
+				break;
+
+			case HCL_CODE_JUMP_BACKWARD_IF_FALSE:
+				FETCH_PARAM_CODE_TO (hcl, b1);
+				LOG_INST_1 (hcl, "jump_backward_if_false %zu", b1);
+				if (HCL_STACK_GETTOP(hcl) == hcl->_false) hcl->ip -= b1;
+				break;
+
+			case HCL_CODE_JUMP2_BACKWARD_IF_FALSE:
+				FETCH_PARAM_CODE_TO (hcl, b1);
+				LOG_INST_1 (hcl, "jump2_backward_if_false %zu", b1);
+				if (HCL_STACK_GETTOP(hcl) == hcl->_false) hcl->ip -= MAX_CODE_JUMP + b1;
+				break;
+
 			case HCL_CODE_JUMP2_BACKWARD:
 				FETCH_PARAM_CODE_TO (hcl, b1);
 				LOG_INST_1 (hcl, "jump2_backward %zu", b1);
@@ -3207,6 +3231,12 @@ static int execute (hcl_t* hcl)
 				t1 = HCL_STACK_GETTOP(hcl); /* value to store */
 				HCL_STACK_POP (hcl);
 				t2 = HCL_STACK_GETTOP(hcl); /* array */
+				if (HCL_UNLIKELY(b1 >= HCL_OBJ_GET_SIZE(t2)))
+				{
+					hcl_seterrbfmt (hcl, HCL_ECALL, "index %zu out of upper bound %zd ", b1, (hcl_oow_t)HCL_OBJ_GET_SIZE(t2));
+					goto oops;
+				}
+
 				((hcl_oop_oop_t)t2)->slot[b1] = t1;
 				break;
 			}
@@ -3273,29 +3303,155 @@ static int execute (hcl_t* hcl)
 				break;
 			}
 
-			case HCL_CODE_MAKE_DLIST:
+			case HCL_CODE_MAKE_CONS:
 			{
 				hcl_oop_t t;
 
-				FETCH_PARAM_CODE_TO (hcl, b1);
-				LOG_INST_1 (hcl, "make_dlist %zu", b1);
+				LOG_INST_0 (hcl, "make_cons");
 
-				/* create an empty array */
-				t = hcl_makedlist(hcl, b1, 0);
+				t = hcl_makecons(hcl, hcl->_nil, hcl->_nil);
 				if (HCL_UNLIKELY(!t)) goto oops;
 
-				HCL_STACK_PUSH (hcl, t); /* push the list created */
+				HCL_STACK_PUSH (hcl, t); /* push the head cons cell */
+				HCL_STACK_PUSH (hcl, hcl->_nil); /* sentinnel */
 				break;
 			}
 
-			case HCL_CODE_POP_INTO_DLIST:
+			case HCL_CODE_POP_INTO_CONS:
 			{
-				hcl_oop_t t1, t2;
-				LOG_INST_0 (hcl, "pop_into_dlist");
+				hcl_oop_t t1, t2, t3;
+				LOG_INST_0 (hcl, "pop_into_cons");
+
 				t1 = HCL_STACK_GETTOP(hcl); /* value to store */
 				HCL_STACK_POP (hcl);
-				t2 = HCL_STACK_GETTOP(hcl); /* dlist */
-				/*  TODO: append t2 to the dlist */
+
+				t3 = HCL_STACK_GETTOP(hcl); /* sentinnel */
+				HCL_STACK_POP (hcl);
+
+				t2 = HCL_STACK_GETTOP(hcl); /* head cons */
+				if (HCL_UNLIKELY(!HCL_IS_CONS(hcl, t2)))
+				{
+					hcl_seterrbfmt (hcl, HCL_EINTERN, "internal error - invalid vm state detected in pop_into_cons");
+					goto oops;
+				}
+
+				if (t3 == hcl->_nil)
+				{
+					((hcl_oop_oop_t)t2)->slot[0] = t1;
+					HCL_STACK_PUSH (hcl, t2); /* push self again */
+				}
+				else
+				{
+					hcl_oop_t t;
+
+					hcl_pushvolat (hcl, &t3);
+					t = hcl_makecons(hcl, t1, hcl->_nil);
+					hcl_popvolat (hcl);
+					if (HCL_UNLIKELY(!t)) goto oops;
+
+					((hcl_oop_oop_t)t3)->slot[1] = t;
+					HCL_STACK_PUSH (hcl, t);
+				}
+
+#if 0
+				if (b1 == 1 || b1 == 3)
+				{
+					if (t3 == hcl->_nil)
+					{
+						((hcl_oop_oop_t)t2)->slot[0] = t1;
+						if (b1 == 1) HCL_STACK_PUSH (hcl, t2); /* push self again */
+					}
+					else
+					{
+						hcl_oop_t t;
+
+						t = hcl_makecons(hcl, t1, hcl->_nil);
+						if (HCL_UNLIKELY(!t)) goto oops;
+
+						((hcl_oop_oop_t)t3)->slot[1] = t;
+						if (b1 == 1) HCL_STACK_PUSH (hcl, t);
+					}
+				}
+				else if (b1 == 2)
+				{
+					if (t3 == hcl->_nil)
+					{
+						((hcl_oop_oop_t)t2)->slot[1] = t1;
+					} 
+					else
+					{
+						((hcl_oop_oop_t)t3)->slot[1] = t1;
+					}
+				}
+#endif
+				break;
+			}
+
+			case HCL_CODE_POP_INTO_CONS_END:
+			{
+				hcl_oop_t t1, t2, t3;
+				LOG_INST_0 (hcl, "pop_into_cons_end");
+
+				t1 = HCL_STACK_GETTOP(hcl); /* value to store */
+				HCL_STACK_POP (hcl);
+
+				t3 = HCL_STACK_GETTOP(hcl); /* sentinnel */
+				HCL_STACK_POP (hcl);
+
+				t2 = HCL_STACK_GETTOP(hcl); /* head cons */
+				if (HCL_UNLIKELY(!HCL_IS_CONS(hcl, t2)))
+				{
+					hcl_seterrbfmt (hcl, HCL_EINTERN, "internal error - invalid vm state detected in pop_into_cons");
+					goto oops;
+				}
+
+				if (t3 == hcl->_nil)
+				{
+					((hcl_oop_oop_t)t2)->slot[0] = t1;
+				}
+				else
+				{
+					hcl_oop_t t;
+
+					hcl_pushvolat (hcl, &t3);
+					t = hcl_makecons(hcl, t1, hcl->_nil);
+					hcl_popvolat (hcl);
+					if (HCL_UNLIKELY(!t)) goto oops;
+
+					((hcl_oop_oop_t)t3)->slot[1] = t;
+				}
+
+				break;
+			}
+
+			case HCL_CODE_POP_INTO_CONS_CDR:
+			{
+				hcl_oop_t t1, t2, t3;
+				LOG_INST_0 (hcl, "pop_into_cons_end");
+
+				t1 = HCL_STACK_GETTOP(hcl); /* value to store */
+				HCL_STACK_POP (hcl);
+
+				t3 = HCL_STACK_GETTOP(hcl); /* sentinnel */
+				HCL_STACK_POP (hcl);
+
+				t2 = HCL_STACK_GETTOP(hcl); /* head cons */
+				if (HCL_UNLIKELY(!HCL_IS_CONS(hcl, t2)))
+				{
+					hcl_seterrbfmt (hcl, HCL_EINTERN, "internal error - invalid vm state detected in pop_into_cons");
+					goto oops;
+				}
+
+				if (t3 == hcl->_nil)
+				{
+					((hcl_oop_oop_t)t2)->slot[1] = t1;
+				} 
+				else
+				{
+					((hcl_oop_oop_t)t3)->slot[1] = t1;
+				}
+
+				/* no push back of the sentinnel */
 				break;
 			}
 

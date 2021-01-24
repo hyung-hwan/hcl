@@ -528,8 +528,12 @@ SHORT INSTRUCTION CODE                                        LONG INSTRUCTION C
                                                               201  1100 1001 XXXXXXXX JUMP2_BACKWARD
 76-79    0100 11XX UNUSED                                     204  1100 1100 XXXXXXXX JUMP_FORWARD_IF_TRUE
                                                               205  1100 1101 XXXXXXXX JUMP2_FORWARD_IF_TRUE
+                                                              206  1100 1110 XXXXXXXX JUMP_BACKWARD_IF_TRUE
+                                                              207  1100 1111 XXXXXXXX JUMP2_BACKWARD_IF_TRUE
 80-83    0101 00XX UNUSED                                     208  1101 0000 XXXXXXXX JUMP_FORWARD_IF_FALSE
                                                               209  1101 0001 XXXXXXXX JUMP2_FORWARD_IF_FALSE
+                                                              210  1101 0010 XXXXXXXX JUMP_BACKWARD_IF_FALSE
+                                                              211  1101 0011 XXXXXXXX JUMP2_BACKWARD_IF_FALSE
 
 84-87    0101 01XX CALL                                       212  1101 0100 XXXXXXXX CALL_X
 
@@ -657,17 +661,7 @@ enum hcl_bcode_t
 	HCL_CODE_JUMP_BACKWARD_2          = 0x4A, /* 74 */
 	HCL_CODE_JUMP_BACKWARD_3          = 0x4B, /* 75 */
 
-#if 0
-	HCL_CODE_JUMP_BACKWARD_IF_FALSE_0 = 0x4C, /* 76 */
-	HCL_CODE_JUMP_BACKWARD_IF_FALSE_1 = 0x4D, /* 77 */
-	HCL_CODE_JUMP_BACKWARD_IF_FALSE_2 = 0x4E, /* 78 */
-	HCL_CODE_JUMP_BACKWARD_IF_FALSE_3 = 0x4F, /* 79 */
-
-	HCL_CODE_JUMP_BACKWARD_IF_TRUE_0  = 0x50, /* 80 */
-	HCL_CODE_JUMP_BACKWARD_IF_TRUE_1  = 0x51, /* 81 */
-	HCL_CODE_JUMP_BACKWARD_IF_TRUE_2  = 0x52, /* 82 */
-	HCL_CODE_JUMP_BACKWARD_IF_TRUE_3  = 0x53, /* 83 */
-#endif
+	/* UNUSED 0x4C - 0x53 */
 
 	HCL_CODE_CALL_0                   = 0x54, /* 84 */
 	HCL_CODE_CALL_1                   = 0x55, /* 85 */
@@ -746,46 +740,73 @@ enum hcl_bcode_t
 	HCL_CODE_PUSH_NEGINTLIT           = 0xB3, /* 179 */
 	HCL_CODE_PUSH_CHARLIT             = 0xB4, /* 180 */
 
+	/* UNUSED - 0xB5 - 0xB7 */
+
 	HCL_CODE_STORE_INTO_OBJECT_X      = 0xB8, /* 184 ## */
 	HCL_CODE_POP_INTO_OBJECT_X        = 0xBC, /* 188 ## */
 	HCL_CODE_PUSH_OBJECT_X            = 0xC0, /* 192 ## */
 
+	/* UNUSED - 0xC1 - 0xC3 */
+
 	HCL_CODE_JUMP_FORWARD_X           = 0xC4, /* 196 ## */
 	HCL_CODE_JUMP2_FORWARD            = 0xC5, /* 197 */
+
+	/* UNUSED - 0xC6 - 0xC7 */
 
 	HCL_CODE_JUMP_BACKWARD_X          = 0xC8, /* 200 ## */
 	HCL_CODE_JUMP2_BACKWARD           = 0xC9, /* 201 */
 
+	/* UNUSED - 0xCA - 0xCB */
+
 	HCL_CODE_JUMP_FORWARD_IF_TRUE     = 0xCC, /* 204 ## */
 	HCL_CODE_JUMP2_FORWARD_IF_TRUE    = 0xCD, /* 205 */
+	HCL_CODE_JUMP_BACKWARD_IF_TRUE    = 0xCE, /* 206 ## */
+	HCL_CODE_JUMP2_BACKWARD_IF_TRUE   = 0xCF, /* 207 */
+
 	HCL_CODE_JUMP_FORWARD_IF_FALSE    = 0xD0, /* 208 ## */
 	HCL_CODE_JUMP2_FORWARD_IF_FALSE   = 0xD1, /* 209 */
+	HCL_CODE_JUMP_BACKWARD_IF_FALSE   = 0xD2, /* 210 ## */
+	HCL_CODE_JUMP2_BACKWARD_IF_FALSE  = 0xD3, /* 211 */
 
 	HCL_CODE_CALL_X                   = 0xD4, /* 212 */
+	/* UNUSED - 0xD5 - 0xD7 */
 
 	HCL_CODE_STORE_INTO_CTXTEMPVAR_X  = 0xD8, /* 216 ## */
+	/* UNUSED - 0xD9 - 0xDB */
+
 	HCL_CODE_POP_INTO_CTXTEMPVAR_X    = 0xDC, /* 220 ## */
+	/* UNUSED - 0xDD - 0xDF */
+
 	HCL_CODE_PUSH_CTXTEMPVAR_X        = 0xE0, /* 224 ## */
+	/* UNUSED - 0xE1 - 0xE3 */
 
 	HCL_CODE_PUSH_OBJVAR_X            = 0xE4, /* 228 ## */
+	/* UNUSED - 0xE5 - 0xE7 */
+
 	HCL_CODE_STORE_INTO_OBJVAR_X      = 0xE8, /* 232 ## */
+
+	HCL_CODE_MAKE_ARRAY               = 0xE9, /* 233 ## */
+	HCL_CODE_MAKE_BYTEARRAY           = 0xEA, /* 234 ## */
+	HCL_CODE_MAKE_DIC                 = 0xEB, /* 235 ## */
+	
 	HCL_CODE_POP_INTO_OBJVAR_X        = 0xEC, /* 236 ## */
 
-	HCL_CODE_MAKE_BYTEARRAY           = 0xED, /* 237 */
-	HCL_CODE_POP_INTO_BYTEARRAY       = 0xEE, /* 238 */
-	HCL_CODE_MAKE_DIC                 = 0xEF, /* 239 */
+	HCL_CODE_POP_INTO_ARRAY           = 0xED, /* 237 ## */
+	HCL_CODE_POP_INTO_BYTEARRAY       = 0xEE, /* 238 ## */
+	HCL_CODE_POP_INTO_DIC             = 0xEF, /* 239 */
 
 	HCL_CODE_SEND_MESSAGE_X           = 0xF0, /* 240 ## */
 
-	HCL_CODE_POP_INTO_DIC             = 0xF1, /* 241 */
-	HCL_CODE_MAKE_DLIST               = 0xF2, /* 242 */
-	HCL_CODE_POP_INTO_DLIST           = 0xF3, /* 243 */
+	HCL_CODE_MAKE_CONS                = 0xF1, /* 241 */
+	HCL_CODE_POP_INTO_CONS            = 0xF2, /* 242 */
+	HCL_CODE_POP_INTO_CONS_END        = 0xF3, /* 243 */
+
 	HCL_CODE_SEND_MESSAGE_TO_SUPER_X  = 0xF4, /* 244 ## */
 
+	HCL_CODE_POP_INTO_CONS_CDR        = 0xF5, /* 245 */
 	/* -------------------------------------- */
 
-	HCL_CODE_MAKE_ARRAY               = 0xF5, /* 245 */
-	HCL_CODE_POP_INTO_ARRAY           = 0xF6, /* 246 */
+	/* UNUSED 0xF6 */
 
 	HCL_CODE_DUP_STACKTOP             = 0xF7,
 	HCL_CODE_POP_STACKTOP             = 0xF8,

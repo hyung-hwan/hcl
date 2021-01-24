@@ -312,6 +312,10 @@ static int emit_single_param_instruction (hcl_t* hcl, int cmd, hcl_oow_t param_1
 		case HCL_CODE_JUMP2_FORWARD_IF_TRUE:
 		case HCL_CODE_JUMP2_FORWARD_IF_FALSE:
 		case HCL_CODE_JUMP2_FORWARD:
+		case HCL_CODE_JUMP_BACKWARD_IF_TRUE:
+		case HCL_CODE_JUMP_BACKWARD_IF_FALSE:
+		case HCL_CODE_JUMP2_BACKWARD_IF_TRUE:
+		case HCL_CODE_JUMP2_BACKWARD_IF_FALSE:
 		case HCL_CODE_JUMP2_BACKWARD:
 		case HCL_CODE_PUSH_INTLIT:
 		case HCL_CODE_PUSH_NEGINTLIT:
@@ -510,9 +514,11 @@ static HCL_INLINE void patch_long_jump (hcl_t* hcl, hcl_ooi_t jip, hcl_ooi_t jum
 		HCL_ASSERT (hcl, jump_offset <= MAX_CODE_JUMP * 2);
 
 		HCL_ASSERT (hcl, hcl->code.bc.ptr[jip] == HCL_CODE_JUMP_FORWARD_X ||
-		                 hcl->code.bc.ptr[jip] == HCL_CODE_JUMP_BACKWARD_X ||
 		                 hcl->code.bc.ptr[jip] == HCL_CODE_JUMP_FORWARD_IF_TRUE ||
-		                 hcl->code.bc.ptr[jip] == HCL_CODE_JUMP_FORWARD_IF_FALSE);
+		                 hcl->code.bc.ptr[jip] == HCL_CODE_JUMP_FORWARD_IF_FALSE ||
+		                 hcl->code.bc.ptr[jip] == HCL_CODE_JUMP_BACKWARD_X ||
+		                 hcl->code.bc.ptr[jip] == HCL_CODE_JUMP_BACKWARD_IF_TRUE ||
+		                 hcl->code.bc.ptr[jip] == HCL_CODE_JUMP_BACKWARD_IF_FALSE);
 
 		/* JUMP2 instructions are chosen to be greater than its JUMP counterpart by 1 */
 		patch_instruction (hcl, jip, hcl->code.bc.ptr[jip] + 1); 
@@ -688,11 +694,11 @@ enum
 	COP_EMIT_MAKE_ARRAY,
 	COP_EMIT_MAKE_BYTEARRAY,
 	COP_EMIT_MAKE_DIC,
-	COP_EMIT_MAKE_DLIST,
+	COP_EMIT_MAKE_CONS,
 	COP_EMIT_POP_INTO_ARRAY,
 	COP_EMIT_POP_INTO_BYTEARRAY,
 	COP_EMIT_POP_INTO_DIC,
-	COP_EMIT_POP_INTO_DLIST,
+	COP_EMIT_POP_INTO_CONS,
 
 	COP_EMIT_LAMBDA,
 	COP_EMIT_POP_STACKTOP,
@@ -1442,7 +1448,7 @@ static int compile_cons_qlist_expression (hcl_t* hcl, hcl_oop_t obj)
 
 	/* NOTE: cframe management functions don't use the object memory.
 	 *       many operations can be performed without taking GC into account */
-	SWITCH_TOP_CFRAME (hcl, COP_EMIT_MAKE_DLIST, HCL_SMOOI_TO_OOP(0));
+	SWITCH_TOP_CFRAME (hcl, COP_EMIT_MAKE_CONS, HCL_SMOOI_TO_OOP(0));
 
 	nargs = hcl_countcons(hcl, obj);
 	if (nargs > MAX_CODE_PARAM) 
@@ -1459,7 +1465,7 @@ static int compile_cons_qlist_expression (hcl_t* hcl, hcl_oop_t obj)
 
 	/* patch the argument count in the operand field of the COP_EMIT_MAKE_ARRAY frame */
 	cf = GET_TOP_CFRAME(hcl);
-	HCL_ASSERT (hcl, cf->opcode == COP_EMIT_MAKE_DLIST);
+	HCL_ASSERT (hcl, cf->opcode == COP_EMIT_MAKE_CONS);
 	cf->operand = HCL_SMOOI_TO_OOP(nargs);
 
 	return 0;
@@ -2080,7 +2086,7 @@ static int compile_qlist (hcl_t* hcl)
 			/*cf->u.qlist_list.index = oldidx + 1;*/
 		}
 
-		PUSH_SUBCFRAME (hcl, COP_EMIT_POP_INTO_DLIST, HCL_SMOOI_TO_OOP(oldidx));
+		PUSH_SUBCFRAME (hcl, COP_EMIT_POP_INTO_CONS, HCL_SMOOI_TO_OOP(oldidx));
 	}
 
 	return 0;
@@ -2577,16 +2583,16 @@ static HCL_INLINE int emit_make_dic (hcl_t* hcl)
 	return n;
 }
 
-static HCL_INLINE int emit_make_dlist (hcl_t* hcl)
+static HCL_INLINE int emit_make_cons (hcl_t* hcl)
 {
 	hcl_cframe_t* cf;
 	int n;
 
 	cf = GET_TOP_CFRAME(hcl);
-	HCL_ASSERT (hcl, cf->opcode == COP_EMIT_MAKE_DLIST);
+	HCL_ASSERT (hcl, cf->opcode == COP_EMIT_MAKE_CONS);
 	HCL_ASSERT (hcl, HCL_OOP_IS_SMOOI(cf->operand));
 
-	n = emit_single_param_instruction (hcl, HCL_CODE_MAKE_DLIST, HCL_OOP_TO_SMOOI(cf->operand));
+	n = emit_single_param_instruction (hcl, HCL_CODE_MAKE_CONS, HCL_OOP_TO_SMOOI(cf->operand));
 
 	POP_CFRAME (hcl);
 	return n;
@@ -2601,7 +2607,7 @@ static HCL_INLINE int emit_pop_into_array (hcl_t* hcl)
 	HCL_ASSERT (hcl, cf->opcode == COP_EMIT_POP_INTO_ARRAY);
 	HCL_ASSERT (hcl, HCL_OOP_IS_SMOOI(cf->operand));
 
-	n = emit_single_param_instruction (hcl, HCL_CODE_POP_INTO_ARRAY, HCL_OOP_TO_SMOOI(cf->operand));
+	n = emit_single_param_instruction(hcl, HCL_CODE_POP_INTO_ARRAY, HCL_OOP_TO_SMOOI(cf->operand));
 
 	POP_CFRAME (hcl);
 	return n;
@@ -2616,7 +2622,7 @@ static HCL_INLINE int emit_pop_into_bytearray (hcl_t* hcl)
 	HCL_ASSERT (hcl, cf->opcode == COP_EMIT_POP_INTO_BYTEARRAY);
 	HCL_ASSERT (hcl, HCL_OOP_IS_SMOOI(cf->operand));
 
-	n = emit_single_param_instruction (hcl, HCL_CODE_POP_INTO_BYTEARRAY, HCL_OOP_TO_SMOOI(cf->operand));
+	n = emit_single_param_instruction(hcl, HCL_CODE_POP_INTO_BYTEARRAY, HCL_OOP_TO_SMOOI(cf->operand));
 
 	POP_CFRAME (hcl);
 	return n;
@@ -2636,16 +2642,16 @@ static HCL_INLINE int emit_pop_into_dic (hcl_t* hcl)
 	return n;
 }
 
-static HCL_INLINE int emit_pop_into_dlist (hcl_t* hcl)
+static HCL_INLINE int emit_pop_into_cons (hcl_t* hcl)
 {
 	hcl_cframe_t* cf;
 	int n;
 
 	cf = GET_TOP_CFRAME(hcl);
-	HCL_ASSERT (hcl, cf->opcode == COP_EMIT_POP_INTO_DLIST);
+	HCL_ASSERT (hcl, cf->opcode == COP_EMIT_POP_INTO_CONS);
 	HCL_ASSERT (hcl, HCL_OOP_IS_SMOOI(cf->operand));
 
-	n = emit_single_param_instruction (hcl, HCL_CODE_POP_INTO_DLIST, HCL_OOP_TO_SMOOI(cf->operand));
+	n = emit_single_param_instruction (hcl, HCL_CODE_POP_INTO_ARRAY, HCL_OOP_TO_SMOOI(cf->operand));
 
 	POP_CFRAME (hcl);
 	return n;
@@ -2875,8 +2881,8 @@ int hcl_compile (hcl_t* hcl, hcl_oop_t obj)
 				if (emit_make_dic(hcl) <= -1) goto oops;
 				break;
 
-			case COP_EMIT_MAKE_DLIST:
-				if (emit_make_dlist(hcl) <= -1) goto oops;
+			case COP_EMIT_MAKE_CONS:
+				if (emit_make_cons(hcl) <= -1) goto oops;
 				break;
 
 			case COP_EMIT_POP_INTO_ARRAY:
@@ -2887,8 +2893,8 @@ int hcl_compile (hcl_t* hcl, hcl_oop_t obj)
 				if (emit_pop_into_bytearray(hcl) <= -1) goto oops;
 				break;
 
-			case COP_EMIT_POP_INTO_DLIST:
-				if (emit_pop_into_dlist(hcl) <= -1) goto oops;
+			case COP_EMIT_POP_INTO_CONS:
+				if (emit_pop_into_cons(hcl) <= -1) goto oops;
 				break;
 
 			case COP_EMIT_POP_INTO_DIC:

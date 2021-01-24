@@ -309,6 +309,26 @@ int hcl_decode (hcl_t* hcl, hcl_oow_t start, hcl_oow_t end)
 				LOG_INST_1 (hcl, "jump2_forward %zu", b1);
 				break;
 
+			case HCL_CODE_JUMP_BACKWARD_IF_TRUE:
+				FETCH_PARAM_CODE_TO (hcl, b1);
+				LOG_INST_1 (hcl, "jump_backward_if_true %zu", b1);
+				break;
+
+			case HCL_CODE_JUMP2_BACKWARD_IF_TRUE:
+				FETCH_PARAM_CODE_TO (hcl, b1);
+				LOG_INST_1 (hcl, "jump2_backward_if_true %zu", b1);
+				break;
+
+			case HCL_CODE_JUMP_BACKWARD_IF_FALSE:
+				FETCH_PARAM_CODE_TO (hcl, b1);
+				LOG_INST_1 (hcl, "jump_backward_if_false %zu", b1);
+				break;
+
+			case HCL_CODE_JUMP2_BACKWARD_IF_FALSE:
+				FETCH_PARAM_CODE_TO (hcl, b1);
+				LOG_INST_1 (hcl, "jump2_backward_if_false %zu", b1);
+				break;
+
 			case HCL_CODE_JUMP2_BACKWARD:
 				FETCH_PARAM_CODE_TO (hcl, b1);
 				LOG_INST_1 (hcl, "jump2_backward %zu", b1);
@@ -530,14 +550,21 @@ int hcl_decode (hcl_t* hcl, hcl_oow_t start, hcl_oow_t end)
 				LOG_INST_0 (hcl, "pop_into_dic");
 				break;
 
-			case HCL_CODE_MAKE_DLIST:
-				FETCH_PARAM_CODE_TO (hcl, b1);
-				LOG_INST_1 (hcl, "make_dlist %zu", b1);
+			case HCL_CODE_MAKE_CONS:
+				LOG_INST_0 (hcl, "make_cons");
 				break;
 
-			case HCL_CODE_POP_INTO_DLIST:
-				LOG_INST_0 (hcl, "pop_into_dlist");
+			case HCL_CODE_POP_INTO_CONS:
+				LOG_INST_0 (hcl, "pop_into_cons");
+				break;
 
+			case HCL_CODE_POP_INTO_CONS_END:
+				LOG_INST_0 (hcl, "pop_into_cons_end");
+				break;
+
+			case HCL_CODE_POP_INTO_CONS_CDR:
+				LOG_INST_0 (hcl, "pop_into_cons_cdr");
+				break;
 			/* -------------------------------------------------------- */
 
 			case HCL_CODE_DUP_STACKTOP:

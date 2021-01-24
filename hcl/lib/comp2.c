@@ -381,6 +381,10 @@ static int emit_single_param_instruction (hcl_t* hcl, int cmd, hcl_oow_t param_1
 		case HCL_CODE_JUMP2_FORWARD_IF_TRUE:
 		case HCL_CODE_JUMP2_FORWARD_IF_FALSE:
 		case HCL_CODE_JUMP2_FORWARD:
+		case HCL_CODE_JUMP_BACKWARD_IF_TRUE:
+		case HCL_CODE_JUMP_BACKWARD_IF_FALSE:
+		case HCL_CODE_JUMP2_BACKWARD_IF_TRUE:
+		case HCL_CODE_JUMP2_BACKWARD_IF_FALSE:
 		case HCL_CODE_JUMP2_BACKWARD:
 		case HCL_CODE_PUSH_INTLIT:
 		case HCL_CODE_PUSH_NEGINTLIT:
@@ -579,9 +583,11 @@ static HCL_INLINE void patch_long_jump (hcl_t* hcl, hcl_ooi_t jip, hcl_ooi_t jum
 		HCL_ASSERT (hcl, jump_offset <= MAX_CODE_JUMP * 2);
 
 		HCL_ASSERT (hcl, hcl->code.bc.ptr[jip] == HCL_CODE_JUMP_FORWARD_X ||
-		                 hcl->code.bc.ptr[jip] == HCL_CODE_JUMP_BACKWARD_X ||
 		                 hcl->code.bc.ptr[jip] == HCL_CODE_JUMP_FORWARD_IF_TRUE ||
-		                 hcl->code.bc.ptr[jip] == HCL_CODE_JUMP_FORWARD_IF_FALSE);
+		                 hcl->code.bc.ptr[jip] == HCL_CODE_JUMP_FORWARD_IF_FALSE ||
+		                 hcl->code.bc.ptr[jip] == HCL_CODE_JUMP_BACKWARD_X ||
+		                 hcl->code.bc.ptr[jip] == HCL_CODE_JUMP_BACKWARD_IF_TRUE ||
+		                 hcl->code.bc.ptr[jip] == HCL_CODE_JUMP_BACKWARD_IF_FALSE);
 
 		/* JUMP2 instructions are chosen to be greater than its JUMP counterpart by 1 */
 		patch_instruction (hcl, jip, hcl->code.bc.ptr[jip] + 1); 
@@ -789,11 +795,13 @@ enum
 	COP_EMIT_MAKE_ARRAY,
 	COP_EMIT_MAKE_BYTEARRAY,
 	COP_EMIT_MAKE_DIC,
-	COP_EMIT_MAKE_DLIST,
+	COP_EMIT_MAKE_CONS,
 	COP_EMIT_POP_INTO_ARRAY,
 	COP_EMIT_POP_INTO_BYTEARRAY,
 	COP_EMIT_POP_INTO_DIC,
-	COP_EMIT_POP_INTO_DLIST,
+	COP_EMIT_POP_INTO_CONS,
+	COP_EMIT_POP_INTO_CONS_END,
+	COP_EMIT_POP_INTO_CONS_CDR,
 
 	COP_EMIT_LAMBDA,
 	COP_EMIT_POP_STACKTOP,
@@ -1252,7 +1260,8 @@ static int compile_return (hcl_t* hcl, hcl_cnode_t* src, int mode)
 	hcl_cnode_t* obj, * val;
 
 	HCL_ASSERT (hcl, HCL_CNODE_IS_CONS(src));
-	HCL_ASSERT (hcl, HCL_CNODE_IS_SYMBOL_SYNCODED(HCL_CNODE_CONS_CAR(src), HCL_SYNCODE_RETURN) || HCL_CNODE_IS_SYMBOL_SYNCODED(HCL_CNODE_CONS_CAR(src), HCL_SYNCODE_RETURN_FROM_HOME));
+	HCL_ASSERT (hcl, HCL_CNODE_IS_SYMBOL_SYNCODED(HCL_CNODE_CONS_CAR(src), HCL_SYNCODE_RETURN) || 
+	                 HCL_CNODE_IS_SYMBOL_SYNCODED(HCL_CNODE_CONS_CAR(src), HCL_SYNCODE_RETURN_FROM_HOME));
 
 	obj = HCL_CNODE_CONS_CDR(src);
 
@@ -1532,40 +1541,15 @@ static int compile_cons_dic_expression (hcl_t* hcl, hcl_cnode_t* obj)
 	return 0;
 }
 
-#if 0
 static int compile_cons_qlist_expression (hcl_t* hcl, hcl_cnode_t* obj)
 {
 	/* #( 1 2  3 ) 
-	 * #(1 (+ 2 3) 5)
+	 * #(1 (+ 2 3) 5) --> #(1 5 5)
 	 * */
-		
-	hcl_ooi_t nargs;
-	hcl_cframe2_t* cf;
-
-	/* NOTE: cframe management functions don't use the object memory.
-	 *       many operations can be performed without taking GC into account */
-	SWITCH_TOP_CFRAME (hcl, COP_EMIT_MAKE_DLIST, HCL_SMOOI_TO_OOP(0));
-
-	nargs = hcl_countcnodecons(hcl, obj);
-	if (nargs > MAX_CODE_PARAM) 
-	{
-		hcl_setsynerrbfmt (hcl, HCL_SYNERR_ARGFLOOD, HCL_CNODE_GET_LOC(obj), HCL_NULL, "too many(%zd) elements", nargs); 
-		return -1;
-	}
-
-	/* redundant cdr check is performed inside compile_object_list() */
+	SWITCH_TOP_CFRAME (hcl, COP_EMIT_MAKE_CONS, HCL_NULL);
 	PUSH_SUBCFRAME (hcl, COP_COMPILE_QLIST, obj);
-	cf = GET_SUBCFRAME(hcl);
-/*	cf->u.qlist.index = 0;*/
-
-	/* patch the argument count in the operand field of the COP_EMIT_MAKE_ARRAY frame */
-	cf = GET_TOP_CFRAME(hcl);
-	HCL_ASSERT (hcl, cf->opcode == COP_EMIT_MAKE_DLIST);
-	cf->operand = HCL_SMOOI_TO_OOP(nargs);
-
 	return 0;
 }
-#endif // QQQQQ
 
 static int compile_cons_xlist_expression (hcl_t* hcl, hcl_cnode_t* obj)
 {
@@ -2037,9 +2021,9 @@ static int compile_object (hcl_t* hcl)
 					if (compile_cons_dic_expression(hcl, oprnd) <= -1) return -1;
 					break;
 				case HCL_CONCODE_QLIST:
-				#if 0
-					//if (compile_cons_qlist_expression(hcl, oprnd) <= -1) return -1;
-					// break;
+				#if 1
+					if (compile_cons_qlist_expression(hcl, oprnd) <= -1) return -1;
+					break;
 				#else
 					hcl_setsynerrbfmt (hcl, HCL_SYNERR_INTERN, HCL_CNODE_GET_LOC(oprnd), HCL_NULL, "internal error - qlist not implemented");
 					return -1;
@@ -2372,30 +2356,29 @@ static int compile_qlist (hcl_t* hcl)
 		hcl_cnode_t* car, * cdr;
 		hcl_ooi_t oldidx;
 
-// TODO: correct this function in pair with compile_cons_qlist_expression()
-#if 0
-//qlist allows non-nil cdr...
 		if (!HCL_CNODE_IS_CONS(oprnd))
 		{
-			hcl_setsynerrbfmt (hcl, HCL_SYNERR_DOTBANNED, HCL_CNODE_GET_LOC(oprnd), HCL_CNODE_GET_TOK(oprnd), "redundant cdr in the q-list");
-			return -1;
+			/* the last element after . */
+			SWITCH_TOP_CFRAME (hcl, COP_COMPILE_OBJECT, oprnd);
+			PUSH_SUBCFRAME (hcl, COP_EMIT_POP_INTO_CONS_CDR, HCL_NULL);
 		}
-#endif
-
-		car = HCL_CNODE_CONS_CAR(oprnd);
-		cdr = HCL_CNODE_CONS_CDR(oprnd);
-
-		/*oldidx = cf->u.qlist.index;*/
-
-		SWITCH_TOP_CFRAME (hcl, COP_COMPILE_OBJECT, car);
-		if (!cdr)
+		else
 		{
-			PUSH_SUBCFRAME (hcl, COP_COMPILE_QLIST, cdr);
-			cf = GET_SUBCFRAME(hcl);
-			/*cf->u.qlist_list.index = oldidx + 1;*/
-		}
+			car = HCL_CNODE_CONS_CAR(oprnd);
+			cdr = HCL_CNODE_CONS_CDR(oprnd);
 
-		PUSH_SUBCFRAME (hcl, COP_EMIT_POP_INTO_DLIST, HCL_SMOOI_TO_OOP(oldidx));
+			SWITCH_TOP_CFRAME (hcl, COP_COMPILE_OBJECT, car); /* 1 */
+			if (cdr)
+			{
+				PUSH_SUBCFRAME (hcl, COP_COMPILE_QLIST, cdr); /* 3 */
+				PUSH_SUBCFRAME (hcl, COP_EMIT_POP_INTO_CONS, HCL_NULL); /* 2 */
+			}
+			else
+			{
+				/* the last element */
+				PUSH_SUBCFRAME (hcl, COP_EMIT_POP_INTO_CONS_END, HCL_NULL); /* 2 */
+			}
+		}
 	}
 
 	return 0;
@@ -2844,7 +2827,7 @@ static HCL_INLINE int emit_call (hcl_t* hcl)
 	HCL_ASSERT (hcl, cf->opcode == COP_EMIT_CALL);
 	HCL_ASSERT (hcl, HCL_OOP_IS_SMOOI(cf->operand));
 
-	n = emit_single_param_instruction (hcl, HCL_CODE_CALL_0, HCL_OOP_TO_SMOOI(cf->operand));
+	n = emit_single_param_instruction(hcl, HCL_CODE_CALL_0, HCL_OOP_TO_SMOOI(cf->operand));
 
 	POP_CFRAME (hcl);
 	return n;
@@ -2859,7 +2842,7 @@ static HCL_INLINE int emit_make_array (hcl_t* hcl)
 	HCL_ASSERT (hcl, cf->opcode == COP_EMIT_MAKE_ARRAY);
 	HCL_ASSERT (hcl, HCL_OOP_IS_SMOOI(cf->operand));
 
-	n = emit_single_param_instruction (hcl, HCL_CODE_MAKE_ARRAY, HCL_OOP_TO_SMOOI(cf->operand));
+	n = emit_single_param_instruction(hcl, HCL_CODE_MAKE_ARRAY, HCL_OOP_TO_SMOOI(cf->operand));
 
 	POP_CFRAME (hcl);
 	return n;
@@ -2874,7 +2857,7 @@ static HCL_INLINE int emit_make_bytearray (hcl_t* hcl)
 	HCL_ASSERT (hcl, cf->opcode == COP_EMIT_MAKE_BYTEARRAY);
 	HCL_ASSERT (hcl, HCL_OOP_IS_SMOOI(cf->operand));
 
-	n = emit_single_param_instruction (hcl, HCL_CODE_MAKE_BYTEARRAY, HCL_OOP_TO_SMOOI(cf->operand));
+	n = emit_single_param_instruction(hcl, HCL_CODE_MAKE_BYTEARRAY, HCL_OOP_TO_SMOOI(cf->operand));
 
 	POP_CFRAME (hcl);
 	return n;
@@ -2889,22 +2872,22 @@ static HCL_INLINE int emit_make_dic (hcl_t* hcl)
 	HCL_ASSERT (hcl, cf->opcode == COP_EMIT_MAKE_DIC);
 	HCL_ASSERT (hcl, HCL_OOP_IS_SMOOI(cf->operand));
 
-	n = emit_single_param_instruction (hcl, HCL_CODE_MAKE_DIC, HCL_OOP_TO_SMOOI(cf->operand));
+	n = emit_single_param_instruction(hcl, HCL_CODE_MAKE_DIC, HCL_OOP_TO_SMOOI(cf->operand));
 
 	POP_CFRAME (hcl);
 	return n;
 }
 
-static HCL_INLINE int emit_make_dlist (hcl_t* hcl)
+static HCL_INLINE int emit_make_cons (hcl_t* hcl)
 {
 	hcl_cframe2_t* cf;
 	int n;
 
 	cf = GET_TOP_CFRAME(hcl);
-	HCL_ASSERT (hcl, cf->opcode == COP_EMIT_MAKE_DLIST);
-	HCL_ASSERT (hcl, HCL_OOP_IS_SMOOI(cf->operand));
+	HCL_ASSERT (hcl, cf->opcode == COP_EMIT_MAKE_CONS);
+	HCL_ASSERT (hcl, cf->operand == HCL_NULL);
 
-	n = emit_single_param_instruction (hcl, HCL_CODE_MAKE_DLIST, HCL_OOP_TO_SMOOI(cf->operand));
+	n = emit_byte_instruction(hcl, HCL_CODE_MAKE_CONS, HCL_NULL);
 
 	POP_CFRAME (hcl);
 	return n;
@@ -2919,7 +2902,7 @@ static HCL_INLINE int emit_pop_into_array (hcl_t* hcl)
 	HCL_ASSERT (hcl, cf->opcode == COP_EMIT_POP_INTO_ARRAY);
 	HCL_ASSERT (hcl, HCL_OOP_IS_SMOOI(cf->operand));
 
-	n = emit_single_param_instruction (hcl, HCL_CODE_POP_INTO_ARRAY, HCL_OOP_TO_SMOOI(cf->operand));
+	n = emit_single_param_instruction(hcl, HCL_CODE_POP_INTO_ARRAY, HCL_OOP_TO_SMOOI(cf->operand));
 
 	POP_CFRAME (hcl);
 	return n;
@@ -2934,7 +2917,7 @@ static HCL_INLINE int emit_pop_into_bytearray (hcl_t* hcl)
 	HCL_ASSERT (hcl, cf->opcode == COP_EMIT_POP_INTO_BYTEARRAY);
 	HCL_ASSERT (hcl, HCL_OOP_IS_SMOOI(cf->operand));
 
-	n = emit_single_param_instruction (hcl, HCL_CODE_POP_INTO_BYTEARRAY, HCL_OOP_TO_SMOOI(cf->operand));
+	n = emit_single_param_instruction(hcl, HCL_CODE_POP_INTO_BYTEARRAY, HCL_OOP_TO_SMOOI(cf->operand));
 
 	POP_CFRAME (hcl);
 	return n;
@@ -2948,22 +2931,24 @@ static HCL_INLINE int emit_pop_into_dic (hcl_t* hcl)
 	cf = GET_TOP_CFRAME(hcl);
 	HCL_ASSERT (hcl, cf->opcode == COP_EMIT_POP_INTO_DIC);
 
-	n = emit_byte_instruction (hcl, HCL_CODE_POP_INTO_DIC, HCL_NULL);
+	n = emit_byte_instruction(hcl, HCL_CODE_POP_INTO_DIC, HCL_NULL);
 
 	POP_CFRAME (hcl);
 	return n;
 }
 
-static HCL_INLINE int emit_pop_into_dlist (hcl_t* hcl)
+static HCL_INLINE int emit_pop_into_cons (hcl_t* hcl, int cmd)
 {
 	hcl_cframe2_t* cf;
 	int n;
 
 	cf = GET_TOP_CFRAME(hcl);
-	HCL_ASSERT (hcl, cf->opcode == COP_EMIT_POP_INTO_DLIST);
-	HCL_ASSERT (hcl, HCL_OOP_IS_SMOOI(cf->operand));
+	HCL_ASSERT (hcl, cf->opcode == COP_EMIT_POP_INTO_CONS ||
+	                 cf->opcode == COP_EMIT_POP_INTO_CONS_END ||
+	                 cf->opcode == COP_EMIT_POP_INTO_CONS_CDR);
+	HCL_ASSERT (hcl, cf->operand == HCL_NULL);
 
-	n = emit_single_param_instruction (hcl, HCL_CODE_POP_INTO_DLIST, HCL_OOP_TO_SMOOI(cf->operand));
+	n = emit_byte_instruction (hcl, cmd, HCL_NULL);
 
 	POP_CFRAME (hcl);
 	return n;
@@ -3178,7 +3163,7 @@ int hcl_compile2 (hcl_t* hcl, hcl_cnode_t* obj)
 				break;
 
 			case COP_COMPILE_QLIST:
-				if (compile_qlist(hcl)  <= -1) goto oops;
+				if (compile_qlist(hcl) <= -1) goto oops;
 				break;
 
 			case COP_EMIT_CALL:
@@ -3197,8 +3182,8 @@ int hcl_compile2 (hcl_t* hcl, hcl_cnode_t* obj)
 				if (emit_make_dic(hcl) <= -1) goto oops;
 				break;
 
-			case COP_EMIT_MAKE_DLIST:
-				if (emit_make_dlist(hcl) <= -1) goto oops;
+			case COP_EMIT_MAKE_CONS:
+				if (emit_make_cons(hcl) <= -1) goto oops;
 				break;
 
 			case COP_EMIT_POP_INTO_ARRAY:
@@ -3209,12 +3194,20 @@ int hcl_compile2 (hcl_t* hcl, hcl_cnode_t* obj)
 				if (emit_pop_into_bytearray(hcl) <= -1) goto oops;
 				break;
 
-			case COP_EMIT_POP_INTO_DLIST:
-				if (emit_pop_into_dlist(hcl) <= -1) goto oops;
-				break;
-
 			case COP_EMIT_POP_INTO_DIC:
 				if (emit_pop_into_dic(hcl) <= -1) goto oops;
+				break;
+
+			case COP_EMIT_POP_INTO_CONS:
+				if (emit_pop_into_cons(hcl, HCL_CODE_POP_INTO_CONS) <= -1) goto oops;
+				break;
+
+			case COP_EMIT_POP_INTO_CONS_END:
+				if (emit_pop_into_cons(hcl, HCL_CODE_POP_INTO_CONS_END) <= -1) goto oops;
+				break;
+
+			case COP_EMIT_POP_INTO_CONS_CDR:
+				if (emit_pop_into_cons(hcl, HCL_CODE_POP_INTO_CONS_CDR) <= -1) goto oops;
 				break;
 
 			case COP_EMIT_LAMBDA:
