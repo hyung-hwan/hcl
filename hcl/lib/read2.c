@@ -1643,18 +1643,15 @@ static hcl_cnode_t* read_vlist (hcl_t* hcl)
 	{
 		hcl_cnode_t* sym, * cons;
 
-		sym = hcl_makecnodesymbol(hcl, TOKEN_LOC(hcl), TOKEN_NAME(hcl));
-		if (HCL_UNLIKELY(!sym)) goto oops;
-
-#if 0
-		if (HCL_OBJ_GET_FLAGS_SYNCODE(sym) || HCL_OBJ_GET_FLAGS_KERNEL(sym))
+		if (hcl_getsyncodebyoocs_noseterr(hcl, TOKEN_NAME(hcl)) > 0)
 		{
-			hcl_setsynerrbfmt (hcl, HCL_SYNERR_BANNEDVARNAME, HCL_NULL, HCL_NULL,
-				"special symbol not to be declared as a variable - %O", sym); /* TOOD: error location */
+			hcl_setsynerrbfmt (hcl, HCL_SYNERR_BANNEDVARNAME, TOKEN_LOC(hcl), TOKEN_NAME(hcl),
+				"special symbol not to be declared as a variable");
 			goto oops;
 		}
-		/* TODO: exclude special symbols.... or do the above check in the compiler code?? */
-#endif
+
+		sym = hcl_makecnodesymbol(hcl, TOKEN_LOC(hcl), TOKEN_NAME(hcl));
+		if (HCL_UNLIKELY(!sym)) goto oops;
 
 		cons = hcl_makecnodecons(hcl, HCL_CNODE_GET_LOC(sym), sym, HCL_NULL);
 		if (HCL_UNLIKELY(!cons)) 
