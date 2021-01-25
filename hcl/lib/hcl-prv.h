@@ -197,7 +197,8 @@ enum hcl_cnode_type_t
 	HCL_CNODE_FALSE,
 
 	HCL_CNODE_CONS,
-	HCL_CNODE_LIST
+	HCL_CNODE_ELIST, /* empty list */
+	HCL_CNODE_SHELL  /* pseudo-node to hold another actual node */
 };
 typedef enum hcl_cnode_type_t hcl_cnode_type_t;
 
@@ -220,9 +221,9 @@ typedef enum hcl_cnode_type_t hcl_cnode_type_t;
 #define HCL_CNODE_CONS_CDR(x) ((x)->u.cons.cdr)
 
 
-#define HCL_CNODE_IS_LIST(x) ((x)->cn_type == HCL_CNODE_LIST)
-#define HCL_CNODE_IS_LIST_CONCODED(x) ((x)->cn_type == HCL_CNODE_LIST && (x)->u.list.concode == (code))
-#define HCL_CNODE_LIST_CONCODE(x) ((x)->u.list.concode)
+#define HCL_CNODE_IS_ELIST(x) ((x)->cn_type == HCL_CNODE_ELIST)
+#define HCL_CNODE_IS_ELIST_CONCODED(x) ((x)->cn_type == HCL_CNODE_ELIST && (x)->u.elist.concode == (code))
+#define HCL_CNODE_ELIST_CONCODE(x) ((x)->u.elist.concode)
 
 /* NOTE: hcl_cnode_t used by the built-in compiler is not an OOP object */
 struct hcl_cnode_t
@@ -260,7 +261,11 @@ struct hcl_cnode_t
 		struct
 		{
 			hcl_concode_t concode;
-		} list;
+		} elist;
+		struct
+		{
+			hcl_cnode_t* obj;
+		} shell;
 	} u;
 };
 
@@ -1359,7 +1364,8 @@ hcl_cnode_t* hcl_makecnodefpdeclit (hcl_t* hcl, const hcl_ioloc_t* loc, const  h
 hcl_cnode_t* hcl_makecnodesmptrlit (hcl_t* hcl, const hcl_ioloc_t* loc, const  hcl_oocs_t* tok, hcl_oow_t v);
 hcl_cnode_t* hcl_makecnodeerrlit (hcl_t* hcl, const hcl_ioloc_t* loc, const  hcl_oocs_t* tok, hcl_ooi_t v);
 hcl_cnode_t* hcl_makecnodecons (hcl_t* hcl, const hcl_ioloc_t* loc, hcl_cnode_t* car, hcl_cnode_t* cdr);
-hcl_cnode_t* hcl_makecnodelist (hcl_t* hcl, const hcl_ioloc_t* loc, hcl_concode_t type);
+hcl_cnode_t* hcl_makecnodeelist (hcl_t* hcl, const hcl_ioloc_t* loc, hcl_concode_t type);
+hcl_cnode_t* hcl_makecnodeshell (hcl_t* hcl, const hcl_ioloc_t* loc, hcl_cnode_t* obj);
 void hcl_freesinglecnode (hcl_t* hcl, hcl_cnode_t* c);
 void hcl_freecnode (hcl_t* hcl, hcl_cnode_t* c);
 hcl_oow_t hcl_countcnodecons (hcl_t* hcl, hcl_cnode_t* cons);

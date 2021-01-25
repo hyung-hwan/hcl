@@ -133,11 +133,19 @@ hcl_cnode_t* hcl_makecnodecons (hcl_t* hcl, const hcl_ioloc_t* loc, hcl_cnode_t*
 	return c;
 }
 
-hcl_cnode_t* hcl_makecnodelist (hcl_t* hcl, const hcl_ioloc_t* loc, hcl_concode_t type)
+hcl_cnode_t* hcl_makecnodeelist (hcl_t* hcl, const hcl_ioloc_t* loc, hcl_concode_t type)
 {
-	hcl_cnode_t* c =  make_cnode(hcl, HCL_CNODE_LIST, loc, HCL_NULL);
+	hcl_cnode_t* c =  make_cnode(hcl, HCL_CNODE_ELIST, loc, HCL_NULL);
 	if (HCL_UNLIKELY(!c)) return HCL_NULL;
-	c->u.list.concode = type;
+	c->u.elist.concode = type;
+	return c;
+}
+
+hcl_cnode_t* hcl_makecnodeshell (hcl_t* hcl, const hcl_ioloc_t* loc, hcl_cnode_t* obj)
+{
+	hcl_cnode_t* c =  make_cnode(hcl, HCL_CNODE_SHELL, loc, HCL_NULL);
+	if (HCL_UNLIKELY(!c)) return HCL_NULL;
+	c->u.shell.obj = obj;
 	return c;
 }
 
@@ -166,6 +174,23 @@ redo:
 			if (tmp2)
 			{
 				c = tmp2;
+				goto redo;
+			}
+
+			break;
+		}
+
+		case HCL_CNODE_SHELL:
+		{
+			hcl_cnode_t* tmp;
+
+			tmp = c->u.shell.obj;
+
+			hcl_freemem (hcl, c);
+
+			if (tmp)
+			{
+				c = tmp;
 				goto redo;
 			}
 

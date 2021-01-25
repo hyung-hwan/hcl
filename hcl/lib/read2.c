@@ -1469,7 +1469,7 @@ static HCL_INLINE hcl_cnode_t* leave_list (hcl_t* hcl, int* flagv, int* oldflagv
 	}
 
 	/* the list is empty */
-	return hcl_makecnodelist(hcl, &loc, concode);
+	return hcl_makecnodeelist(hcl, &loc, concode);
 }
 
 static HCL_INLINE int can_dot_list (hcl_t* hcl)
@@ -1555,12 +1555,12 @@ static int chain_to_list (hcl_t* hcl, hcl_cnode_t* obj)
 	if (flagv & CLOSED)
 	{
 		/* the list has already been closed and cannot add more items
-		 * for instance,  see this faulty expression [1 2 . 3 4 ].
+		 * for instance,  see this faulty expression #(1 2 . 3 4 ).
 		 * you can have only 1 item  after the period. this condition
 		 * can only be triggered by a wrong qlist where a period is
 		 * allowed. so i can safely hard-code the error code to
-		 * HCL_SYNERR_RBRACK. */
-		hcl_setsynerr (hcl, HCL_SYNERR_RBRACK, TOKEN_LOC(hcl), TOKEN_NAME(hcl));
+		 * HCL_SYNERR_RPAREN */
+		hcl_setsynerr (hcl, HCL_SYNERR_RPAREN, TOKEN_LOC(hcl), TOKEN_NAME(hcl));
 		return -1;
 	}
 	else if (flagv & DOTTED)
@@ -1575,7 +1575,25 @@ static int chain_to_list (hcl_t* hcl, hcl_cnode_t* obj)
 		tail = rstl->tail;
 		HCL_ASSERT (hcl, tail != HCL_NULL);
 		HCL_ASSERT (hcl, HCL_CNODE_IS_CONS(tail));
-		tail->u.cons.cdr = obj;
+
+		if (HCL_CNODE_IS_CONS(obj) && HCL_CNODE_CONS_CONCODE(obj) != HCL_CONCODE_QLIST)
+		{
+			hcl_cnode_t* shell;
+
+			/* if the last element is another non-data list
+			 * for example, #( 1 2 . [ 3 4 5  ]) 
+			 * use a shell node to wrap the actual object list node head
+			 * for the compiler.
+			 */
+			shell = hcl_makecnodeshell(hcl, HCL_CNODE_GET_LOC(obj), obj);
+			if (HCL_UNLIKELY(!shell)) return -1;
+
+			tail->u.cons.cdr = shell;
+		}
+		else
+		{
+			tail->u.cons.cdr = obj;
+		}
 
 		/* update the flag to CLOSED so that you can have more than
 		 * one item after the dot. */
@@ -1688,7 +1706,8 @@ static hcl_cnode_t* read_vlist (hcl_t* hcl)
 		return vh;
 	}
 
-	return hcl_makecnodelist(hcl, &start_loc, HCL_CONCODE_VLIST);
+	/* this is an empty list */
+	return hcl_makecnodeelist(hcl, &start_loc, HCL_CONCODE_VLIST);
 
 oops:
 	if (vh) hcl_freecnode (hcl, vh);
@@ -1983,8 +2002,7 @@ static hcl_cnode_t* read_object (hcl_t* hcl)
 			/* if so, append the element read into the quote list */
 			if (chain_to_list(hcl, obj) <= -1) goto oops;
 
-			/* exit out of the quoted list. the quoted list can have
-			 * one element only. */
+			/* exit out of the quoted list. the quoted list can have one element only. */
 			obj = leave_list(hcl, &flagv, &oldflagv);
 
 			/* one level up toward the top */

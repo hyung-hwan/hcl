@@ -1950,6 +1950,7 @@ static int compile_object (hcl_t* hcl)
 	HCL_ASSERT (hcl, cf->opcode == COP_COMPILE_OBJECT);
 
 	oprnd = cf->operand;
+redo:
 	switch (HCL_CNODE_GET_TYPE(oprnd))
 	{
 		case HCL_CNODE_NIL:
@@ -2040,10 +2041,10 @@ static int compile_object (hcl_t* hcl)
 			break;
 		}
 
-		case HCL_CNODE_LIST:
+		case HCL_CNODE_ELIST:
 		{
 			/* empty list */
-			switch (HCL_CNODE_LIST_CONCODE(oprnd))
+			switch (HCL_CNODE_ELIST_CONCODE(oprnd))
 			{
 				case HCL_CONCODE_XLIST:
 					hcl_setsynerrbfmt (hcl, HCL_SYNERR_VARDCLBANNED, HCL_CNODE_GET_LOC(oprnd), HCL_NULL, "empty executable list");
@@ -2076,6 +2077,11 @@ static int compile_object (hcl_t* hcl)
 
 			break;
 		}
+
+		case HCL_CNODE_SHELL:
+			/* a shell node is just a wrapper of an actual node */
+			oprnd = oprnd->u.shell.obj;
+			goto redo;
 
 		default:
 			hcl_setsynerrbfmt (hcl, HCL_SYNERR_INTERN, HCL_CNODE_GET_LOC(oprnd), HCL_CNODE_GET_TOK(oprnd), "internal error - unexpected object type %d", HCL_CNODE_GET_TYPE(oprnd));
@@ -3229,11 +3235,11 @@ int hcl_compile2 (hcl_t* hcl, hcl_cnode_t* obj)
 			case COP_SUBCOMPILE_AND_EXPR:
 				if (subcompile_and_expr(hcl) <= -1) goto oops;
 				break;
-				
+
 			case COP_SUBCOMPILE_OR_EXPR:
 				if (subcompile_or_expr(hcl) <= -1) goto oops;
 				break;
-				
+
 			case COP_POST_AND_EXPR:
 				if (post_and_expr(hcl) <= -1) goto oops;
 				break;
