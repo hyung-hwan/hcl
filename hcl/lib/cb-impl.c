@@ -508,7 +508,7 @@ void* hcl_vmprim_alloc_heap (hcl_t* hcl, hcl_oow_t size)
 	return (void*)(ptr + 1);
 
 #else
-	return HCL_MMGR_ALLOC(hcl->mmgr, size);
+	return HCL_MMGR_ALLOC(hcl->_mmgr, size);
 #endif
 }
 
@@ -519,7 +519,7 @@ void hcl_vmprim_free_heap (hcl_t* hcl, void* ptr)
 	actual_ptr = (hcl_oow_t*)ptr - 1;
 	munmap (actual_ptr, *actual_ptr);
 #else
-	return HCL_MMGR_FREE(hcl->mmgr, ptr);
+	return HCL_MMGR_FREE(hcl->_mmgr, ptr);
 #endif
 }
 
