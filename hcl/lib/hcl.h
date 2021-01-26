@@ -532,7 +532,7 @@ struct hcl_fpdec_t
 #define HCL_FUNCTION_GET_CODE_BYTE(m) HCL_OBJ_GET_TRAILER_BYTE(m)
 #define HCL_FUNCTION_GET_CODE_SIZE(m) HCL_OBJ_GET_TRAILER_SIZE(m)
 
-#define HCL_FUNCTION_NAMED_INSTVARS 3   /* this excludes literal frames and byte codes */
+#define HCL_FUNCTION_NAMED_INSTVARS 4   /* this excludes literal frames and byte codes */
 typedef struct hcl_function_t hcl_function_t;
 typedef struct hcl_function_t* hcl_oop_function_t;
 
@@ -551,6 +551,8 @@ struct hcl_function_t
 	hcl_oop_t ntmprs; /* smooi. number of temporaries. includes arguments as well */
 	hcl_oop_t nargs;  /* smooi. number of arguments */
 	hcl_oop_context_t home; /* home context. nil for the initial function */
+
+	hcl_oop_t dbgi_file_offset;
 
 	/* == variable indexed part == */
 	hcl_oop_t literal_frame[1]; /* it stores literals. it may not exist */
@@ -838,7 +840,6 @@ enum hcl_dbgi_type_t
 	HCL_DBGI_TYPE_CODE_FILE    = 0,
 	HCL_DBGI_TYPE_CODE_CLASS   = 1,
 	HCL_DBGI_TYPE_CODE_TEXT    = 2,
-	/* TODO: interface? etc? */
 	HCL_DBGI_TYPE_CODE_METHOD  = 3, /* method instruction location information */
 
 	/* low 8 bits */

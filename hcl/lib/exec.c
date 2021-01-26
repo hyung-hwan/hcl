@@ -1807,10 +1807,10 @@ static int __activate_function (hcl_t* hcl, hcl_oop_function_t rcv_func, hcl_ooi
 	hcl_ooi_t local_ntmprs, i;
 
 	/*
-	 * (defun sum (x)
-	 *     (if (< x 2) 1
-	 *      else (+ x (sum (- x 1)))))
-	 * (printf ">>>> %d\n" (sum 10))
+	  (defun sum (x)
+	      (if (< x 2) 1
+	       else (+ x (sum (- x 1)))))
+	  (printf ">>>> %d\n" (sum 10))
 	 */
 
 	/* the receiver must be a function */
@@ -3645,6 +3645,7 @@ hcl_oop_t hcl_execute (hcl_t* hcl)
 	#endif
 	}
 
+	/* create a virtual function object that hold the bytes codes generated */
 	func = make_function(hcl, hcl->code.lit.len, hcl->code.bc.ptr, hcl->code.bc.len);
 	if (HCL_UNLIKELY(!func)) return HCL_NULL;
 

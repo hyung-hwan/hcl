@@ -3108,7 +3108,7 @@ int hcl_compile2 (hcl_t* hcl, hcl_cnode_t* obj)
 	 * translated to base context objects instead.
 	 * 
 	 * In the INTERACTIVE mode, the literal frame base plays a key role.
-	 * hcl_compile() is called for the top-level expression andthe literal
+	 * hcl_compile() is called for the top-level expression and the literal
 	 * frame base can be 0. The means it is ok for a top-level code to 
 	 * reference part of the literal frame reserved for a lambda function.
 	 *

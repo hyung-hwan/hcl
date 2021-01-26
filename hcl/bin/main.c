@@ -1164,7 +1164,7 @@ hcl_logufmt (hcl, HCL_LOG_WARN, fmt, ustr, 0x6789);
 #if 0
 // TODO: change the option name
 // in the INTERACTIVE mode, the compiler generates MAKE_FUNCTION for lambda functions.
-// in the non-INTERACTIVE mode, the compiler generates MAKE_CONTEXT for lambda functions.
+// in the non-INTERACTIVE mode, the compiler generates MAKE_BLOCK for lambda functions.
 {
 	hcl_bitmask_t trait;
 	hcl_getoption (hcl, HCL_TRAIT, &trait);
