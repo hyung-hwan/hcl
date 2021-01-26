@@ -300,6 +300,7 @@ static int emit_byte_instruction (hcl_t* hcl, hcl_oob_t bc, const hcl_ioloc_t* s
 
 	if (srcloc)
 	{
+		
 		hcl->code.locptr[hcl->code.bc.len] = srcloc->line;
 	}
 

@@ -1033,7 +1033,7 @@ retry:
 		{
 			int n;
 
-			n = end_include (hcl);
+			n = end_include(hcl);
 			if (n <= -1) return -1;
 			if (n >= 1) goto retry;
 

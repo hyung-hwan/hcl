@@ -552,7 +552,7 @@ struct hcl_function_t
 	hcl_oop_t nargs;  /* smooi. number of arguments */
 	hcl_oop_context_t home; /* home context. nil for the initial function */
 
-	hcl_oop_t dbgi_file_offset;
+	hcl_oop_t dbgi; /* byte array containing debug information. nil if not available */
 
 	/* == variable indexed part == */
 	hcl_oop_t literal_frame[1]; /* it stores literals. it may not exist */
