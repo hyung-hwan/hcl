@@ -1319,10 +1319,10 @@ static int begin_include (hcl_t* hcl)
 	hcl_ioinarg_t* arg;
 	const hcl_ooch_t* io_name;
 
-	io_name = add_io_name (hcl, TOKEN_NAME(hcl));
-	if (!io_name) return -1;
+	io_name = add_io_name(hcl, TOKEN_NAME(hcl));
+	if (HCL_UNLIKELY(!io_name)) return -1;
 
-	arg = (hcl_ioinarg_t*)hcl_callocmem (hcl, HCL_SIZEOF(*arg));
+	arg = (hcl_ioinarg_t*)hcl_callocmem(hcl, HCL_SIZEOF(*arg));
 	if (HCL_UNLIKELY(!arg)) goto oops;
 
 	arg->name = io_name;

@@ -1373,6 +1373,14 @@ struct hcl_synerr_t
 	} tgt;
 };
 
+
+typedef struct hcl_dbgl_t hcl_dbgl_t;
+struct hcl_dbgl_t
+{
+	const hcl_ooch_t* fname; /* file name */
+	hcl_oow_t sline; /* source line in the file */
+};
+
 #if defined(HCL_INCLUDE_COMPILER)
 typedef struct hcl_compiler_t hcl_compiler_t;
 typedef struct hcl_cnode_t hcl_cnode_t;
@@ -1567,7 +1575,8 @@ struct hcl_t
 		} lit;
 
 		/* array that hold the location of the byte code emitted */
-		hcl_oow_t* locptr;
+
+		hcl_dbgl_t* locptr;
 	} code;
 
 	/* == PRINTER == */

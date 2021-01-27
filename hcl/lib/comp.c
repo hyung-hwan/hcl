@@ -210,13 +210,13 @@ static int emit_byte_instruction (hcl_t* hcl, hcl_oob_t bc, const hcl_ioloc_t* s
 	{
 		hcl_oow_t newcapa;
 		hcl_oob_t* tmp;
-		hcl_oow_t* tmp2;
+		hcl_dbgl_t* tmp2;
 
 		newcapa = HCL_ALIGN(hcl->code.bc.capa + 1, HCL_BC_BUFFER_ALIGN);
 		tmp = (hcl_oob_t*)hcl_reallocmem(hcl, hcl->code.bc.ptr, HCL_SIZEOF(*tmp) * newcapa);
 		if (HCL_UNLIKELY(!tmp)) return -1;
 
-		tmp2 = (hcl_oow_t*)hcl_reallocmem(hcl, hcl->code.locptr, HCL_SIZEOF(*tmp2) * newcapa);
+		tmp2 = (hcl_dbgl_t*)hcl_reallocmem(hcl, hcl->code.locptr, HCL_SIZEOF(*tmp2) * newcapa);
 		if (HCL_UNLIKELY(!tmp2))
 		{
 			hcl_freemem (hcl, tmp);
@@ -231,10 +231,13 @@ static int emit_byte_instruction (hcl_t* hcl, hcl_oob_t bc, const hcl_ioloc_t* s
 
 	hcl->code.bc.ptr[hcl->code.bc.len] = bc;
 
+/*
 	if (srcloc)
 	{
-		hcl->code.locptr[hcl->code.bc.len] = srcloc->line;
+		hcl->code.locptr[hcl->code.bc.len].fname = srcloc->file;
+		hcl->code.locptr[hcl->code.bc.len].sline = srcloc->line;
 	}
+*/
 
 	hcl->code.bc.len++;
 	return 0;

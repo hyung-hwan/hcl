@@ -3649,6 +3649,8 @@ hcl_oop_t hcl_execute (hcl_t* hcl)
 	func = make_function(hcl, hcl->code.lit.len, hcl->code.bc.ptr, hcl->code.bc.len);
 	if (HCL_UNLIKELY(!func)) return HCL_NULL;
 
+/* TODO: copy the debug information as well into the dbgi field of the function object. */
+
 	/* pass nil for the home context of the initial function */
 	fill_function_data (hcl, func, 0, 0, (hcl_oop_context_t)hcl->_nil, hcl->code.lit.arr->slot, hcl->code.lit.len);
 

@@ -1299,7 +1299,7 @@ static const hcl_ooch_t* add_io_name (hcl_t* hcl, const hcl_oocs_t* name)
 	hcl_iolink_t* link;
 	hcl_ooch_t* ptr;
 
-	link = (hcl_iolink_t*)hcl_callocmem (hcl, HCL_SIZEOF(*link) + HCL_SIZEOF(hcl_ooch_t) * (name->len + 1));
+	link = (hcl_iolink_t*)hcl_callocmem(hcl, HCL_SIZEOF(*link) + HCL_SIZEOF(hcl_ooch_t) * (name->len + 1));
 	if (HCL_UNLIKELY(!link)) return HCL_NULL;
 
 	ptr = (hcl_ooch_t*)(link + 1);

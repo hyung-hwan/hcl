@@ -47,7 +47,7 @@
 #define HCL_ENABLE_FLTFMT
 
 #if defined(HCL_BUILD_DEBUG)
-#define HCL_DEBUG_LEXER 1
+/*#define HCL_DEBUG_LEXER 1*/
 #define HCL_DEBUG_VM_PROCESSOR 1
 #define HCL_DEBUG_VM_EXEC 1
 /*#define HCL_PROFILE_VM 1*/
@@ -349,10 +349,15 @@ struct hcl_cframe2_t
 
 		struct
 		{
-			hcl_ioloc_t start_loc;
+			hcl_oow_t jump_inst_pos;
 			hcl_ooi_t lfbase_pos;
 			hcl_ooi_t lfsize_pos;
 		} lambda;
+
+		struct
+		{
+			int from_home;
+		} _return;
 	} u;
 };
 typedef struct hcl_cframe2_t hcl_cframe2_t;
