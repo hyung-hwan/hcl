@@ -315,7 +315,7 @@ int hcl_emitbyteinstruction (hcl_t* hcl, hcl_oob_t bc)
 	return emit_byte_instruction(hcl, bc, HCL_NULL);
 }*/
 
-static int emit_single_param_instruction (hcl_t* hcl, int cmd, hcl_oow_t param_1)
+static int emit_single_param_instruction (hcl_t* hcl, int cmd, hcl_oow_t param_1, const hcl_ioloc_t* srcloc)
 {
 	hcl_oob_t bc;
 
@@ -404,7 +404,7 @@ static int emit_single_param_instruction (hcl_t* hcl, int cmd, hcl_oow_t param_1
 	return -1;
 
 write_short:
-	if (emit_byte_instruction(hcl, bc, HCL_NULL) <= -1) return -1;
+	if (emit_byte_instruction(hcl, bc, srcloc) <= -1) return -1;
 	return 0;
 
 write_long:
@@ -414,11 +414,11 @@ write_long:
 		return -1;
 	}
 #if (HCL_HCL_CODE_LONG_PARAM_SIZE == 2)
-	if (emit_byte_instruction(hcl, bc, HCL_NULL) <= -1 ||
+	if (emit_byte_instruction(hcl, bc, srcloc) <= -1 ||
 	    emit_byte_instruction(hcl, (param_1 >> 8) & 0xFF, HCL_NULL) <= -1 ||
 	    emit_byte_instruction(hcl, param_1 & 0xFF, HCL_NULL) <= -1) return -1;
 #else
-	if (emit_byte_instruction(hcl, bc, HCL_NULL) <= -1 ||
+	if (emit_byte_instruction(hcl, bc, srcloc) <= -1 ||
 	    emit_byte_instruction(hcl, param_1, HCL_NULL) <= -1) return -1;
 #endif
 	return 0;
@@ -430,13 +430,13 @@ write_long2:
 		return -1;
 	}
 #if (HCL_HCL_CODE_LONG_PARAM_SIZE == 2)
-	if (emit_byte_instruction(hcl, bc, HCL_NULL) <= -1 ||
+	if (emit_byte_instruction(hcl, bc, srcloc) <= -1 ||
 	    emit_byte_instruction(hcl, (param_1 >> 24) & 0xFF, HCL_NULL) <= -1 ||
 	    emit_byte_instruction(hcl, (param_1 >> 16) & 0xFF, HCL_NULL) <= -1 ||
 	    emit_byte_instruction(hcl, (param_1 >>  8) & 0xFF, HCL_NULL) <= -1 ||
 	    emit_byte_instruction(hcl, param_1 & 0xFF, HCL_NULL) <= -1) return -1;
 #else
-	if (emit_byte_instruction(hcl, bc, HCL_NULL) <= -1 ||
+	if (emit_byte_instruction(hcl, bc, srcloc) <= -1 ||
 	    emit_byte_instruction(hcl, (param_1 >> 8) & 0xFF, HCL_NULL) <= -1 ||
 	    emit_byte_instruction(hcl, param_1 & 0xFF, HCL_NULL) <= -1) return -1;
 #endif
@@ -551,11 +551,11 @@ static int emit_push_literal (hcl_t* hcl, hcl_oop_t obj)
 
 		if (i >= 0 && i <= MAX_CODE_PARAM)
 		{
-			return emit_single_param_instruction(hcl, HCL_CODE_PUSH_INTLIT, i);
+			return emit_single_param_instruction(hcl, HCL_CODE_PUSH_INTLIT, i, HCL_NULL);
 		}
 		else if (i < 0 && i >= -(hcl_ooi_t)MAX_CODE_PARAM)
 		{
-			return emit_single_param_instruction(hcl, HCL_CODE_PUSH_NEGINTLIT, -i);
+			return emit_single_param_instruction(hcl, HCL_CODE_PUSH_NEGINTLIT, -i, HCL_NULL);
 		}
 	}
 	else if (HCL_OOP_IS_CHAR(obj))
@@ -565,11 +565,11 @@ static int emit_push_literal (hcl_t* hcl, hcl_oop_t obj)
 		i = HCL_OOP_TO_CHAR(obj);
 
 		if (i >= 0 && i <= MAX_CODE_PARAM)
-			return emit_single_param_instruction(hcl, HCL_CODE_PUSH_CHARLIT, i);
+			return emit_single_param_instruction(hcl, HCL_CODE_PUSH_CHARLIT, i, HCL_NULL);
 	}
 
 	if (add_literal(hcl, obj, &index) <= -1 ||
-	    emit_single_param_instruction(hcl, HCL_CODE_PUSH_LITERAL_0, index) <= -1) return -1;
+	    emit_single_param_instruction(hcl, HCL_CODE_PUSH_LITERAL_0, index, HCL_NULL) <= -1) return -1;
 
 	return 0;
 }
@@ -641,7 +641,7 @@ static int emit_indexed_variable_access (hcl_t* hcl, hcl_oow_t index, hcl_oob_t 
 	}
 
 	/* TODO: top-level... verify this. this will vary depending on how i implement the top-level and global variables... */
-	if (emit_single_param_instruction (hcl, baseinst2, index) <= -1) return -1;
+	if (emit_single_param_instruction (hcl, baseinst2, index, HCL_NULL) <= -1) return -1;
 	return 0;
 }
 
@@ -934,7 +934,7 @@ static int compile_break (hcl_t* hcl, hcl_cnode_t* src)
 			HCL_ASSERT (hcl, hcl->code.bc.len < HCL_SMOOI_MAX);
 			jump_inst_pos = hcl->code.bc.len;
 			
-			if (emit_single_param_instruction (hcl, HCL_CODE_JUMP_FORWARD_0, MAX_CODE_JUMP) <= -1) return -1;
+			if (emit_single_param_instruction (hcl, HCL_CODE_JUMP_FORWARD_0, MAX_CODE_JUMP, HCL_NULL) <= -1) return -1;
 			INSERT_CFRAME (hcl, i, COP_UPDATE_BREAK, HCL_SMOOI_TO_OOP(jump_inst_pos));
 
 			POP_CFRAME (hcl);
@@ -1216,7 +1216,7 @@ static int compile_lambda (hcl_t* hcl, hcl_cnode_t* src, int defun)
 	jump_inst_pos = hcl->code.bc.len;
 	/* specifying MAX_CODE_JUMP causes emit_single_param_instruction() to 
 	 * produce the long jump instruction (HCL_CODE_JUMP_FORWARD_X) */
-	if (emit_single_param_instruction(hcl, HCL_CODE_JUMP_FORWARD_0, MAX_CODE_JUMP) <= -1) return -1;
+	if (emit_single_param_instruction(hcl, HCL_CODE_JUMP_FORWARD_0, MAX_CODE_JUMP, HCL_NULL) <= -1) return -1;
 
 	SWITCH_TOP_CFRAME (hcl, COP_COMPILE_OBJECT_LIST, obj);
 
@@ -1761,7 +1761,7 @@ static HCL_INLINE int compile_symbol (hcl_t* hcl, hcl_cnode_t* obj)
 		/* add the entire cons pair to the literal frame */
 
 		if (add_literal(hcl, cons, &index) <= -1 ||
-		    emit_single_param_instruction(hcl, HCL_CODE_PUSH_OBJECT_0, index) <= -1) return -1;
+		    emit_single_param_instruction(hcl, HCL_CODE_PUSH_OBJECT_0, index, HCL_NULL) <= -1) return -1;
 
 		return 0;
 	}
@@ -1840,7 +1840,7 @@ static HCL_INLINE int compile_dsymbol (hcl_t* hcl, hcl_cnode_t* obj)
 	}
 
 	if (add_literal(hcl, cons, &index) <= -1 ||
-	    emit_single_param_instruction(hcl, HCL_CODE_PUSH_OBJECT_0, index) <= -1) return -1;
+	    emit_single_param_instruction(hcl, HCL_CODE_PUSH_OBJECT_0, index, HCL_NULL) <= -1) return -1;
 
 	return 0;
 }
@@ -2016,23 +2016,23 @@ redo:
 				case HCL_CONCODE_XLIST:
 					if (compile_cons_xlist_expression(hcl, oprnd) <= -1) return -1;
 					break;
+
 				case HCL_CONCODE_ARRAY:
 					if (compile_cons_array_expression(hcl, oprnd) <= -1) return -1;
 					break;
+
 				case HCL_CONCODE_BYTEARRAY:
 					if (compile_cons_bytearray_expression(hcl, oprnd) <= -1) return -1;
 					break;
+
 				case HCL_CONCODE_DIC:
 					if (compile_cons_dic_expression(hcl, oprnd) <= -1) return -1;
 					break;
+
 				case HCL_CONCODE_QLIST:
-				#if 1
 					if (compile_cons_qlist_expression(hcl, oprnd) <= -1) return -1;
 					break;
-				#else
-					hcl_setsynerrbfmt (hcl, HCL_SYNERR_INTERN, HCL_CNODE_GET_LOC(oprnd), HCL_NULL, "internal error - qlist not implemented");
-					return -1;
-				#endif
+
 				case HCL_CONCODE_VLIST:
 					hcl_setsynerrbfmt (hcl, HCL_SYNERR_VARDCLBANNED, HCL_CNODE_GET_LOC(oprnd), HCL_NULL, "variable declaration disallowed");
 					return -1;
@@ -2055,19 +2055,19 @@ redo:
 					return -1;
 
 				case HCL_CONCODE_ARRAY:
-					if (emit_single_param_instruction(hcl, HCL_CODE_MAKE_ARRAY, 0) <= -1) return -1;
+					if (emit_single_param_instruction(hcl, HCL_CODE_MAKE_ARRAY, 0, HCL_CNODE_GET_LOC(oprnd)) <= -1) return -1;
 					goto done;
 
 				case HCL_CONCODE_BYTEARRAY:
-					if (emit_single_param_instruction(hcl, HCL_CODE_MAKE_BYTEARRAY, 0) <= -1) return -1;
+					if (emit_single_param_instruction(hcl, HCL_CODE_MAKE_BYTEARRAY, 0, HCL_CNODE_GET_LOC(oprnd)) <= -1) return -1;
 					goto done;
 
 				case HCL_CONCODE_DIC:
-					if (emit_single_param_instruction(hcl, HCL_CODE_MAKE_DIC, 16) <= -1) return -1;
+					if (emit_single_param_instruction(hcl, HCL_CODE_MAKE_DIC, 16, HCL_CNODE_GET_LOC(oprnd)) <= -1) return -1;
 					goto done;
 
 				case HCL_CONCODE_QLIST:
-					if (emit_byte_instruction(hcl, HCL_CODE_PUSH_NIL, HCL_NULL) <= -1) return -1;
+					if (emit_byte_instruction(hcl, HCL_CODE_PUSH_NIL, HCL_CNODE_GET_LOC(oprnd)) <= -1) return -1;
 					goto done;
 
 				case HCL_CONCODE_VLIST:
@@ -2423,7 +2423,7 @@ static HCL_INLINE int patch_nearest_post_if_body (hcl_t* hcl, hcl_cnode_t* cmd)
 	/* emit jump_forward before the beginning of the else block.
 	 * this is to make the earlier if or elif block to skip
 	 * the else part. it is to be patched in post_else_body(). */
-	if (emit_single_param_instruction (hcl, HCL_CODE_JUMP_FORWARD_0, MAX_CODE_JUMP) <= -1) return -1;
+	if (emit_single_param_instruction (hcl, HCL_CODE_JUMP_FORWARD_0, MAX_CODE_JUMP, HCL_NULL) <= -1) return -1;
 
 	/* HCL_CODE_LONG_PARAM_SIZE + 1 => size of the long JUMP_FORWARD instruction */
 	jump_offset = hcl->code.bc.len - jip - (HCL_HCL_CODE_LONG_PARAM_SIZE + 1);
@@ -2551,7 +2551,7 @@ static HCL_INLINE int subcompile_and_expr (hcl_t* hcl)
 	HCL_ASSERT (hcl, hcl->code.bc.len < HCL_SMOOI_MAX);
 	jump_inst_pos = hcl->code.bc.len;
 
-	if (emit_single_param_instruction(hcl, HCL_CODE_JUMP_FORWARD_IF_FALSE, MAX_CODE_JUMP) <= -1) return -1;
+	if (emit_single_param_instruction(hcl, HCL_CODE_JUMP_FORWARD_IF_FALSE, MAX_CODE_JUMP, HCL_NULL) <= -1) return -1;
 	if (emit_byte_instruction(hcl, HCL_CODE_POP_STACKTOP, HCL_NULL) <= -1) return -1; 
 
 	expr = HCL_CNODE_CONS_CAR(obj);
@@ -2617,7 +2617,7 @@ static HCL_INLINE int subcompile_or_expr (hcl_t* hcl)
 	HCL_ASSERT (hcl, hcl->code.bc.len < HCL_SMOOI_MAX);
 	jump_inst_pos = hcl->code.bc.len;
 
-	if (emit_single_param_instruction(hcl, HCL_CODE_JUMP_FORWARD_IF_TRUE, MAX_CODE_JUMP) <= -1) return -1;
+	if (emit_single_param_instruction(hcl, HCL_CODE_JUMP_FORWARD_IF_TRUE, MAX_CODE_JUMP, HCL_NULL) <= -1) return -1;
 	if (emit_byte_instruction(hcl, HCL_CODE_POP_STACKTOP, HCL_NULL) <= -1) return -1; 
 
 	expr = HCL_CNODE_CONS_CAR(obj);
@@ -2668,7 +2668,7 @@ static HCL_INLINE int post_if_cond (hcl_t* hcl)
 	HCL_ASSERT (hcl, hcl->code.bc.len < HCL_SMOOI_MAX);
 	jump_inst_pos = hcl->code.bc.len;
 
-	if (emit_single_param_instruction (hcl, HCL_CODE_JUMP_FORWARD_IF_FALSE, MAX_CODE_JUMP) <= -1) return -1;
+	if (emit_single_param_instruction (hcl, HCL_CODE_JUMP_FORWARD_IF_FALSE, MAX_CODE_JUMP, HCL_NULL) <= -1) return -1;
 
 	/* to drop the result of the conditional when it is true */
 	if (emit_byte_instruction(hcl, HCL_CODE_POP_STACKTOP, HCL_NULL) <= -1) return -1; 
@@ -2743,7 +2743,7 @@ static HCL_INLINE int post_while_cond (hcl_t* hcl)
 		next_cop = COP_POST_WHILE_BODY;
 	}
 
-	if (emit_single_param_instruction (hcl, jump_inst, MAX_CODE_JUMP) <= -1) return -1;
+	if (emit_single_param_instruction (hcl, jump_inst, MAX_CODE_JUMP, HCL_NULL) <= -1) return -1;
 	if (emit_byte_instruction(hcl, HCL_CODE_POP_STACKTOP, HCL_NULL) <= -1) return -1;
 
 	HCL_ASSERT (hcl, hcl->code.bc.len < HCL_SMOOI_MAX);
@@ -2786,7 +2786,7 @@ static HCL_INLINE int post_while_body (hcl_t* hcl)
 	HCL_ASSERT (hcl, hcl->code.bc.len < HCL_SMOOI_MAX);
 	jump_offset = hcl->code.bc.len - cf->u.post_while.cond_pos + 1;
 	if (jump_offset > 3) jump_offset += HCL_HCL_CODE_LONG_PARAM_SIZE;
-	if (emit_single_param_instruction (hcl, HCL_CODE_JUMP_BACKWARD_0, jump_offset) <= -1) return -1;
+	if (emit_single_param_instruction (hcl, HCL_CODE_JUMP_BACKWARD_0, jump_offset, HCL_NULL) <= -1) return -1;
 
 	jip = HCL_OOP_TO_SMOOI(cf->operand);
 	/* HCL_CODE_LONG_PARAM_SIZE + 1 => size of the long JUMP_FORWARD_IF_FALSE/JUMP_FORWARD_IF_TRUE instruction */
@@ -2839,7 +2839,7 @@ static HCL_INLINE int emit_call (hcl_t* hcl)
 	HCL_ASSERT (hcl, cf->opcode == COP_EMIT_CALL);
 	HCL_ASSERT (hcl, HCL_OOP_IS_SMOOI(cf->operand));
 
-	n = emit_single_param_instruction(hcl, HCL_CODE_CALL_0, HCL_OOP_TO_SMOOI(cf->operand));
+	n = emit_single_param_instruction(hcl, HCL_CODE_CALL_0, HCL_OOP_TO_SMOOI(cf->operand), HCL_NULL);
 
 	POP_CFRAME (hcl);
 	return n;
@@ -2854,7 +2854,7 @@ static HCL_INLINE int emit_make_array (hcl_t* hcl)
 	HCL_ASSERT (hcl, cf->opcode == COP_EMIT_MAKE_ARRAY);
 	HCL_ASSERT (hcl, HCL_OOP_IS_SMOOI(cf->operand));
 
-	n = emit_single_param_instruction(hcl, HCL_CODE_MAKE_ARRAY, HCL_OOP_TO_SMOOI(cf->operand));
+	n = emit_single_param_instruction(hcl, HCL_CODE_MAKE_ARRAY, HCL_OOP_TO_SMOOI(cf->operand), HCL_NULL);
 
 	POP_CFRAME (hcl);
 	return n;
@@ -2869,7 +2869,7 @@ static HCL_INLINE int emit_make_bytearray (hcl_t* hcl)
 	HCL_ASSERT (hcl, cf->opcode == COP_EMIT_MAKE_BYTEARRAY);
 	HCL_ASSERT (hcl, HCL_OOP_IS_SMOOI(cf->operand));
 
-	n = emit_single_param_instruction(hcl, HCL_CODE_MAKE_BYTEARRAY, HCL_OOP_TO_SMOOI(cf->operand));
+	n = emit_single_param_instruction(hcl, HCL_CODE_MAKE_BYTEARRAY, HCL_OOP_TO_SMOOI(cf->operand), HCL_NULL);
 
 	POP_CFRAME (hcl);
 	return n;
@@ -2884,7 +2884,7 @@ static HCL_INLINE int emit_make_dic (hcl_t* hcl)
 	HCL_ASSERT (hcl, cf->opcode == COP_EMIT_MAKE_DIC);
 	HCL_ASSERT (hcl, HCL_OOP_IS_SMOOI(cf->operand));
 
-	n = emit_single_param_instruction(hcl, HCL_CODE_MAKE_DIC, HCL_OOP_TO_SMOOI(cf->operand));
+	n = emit_single_param_instruction(hcl, HCL_CODE_MAKE_DIC, HCL_OOP_TO_SMOOI(cf->operand), HCL_NULL);
 
 	POP_CFRAME (hcl);
 	return n;
@@ -2914,7 +2914,7 @@ static HCL_INLINE int emit_pop_into_array (hcl_t* hcl)
 	HCL_ASSERT (hcl, cf->opcode == COP_EMIT_POP_INTO_ARRAY);
 	HCL_ASSERT (hcl, cf->operand != HCL_NULL);
 
-	n = emit_single_param_instruction(hcl, HCL_CODE_POP_INTO_ARRAY, cf->u.array_list.index);
+	n = emit_single_param_instruction(hcl, HCL_CODE_POP_INTO_ARRAY, cf->u.array_list.index, HCL_CNODE_GET_LOC(cf->operand));
 
 	POP_CFRAME (hcl);
 	return n;
@@ -2929,7 +2929,7 @@ static HCL_INLINE int emit_pop_into_bytearray (hcl_t* hcl)
 	HCL_ASSERT (hcl, cf->opcode == COP_EMIT_POP_INTO_BYTEARRAY);
 	HCL_ASSERT (hcl, cf->operand != HCL_NULL);
 
-	n = emit_single_param_instruction(hcl, HCL_CODE_POP_INTO_BYTEARRAY, cf->u.bytearray_list.index);
+	n = emit_single_param_instruction(hcl, HCL_CODE_POP_INTO_BYTEARRAY, cf->u.bytearray_list.index, HCL_CNODE_GET_LOC(cf->operand));
 
 	POP_CFRAME (hcl);
 	return n;
@@ -3069,7 +3069,7 @@ static HCL_INLINE int emit_set (hcl_t* hcl)
 		}
 
 		if (add_literal(hcl, cons, &index) <= -1 ||
-		    emit_single_param_instruction(hcl, HCL_CODE_STORE_INTO_OBJECT_0, index) <= -1) return -1;
+		    emit_single_param_instruction(hcl, HCL_CODE_STORE_INTO_OBJECT_0, index, HCL_NULL) <= -1) return -1;
 	}
 	else
 	{
