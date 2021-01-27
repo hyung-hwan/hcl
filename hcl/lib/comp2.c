@@ -2246,12 +2246,13 @@ static int compile_array_list (hcl_t* hcl)
 			cf->u.array_list.index = oldidx + 1;
 		}
 
-		PUSH_SUBCFRAME (hcl, COP_EMIT_POP_INTO_ARRAY, HCL_SMOOI_TO_OOP(oldidx));
+		PUSH_SUBCFRAME (hcl, COP_EMIT_POP_INTO_ARRAY, car);
+		cf = GET_SUBCFRAME(hcl);
+		cf->u.array_list.index = oldidx;
 	}
 
 	return 0;
 }
-
 
 static int compile_bytearray_list (hcl_t* hcl)
 {
@@ -2291,7 +2292,9 @@ static int compile_bytearray_list (hcl_t* hcl)
 			cf->u.bytearray_list.index = oldidx + 1;
 		}
 
-		PUSH_SUBCFRAME (hcl, COP_EMIT_POP_INTO_BYTEARRAY, HCL_SMOOI_TO_OOP(oldidx));
+		PUSH_SUBCFRAME (hcl, COP_EMIT_POP_INTO_BYTEARRAY, car);
+		cf = GET_SUBCFRAME(hcl);
+		cf->u.bytearray_list.index = oldidx;
 	}
 
 	return 0;
@@ -2340,7 +2343,7 @@ static int compile_dic_list (hcl_t* hcl)
 			PUSH_SUBCFRAME (hcl, COP_COMPILE_DIC_LIST, cddr);
 		}
 
-		PUSH_SUBCFRAME (hcl, COP_EMIT_POP_INTO_DIC, HCL_SMOOI_TO_OOP(0));
+		PUSH_SUBCFRAME (hcl, COP_EMIT_POP_INTO_DIC, cdr);
 		PUSH_SUBCFRAME(hcl, COP_COMPILE_OBJECT, cadr);
 	}
 
@@ -2363,16 +2366,16 @@ static int compile_qlist (hcl_t* hcl)
 	}
 	else
 	{
-		hcl_cnode_t* car, * cdr;
-
 		if (!HCL_CNODE_IS_CONS(oprnd))
 		{
 			/* the last element after . */
 			SWITCH_TOP_CFRAME (hcl, COP_COMPILE_OBJECT, oprnd);
-			PUSH_SUBCFRAME (hcl, COP_EMIT_POP_INTO_CONS_CDR, oprnd); /* TODO: can i pass the location of the closing )? */
+			PUSH_SUBCFRAME (hcl, COP_EMIT_POP_INTO_CONS_CDR, oprnd);
 		}
 		else
 		{
+			hcl_cnode_t* car, * cdr;
+
 			car = HCL_CNODE_CONS_CAR(oprnd);
 			cdr = HCL_CNODE_CONS_CDR(oprnd);
 
@@ -2380,12 +2383,12 @@ static int compile_qlist (hcl_t* hcl)
 			if (cdr)
 			{
 				PUSH_SUBCFRAME (hcl, COP_COMPILE_QLIST, cdr); /* 3 */
-				PUSH_SUBCFRAME (hcl, COP_EMIT_POP_INTO_CONS, oprnd); /* 2 */
+				PUSH_SUBCFRAME (hcl, COP_EMIT_POP_INTO_CONS, car); /* 2 */
 			}
 			else
 			{
 				/* the last element */
-				PUSH_SUBCFRAME (hcl, COP_EMIT_POP_INTO_CONS_END, oprnd); /* 2 */
+				PUSH_SUBCFRAME (hcl, COP_EMIT_POP_INTO_CONS_END, car); /* 2 */
 			}
 		}
 	}
@@ -2909,9 +2912,9 @@ static HCL_INLINE int emit_pop_into_array (hcl_t* hcl)
 
 	cf = GET_TOP_CFRAME(hcl);
 	HCL_ASSERT (hcl, cf->opcode == COP_EMIT_POP_INTO_ARRAY);
-	HCL_ASSERT (hcl, HCL_OOP_IS_SMOOI(cf->operand));
+	HCL_ASSERT (hcl, cf->operand != HCL_NULL);
 
-	n = emit_single_param_instruction(hcl, HCL_CODE_POP_INTO_ARRAY, HCL_OOP_TO_SMOOI(cf->operand));
+	n = emit_single_param_instruction(hcl, HCL_CODE_POP_INTO_ARRAY, cf->u.array_list.index);
 
 	POP_CFRAME (hcl);
 	return n;
@@ -2924,9 +2927,9 @@ static HCL_INLINE int emit_pop_into_bytearray (hcl_t* hcl)
 
 	cf = GET_TOP_CFRAME(hcl);
 	HCL_ASSERT (hcl, cf->opcode == COP_EMIT_POP_INTO_BYTEARRAY);
-	HCL_ASSERT (hcl, HCL_OOP_IS_SMOOI(cf->operand));
+	HCL_ASSERT (hcl, cf->operand != HCL_NULL);
 
-	n = emit_single_param_instruction(hcl, HCL_CODE_POP_INTO_BYTEARRAY, HCL_OOP_TO_SMOOI(cf->operand));
+	n = emit_single_param_instruction(hcl, HCL_CODE_POP_INTO_BYTEARRAY, cf->u.bytearray_list.index);
 
 	POP_CFRAME (hcl);
 	return n;
@@ -2939,8 +2942,9 @@ static HCL_INLINE int emit_pop_into_dic (hcl_t* hcl)
 
 	cf = GET_TOP_CFRAME(hcl);
 	HCL_ASSERT (hcl, cf->opcode == COP_EMIT_POP_INTO_DIC);
+	HCL_ASSERT (hcl, cf->operand != HCL_NULL);
 
-	n = emit_byte_instruction(hcl, HCL_CODE_POP_INTO_DIC, HCL_NULL);
+	n = emit_byte_instruction(hcl, HCL_CODE_POP_INTO_DIC, HCL_CNODE_GET_LOC(cf->operand));
 
 	POP_CFRAME (hcl);
 	return n;

@@ -337,16 +337,19 @@ struct hcl_cframe2_t
 			hcl_ioloc_t start_loc;
 		} post_if;
 
+		/* COP_COMPILE_ARRAY_LIST, COP_POP_INTO_ARRAY */
 		struct
 		{
 			hcl_ooi_t index;
 		} array_list;
 
+		/* COP_COMPILE_BYTEARRAY_LIST, COP_POP_INTO_BYTEARRAY */
 		struct
 		{
 			hcl_ooi_t index;
 		} bytearray_list;
 
+		/* COP_EMIT_LAMBDA */
 		struct
 		{
 			hcl_oow_t jump_inst_pos;
@@ -354,6 +357,7 @@ struct hcl_cframe2_t
 			hcl_ooi_t lfsize_pos;
 		} lambda;
 
+		/* COP_EMIT_RETURN */
 		struct
 		{
 			int from_home;
