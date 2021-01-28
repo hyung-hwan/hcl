@@ -320,9 +320,17 @@ struct hcl_cframe2_t
 
 	union
 	{
+		/* COP_EMIT_CALL */
+		struct
+		{
+			hcl_ooi_t index;
+		} call;
+
+		/* COP_EMIT_SET */
 		struct
 		{
 			int var_type;
+			hcl_ooi_t index;
 		} set;
 
 		struct
@@ -335,6 +343,7 @@ struct hcl_cframe2_t
 		struct
 		{
 			hcl_ooi_t body_pos;
+			hcl_ooi_t jump_inst_pos;
 			hcl_ioloc_t start_loc;
 		} post_if;
 

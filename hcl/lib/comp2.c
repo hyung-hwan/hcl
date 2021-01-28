@@ -443,7 +443,7 @@ write_long2:
 	return 0;
 }
 
-static int emit_double_param_instruction (hcl_t* hcl, int cmd, hcl_oow_t param_1, hcl_oow_t param_2)
+static int emit_double_param_instruction (hcl_t* hcl, int cmd, hcl_oow_t param_1, hcl_oow_t param_2, const hcl_ioloc_t* srcloc)
 {
 	hcl_oob_t bc;
 
@@ -485,7 +485,7 @@ static int emit_double_param_instruction (hcl_t* hcl, int cmd, hcl_oow_t param_1
 	return -1;
 
 write_short:
-	if (emit_byte_instruction(hcl, bc, HCL_NULL) <= -1 ||
+	if (emit_byte_instruction(hcl, bc, srcloc) <= -1 ||
 	    emit_byte_instruction(hcl, param_2, HCL_NULL) <= -1) return -1;
 	return 0;
 
@@ -496,13 +496,13 @@ write_long:
 		return -1;
 	}
 #if (HCL_HCL_CODE_LONG_PARAM_SIZE == 2)
-	if (emit_byte_instruction(hcl, bc, HCL_NULL) <= -1 ||
+	if (emit_byte_instruction(hcl, bc, srcloc) <= -1 ||
 	    emit_byte_instruction(hcl, param_1 >> 8, HCL_NULL) <= -1 ||
 	    emit_byte_instruction(hcl, param_1 & 0xFF, HCL_NULL) <= -1 ||
 	    emit_byte_instruction(hcl, param_2 >> 8, HCL_NULL) <= -1 ||
 	    emit_byte_instruction(hcl, param_2 & 0xFF, HCL_NULL) <= -1) return -1;
 #else
-	if (emit_byte_instruction(hcl, bc, HCL_NULL) <= -1 ||
+	if (emit_byte_instruction(hcl, bc, srcloc) <= -1 ||
 	    emit_byte_instruction(hcl, param_1, HCL_NULL) <= -1 ||
 	    emit_byte_instruction(hcl, param_2, HCL_NULL) <= -1) return -1;
 #endif
@@ -613,7 +613,7 @@ static HCL_INLINE void patch_long_param (hcl_t* hcl, hcl_ooi_t ip, hcl_oow_t par
 #endif
 }
 
-static int emit_indexed_variable_access (hcl_t* hcl, hcl_oow_t index, hcl_oob_t baseinst1, hcl_oob_t baseinst2)
+static int emit_indexed_variable_access (hcl_t* hcl, hcl_oow_t index, hcl_oob_t baseinst1, hcl_oob_t baseinst2, const hcl_ioloc_t* srcloc)
 {
 	if (hcl->c->blk.depth >= 0)
 	{
@@ -634,14 +634,14 @@ static int emit_indexed_variable_access (hcl_t* hcl, hcl_oow_t index, hcl_oob_t 
 				 *            2 means current->home->home. 
 				 * index_in_ctx is a relative index within the context found.
 				 */
-				if (emit_double_param_instruction(hcl, baseinst1, ctx_offset, index_in_ctx) <= -1) return -1;
+				if (emit_double_param_instruction(hcl, baseinst1, ctx_offset, index_in_ctx, srcloc) <= -1) return -1;
 				return 0;
 			}
 		}
 	}
 
 	/* TODO: top-level... verify this. this will vary depending on how i implement the top-level and global variables... */
-	if (emit_single_param_instruction (hcl, baseinst2, index, HCL_NULL) <= -1) return -1;
+	if (emit_single_param_instruction (hcl, baseinst2, index, srcloc) <= -1) return -1;
 	return 0;
 }
 
@@ -1205,7 +1205,7 @@ static int compile_lambda (hcl_t* hcl, hcl_cnode_t* src, int defun)
 	if (hcl->option.trait & HCL_TRAIT_INTERACTIVE)
 	{
 		/* make_function nargs ntmprs lfbase lfsize */
-		if (emit_double_param_instruction(hcl, HCL_CODE_MAKE_FUNCTION, nargs, ntmprs) <= -1) return -1;
+		if (emit_double_param_instruction(hcl, HCL_CODE_MAKE_FUNCTION, nargs, ntmprs, HCL_CNODE_GET_LOC(cmd)) <= -1) return -1;
 		lfbase_pos = hcl->code.bc.len;
 		if (emit_long_param(hcl, hcl->code.lit.len - hcl->c->blk.info[hcl->c->blk.depth - 1].lfbase) <= -1) return -1; /* literal frame base */
 		lfsize_pos = hcl->code.bc.len; /* literal frame size */
@@ -1213,14 +1213,14 @@ static int compile_lambda (hcl_t* hcl, hcl_cnode_t* src, int defun)
 	}
 	else
 	{
-		if (emit_double_param_instruction(hcl, HCL_CODE_MAKE_BLOCK, nargs, ntmprs) <= -1) return -1;
+		if (emit_double_param_instruction(hcl, HCL_CODE_MAKE_BLOCK, nargs, ntmprs, HCL_CNODE_GET_LOC(cmd)) <= -1) return -1;
 	}
 
 	HCL_ASSERT (hcl, hcl->code.bc.len < HCL_SMOOI_MAX);  /* guaranteed in emit_byte_instruction() */
 	jump_inst_pos = hcl->code.bc.len;
 	/* specifying MAX_CODE_JUMP causes emit_single_param_instruction() to 
 	 * produce the long jump instruction (HCL_CODE_JUMP_FORWARD_X) */
-	if (emit_single_param_instruction(hcl, HCL_CODE_JUMP_FORWARD_0, MAX_CODE_JUMP, HCL_NULL) <= -1) return -1;
+	if (emit_single_param_instruction(hcl, HCL_CODE_JUMP_FORWARD_0, MAX_CODE_JUMP, HCL_CNODE_GET_LOC(cmd)) <= -1) return -1;
 
 	SWITCH_TOP_CFRAME (hcl, COP_COMPILE_OBJECT_LIST, obj);
 
@@ -1240,9 +1240,10 @@ static int compile_lambda (hcl_t* hcl, hcl_cnode_t* src, int defun)
 			/* the check in compile_lambda() must ensure this condition */
 			HCL_ASSERT (hcl, index <= HCL_SMOOI_MAX); 
 
-			PUSH_SUBCFRAME (hcl, COP_EMIT_SET, HCL_SMOOI_TO_OOP(index)); 
+			PUSH_SUBCFRAME (hcl, COP_EMIT_SET, defun_name);
 			cf = GET_SUBCFRAME(hcl);
 			cf->u.set.var_type = VAR_INDEXED;
+			cf->u.set.index = index;
 		}
 	}
 
@@ -1375,9 +1376,10 @@ static int compile_set (hcl_t* hcl, hcl_cnode_t* src)
 		/* the check in compile_lambda() must ensure this condition */
 		HCL_ASSERT (hcl, index <= HCL_SMOOI_MAX); 
 
-		PUSH_SUBCFRAME (hcl, COP_EMIT_SET, HCL_SMOOI_TO_OOP(index)); 
+		PUSH_SUBCFRAME (hcl, COP_EMIT_SET, cmd); 
 		cf = GET_SUBCFRAME(hcl);
 		cf->u.set.var_type = VAR_INDEXED;
+		cf->u.set.index = index;
 	}
 
 	return 0;
@@ -1642,7 +1644,6 @@ static int compile_cons_xlist_expression (hcl_t* hcl, hcl_cnode_t* obj)
 		hcl_ooi_t oldtop;
 		hcl_cframe2_t* cf;
 		hcl_cnode_t* cdr;
-		hcl_cnode_t* sdc;
 
 		/* NOTE: cframe management functions don't use the object memory.
 		 *       many operations can be performed without taking GC into account */
@@ -1653,7 +1654,7 @@ static int compile_cons_xlist_expression (hcl_t* hcl, hcl_cnode_t* obj)
 		oldtop = GET_TOP_CFRAME_INDEX(hcl); 
 		HCL_ASSERT (hcl, oldtop >= 0);
 
-		SWITCH_TOP_CFRAME (hcl, COP_EMIT_CALL, HCL_SMOOI_TO_OOP(0));
+		SWITCH_TOP_CFRAME (hcl, COP_EMIT_CALL, car);
 
 		/* compile <operator> */
 		PUSH_CFRAME (hcl, COP_COMPILE_OBJECT, car);
@@ -1684,6 +1685,8 @@ static int compile_cons_xlist_expression (hcl_t* hcl, hcl_cnode_t* obj)
 
 		if (HCL_CNODE_IS_SYMBOL(car) || HCL_CNODE_IS_DSYMBOL(car))
 		{
+			hcl_oop_cons_t sdc;
+
 			/* only symbols are added to the system dictionary. 
 			 * perform this lookup only if car is a symbol */
 			sdc = hcl_lookupsysdicforsymbol_noseterr(hcl, HCL_CNODE_GET_TOK(car));
@@ -1709,7 +1712,7 @@ static int compile_cons_xlist_expression (hcl_t* hcl, hcl_cnode_t* obj)
 		/* patch the argument count in the operand field of the COP_EMIT_CALL frame */
 		cf = GET_CFRAME(hcl, oldtop);
 		HCL_ASSERT (hcl, cf->opcode == COP_EMIT_CALL);
-		cf->operand = HCL_SMOOI_TO_OOP(nargs);
+		cf->u.call.index = nargs;
 	}
 	else
 	{
@@ -1758,7 +1761,7 @@ static HCL_INLINE int compile_symbol (hcl_t* hcl, hcl_cnode_t* obj)
 	}
 	else
 	{
-		return emit_indexed_variable_access(hcl, index, HCL_CODE_PUSH_CTXTEMPVAR_0, HCL_CODE_PUSH_TEMPVAR_0);
+		return emit_indexed_variable_access(hcl, index, HCL_CODE_PUSH_CTXTEMPVAR_0, HCL_CODE_PUSH_TEMPVAR_0, HCL_NULL);
 	}
 }
 
@@ -2395,16 +2398,18 @@ static HCL_INLINE int patch_nearest_post_if_body (hcl_t* hcl, hcl_cnode_t* cmd)
 	hcl_ooi_t jip, jump_offset;
 	hcl_cframe2_t* cf;
 
-	cf = find_cframe_from_top (hcl, COP_POST_IF_BODY);
+	cf = find_cframe_from_top(hcl, COP_POST_IF_BODY);
 	HCL_ASSERT (hcl, cf != HCL_NULL);
+	HCL_ASSERT (hcl, cf->opcode == COP_POST_IF_BODY);
+	HCL_ASSERT (hcl, cf->operand != HCL_NULL);
 
 	/* jump instruction position of the JUMP_FORWARD_IF_FALSE after the conditional of the previous if or elif*/
-	jip = HCL_OOP_TO_SMOOI(cf->operand); 
+	jip = cf->u.post_if.jump_inst_pos;
 
 	if (hcl->code.bc.len <= cf->u.post_if.body_pos)
 	{
 		/* the if body is empty. */
-		if (emit_byte_instruction (hcl, HCL_CODE_PUSH_NIL, HCL_NULL) <= -1) return -1;
+		if (emit_byte_instruction(hcl, HCL_CODE_PUSH_NIL, HCL_CNODE_GET_LOC(cf->operand)) <= -1) return -1;
 	}
 
 	HCL_ASSERT (hcl, hcl->code.bc.len < HCL_SMOOI_MAX);
@@ -2413,7 +2418,7 @@ static HCL_INLINE int patch_nearest_post_if_body (hcl_t* hcl, hcl_cnode_t* cmd)
 	/* emit jump_forward before the beginning of the else block.
 	 * this is to make the earlier if or elif block to skip
 	 * the else part. it is to be patched in post_else_body(). */
-	if (emit_single_param_instruction (hcl, HCL_CODE_JUMP_FORWARD_0, MAX_CODE_JUMP, HCL_NULL) <= -1) return -1;
+	if (emit_single_param_instruction (hcl, HCL_CODE_JUMP_FORWARD_0, MAX_CODE_JUMP, HCL_CNODE_GET_LOC(cf->operand)) <= -1) return -1;
 
 	/* HCL_CODE_LONG_PARAM_SIZE + 1 => size of the long JUMP_FORWARD instruction */
 	jump_offset = hcl->code.bc.len - jip - (HCL_HCL_CODE_LONG_PARAM_SIZE + 1);
@@ -2427,7 +2432,7 @@ static HCL_INLINE int patch_nearest_post_if_body (hcl_t* hcl, hcl_cnode_t* cmd)
 
 	/* beginning of the elif/else block code */
 	/* to drop the result of the conditional when the conditional is false */
-	if (emit_byte_instruction (hcl, HCL_CODE_POP_STACKTOP, HCL_NULL) <= -1) return -1; 
+	if (emit_byte_instruction (hcl, HCL_CODE_POP_STACKTOP, HCL_CNODE_GET_LOC(cf->operand)) <= -1) return -1; 
 
 	/* this is the actual beginning */
 	HCL_ASSERT (hcl, hcl->code.bc.len < HCL_SMOOI_MAX);
@@ -2435,8 +2440,8 @@ static HCL_INLINE int patch_nearest_post_if_body (hcl_t* hcl, hcl_cnode_t* cmd)
 
 	/* modify the POST_IF_BODY frame */
 	HCL_ASSERT (hcl, cf->opcode == COP_POST_IF_BODY);
-	HCL_ASSERT (hcl, HCL_OOP_IS_SMOOI(cf->operand));
-	cf->operand = HCL_SMOOI_TO_OOP(jump_inst_pos); 
+	HCL_ASSERT (hcl, cf->operand != HCL_NULL);
+	cf->u.post_if.jump_inst_pos = jump_inst_pos;
 	cf->u.post_if.body_pos = body_pos;
 
 	return 0;
@@ -2470,7 +2475,7 @@ static HCL_INLINE int subcompile_elif (hcl_t* hcl)
 	}
 
 	cond = HCL_CNODE_CONS_CAR(obj);
-	obj = HCL_CONS_CDR(obj);
+	obj = HCL_CNODE_CONS_CDR(obj);
 
 	SWITCH_TOP_CFRAME (hcl, COP_COMPILE_OBJECT, cond); /* 1 */
 	PUSH_SUBCFRAME (hcl, COP_POST_IF_COND, obj); /* 2 */
@@ -2654,22 +2659,24 @@ static HCL_INLINE int post_if_cond (hcl_t* hcl)
 
 	cf = GET_TOP_CFRAME(hcl);
 	HCL_ASSERT (hcl, cf->opcode == COP_POST_IF_COND);
+	HCL_ASSERT (hcl, cf->operand != HCL_NULL);
 
 	HCL_ASSERT (hcl, hcl->code.bc.len < HCL_SMOOI_MAX);
 	jump_inst_pos = hcl->code.bc.len;
 
-	if (emit_single_param_instruction (hcl, HCL_CODE_JUMP_FORWARD_IF_FALSE, MAX_CODE_JUMP, HCL_NULL) <= -1) return -1;
+	if (emit_single_param_instruction(hcl, HCL_CODE_JUMP_FORWARD_IF_FALSE, MAX_CODE_JUMP, HCL_CNODE_GET_LOC(cf->operand)) <= -1) return -1;
 
 	/* to drop the result of the conditional when it is true */
-	if (emit_byte_instruction(hcl, HCL_CODE_POP_STACKTOP, HCL_NULL) <= -1) return -1; 
+	if (emit_byte_instruction(hcl, HCL_CODE_POP_STACKTOP, HCL_CNODE_GET_LOC(cf->operand)) <= -1) return -1; 
 
 	HCL_ASSERT (hcl, hcl->code.bc.len < HCL_SMOOI_MAX);
 	body_pos = hcl->code.bc.len;
 
 	SWITCH_TOP_CFRAME (hcl, COP_COMPILE_IF_OBJECT_LIST, cf->operand); /* 1 */
-	PUSH_SUBCFRAME (hcl, COP_POST_IF_BODY, HCL_SMOOI_TO_OOP(jump_inst_pos)); /* 2 */
+	PUSH_SUBCFRAME (hcl, COP_POST_IF_BODY, cf->operand); /* 2 */
 	cf = GET_SUBCFRAME(hcl);
 	cf->u.post_if.body_pos = body_pos;
+	cf->u.post_if.jump_inst_pos = jump_inst_pos;
 	return 0;
 }
 
@@ -2681,14 +2688,14 @@ static HCL_INLINE int post_if_body (hcl_t* hcl)
 
 	cf = GET_TOP_CFRAME(hcl);
 	HCL_ASSERT (hcl, cf->opcode == COP_POST_IF_BODY);
-	HCL_ASSERT (hcl, HCL_OOP_IS_SMOOI(cf->operand));
+	HCL_ASSERT (hcl, cf->operand != HCL_NULL);
 
-	jip = HCL_OOP_TO_SMOOI(cf->operand);
+	jip = cf->u.post_if.jump_inst_pos;
 
 	if (hcl->code.bc.len <= cf->u.post_if.body_pos)
 	{
 		/* if body is empty */
-		if (emit_byte_instruction (hcl, HCL_CODE_PUSH_NIL, HCL_NULL) <= -1) return -1;
+		if (emit_byte_instruction(hcl, HCL_CODE_PUSH_NIL, HCL_CNODE_GET_LOC(cf->operand)) <= -1) return -1;
 	}
 
 	/* HCL_CODE_LONG_PARAM_SIZE + 1 => size of the long JUMP_FORWARD_IF_FALSE instruction */
@@ -2827,9 +2834,9 @@ static HCL_INLINE int emit_call (hcl_t* hcl)
 
 	cf = GET_TOP_CFRAME(hcl);
 	HCL_ASSERT (hcl, cf->opcode == COP_EMIT_CALL);
-	HCL_ASSERT (hcl, HCL_OOP_IS_SMOOI(cf->operand));
+	HCL_ASSERT (hcl, cf->operand != HCL_NULL);
 
-	n = emit_single_param_instruction(hcl, HCL_CODE_CALL_0, HCL_OOP_TO_SMOOI(cf->operand), HCL_NULL);
+	n = emit_single_param_instruction(hcl, HCL_CODE_CALL_0, cf->u.call.index, HCL_CNODE_GET_LOC(cf->operand));
 
 	POP_CFRAME (hcl);
 	return n;
@@ -3055,7 +3062,7 @@ static HCL_INLINE int emit_set (hcl_t* hcl)
 		if (!cons) 
 		{
 			cons = (hcl_oop_t)hcl_putatsysdic(hcl, sym, hcl->_nil);
-			if (!cons) return -1;
+			if (HCL_UNLIKELY(!cons)) return -1;
 		}
 
 		if (add_literal(hcl, cons, &index) <= -1 ||
@@ -3063,12 +3070,9 @@ static HCL_INLINE int emit_set (hcl_t* hcl)
 	}
 	else
 	{
-		hcl_oow_t index;
 		HCL_ASSERT (hcl, cf->u.set.var_type == VAR_INDEXED);
-		HCL_ASSERT (hcl, HCL_OOP_IS_SMOOI(cf->operand));
-
-		index = (hcl_oow_t)HCL_OOP_TO_SMOOI(cf->operand);
-		if (emit_indexed_variable_access(hcl, index, HCL_CODE_STORE_INTO_CTXTEMPVAR_0, HCL_CODE_STORE_INTO_TEMPVAR_0) <= -1) return -1;
+		HCL_ASSERT (hcl, cf->operand != HCL_NULL);
+		if (emit_indexed_variable_access(hcl, cf->u.set.index, HCL_CODE_STORE_INTO_CTXTEMPVAR_0, HCL_CODE_STORE_INTO_TEMPVAR_0, HCL_CNODE_GET_LOC(cf->operand)) <= -1) return -1;
 	}
 
 	POP_CFRAME (hcl);
