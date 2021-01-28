@@ -293,6 +293,7 @@ struct hcl_cframe_t
 			hcl_ooi_t body_pos;
 		} post_if;
 
+
 		struct
 		{
 			hcl_ooi_t index;
@@ -337,17 +338,23 @@ struct hcl_cframe2_t
 			hcl_ioloc_t start_loc;
 		} post_if;
 
-		/* COP_COMPILE_ARRAY_LIST, COP_POP_INTO_ARRAY */
+		/* COP_COMPILE_ARRAY_LIST, COP_POP_INTO_ARRAY, COP_EMIT_MAKE_ARRAY */
 		struct
 		{
 			hcl_ooi_t index;
 		} array_list;
 
-		/* COP_COMPILE_BYTEARRAY_LIST, COP_POP_INTO_BYTEARRAY */
+		/* COP_COMPILE_BYTEARRAY_LIST, COP_POP_INTO_BYTEARRAY, COP_EMIT_MAKE_BYTEARRAY */
 		struct
 		{
 			hcl_ooi_t index;
 		} bytearray_list;
+
+		/* COP_EMIT_MAKE_DIC */
+		struct
+		{
+			hcl_ooi_t index;
+		} dic_list;
 
 		/* COP_EMIT_LAMBDA */
 		struct

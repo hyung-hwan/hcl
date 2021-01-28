@@ -751,7 +751,11 @@ static int push_subcframe (hcl_t* hcl, int opcode, hcl_cnode_t* operand)
 	cf->opcode = opcode;
 	cf->operand = operand;
 
-	return push_cframe(hcl, tmp.opcode, tmp.operand);
+	if (push_cframe(hcl, tmp.opcode, tmp.operand) <= -1) return -1;
+	cf = GET_TOP_CFRAME(hcl);
+	cf->u = tmp.u; /* copy the extra information */
+
+	return 0;
 }
 
 static HCL_INLINE hcl_cframe2_t* find_cframe_from_top (hcl_t* hcl, int opcode)
@@ -1465,10 +1469,6 @@ static int compile_cons_array_expression (hcl_t* hcl, hcl_cnode_t* obj)
 	hcl_ooi_t nargs;
 	hcl_cframe2_t* cf;
 
-	/* NOTE: cframe management functions don't use the object memory.
-	 *       many operations can be performed without taking GC into account */
-	SWITCH_TOP_CFRAME (hcl, COP_EMIT_MAKE_ARRAY, HCL_SMOOI_TO_OOP(0));
-
 	nargs = hcl_countcnodecons(hcl, obj);
 	if (nargs > MAX_CODE_PARAM) 
 	{
@@ -1476,15 +1476,14 @@ static int compile_cons_array_expression (hcl_t* hcl, hcl_cnode_t* obj)
 		return -1;
 	}
 
+	SWITCH_TOP_CFRAME (hcl, COP_EMIT_MAKE_ARRAY, obj);
+	cf = GET_TOP_CFRAME(hcl);
+	cf->u.array_list.index = nargs;
+
 	/* redundant cdr check is performed inside compile_object_list() */
 	PUSH_SUBCFRAME (hcl, COP_COMPILE_ARRAY_LIST, obj);
 	cf = GET_SUBCFRAME(hcl);
 	cf->u.array_list.index = 0;
-
-	/* patch the argument count in the operand field of the COP_EMIT_MAKE_ARRAY frame */
-	cf = GET_TOP_CFRAME(hcl);
-	HCL_ASSERT (hcl, cf->opcode == COP_EMIT_MAKE_ARRAY);
-	cf->operand = HCL_SMOOI_TO_OOP(nargs);
 
 	return 0;
 }
@@ -1495,10 +1494,6 @@ static int compile_cons_bytearray_expression (hcl_t* hcl, hcl_cnode_t* obj)
 	hcl_ooi_t nargs;
 	hcl_cframe2_t* cf;
 
-	/* NOTE: cframe management functions don't use the object memory.
-	 *       many operations can be performed without taking GC into account */
-	SWITCH_TOP_CFRAME (hcl, COP_EMIT_MAKE_BYTEARRAY, HCL_SMOOI_TO_OOP(0));
-
 	nargs = hcl_countcnodecons(hcl, obj);
 	if (nargs > MAX_CODE_PARAM) 
 	{
@@ -1506,15 +1501,14 @@ static int compile_cons_bytearray_expression (hcl_t* hcl, hcl_cnode_t* obj)
 		return -1;
 	}
 
+	SWITCH_TOP_CFRAME (hcl, COP_EMIT_MAKE_BYTEARRAY, obj);
+	cf = GET_TOP_CFRAME(hcl);
+	cf->u.bytearray_list.index = nargs;
+
 	/* redundant cdr check is performed inside compile_object_list() */
 	PUSH_SUBCFRAME (hcl, COP_COMPILE_BYTEARRAY_LIST, obj);
 	cf = GET_SUBCFRAME(hcl);
 	cf->u.bytearray_list.index = 0;
-
-	/* patch the argument count in the operand field of the COP_EMIT_MAKE_BYTEARRAY frame */
-	cf = GET_TOP_CFRAME(hcl);
-	HCL_ASSERT (hcl, cf->opcode == COP_EMIT_MAKE_BYTEARRAY);
-	cf->operand = HCL_SMOOI_TO_OOP(nargs);
 
 	return 0;
 }
@@ -1525,8 +1519,6 @@ static int compile_cons_dic_expression (hcl_t* hcl, hcl_cnode_t* obj)
 	hcl_ooi_t nargs;
 	hcl_cframe2_t* cf;
 
-	SWITCH_TOP_CFRAME (hcl, COP_EMIT_MAKE_DIC, HCL_SMOOI_TO_OOP(0));
-
 	nargs = hcl_countcnodecons(hcl, obj);
 	if (nargs > MAX_CODE_PARAM) 
 	{
@@ -1534,13 +1526,12 @@ static int compile_cons_dic_expression (hcl_t* hcl, hcl_cnode_t* obj)
 		return -1;
 	}
 
+	SWITCH_TOP_CFRAME (hcl, COP_EMIT_MAKE_DIC, obj);
+	cf = GET_TOP_CFRAME(hcl);
+	cf->u.dic_list.index = nargs >> 1; /* only the half */
+
 	/* redundant cdr check is performed inside compile_object_list() */
 	PUSH_SUBCFRAME (hcl, COP_COMPILE_DIC_LIST, obj);
-
-	/* patch the argument count in the operand field of the COP_EMIT_MAKE_DIC frame */
-	cf = GET_TOP_CFRAME(hcl);
-	HCL_ASSERT (hcl, cf->opcode == COP_EMIT_MAKE_DIC);
-	cf->operand = HCL_SMOOI_TO_OOP(nargs);
 
 	return 0;
 }
@@ -1550,7 +1541,7 @@ static int compile_cons_qlist_expression (hcl_t* hcl, hcl_cnode_t* obj)
 	/* #( 1 2  3 ) 
 	 * #(1 (+ 2 3) 5) --> #(1 5 5)
 	 * */
-	SWITCH_TOP_CFRAME (hcl, COP_EMIT_MAKE_CONS, HCL_NULL);
+	SWITCH_TOP_CFRAME (hcl, COP_EMIT_MAKE_CONS, obj);
 	PUSH_SUBCFRAME (hcl, COP_COMPILE_QLIST, obj);
 	return 0;
 }
@@ -2396,7 +2387,6 @@ static int compile_qlist (hcl_t* hcl)
 	return 0;
 }
 
-
 /* ========================================================================= */
 
 static HCL_INLINE int patch_nearest_post_if_body (hcl_t* hcl, hcl_cnode_t* cmd)
@@ -2852,9 +2842,9 @@ static HCL_INLINE int emit_make_array (hcl_t* hcl)
 
 	cf = GET_TOP_CFRAME(hcl);
 	HCL_ASSERT (hcl, cf->opcode == COP_EMIT_MAKE_ARRAY);
-	HCL_ASSERT (hcl, HCL_OOP_IS_SMOOI(cf->operand));
+	HCL_ASSERT (hcl, cf->operand != HCL_NULL);
 
-	n = emit_single_param_instruction(hcl, HCL_CODE_MAKE_ARRAY, HCL_OOP_TO_SMOOI(cf->operand), HCL_NULL);
+	n = emit_single_param_instruction(hcl, HCL_CODE_MAKE_ARRAY, cf->u.array_list.index, HCL_CNODE_GET_LOC(cf->operand));
 
 	POP_CFRAME (hcl);
 	return n;
@@ -2867,9 +2857,9 @@ static HCL_INLINE int emit_make_bytearray (hcl_t* hcl)
 
 	cf = GET_TOP_CFRAME(hcl);
 	HCL_ASSERT (hcl, cf->opcode == COP_EMIT_MAKE_BYTEARRAY);
-	HCL_ASSERT (hcl, HCL_OOP_IS_SMOOI(cf->operand));
+	HCL_ASSERT (hcl, cf->operand != HCL_NULL);
 
-	n = emit_single_param_instruction(hcl, HCL_CODE_MAKE_BYTEARRAY, HCL_OOP_TO_SMOOI(cf->operand), HCL_NULL);
+	n = emit_single_param_instruction(hcl, HCL_CODE_MAKE_BYTEARRAY, cf->u.bytearray_list.index, HCL_CNODE_GET_LOC(cf->operand));
 
 	POP_CFRAME (hcl);
 	return n;
@@ -2882,9 +2872,9 @@ static HCL_INLINE int emit_make_dic (hcl_t* hcl)
 
 	cf = GET_TOP_CFRAME(hcl);
 	HCL_ASSERT (hcl, cf->opcode == COP_EMIT_MAKE_DIC);
-	HCL_ASSERT (hcl, HCL_OOP_IS_SMOOI(cf->operand));
+	HCL_ASSERT (hcl, cf->operand != HCL_NULL);
 
-	n = emit_single_param_instruction(hcl, HCL_CODE_MAKE_DIC, HCL_OOP_TO_SMOOI(cf->operand), HCL_NULL);
+	n = emit_single_param_instruction(hcl, HCL_CODE_MAKE_DIC, cf->u.dic_list.index, HCL_CNODE_GET_LOC(cf->operand));
 
 	POP_CFRAME (hcl);
 	return n;
@@ -2897,9 +2887,9 @@ static HCL_INLINE int emit_make_cons (hcl_t* hcl)
 
 	cf = GET_TOP_CFRAME(hcl);
 	HCL_ASSERT (hcl, cf->opcode == COP_EMIT_MAKE_CONS);
-	HCL_ASSERT (hcl, cf->operand == HCL_NULL);
+	HCL_ASSERT (hcl, cf->operand != HCL_NULL);
 
-	n = emit_byte_instruction(hcl, HCL_CODE_MAKE_CONS, HCL_NULL);
+	n = emit_byte_instruction(hcl, HCL_CODE_MAKE_CONS, HCL_CNODE_GET_LOC(cf->operand));
 
 	POP_CFRAME (hcl);
 	return n;
