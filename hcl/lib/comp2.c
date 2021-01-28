@@ -525,7 +525,7 @@ static HCL_INLINE int emit_long_param (hcl_t* hcl, hcl_oow_t param)
 #endif
 }
 
-static int emit_push_literal (hcl_t* hcl, hcl_oop_t obj)
+static int emit_push_literal (hcl_t* hcl, hcl_oop_t obj, const hcl_ioloc_t* srcloc)
 {
 	hcl_oow_t index;
 
@@ -537,25 +537,25 @@ static int emit_push_literal (hcl_t* hcl, hcl_oop_t obj)
 		switch (i)
 		{
 			case -1:
-				return emit_byte_instruction(hcl, HCL_CODE_PUSH_NEGONE, HCL_NULL);
+				return emit_byte_instruction(hcl, HCL_CODE_PUSH_NEGONE, srcloc);
 
 			case 0:
-				return emit_byte_instruction(hcl, HCL_CODE_PUSH_ZERO, HCL_NULL);
+				return emit_byte_instruction(hcl, HCL_CODE_PUSH_ZERO, srcloc);
 
 			case 1:
-				return emit_byte_instruction(hcl, HCL_CODE_PUSH_ONE, HCL_NULL);
+				return emit_byte_instruction(hcl, HCL_CODE_PUSH_ONE, srcloc);
 
 			case 2:
-				return emit_byte_instruction(hcl, HCL_CODE_PUSH_TWO, HCL_NULL);
+				return emit_byte_instruction(hcl, HCL_CODE_PUSH_TWO, srcloc);
 		}
 
 		if (i >= 0 && i <= MAX_CODE_PARAM)
 		{
-			return emit_single_param_instruction(hcl, HCL_CODE_PUSH_INTLIT, i, HCL_NULL);
+			return emit_single_param_instruction(hcl, HCL_CODE_PUSH_INTLIT, i, srcloc);
 		}
 		else if (i < 0 && i >= -(hcl_ooi_t)MAX_CODE_PARAM)
 		{
-			return emit_single_param_instruction(hcl, HCL_CODE_PUSH_NEGINTLIT, -i, HCL_NULL);
+			return emit_single_param_instruction(hcl, HCL_CODE_PUSH_NEGINTLIT, -i, srcloc);
 		}
 	}
 	else if (HCL_OOP_IS_CHAR(obj))
@@ -565,11 +565,11 @@ static int emit_push_literal (hcl_t* hcl, hcl_oop_t obj)
 		i = HCL_OOP_TO_CHAR(obj);
 
 		if (i >= 0 && i <= MAX_CODE_PARAM)
-			return emit_single_param_instruction(hcl, HCL_CODE_PUSH_CHARLIT, i, HCL_NULL);
+			return emit_single_param_instruction(hcl, HCL_CODE_PUSH_CHARLIT, i, srcloc);
 	}
 
 	if (add_literal(hcl, obj, &index) <= -1 ||
-	    emit_single_param_instruction(hcl, HCL_CODE_PUSH_LITERAL_0, index, HCL_NULL) <= -1) return -1;
+	    emit_single_param_instruction(hcl, HCL_CODE_PUSH_LITERAL_0, index, srcloc) <= -1) return -1;
 
 	return 0;
 }
@@ -680,7 +680,7 @@ static HCL_INLINE int _insert_cframe (hcl_t* hcl, hcl_ooi_t index, int opcode, h
 	tmp = &hcl->c->cfs2.ptr[index];
 	tmp->opcode = opcode;
 	tmp->operand = operand;
-	/* leave tmp->u untouched/uninitialized */
+	HCL_MEMSET (&tmp->u, 0, HCL_SIZEOF(tmp->u));
 	return 0;
 }
 
@@ -858,7 +858,7 @@ static int compile_and (hcl_t* hcl, hcl_cnode_t* src)
 	obj = HCL_CNODE_CONS_CDR(obj);
 
 	SWITCH_TOP_CFRAME (hcl, COP_COMPILE_OBJECT, expr); /* 1 */
-	PUSH_SUBCFRAME (hcl, COP_SUBCOMPILE_AND_EXPR, obj); /* 2 */
+	if (obj) PUSH_SUBCFRAME (hcl, COP_SUBCOMPILE_AND_EXPR, obj); /* 2 */
 
 	return 0;
 }
@@ -1452,13 +1452,15 @@ static int compile_while (hcl_t* hcl, hcl_cnode_t* src, int next_cop)
 	cond_pos = hcl->code.bc.len; /* position where the bytecode for the conditional is emitted */
 
 	cond = HCL_CNODE_CONS_CAR(obj);
-	obj = HCL_CNODE_CONS_CDR(obj);
 
 	SWITCH_TOP_CFRAME (hcl, COP_COMPILE_OBJECT, cond); /* 1 */
+
+	/* pass the cons cell branching to the conditional and the body. see post_while_cond() for the reason */
 	PUSH_SUBCFRAME (hcl, next_cop, obj); /* 2 */
 	cf = GET_SUBCFRAME(hcl);
 	cf->u.post_while.cond_pos = cond_pos;
 	cf->u.post_while.body_pos = -1; /* unknown yet*/
+	cf->u.post_while.jump_inst_pos = -1; /* not needed */
 	cf->u.post_while.start_loc = *HCL_CNODE_GET_LOC(src);
 
 	return 0;
@@ -1946,6 +1948,7 @@ static int compile_object (hcl_t* hcl)
 
 	cf = GET_TOP_CFRAME(hcl);
 	HCL_ASSERT (hcl, cf->opcode == COP_COMPILE_OBJECT);
+	HCL_ASSERT (hcl, cf->operand != HCL_NULL);
 
 	oprnd = cf->operand;
 redo:
@@ -2089,7 +2092,7 @@ redo:
 	return 0;
 
 literal:
-	if (emit_push_literal(hcl, lit) <= -1) return -1;
+	if (emit_push_literal(hcl, lit, HCL_CNODE_GET_LOC(oprnd)) <= -1) return -1;
 
 done:
 	POP_CFRAME (hcl);
@@ -2441,8 +2444,8 @@ static HCL_INLINE int patch_nearest_post_if_body (hcl_t* hcl, hcl_cnode_t* cmd)
 	/* modify the POST_IF_BODY frame */
 	HCL_ASSERT (hcl, cf->opcode == COP_POST_IF_BODY);
 	HCL_ASSERT (hcl, cf->operand != HCL_NULL);
-	cf->u.post_if.jump_inst_pos = jump_inst_pos;
 	cf->u.post_if.body_pos = body_pos;
+	cf->u.post_if.jump_inst_pos = jump_inst_pos;
 
 	return 0;
 }
@@ -2481,6 +2484,7 @@ static HCL_INLINE int subcompile_elif (hcl_t* hcl)
 	PUSH_SUBCFRAME (hcl, COP_POST_IF_COND, obj); /* 2 */
 	cf = GET_SUBCFRAME(hcl);
 	cf->u.post_if.body_pos = -1; /* unknown yet */
+	cf->u.post_if.jump_inst_pos = -1; /* not needed */
 	cf->u.post_if.start_loc = *HCL_CNODE_GET_LOC(src);
 
 	return patch_nearest_post_if_body(hcl, cmd);
@@ -2527,17 +2531,11 @@ static HCL_INLINE int subcompile_and_expr (hcl_t* hcl)
 	
 	cf = GET_TOP_CFRAME(hcl);
 	HCL_ASSERT (hcl, cf->opcode == COP_SUBCOMPILE_AND_EXPR);
-
-	obj = cf->operand;
+	HCL_ASSERT (hcl, cf->operand != HCL_NULL);
 
 /* TODO: optimization - eat away all true expressions */
-	if (!obj)
-	{
-		/* no more */
-		POP_CFRAME (hcl);
-		return 0;
-	}
-	else if (!HCL_CNODE_IS_CONS(obj))
+	obj = cf->operand;
+	if (!HCL_CNODE_IS_CONS(obj))
 	{
 		hcl_setsynerrbfmt (hcl, HCL_SYNERR_DOTBANNED, HCL_CNODE_GET_LOC(obj), HCL_CNODE_GET_TOK(obj), "redundant cdr in and");
 		return -1;
@@ -2554,11 +2552,11 @@ static HCL_INLINE int subcompile_and_expr (hcl_t* hcl)
 
 	SWITCH_TOP_CFRAME (hcl, COP_COMPILE_OBJECT, expr); /* 1 */
 	
-	PUSH_SUBCFRAME (hcl, COP_POST_AND_EXPR, obj); /* 3 */
+	PUSH_SUBCFRAME (hcl, COP_POST_AND_EXPR, expr); /* 3 */
 	cf = GET_SUBCFRAME(hcl);
-	cf->operand = HCL_SMOOI_TO_OOP(jump_inst_pos);
-	
-	PUSH_SUBCFRAME (hcl, COP_SUBCOMPILE_AND_EXPR, obj); /* 2 */
+	cf->u.post_and.jump_inst_pos = jump_inst_pos;
+
+	if (obj) PUSH_SUBCFRAME (hcl, COP_SUBCOMPILE_AND_EXPR, obj); /* 2 */
 
 	return 0;
 }
@@ -2571,9 +2569,10 @@ static HCL_INLINE int post_and_expr (hcl_t* hcl)
 
 	cf = GET_TOP_CFRAME(hcl);
 	HCL_ASSERT (hcl, cf->opcode == COP_POST_AND_EXPR);
+	HCL_ASSERT (hcl, cf->operand != HCL_NULL);
 
 	HCL_ASSERT (hcl, hcl->code.bc.len < HCL_SMOOI_MAX);
-	jip = HCL_OOP_TO_SMOOI(cf->operand);
+	jip = cf->u.post_and.jump_inst_pos;
 
 	/* patch the jump insruction emitted after each expression inside the 'and' expression */
 	jump_offset = hcl->code.bc.len - jip - (HCL_HCL_CODE_LONG_PARAM_SIZE + 1);
@@ -2593,17 +2592,12 @@ static HCL_INLINE int subcompile_or_expr (hcl_t* hcl)
 	
 	cf = GET_TOP_CFRAME(hcl);
 	HCL_ASSERT (hcl, cf->opcode == COP_SUBCOMPILE_OR_EXPR);
-
-	obj = cf->operand;
+	HCL_ASSERT (hcl, cf->operand != HCL_NULL);
 
 /* TODO: optimization - eat away all false expressions */
-	if (!obj)
-	{
-		/* no more */
-		POP_CFRAME (hcl);
-		return 0;
-	}
-	else if (!HCL_CNODE_IS_CONS(obj))
+
+	obj = cf->operand;
+	if (!HCL_CNODE_IS_CONS(obj))
 	{
 		hcl_setsynerrbfmt (hcl, HCL_SYNERR_DOTBANNED, HCL_CNODE_GET_LOC(obj), HCL_CNODE_GET_TOK(obj), "redundant cdr in or");
 		return -1;
@@ -2612,19 +2606,19 @@ static HCL_INLINE int subcompile_or_expr (hcl_t* hcl)
 	HCL_ASSERT (hcl, hcl->code.bc.len < HCL_SMOOI_MAX);
 	jump_inst_pos = hcl->code.bc.len;
 
-	if (emit_single_param_instruction(hcl, HCL_CODE_JUMP_FORWARD_IF_TRUE, MAX_CODE_JUMP, HCL_NULL) <= -1) return -1;
-	if (emit_byte_instruction(hcl, HCL_CODE_POP_STACKTOP, HCL_NULL) <= -1) return -1; 
+	if (emit_single_param_instruction(hcl, HCL_CODE_JUMP_FORWARD_IF_TRUE, MAX_CODE_JUMP, HCL_CNODE_GET_LOC(obj)) <= -1) return -1;
+	if (emit_byte_instruction(hcl, HCL_CODE_POP_STACKTOP, HCL_CNODE_GET_LOC(obj)) <= -1) return -1; 
 
 	expr = HCL_CNODE_CONS_CAR(obj);
 	obj = HCL_CNODE_CONS_CDR(obj);
 
 	SWITCH_TOP_CFRAME (hcl, COP_COMPILE_OBJECT, expr); /* 1 */
-	
-	PUSH_SUBCFRAME (hcl, COP_POST_OR_EXPR, obj); /* 3 */
+
+	PUSH_SUBCFRAME (hcl, COP_POST_OR_EXPR, expr); /* 3 */
 	cf = GET_SUBCFRAME(hcl);
-	cf->operand = HCL_SMOOI_TO_OOP(jump_inst_pos);
-	
-	PUSH_SUBCFRAME (hcl, COP_SUBCOMPILE_OR_EXPR, obj); /* 2 */
+	cf->u.post_or.jump_inst_pos = jump_inst_pos;
+
+	if (obj) PUSH_SUBCFRAME (hcl, COP_SUBCOMPILE_OR_EXPR, obj); /* 2 */
 
 	return 0;
 }
@@ -2637,9 +2631,10 @@ static HCL_INLINE int post_or_expr (hcl_t* hcl)
 
 	cf = GET_TOP_CFRAME(hcl);
 	HCL_ASSERT (hcl, cf->opcode == COP_POST_OR_EXPR);
+	HCL_ASSERT (hcl, cf->operand != HCL_NULL);
 
 	HCL_ASSERT (hcl, hcl->code.bc.len < HCL_SMOOI_MAX);
-	jip = HCL_OOP_TO_SMOOI(cf->operand);
+	jip = cf->u.post_or.jump_inst_pos;
 
 	/* patch the jump insruction emitted after each expression inside the 'and' expression */
 	jump_offset = hcl->code.bc.len - jip - (HCL_HCL_CODE_LONG_PARAM_SIZE + 1);
@@ -2720,9 +2715,17 @@ static HCL_INLINE int post_while_cond (hcl_t* hcl)
 	hcl_ooi_t cond_pos, body_pos;
 	hcl_ioloc_t start_loc;
 	int jump_inst, next_cop;
+	hcl_cnode_t* cond, * body;
 
 	cf = GET_TOP_CFRAME(hcl);
 	HCL_ASSERT (hcl, cf->opcode == COP_POST_UNTIL_COND || cf->opcode == COP_POST_WHILE_COND);
+	HCL_ASSERT (hcl, cf->operand != HCL_NULL);
+
+	/* the caller must pass the cons cell branching to the conditinal and the body 
+	 * if the body cell is given, things gets complicated because the body part can be HCL_NULL.
+	 * for instance, the body part is empty in (while (< i 1)  ) */
+	cond = HCL_CNODE_CONS_CAR(cf->operand);
+	body = HCL_CNODE_CONS_CDR(cf->operand); 
 
 	cond_pos = cf->u.post_while.cond_pos;
 	start_loc = cf->u.post_while.start_loc;
@@ -2740,18 +2743,29 @@ static HCL_INLINE int post_while_cond (hcl_t* hcl)
 		next_cop = COP_POST_WHILE_BODY;
 	}
 
-	if (emit_single_param_instruction (hcl, jump_inst, MAX_CODE_JUMP, HCL_NULL) <= -1) return -1;
-	if (emit_byte_instruction(hcl, HCL_CODE_POP_STACKTOP, HCL_NULL) <= -1) return -1;
+	if (emit_single_param_instruction (hcl, jump_inst, MAX_CODE_JUMP, HCL_CNODE_GET_LOC(cond)) <= -1) return -1;
+	if (emit_byte_instruction(hcl, HCL_CODE_POP_STACKTOP, HCL_CNODE_GET_LOC(cond)) <= -1) return -1;
 
 	HCL_ASSERT (hcl, hcl->code.bc.len < HCL_SMOOI_MAX);
 	body_pos = hcl->code.bc.len;
 
-	SWITCH_TOP_CFRAME (hcl, COP_COMPILE_OBJECT_LIST, cf->operand); /* 1 */
-	PUSH_SUBCFRAME (hcl, next_cop, HCL_SMOOI_TO_OOP(jump_inst_pos)); /* 2 */
-	cf = GET_SUBCFRAME(hcl);
+	if (body)
+	{
+		SWITCH_TOP_CFRAME (hcl, COP_COMPILE_OBJECT_LIST, body); /* 1 */
+		PUSH_SUBCFRAME (hcl, next_cop, cf->operand); /* 2 */
+		cf = GET_SUBCFRAME(hcl);
+	}
+	else
+	{
+		/* the body is empty */
+		SWITCH_TOP_CFRAME (hcl, next_cop, cond); /* 2 */
+		cf = GET_TOP_CFRAME(hcl);
+	}
 	cf->u.post_while.cond_pos = cond_pos; 
 	cf->u.post_while.body_pos = body_pos;
+	cf->u.post_while.jump_inst_pos = jump_inst_pos;
 	cf->u.post_while.start_loc = start_loc;
+
 	return 0;
 }
 
@@ -2763,7 +2777,7 @@ static HCL_INLINE int post_while_body (hcl_t* hcl)
 
 	cf = GET_TOP_CFRAME(hcl);
 	HCL_ASSERT (hcl, cf->opcode == COP_POST_UNTIL_BODY || cf->opcode == COP_POST_WHILE_BODY);
-	HCL_ASSERT (hcl, HCL_OOP_IS_SMOOI(cf->operand));
+	HCL_ASSERT (hcl, cf->operand != HCL_NULL);
 
 	HCL_ASSERT (hcl, hcl->code.bc.len >= cf->u.post_while.cond_pos);
 	if (hcl->code.bc.len > cf->u.post_while.body_pos)
@@ -2777,15 +2791,15 @@ static HCL_INLINE int post_while_body (hcl_t* hcl)
 		 *   pop_stacktop
 		 * this check prevents another pop_stacktop between 1) and 2)
 		 */
-		if (emit_byte_instruction (hcl, HCL_CODE_POP_STACKTOP, HCL_NULL) <= -1) return -1;
+		if (emit_byte_instruction (hcl, HCL_CODE_POP_STACKTOP, HCL_CNODE_GET_LOC(cf->operand)) <= -1) return -1;
 	}
 
 	HCL_ASSERT (hcl, hcl->code.bc.len < HCL_SMOOI_MAX);
 	jump_offset = hcl->code.bc.len - cf->u.post_while.cond_pos + 1;
 	if (jump_offset > 3) jump_offset += HCL_HCL_CODE_LONG_PARAM_SIZE;
-	if (emit_single_param_instruction (hcl, HCL_CODE_JUMP_BACKWARD_0, jump_offset, HCL_NULL) <= -1) return -1;
+	if (emit_single_param_instruction (hcl, HCL_CODE_JUMP_BACKWARD_0, jump_offset, HCL_CNODE_GET_LOC(cf->operand)) <= -1) return -1;
 
-	jip = HCL_OOP_TO_SMOOI(cf->operand);
+	jip = cf->u.post_while.jump_inst_pos;
 	/* HCL_CODE_LONG_PARAM_SIZE + 1 => size of the long JUMP_FORWARD_IF_FALSE/JUMP_FORWARD_IF_TRUE instruction */
 	jump_offset = hcl->code.bc.len - jip - (HCL_HCL_CODE_LONG_PARAM_SIZE + 1);
 	if (jump_offset > MAX_CODE_JUMP * 2)

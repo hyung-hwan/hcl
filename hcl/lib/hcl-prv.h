@@ -337,6 +337,7 @@ struct hcl_cframe2_t
 		{
 			hcl_ooi_t cond_pos;
 			hcl_ooi_t body_pos;
+			hcl_ooi_t jump_inst_pos;
 			hcl_ioloc_t start_loc;
 		} post_while;
 
@@ -346,6 +347,16 @@ struct hcl_cframe2_t
 			hcl_ooi_t jump_inst_pos;
 			hcl_ioloc_t start_loc;
 		} post_if;
+
+		struct
+		{
+			hcl_ooi_t jump_inst_pos;
+		} post_and;
+
+		struct
+		{
+			hcl_ooi_t jump_inst_pos;
+		} post_or;
 
 		/* COP_COMPILE_ARRAY_LIST, COP_POP_INTO_ARRAY, COP_EMIT_MAKE_ARRAY */
 		struct
