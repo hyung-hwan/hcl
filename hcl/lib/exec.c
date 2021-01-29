@@ -100,7 +100,7 @@ static HCL_INLINE const char* proc_state_to_string (int state)
 /*#define FETCH_BYTE_CODE(hcl) ((hcl)->code.bc.arr->slot[(hcl)->ip++])*/
 #define FETCH_BYTE_CODE(hcl) ((hcl)->active_code[(hcl)->ip++])
 #define FETCH_BYTE_CODE_TO(hcl, v_oow) (v_oow = FETCH_BYTE_CODE(hcl))
-#if (HCL_HCL_CODE_LONG_PARAM_SIZE == 2)
+#if (HCL_CODE_LONG_PARAM_SIZE == 2)
 #	define FETCH_PARAM_CODE_TO(hcl, v_oow) \
 		do { \
 			v_oow = FETCH_BYTE_CODE(hcl); \
@@ -261,11 +261,25 @@ static HCL_INLINE hcl_oop_context_t make_context (hcl_t* hcl, hcl_ooi_t ntmprs)
 	return (hcl_oop_context_t)hcl_allocoopobj(hcl, HCL_BRAND_CONTEXT, HCL_CONTEXT_NAMED_INSTVARS + (hcl_oow_t)ntmprs);
 }
 
-static HCL_INLINE hcl_oop_function_t make_function (hcl_t* hcl, hcl_oow_t lfsize, const hcl_oob_t* bptr, hcl_oow_t blen)
+static HCL_INLINE hcl_oop_function_t make_function (hcl_t* hcl, hcl_oow_t lfsize, const hcl_oob_t* bptr, hcl_oow_t blen, hcl_dbgl_t* locptr)
 {
+	hcl_oop_function_t func;
+
 	/* the literal frame is placed in the variable part.
 	 * the byte code is placed in the trailer space */
-	return (hcl_oop_function_t)hcl_allocoopobjwithtrailer(hcl, HCL_BRAND_FUNCTION, HCL_FUNCTION_NAMED_INSTVARS + lfsize, bptr, blen);
+	func = (hcl_oop_function_t)hcl_allocoopobjwithtrailer(hcl, HCL_BRAND_FUNCTION, HCL_FUNCTION_NAMED_INSTVARS + lfsize, bptr, blen);
+	if (HCL_UNLIKELY(!func)) return HCL_NULL;
+	
+	if (locptr)
+	{
+		hcl_oop_t tmp;
+		hcl_pushvolat (hcl, (hcl_oop_t*)&func);
+		tmp = hcl_makebytearray(hcl, (hcl_oob_t*)locptr, HCL_SIZEOF(*locptr) * blen);
+		hcl_popvolat (hcl);
+		if (tmp) func->dbgi = tmp;
+	}
+
+	return func;
 }
 
 static HCL_INLINE void fill_function_data (hcl_t* hcl, hcl_oop_function_t func, hcl_ooi_t nargs, hcl_ooi_t ntmprs, hcl_oop_context_t homectx, const hcl_oop_t* lfptr, hcl_oow_t lfsize)
@@ -2760,7 +2774,7 @@ static int execute (hcl_t* hcl)
 			case HCL_CODE_PUSH_LITERAL_X2:
 				FETCH_PARAM_CODE_TO (hcl, b1);
 				FETCH_PARAM_CODE_TO (hcl, b2);
-		#if (HCL_HCL_CODE_LONG_PARAM_SIZE == 2)
+		#if (HCL_CODE_LONG_PARAM_SIZE == 2)
 				b1 = (b1 << 16) | b2;
 		#else
 				b1 = (b1 << 8) | b2;
@@ -2972,7 +2986,24 @@ static int execute (hcl_t* hcl)
 				{
 				cannot_call:
 					/* run time error */
+if (hcl->active_function->dbgi != hcl->_nil)
+{
+	hcl_dbgl_t* dbgl;
+	hcl_ooi_t ip;
+	static hcl_ooch_t dash[] = { '*', '\0' };
+
+	HCL_ASSERT (hcl, HCL_IS_BYTEARRAY(hcl, hcl->active_function->dbgi));
+	dbgl = (hcl_dbgl_t*)HCL_OBJ_GET_BYTE_SLOT(hcl->active_function->dbgi);	
+	ip = hcl->ip - 1;
+	if (bcode == HCL_CODE_CALL_X) ip -= HCL_CODE_LONG_PARAM_SIZE;
+
+hcl_seterrbfmt (hcl, HCL_ECALL, "cannot call %O [%js:%zu]", 
+	rcv, (dbgl[ip].fname? dbgl[ip].fname: dash), dbgl[ip].sline);
+}
+else
+{
 					hcl_seterrbfmt (hcl, HCL_ECALL, "cannot call %O", rcv);
+}
 					goto oops;
 				}
 				break;
@@ -3531,15 +3562,15 @@ static int execute (hcl_t* hcl)
 				* of the block context */
 				HCL_ASSERT (hcl, hcl->active_code[hcl->ip] == HCL_CODE_JUMP_FORWARD_X);
 				joff = hcl->active_code[hcl->ip + 1];
-			#if (HCL_HCL_CODE_LONG_PARAM_SIZE == 2)
+			#if (HCL_CODE_LONG_PARAM_SIZE == 2)
 				joff = (joff << 8) | hcl->active_code[hcl->ip + 2];
 			#endif
 
 				/* copy the byte codes from the active context to the new context */
-			#if (HCL_HCL_CODE_LONG_PARAM_SIZE == 2)
-				func = make_function(hcl, b4, &hcl->active_code[hcl->ip + 3], joff);
+			#if (HCL_CODE_LONG_PARAM_SIZE == 2)
+				func = make_function(hcl, b4, &hcl->active_code[hcl->ip + 3], joff, HCL_NULL);
 			#else
-				func = make_function(hcl, b4, &hcl->active_code[hcl->ip + 2], joff);
+				func = make_function(hcl, b4, &hcl->active_code[hcl->ip + 2], joff, HCL_NULL);
 			#endif
 				if (HCL_UNLIKELY(!func)) goto oops;
 
@@ -3569,9 +3600,9 @@ static int execute (hcl_t* hcl)
 
 				/* the long forward jump instruction has the format of 
 				 *   11000100 KKKKKKKK or 11000100 KKKKKKKK KKKKKKKK 
-				 * depending on HCL_HCL_CODE_LONG_PARAM_SIZE. change 'ip' to point to
+				 * depending on HCL_CODE_LONG_PARAM_SIZE. change 'ip' to point to
 				 * the instruction after the jump. */
-				fill_block_data (hcl, blkobj, b1, b2, hcl->ip + HCL_HCL_CODE_LONG_PARAM_SIZE + 1, hcl->active_context);
+				fill_block_data (hcl, blkobj, b1, b2, hcl->ip + HCL_CODE_LONG_PARAM_SIZE + 1, hcl->active_context);
 
 				/* push the new block context to the stack of the active context */
 				HCL_STACK_PUSH (hcl, (hcl_oop_t)blkobj);
@@ -3645,10 +3676,8 @@ hcl_oop_t hcl_execute (hcl_t* hcl)
 	}
 
 	/* create a virtual function object that hold the bytes codes generated */
-	func = make_function(hcl, hcl->code.lit.len, hcl->code.bc.ptr, hcl->code.bc.len);
+	func = make_function(hcl, hcl->code.lit.len, hcl->code.bc.ptr, hcl->code.bc.len, hcl->code.locptr);
 	if (HCL_UNLIKELY(!func)) return HCL_NULL;
-
-/* TODO: copy the debug information as well into the dbgi field of the function object. */
 
 	/* pass nil for the home context of the initial function */
 	fill_function_data (hcl, func, 0, 0, (hcl_oop_context_t)hcl->_nil, hcl->code.lit.arr->slot, hcl->code.lit.len);

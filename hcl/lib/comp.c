@@ -413,7 +413,7 @@ write_long:
 		hcl_seterrnum (hcl, HCL_ERANGE);
 		return -1;
 	}
-#if (HCL_HCL_CODE_LONG_PARAM_SIZE == 2)
+#if (HCL_CODE_LONG_PARAM_SIZE == 2)
 	if (emit_byte_instruction(hcl, bc, srcloc) <= -1 ||
 	    emit_byte_instruction(hcl, (param_1 >> 8) & 0xFF, HCL_NULL) <= -1 ||
 	    emit_byte_instruction(hcl, param_1 & 0xFF, HCL_NULL) <= -1) return -1;
@@ -429,7 +429,7 @@ write_long2:
 		hcl_seterrnum (hcl, HCL_ERANGE);
 		return -1;
 	}
-#if (HCL_HCL_CODE_LONG_PARAM_SIZE == 2)
+#if (HCL_CODE_LONG_PARAM_SIZE == 2)
 	if (emit_byte_instruction(hcl, bc, srcloc) <= -1 ||
 	    emit_byte_instruction(hcl, (param_1 >> 24) & 0xFF, HCL_NULL) <= -1 ||
 	    emit_byte_instruction(hcl, (param_1 >> 16) & 0xFF, HCL_NULL) <= -1 ||
@@ -495,7 +495,7 @@ write_long:
 		hcl_seterrnum (hcl, HCL_ERANGE);
 		return -1;
 	}
-#if (HCL_HCL_CODE_LONG_PARAM_SIZE == 2)
+#if (HCL_CODE_LONG_PARAM_SIZE == 2)
 	if (emit_byte_instruction(hcl, bc, srcloc) <= -1 ||
 	    emit_byte_instruction(hcl, param_1 >> 8, HCL_NULL) <= -1 ||
 	    emit_byte_instruction(hcl, param_1 & 0xFF, HCL_NULL) <= -1 ||
@@ -517,7 +517,7 @@ static HCL_INLINE int emit_long_param (hcl_t* hcl, hcl_oow_t param)
 		return -1;
 	}
 
-#if (HCL_HCL_CODE_LONG_PARAM_SIZE == 2)
+#if (HCL_CODE_LONG_PARAM_SIZE == 2)
 	return (emit_byte_instruction(hcl, param >> 8, HCL_NULL) <= -1 ||
 	        emit_byte_instruction(hcl, param & 0xFF, HCL_NULL) <= -1)? -1: 0;
 #else
@@ -595,7 +595,7 @@ static HCL_INLINE void patch_long_jump (hcl_t* hcl, hcl_ooi_t jip, hcl_ooi_t jum
 		jump_offset -= MAX_CODE_JUMP;
 	}
 
-#if (HCL_HCL_CODE_LONG_PARAM_SIZE == 2)
+#if (HCL_CODE_LONG_PARAM_SIZE == 2)
 	patch_instruction (hcl, jip + 1, jump_offset >> 8);
 	patch_instruction (hcl, jip + 2, jump_offset & 0xFF);
 #else
@@ -605,7 +605,7 @@ static HCL_INLINE void patch_long_jump (hcl_t* hcl, hcl_ooi_t jip, hcl_ooi_t jum
 
 static HCL_INLINE void patch_long_param (hcl_t* hcl, hcl_ooi_t ip, hcl_oow_t param)
 {
-#if (HCL_HCL_CODE_LONG_PARAM_SIZE == 2)
+#if (HCL_CODE_LONG_PARAM_SIZE == 2)
 	patch_instruction (hcl, ip, param >> 8);
 	patch_instruction (hcl, ip + 1, param & 0xFF);
 #else
@@ -991,7 +991,7 @@ static int compile_continue (hcl_t* hcl, hcl_cnode_t* src)
 
 			HCL_ASSERT (hcl, hcl->code.bc.len < HCL_SMOOI_MAX);
 			jump_offset = hcl->code.bc.len - tcf->u.post_while.cond_pos + 1;
-			if (jump_offset > 3) jump_offset += HCL_HCL_CODE_LONG_PARAM_SIZE;
+			if (jump_offset > 3) jump_offset += HCL_CODE_LONG_PARAM_SIZE;
 			if (emit_single_param_instruction(hcl, HCL_CODE_JUMP_BACKWARD_0, jump_offset, HCL_CNODE_GET_LOC(cmd)) <= -1) return -1;
 
 			POP_CFRAME (hcl);
@@ -2482,7 +2482,7 @@ static HCL_INLINE int patch_nearest_post_if_body (hcl_t* hcl, hcl_cnode_t* cmd)
 	if (emit_single_param_instruction (hcl, HCL_CODE_JUMP_FORWARD_0, MAX_CODE_JUMP, HCL_CNODE_GET_LOC(cf->operand)) <= -1) return -1;
 
 	/* HCL_CODE_LONG_PARAM_SIZE + 1 => size of the long JUMP_FORWARD instruction */
-	jump_offset = hcl->code.bc.len - jip - (HCL_HCL_CODE_LONG_PARAM_SIZE + 1);
+	jump_offset = hcl->code.bc.len - jip - (HCL_CODE_LONG_PARAM_SIZE + 1);
 
 	if (jump_offset > MAX_CODE_JUMP * 2)
 	{
@@ -2633,7 +2633,7 @@ static HCL_INLINE int post_and_expr (hcl_t* hcl)
 	jip = cf->u.post_and.jump_inst_pos;
 
 	/* patch the jump insruction emitted after each expression inside the 'and' expression */
-	jump_offset = hcl->code.bc.len - jip - (HCL_HCL_CODE_LONG_PARAM_SIZE + 1);
+	jump_offset = hcl->code.bc.len - jip - (HCL_CODE_LONG_PARAM_SIZE + 1);
 	patch_long_jump (hcl, jip, jump_offset);
 
 	POP_CFRAME(hcl);
@@ -2695,7 +2695,7 @@ static HCL_INLINE int post_or_expr (hcl_t* hcl)
 	jip = cf->u.post_or.jump_inst_pos;
 
 	/* patch the jump insruction emitted after each expression inside the 'and' expression */
-	jump_offset = hcl->code.bc.len - jip - (HCL_HCL_CODE_LONG_PARAM_SIZE + 1);
+	jump_offset = hcl->code.bc.len - jip - (HCL_CODE_LONG_PARAM_SIZE + 1);
 	patch_long_jump (hcl, jip, jump_offset);
 
 	POP_CFRAME(hcl);
@@ -2752,7 +2752,7 @@ static HCL_INLINE int post_if_body (hcl_t* hcl)
 	}
 
 	/* HCL_CODE_LONG_PARAM_SIZE + 1 => size of the long JUMP_FORWARD_IF_FALSE instruction */
-	jump_offset = hcl->code.bc.len - jip - (HCL_HCL_CODE_LONG_PARAM_SIZE + 1);
+	jump_offset = hcl->code.bc.len - jip - (HCL_CODE_LONG_PARAM_SIZE + 1);
 
 	if (jump_offset > MAX_CODE_JUMP * 2)
 	{
@@ -2854,12 +2854,12 @@ static HCL_INLINE int post_while_body (hcl_t* hcl)
 
 	HCL_ASSERT (hcl, hcl->code.bc.len < HCL_SMOOI_MAX);
 	jump_offset = hcl->code.bc.len - cf->u.post_while.cond_pos + 1;
-	if (jump_offset > 3) jump_offset += HCL_HCL_CODE_LONG_PARAM_SIZE;
+	if (jump_offset > 3) jump_offset += HCL_CODE_LONG_PARAM_SIZE;
 	if (emit_single_param_instruction (hcl, HCL_CODE_JUMP_BACKWARD_0, jump_offset, HCL_CNODE_GET_LOC(cf->operand)) <= -1) return -1;
 
 	jip = cf->u.post_while.jump_inst_pos;
 	/* HCL_CODE_LONG_PARAM_SIZE + 1 => size of the long JUMP_FORWARD_IF_FALSE/JUMP_FORWARD_IF_TRUE instruction */
-	jump_offset = hcl->code.bc.len - jip - (HCL_HCL_CODE_LONG_PARAM_SIZE + 1);
+	jump_offset = hcl->code.bc.len - jip - (HCL_CODE_LONG_PARAM_SIZE + 1);
 	if (jump_offset > MAX_CODE_JUMP * 2)
 	{
 		hcl_setsynerrbfmt (hcl, HCL_SYNERR_BLKFLOOD, &cf->u.post_while.start_loc, HCL_NULL, "code too big - size %zu", jump_offset);
@@ -2885,7 +2885,7 @@ static int update_break (hcl_t* hcl)
 	jip = cf->u._break.jump_inst_pos;;
 
 	/* HCL_CODE_LONG_PARAM_SIZE + 1 => size of the long JUMP_FORWARD instruction */
-	jump_offset = hcl->code.bc.len - jip - (HCL_HCL_CODE_LONG_PARAM_SIZE + 1);
+	jump_offset = hcl->code.bc.len - jip - (HCL_CODE_LONG_PARAM_SIZE + 1);
 
 	/* no explicit about jump_offset. because break can only place inside
 	 * a loop, the same check in post_while_body() must assert
@@ -3056,7 +3056,7 @@ static HCL_INLINE int emit_lambda (hcl_t* hcl)
 	hcl->c->tv2.wcount = hcl->c->blk.info[hcl->c->blk.depth].tmprcnt;
 
 	/* HCL_CODE_LONG_PARAM_SIZE + 1 => size of the long JUMP_FORWARD instruction */
-	block_code_size = hcl->code.bc.len - jip - (HCL_HCL_CODE_LONG_PARAM_SIZE + 1);
+	block_code_size = hcl->code.bc.len - jip - (HCL_CODE_LONG_PARAM_SIZE + 1);
 
 	if (block_code_size == 0)
  	{

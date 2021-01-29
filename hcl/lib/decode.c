@@ -46,7 +46,7 @@
 
 #define FETCH_BYTE_CODE(hcl) (cdptr[ip++])
 #define FETCH_BYTE_CODE_TO(hcl,v_ooi) (v_ooi = FETCH_BYTE_CODE(hcl))
-#if (HCL_HCL_CODE_LONG_PARAM_SIZE == 2)
+#if (HCL_CODE_LONG_PARAM_SIZE == 2)
 #	define FETCH_PARAM_CODE_TO(hcl,v_ooi) \
 		do { \
 			v_ooi = FETCH_BYTE_CODE(hcl); \
@@ -195,7 +195,7 @@ int hcl_decode (hcl_t* hcl, hcl_oow_t start, hcl_oow_t end)
 			case HCL_CODE_PUSH_LITERAL_X2:
 				FETCH_PARAM_CODE_TO (hcl, b1);
 				FETCH_PARAM_CODE_TO (hcl, b2);
-		#if (HCL_HCL_CODE_LONG_PARAM_SIZE == 2)
+		#if (HCL_CODE_LONG_PARAM_SIZE == 2)
 				b1 = (b1 << 16) | b2;
 		#else
 				b1 = (b1 << 8) | b2;

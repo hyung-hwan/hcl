@@ -32,7 +32,7 @@
 #include <hcl-utl.h>
 
 /* you can define this to either 1 or 2 */
-#define HCL_HCL_CODE_LONG_PARAM_SIZE 2
+#define HCL_CODE_LONG_PARAM_SIZE 2
 
 /* this is useful for debugging. hcl_gc() can be called 
  * while hcl has not been fully initialized when this is defined*/
@@ -467,7 +467,7 @@ struct hcl_compiler_t
 #endif
 
 
-#if defined(HCL_HCL_CODE_LONG_PARAM_SIZE) && (HCL_HCL_CODE_LONG_PARAM_SIZE == 1)
+#if defined(HCL_CODE_LONG_PARAM_SIZE) && (HCL_CODE_LONG_PARAM_SIZE == 1)
 #	define MAX_CODE_INDEX               (0xFFu)
 #	define MAX_CODE_NTMPRS              (0xFFu)
 #	define MAX_CODE_NARGS               (0xFFu)
@@ -476,7 +476,7 @@ struct hcl_compiler_t
 #	define MAX_CODE_JUMP                (0xFFu)
 #	define MAX_CODE_PARAM               (0xFFu)
 #	define MAX_CODE_PARAM2              (0xFFFFu)
-#elif defined(HCL_HCL_CODE_LONG_PARAM_SIZE) && (HCL_HCL_CODE_LONG_PARAM_SIZE == 2)
+#elif defined(HCL_CODE_LONG_PARAM_SIZE) && (HCL_CODE_LONG_PARAM_SIZE == 2)
 #	define MAX_CODE_INDEX               (0xFFFFu)
 #	define MAX_CODE_NTMPRS              (0xFFFFu)
 #	define MAX_CODE_NARGS               (0xFFFFu)
@@ -486,7 +486,7 @@ struct hcl_compiler_t
 #	define MAX_CODE_PARAM               (0xFFFFu)
 #	define MAX_CODE_PARAM2              (0xFFFFFFFFu)
 #else
-#	error Unsupported HCL_HCL_CODE_LONG_PARAM_SIZE
+#	error Unsupported HCL_CODE_LONG_PARAM_SIZE
 #endif
 
 
