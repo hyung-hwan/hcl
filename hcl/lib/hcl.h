@@ -1450,6 +1450,7 @@ struct hcl_t
 
 	hcl_oop_t _and;    /* symbol */
 	hcl_oop_t _break;  /* symbol */
+	hcl_oop_t _continue; /* symbol */
 	hcl_oop_t _defun;  /* symbol */
 	hcl_oop_t _do;     /* symbol */
 	hcl_oop_t _elif;   /* symbol */
@@ -1710,6 +1711,7 @@ enum hcl_syncode_t
 	/* these enumerators can be set in the SYNCODE flags for a symbol */
 	HCL_SYNCODE_AND = 1,
 	HCL_SYNCODE_BREAK,
+	HCL_SYNCODE_CONTINUE,
 	HCL_SYNCODE_DEFUN,
 	HCL_SYNCODE_DO,
 	HCL_SYNCODE_ELIF,

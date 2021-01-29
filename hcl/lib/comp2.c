@@ -897,22 +897,23 @@ static int compile_or (hcl_t* hcl, hcl_cnode_t* src)
 static int compile_break (hcl_t* hcl, hcl_cnode_t* src)
 {
 	/* (break) */
-	hcl_cnode_t* obj;
+	hcl_cnode_t* cmd, * obj;
 	hcl_ooi_t i;
 
 	HCL_ASSERT (hcl, HCL_CNODE_IS_CONS(src));
 	HCL_ASSERT (hcl, HCL_CNODE_IS_SYMBOL_SYNCODED(HCL_CNODE_CONS_CAR(src), HCL_SYNCODE_BREAK));
 
+	cmd = HCL_CNODE_CONS_CAR(src);
 	obj = HCL_CNODE_CONS_CDR(src);
 	if (obj)
 	{
 		if (HCL_CNODE_IS_CONS(obj))
 		{
-			hcl_setsynerrbfmt (hcl, HCL_SYNERR_ARGCOUNT, HCL_CNODE_GET_LOC(obj), HCL_NULL, "redundant argument in break");
+			hcl_setsynerrbfmt (hcl, HCL_SYNERR_ARGCOUNT, HCL_CNODE_GET_LOC(obj), HCL_NULL, "redundant argument in %.*js", HCL_CNODE_GET_TOKLEN(cmd), HCL_CNODE_GET_TOKPTR(cmd));
 		}
 		else
 		{
-			hcl_setsynerrbfmt (hcl, HCL_SYNERR_DOTBANNED, HCL_CNODE_GET_LOC(obj), HCL_CNODE_GET_TOK(obj), "redundant cdr in break");
+			hcl_setsynerrbfmt (hcl, HCL_SYNERR_DOTBANNED, HCL_CNODE_GET_LOC(obj), HCL_CNODE_GET_TOK(obj), "redundant cdr in %.*js", HCL_CNODE_GET_TOKLEN(cmd), HCL_CNODE_GET_TOKPTR(cmd));
 		}
 		return -1;
 	}
@@ -927,26 +928,79 @@ static int compile_break (hcl_t* hcl, hcl_cnode_t* src)
 		if (tcf->opcode == COP_POST_UNTIL_BODY || tcf->opcode == COP_POST_WHILE_BODY)
 		{
 			hcl_ooi_t jump_inst_pos;
+			hcl_cframe2_t* cf;
 
 			/* (break) is not really a function call. but to make it look like a
 			 * function call, i generate PUSH_NIL so nil becomes a return value.
 			 *     (set x (until #f (break)))
 			 * x will get nill. */
-			if (emit_byte_instruction (hcl, HCL_CODE_PUSH_NIL, HCL_NULL) <= -1) return -1;
+			if (emit_byte_instruction (hcl, HCL_CODE_PUSH_NIL, HCL_CNODE_GET_LOC(cmd)) <= -1) return -1;
 
 /* TODO: study if supporting expression after break is good like return. (break (+ 10 20)) */
 			HCL_ASSERT (hcl, hcl->code.bc.len < HCL_SMOOI_MAX);
 			jump_inst_pos = hcl->code.bc.len;
-			
-			if (emit_single_param_instruction (hcl, HCL_CODE_JUMP_FORWARD_0, MAX_CODE_JUMP, HCL_NULL) <= -1) return -1;
-			INSERT_CFRAME (hcl, i, COP_UPDATE_BREAK, HCL_SMOOI_TO_OOP(jump_inst_pos));
+
+			if (emit_single_param_instruction(hcl, HCL_CODE_JUMP_FORWARD_0, MAX_CODE_JUMP, HCL_CNODE_GET_LOC(cmd)) <= -1) return -1;
+			INSERT_CFRAME (hcl, i, COP_UPDATE_BREAK, cmd);
+			cf = GET_CFRAME(hcl, i);
+			cf->u._break.jump_inst_pos = jump_inst_pos;
 
 			POP_CFRAME (hcl);
 			return 0;
 		}
 	}
 
-	hcl_setsynerrbfmt (hcl, HCL_SYNERR_BREAK, HCL_CNODE_GET_LOC(src), HCL_NULL, "break outside loop");
+	hcl_setsynerrbfmt (hcl, HCL_SYNERR_BREAK, HCL_CNODE_GET_LOC(src), HCL_NULL, "%.*js outside loop", HCL_CNODE_GET_TOKLEN(cmd), HCL_CNODE_GET_TOKPTR(cmd));
+	return -1;
+}
+
+static int compile_continue (hcl_t* hcl, hcl_cnode_t* src)
+{
+	/* (continue) */
+	hcl_cnode_t* cmd, * obj;
+	hcl_ooi_t i;
+
+	HCL_ASSERT (hcl, HCL_CNODE_IS_CONS(src));
+	HCL_ASSERT (hcl, HCL_CNODE_IS_SYMBOL_SYNCODED(HCL_CNODE_CONS_CAR(src), HCL_SYNCODE_CONTINUE));
+
+	cmd = HCL_CNODE_CONS_CAR(src);
+	obj = HCL_CNODE_CONS_CDR(src);
+	if (obj)
+	{
+		if (HCL_CNODE_IS_CONS(obj))
+		{
+			hcl_setsynerrbfmt (hcl, HCL_SYNERR_ARGCOUNT, HCL_CNODE_GET_LOC(obj), HCL_NULL, "redundant argument in %.*js", HCL_CNODE_GET_TOKLEN(cmd), HCL_CNODE_GET_TOKPTR(cmd));
+		}
+		else
+		{
+			hcl_setsynerrbfmt (hcl, HCL_SYNERR_DOTBANNED, HCL_CNODE_GET_LOC(obj), HCL_CNODE_GET_TOK(obj), "redundant cdr in %.*js", HCL_CNODE_GET_TOKLEN(cmd), HCL_CNODE_GET_TOKPTR(cmd));
+		}
+		return -1;
+	}
+
+	for (i = hcl->c->cfs2.top; i >= 0; --i)
+	{
+		const hcl_cframe2_t* tcf;
+		tcf = &hcl->c->cfs2.ptr[i];
+
+		if (tcf->opcode == COP_EMIT_LAMBDA) break; /* seems to cross lambda boundary */
+
+		if (tcf->opcode == COP_POST_UNTIL_BODY || tcf->opcode == COP_POST_WHILE_BODY)
+		{
+			hcl_ooi_t jump_offset;
+
+			HCL_ASSERT (hcl, hcl->code.bc.len < HCL_SMOOI_MAX);
+			jump_offset = hcl->code.bc.len - tcf->u.post_while.cond_pos + 1;
+			if (jump_offset > 3) jump_offset += HCL_HCL_CODE_LONG_PARAM_SIZE;
+			if (emit_single_param_instruction(hcl, HCL_CODE_JUMP_BACKWARD_0, jump_offset, HCL_CNODE_GET_LOC(cmd)) <= -1) return -1;
+
+
+			POP_CFRAME (hcl);
+			return 0;
+		}
+	}
+
+	hcl_setsynerrbfmt (hcl, HCL_SYNERR_BREAK, HCL_CNODE_GET_LOC(src), HCL_NULL, "%.*js outside loop", HCL_CNODE_GET_TOKLEN(cmd), HCL_CNODE_GET_TOKPTR(cmd));
 	return -1;
 }
 
@@ -1579,6 +1633,11 @@ static int compile_cons_xlist_expression (hcl_t* hcl, hcl_cnode_t* obj)
 				if (compile_break(hcl, obj) <= -1) return -1;
 				break;
 
+			case HCL_SYNCODE_CONTINUE:
+				/* (continue)*/
+				if (compile_continue(hcl, obj) <= -1) return -1;
+				break;
+
 			case HCL_SYNCODE_DEFUN:
 				if (compile_lambda(hcl, obj, 1) <= -1) return -1;
 				break;
@@ -1757,13 +1816,13 @@ static HCL_INLINE int compile_symbol (hcl_t* hcl, hcl_cnode_t* obj)
 		/* add the entire cons pair to the literal frame */
 
 		if (add_literal(hcl, cons, &index) <= -1 ||
-		    emit_single_param_instruction(hcl, HCL_CODE_PUSH_OBJECT_0, index, HCL_NULL) <= -1) return -1;
+		    emit_single_param_instruction(hcl, HCL_CODE_PUSH_OBJECT_0, index, HCL_CNODE_GET_LOC(obj)) <= -1) return -1;
 
 		return 0;
 	}
 	else
 	{
-		return emit_indexed_variable_access(hcl, index, HCL_CODE_PUSH_CTXTEMPVAR_0, HCL_CODE_PUSH_TEMPVAR_0, HCL_NULL);
+		return emit_indexed_variable_access(hcl, index, HCL_CODE_PUSH_CTXTEMPVAR_0, HCL_CODE_PUSH_TEMPVAR_0, HCL_CNODE_GET_LOC(obj));
 	}
 }
 
@@ -1836,7 +1895,7 @@ static HCL_INLINE int compile_dsymbol (hcl_t* hcl, hcl_cnode_t* obj)
 	}
 
 	if (add_literal(hcl, cons, &index) <= -1 ||
-	    emit_single_param_instruction(hcl, HCL_CODE_PUSH_OBJECT_0, index, HCL_NULL) <= -1) return -1;
+	    emit_single_param_instruction(hcl, HCL_CODE_PUSH_OBJECT_0, index, HCL_CNODE_GET_LOC(obj)) <= -1) return -1;
 
 	return 0;
 }
@@ -1955,15 +2014,15 @@ redo:
 	switch (HCL_CNODE_GET_TYPE(oprnd))
 	{
 		case HCL_CNODE_NIL:
-			if (emit_byte_instruction(hcl, HCL_CODE_PUSH_NIL, HCL_NULL) <= -1) return -1;
+			if (emit_byte_instruction(hcl, HCL_CODE_PUSH_NIL, HCL_CNODE_GET_LOC(oprnd)) <= -1) return -1;
 			goto done;
 
 		case HCL_CNODE_TRUE:
-			if (emit_byte_instruction(hcl, HCL_CODE_PUSH_TRUE, HCL_NULL) <= -1) return -1;
+			if (emit_byte_instruction(hcl, HCL_CODE_PUSH_TRUE, HCL_CNODE_GET_LOC(oprnd)) <= -1) return -1;
 			goto done;
 
 		case HCL_CNODE_FALSE:
-			if (emit_byte_instruction(hcl, HCL_CODE_PUSH_FALSE, HCL_NULL) <= -1) return -1;
+			if (emit_byte_instruction(hcl, HCL_CODE_PUSH_FALSE, HCL_CNODE_GET_LOC(oprnd)) <= -1) return -1;
 			goto done;
 
 		case HCL_CNODE_CHARLIT:
@@ -2197,7 +2256,7 @@ static int compile_object_list (hcl_t* hcl)
 		{
 			/* emit POP_STACKTOP before evaluating the second objects 
 			 * and onwards. this goes above COP_COMPILE_OBJECT */
-			PUSH_CFRAME (hcl, COP_EMIT_POP_STACKTOP, HCL_NULL);
+			PUSH_CFRAME (hcl, COP_EMIT_POP_STACKTOP, oprnd);
 		}
 	}
 
@@ -2544,8 +2603,8 @@ static HCL_INLINE int subcompile_and_expr (hcl_t* hcl)
 	HCL_ASSERT (hcl, hcl->code.bc.len < HCL_SMOOI_MAX);
 	jump_inst_pos = hcl->code.bc.len;
 
-	if (emit_single_param_instruction(hcl, HCL_CODE_JUMP_FORWARD_IF_FALSE, MAX_CODE_JUMP, HCL_NULL) <= -1) return -1;
-	if (emit_byte_instruction(hcl, HCL_CODE_POP_STACKTOP, HCL_NULL) <= -1) return -1; 
+	if (emit_single_param_instruction(hcl, HCL_CODE_JUMP_FORWARD_IF_FALSE, MAX_CODE_JUMP, HCL_CNODE_GET_LOC(obj)) <= -1) return -1;
+	if (emit_byte_instruction(hcl, HCL_CODE_POP_STACKTOP, HCL_CNODE_GET_LOC(obj)) <= -1) return -1; 
 
 	expr = HCL_CNODE_CONS_CAR(obj);
 	obj = HCL_CNODE_CONS_CDR(obj);
@@ -2822,9 +2881,9 @@ static int update_break (hcl_t* hcl)
 
 	cf = GET_TOP_CFRAME(hcl);
 	HCL_ASSERT (hcl, cf->opcode == COP_UPDATE_BREAK);
-	HCL_ASSERT (hcl, HCL_OOP_IS_SMOOI(cf->operand));
+	HCL_ASSERT (hcl, cf->operand != HCL_NULL);
 
-	jip = HCL_OOP_TO_SMOOI(cf->operand);
+	jip = cf->u._break.jump_inst_pos;;
 
 	/* HCL_CODE_LONG_PARAM_SIZE + 1 => size of the long JUMP_FORWARD instruction */
 	jump_offset = hcl->code.bc.len - jip - (HCL_HCL_CODE_LONG_PARAM_SIZE + 1);
@@ -3032,9 +3091,9 @@ static HCL_INLINE int emit_pop_stacktop (hcl_t* hcl)
 
 	cf = GET_TOP_CFRAME(hcl);
 	HCL_ASSERT (hcl, cf->opcode == COP_EMIT_POP_STACKTOP);
-	HCL_ASSERT (hcl, cf->operand == HCL_NULL);
+	HCL_ASSERT (hcl, cf->operand != HCL_NULL);
 
-	n = emit_byte_instruction(hcl, HCL_CODE_POP_STACKTOP, HCL_NULL);
+	n = emit_byte_instruction(hcl, HCL_CODE_POP_STACKTOP, HCL_CNODE_GET_LOC(cf->operand));
 
 	POP_CFRAME (hcl);
 	return n;
@@ -3080,7 +3139,7 @@ static HCL_INLINE int emit_set (hcl_t* hcl)
 		}
 
 		if (add_literal(hcl, cons, &index) <= -1 ||
-		    emit_single_param_instruction(hcl, HCL_CODE_STORE_INTO_OBJECT_0, index, HCL_NULL) <= -1) return -1;
+		    emit_single_param_instruction(hcl, HCL_CODE_STORE_INTO_OBJECT_0, index, HCL_CNODE_GET_LOC(cf->operand)) <= -1) return -1;
 	}
 	else
 	{

@@ -389,6 +389,12 @@ struct hcl_cframe2_t
 		{
 			int from_home;
 		} _return;
+
+		/* COP_UPDATE_BREAK */
+		struct
+		{
+			hcl_ooi_t jump_inst_pos;
+		} _break;
 	} u;
 };
 typedef struct hcl_cframe2_t hcl_cframe2_t;
