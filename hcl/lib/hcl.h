@@ -1992,7 +1992,7 @@ HCL_EXPORT void hcl_flushio (
 	hcl_t*       hcl
 );
 
-HCL_EXPORT hcl_cnode_t* hcl_read2 (
+HCL_EXPORT hcl_cnode_t* hcl_read (
 	hcl_t*       hcl
 );
 
@@ -2016,7 +2016,7 @@ HCL_EXPORT hcl_ooi_t hcl_proutufmt (
 	...
 );
 
-HCL_EXPORT int hcl_compile2 (
+HCL_EXPORT int hcl_compile (
 	hcl_t*       hcl,
 	hcl_cnode_t* obj
 );

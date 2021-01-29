@@ -2054,7 +2054,7 @@ oops:
 	return HCL_NULL;
 }
 
-hcl_cnode_t* hcl_read2 (hcl_t* hcl)
+hcl_cnode_t* hcl_read (hcl_t* hcl)
 {
 	HCL_ASSERT (hcl, hcl->c && hcl->c->reader);
 	if (get_token(hcl) <= -1) return HCL_NULL;

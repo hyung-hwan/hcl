@@ -1183,7 +1183,7 @@ static int count = 0;
 if (count %5 == 0) hcl_reset (hcl);
 count++;
 */
-		obj = hcl_read2(hcl);
+		obj = hcl_read(hcl);
 		if (!obj)
 		{
 			if (hcl->errnum == HCL_EFINIS)
@@ -1217,7 +1217,7 @@ count++;
 
 		if (verbose) hcl_prbfmt (hcl, "\n"); /* flush the output buffer by hcl_print above */
 
-		n = hcl_compile2(hcl, obj);
+		n = hcl_compile(hcl, obj);
 		hcl_freecnode (hcl, obj); /* not needed any more */
 
 		if (n <= -1)

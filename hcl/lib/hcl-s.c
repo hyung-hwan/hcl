@@ -1457,7 +1457,7 @@ int hcl_server_proto_handle_request (hcl_server_proto_t* proto)
 			if (proto->req.state == HCL_SERVER_PROTO_REQ_IN_TOP_LEVEL) hcl_reset(proto->hcl);
 
 			proto->worker->opstate = HCL_SERVER_WORKER_OPSTATE_READ;
-			obj = hcl_read2(proto->hcl);
+			obj = hcl_read(proto->hcl);
 			if (!obj)
 			{
 				if (hcl_geterrnum(proto->hcl) == HCL_ESYNERR) reformat_synerr (proto->hcl);
@@ -1477,7 +1477,7 @@ int hcl_server_proto_handle_request (hcl_server_proto_t* proto)
 			}
 
 			proto->worker->opstate = HCL_SERVER_WORKER_OPSTATE_COMPILE;
-			n = hcl_compile2(proto->hcl, obj);
+			n = hcl_compile(proto->hcl, obj);
 			hcl_freecnode (proto->hcl, obj);
 			if (n <= -1)
 			{
