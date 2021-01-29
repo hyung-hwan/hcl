@@ -169,7 +169,7 @@ static HCL_INLINE int open_input (hcl_t* hcl, hcl_ioinarg_t* arg)
 		const hcl_bch_t* fn, * fb;
 
 	#if defined(HCL_OOCH_IS_UCH)
-		if (hcl_convootobcstr (hcl, arg->name, &ucslen, HCL_NULL, &bcslen) <= -1) goto oops;
+		if (hcl_convootobcstr(hcl, arg->name, &ucslen, HCL_NULL, &bcslen) <= -1) goto oops;
 	#else
 		bcslen = hcl_count_bcstr (arg->name);
 	#endif
@@ -195,9 +195,9 @@ static HCL_INLINE int open_input (hcl_t* hcl, hcl_ioinarg_t* arg)
 		/* main stream */
 		hcl_oow_t pathlen;
 
-		pathlen = hcl_count_bcstr (xtn->read_path);
+		pathlen = hcl_count_bcstr(xtn->read_path);
 
-		bb = (bb_t*)hcl_callocmem (hcl, HCL_SIZEOF(*bb) + (HCL_SIZEOF(hcl_bch_t) * (pathlen + 1)));
+		bb = (bb_t*)hcl_callocmem(hcl, HCL_SIZEOF(*bb) + (HCL_SIZEOF(hcl_bch_t) * (pathlen + 1)));
 		if (!bb) goto oops;
 
 		bb->fn = (hcl_bch_t*)(bb + 1);
@@ -279,7 +279,7 @@ static HCL_INLINE int read_input (hcl_t* hcl, hcl_ioinarg_t* arg)
 #if defined(HCL_OOCH_IS_UCH)
 	bcslen = bb->len;
 	ucslen = HCL_COUNTOF(arg->buf);
-	x = hcl_convbtooochars (hcl, bb->buf, &bcslen, arg->buf, &ucslen);
+	x = hcl_convbtooochars(hcl, bb->buf, &bcslen, arg->buf, &ucslen);
 	if (x <= -1 && ucslen <= 0) return -1;
 	/* if ucslen is greater than 0, i see that some characters have been
 	 * converted properly */
@@ -302,13 +302,13 @@ static int read_handler (hcl_t* hcl, hcl_iocmd_t cmd, void* arg)
 	switch (cmd)
 	{
 		case HCL_IO_OPEN:
-			return open_input (hcl, (hcl_ioinarg_t*)arg);
+			return open_input(hcl, (hcl_ioinarg_t*)arg);
 			
 		case HCL_IO_CLOSE:
-			return close_input (hcl, (hcl_ioinarg_t*)arg);
+			return close_input(hcl, (hcl_ioinarg_t*)arg);
 
 		case HCL_IO_READ:
-			return read_input (hcl, (hcl_ioinarg_t*)arg);
+			return read_input(hcl, (hcl_ioinarg_t*)arg);
 
 		case HCL_IO_FLUSH:
 			/* no effect on an input stream */
@@ -320,16 +320,16 @@ static int read_handler (hcl_t* hcl, hcl_iocmd_t cmd, void* arg)
 	}
 }
 
-static HCL_INLINE int open_output(hcl_t* hcl, hcl_iooutarg_t* arg)
+static HCL_INLINE int open_output (hcl_t* hcl, hcl_iooutarg_t* arg)
 {
 	xtn_t* xtn = (xtn_t*)hcl_getxtn(hcl);
 	FILE* fp;
 
 #if defined(__MSDOS__) || defined(_WIN32) || defined(__OS2__)
-	if (xtn->print_path) fp = fopen (xtn->print_path, "wb");
+	if (xtn->print_path) fp = fopen(xtn->print_path, "wb");
 	else fp = stdout;
 #else
-	if (xtn->print_path) fp = fopen (xtn->print_path, "w");
+	if (xtn->print_path) fp = fopen(xtn->print_path, "w");
 	else fp = stdout;
 #endif
 	if (!fp)
@@ -1132,7 +1132,7 @@ int main (int argc, char* argv[])
 
 	if (hcl_attachio(hcl, read_handler, print_handler) <= -1)
 	{
-		hcl_logbfmt (hcl, HCL_LOG_STDERR, "ERROR: cannot attach input stream - [%d] %js\n", hcl_geterrnum(hcl), hcl_geterrmsg(hcl));
+		hcl_logbfmt (hcl, HCL_LOG_STDERR, "ERROR: cannot attach IO streams - [%d] %js\n", hcl_geterrnum(hcl), hcl_geterrmsg(hcl));
 		goto oops;
 	}
 
@@ -1256,7 +1256,7 @@ count++;
 			else
 			{
 				/* print the result in the interactive mode regardless 'verbose' */
-				hcl_logbfmt (hcl, HCL_LOG_STDOUT, "%O\n", retv);
+				hcl_logbfmt (hcl, HCL_LOG_STDOUT, "%O\n", retv); /* TODO: show this go to the output handler?? */
 
 				/*
 				 * print the value of ERRSTR.

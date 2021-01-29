@@ -2990,14 +2990,14 @@ if (hcl->active_function->dbgi != hcl->_nil)
 {
 	hcl_dbgl_t* dbgl;
 	hcl_ooi_t ip;
-	static hcl_ooch_t dash[] = { '*', '\0' };
+	static hcl_ooch_t dash[] = { '-', '\0' };
 
 	HCL_ASSERT (hcl, HCL_IS_BYTEARRAY(hcl, hcl->active_function->dbgi));
 	dbgl = (hcl_dbgl_t*)HCL_OBJ_GET_BYTE_SLOT(hcl->active_function->dbgi);	
 	ip = hcl->ip - 1;
 	if (bcode == HCL_CODE_CALL_X) ip -= HCL_CODE_LONG_PARAM_SIZE;
 
-hcl_seterrbfmt (hcl, HCL_ECALL, "cannot call %O [%js:%zu]", 
+hcl_seterrbfmt (hcl, HCL_ECALL, "cannot call %O (%js %zu)", 
 	rcv, (dbgl[ip].fname? dbgl[ip].fname: dash), dbgl[ip].sline);
 }
 else

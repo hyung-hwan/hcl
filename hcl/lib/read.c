@@ -2185,7 +2185,7 @@ int hcl_attachio (hcl_t* hcl, hcl_ioimpl_t reader, hcl_ioimpl_t printer)
 		if (!cbp) return -1;
 
 		hcl->c = (hcl_compiler_t*)hcl_callocmem(hcl, HCL_SIZEOF(*hcl->c));
-		if (!hcl->c)
+		if (HCL_UNLIKELY(!hcl->c))
 		{
 			hcl_deregcb (hcl, cbp);
 			return -1;
