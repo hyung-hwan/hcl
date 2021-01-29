@@ -272,49 +272,6 @@ struct hcl_cnode_t
 /* NOTE: hcl_cframe_t used by the built-in compiler is not an OOP object */
 struct hcl_cframe_t
 {
-	int       opcode;
-	hcl_oop_t operand;
-
-	union
-	{
-		struct
-		{
-			int var_type;
-		} set;
-
-		struct
-		{
-			hcl_ooi_t cond_pos;
-			hcl_ooi_t body_pos;
-		} post_while;
-
-		struct
-		{
-			hcl_ooi_t body_pos;
-		} post_if;
-
-
-		struct
-		{
-			hcl_ooi_t index;
-		} array_list;
-
-		struct
-		{
-			hcl_ooi_t index;
-		} bytearray_list;
-
-		struct
-		{
-			hcl_ooi_t lfbase_pos;
-			hcl_ooi_t lfsize_pos;
-		} lambda;
-	} u;
-};
-typedef struct hcl_cframe_t hcl_cframe_t;
-
-struct hcl_cframe2_t
-{
 	int          opcode;
 	hcl_cnode_t* operand;
 
@@ -397,7 +354,7 @@ struct hcl_cframe2_t
 		} _break;
 	} u;
 };
-typedef struct hcl_cframe2_t hcl_cframe2_t;
+typedef struct hcl_cframe_t hcl_cframe_t;
 
 struct hcl_blk_info_t
 {
@@ -484,13 +441,6 @@ struct hcl_compiler_t
 		hcl_ooi_t     top;
 		hcl_oow_t     capa;
 	} cfs;
-
-	struct
-	{
-		hcl_cframe2_t* ptr;
-		hcl_ooi_t     top;
-		hcl_oow_t     capa;
-	} cfs2;
 	/* == END COMPILER STACK == */
 
 	struct

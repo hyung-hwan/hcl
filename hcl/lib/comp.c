@@ -648,36 +648,36 @@ static int emit_indexed_variable_access (hcl_t* hcl, hcl_oow_t index, hcl_oob_t 
 /* ========================================================================= */
 static HCL_INLINE int _insert_cframe (hcl_t* hcl, hcl_ooi_t index, int opcode, hcl_cnode_t* operand)
 {
-	hcl_cframe2_t* tmp;
+	hcl_cframe_t* tmp;
 
 	HCL_ASSERT (hcl, index >= 0);
 	
-	hcl->c->cfs2.top++;
-	HCL_ASSERT (hcl, hcl->c->cfs2.top >= 0);
-	HCL_ASSERT (hcl, index <= hcl->c->cfs2.top);
+	hcl->c->cfs.top++;
+	HCL_ASSERT (hcl, hcl->c->cfs.top >= 0);
+	HCL_ASSERT (hcl, index <= hcl->c->cfs.top);
 
-	if ((hcl_oow_t)hcl->c->cfs2.top >= hcl->c->cfs2.capa)
+	if ((hcl_oow_t)hcl->c->cfs.top >= hcl->c->cfs.capa)
 	{
 		hcl_oow_t newcapa;
 
-		newcapa = HCL_ALIGN (hcl->c->cfs2.top + 256, 256); /* TODO: adjust this capacity */
-		tmp = (hcl_cframe2_t*)hcl_reallocmem (hcl, hcl->c->cfs2.ptr, newcapa * HCL_SIZEOF(*tmp));
+		newcapa = HCL_ALIGN (hcl->c->cfs.top + 256, 256); /* TODO: adjust this capacity */
+		tmp = (hcl_cframe_t*)hcl_reallocmem (hcl, hcl->c->cfs.ptr, newcapa * HCL_SIZEOF(*tmp));
 		if (HCL_UNLIKELY(!tmp)) 
 		{
-			hcl->c->cfs2.top--;
+			hcl->c->cfs.top--;
 			return -1;
 		}
 
-		hcl->c->cfs2.capa = newcapa;
-		hcl->c->cfs2.ptr = tmp;
+		hcl->c->cfs.capa = newcapa;
+		hcl->c->cfs.ptr = tmp;
 	}
 
-	if (index < hcl->c->cfs2.top)
+	if (index < hcl->c->cfs.top)
 	{
-		HCL_MEMMOVE (&hcl->c->cfs2.ptr[index + 1], &hcl->c->cfs2.ptr[index], (hcl->c->cfs2.top - index) * HCL_SIZEOF(*tmp));
+		HCL_MEMMOVE (&hcl->c->cfs.ptr[index + 1], &hcl->c->cfs.ptr[index], (hcl->c->cfs.top - index) * HCL_SIZEOF(*tmp));
 	}
 
-	tmp = &hcl->c->cfs2.ptr[index];
+	tmp = &hcl->c->cfs.ptr[index];
 	tmp->opcode = opcode;
 	tmp->operand = operand;
 	HCL_MEMSET (&tmp->u, 0, HCL_SIZEOF(tmp->u));
@@ -686,7 +686,7 @@ static HCL_INLINE int _insert_cframe (hcl_t* hcl, hcl_ooi_t index, int opcode, h
 
 static int insert_cframe (hcl_t* hcl, hcl_ooi_t index, int opcode, hcl_cnode_t* operand)
 {
-	if (hcl->c->cfs2.top == HCL_TYPE_MAX(hcl_ooi_t))
+	if (hcl->c->cfs.top == HCL_TYPE_MAX(hcl_ooi_t))
 	{
 		hcl_seterrnum (hcl, HCL_EFRMFLOOD);
 		return -1;
@@ -697,19 +697,19 @@ static int insert_cframe (hcl_t* hcl, hcl_ooi_t index, int opcode, hcl_cnode_t* 
 
 static int push_cframe (hcl_t* hcl, int opcode, hcl_cnode_t* operand)
 {
-	if (hcl->c->cfs2.top == HCL_TYPE_MAX(hcl_ooi_t))
+	if (hcl->c->cfs.top == HCL_TYPE_MAX(hcl_ooi_t))
 	{
 		hcl_seterrnum (hcl, HCL_EFRMFLOOD);
 		return -1;
 	}
 
-	return _insert_cframe(hcl, hcl->c->cfs2.top + 1, opcode, operand);
+	return _insert_cframe(hcl, hcl->c->cfs.top + 1, opcode, operand);
 }
 
 static HCL_INLINE void pop_cframe (hcl_t* hcl)
 {
-	HCL_ASSERT (hcl, hcl->c->cfs2.top >= 0);
-	hcl->c->cfs2.top--;
+	HCL_ASSERT (hcl, hcl->c->cfs.top >= 0);
+	hcl->c->cfs.top--;
 }
 
 #define PUSH_CFRAME(hcl,opcode,operand) \
@@ -720,31 +720,31 @@ static HCL_INLINE void pop_cframe (hcl_t* hcl)
 
 #define POP_CFRAME(hcl) pop_cframe(hcl)
 
-#define POP_ALL_CFRAMES(hcl) (hcl->c->cfs2.top = -1)
+#define POP_ALL_CFRAMES(hcl) (hcl->c->cfs.top = -1)
 
-#define GET_TOP_CFRAME_INDEX(hcl) (hcl->c->cfs2.top)
+#define GET_TOP_CFRAME_INDEX(hcl) (hcl->c->cfs.top)
 
-#define GET_TOP_CFRAME(hcl) (&hcl->c->cfs2.ptr[hcl->c->cfs2.top])
+#define GET_TOP_CFRAME(hcl) (&hcl->c->cfs.ptr[hcl->c->cfs.top])
 
-#define GET_CFRAME(hcl,index) (&hcl->c->cfs2.ptr[index])
+#define GET_CFRAME(hcl,index) (&hcl->c->cfs.ptr[index])
 
 #define SWITCH_TOP_CFRAME(hcl,_opcode,_operand) \
 	do { \
-		hcl_cframe2_t* _cf = GET_TOP_CFRAME(hcl); \
+		hcl_cframe_t* _cf = GET_TOP_CFRAME(hcl); \
 		_cf->opcode = _opcode; \
 		_cf->operand = _operand; \
 	} while (0);
 
 #define SWITCH_CFRAME(hcl,_index,_opcode,_operand) \
 	do { \
-		hcl_cframe2_t* _cf = GET_CFRAME(hcl,_index); \
+		hcl_cframe_t* _cf = GET_CFRAME(hcl,_index); \
 		_cf->opcode = _opcode; \
 		_cf->operand = _operand; \
 	} while (0);
 
 static int push_subcframe (hcl_t* hcl, int opcode, hcl_cnode_t* operand)
 {
-	hcl_cframe2_t* cf, tmp;
+	hcl_cframe_t* cf, tmp;
 
 	cf = GET_TOP_CFRAME(hcl);
 	tmp = *cf;
@@ -758,14 +758,14 @@ static int push_subcframe (hcl_t* hcl, int opcode, hcl_cnode_t* operand)
 	return 0;
 }
 
-static HCL_INLINE hcl_cframe2_t* find_cframe_from_top (hcl_t* hcl, int opcode)
+static HCL_INLINE hcl_cframe_t* find_cframe_from_top (hcl_t* hcl, int opcode)
 {
-	hcl_cframe2_t* cf;
+	hcl_cframe_t* cf;
 	hcl_ooi_t i;
 
-	for (i = hcl->c->cfs2.top; i >= 0; i--)
+	for (i = hcl->c->cfs.top; i >= 0; i--)
 	{
-		cf = &hcl->c->cfs2.ptr[i];
+		cf = &hcl->c->cfs.ptr[i];
 		if (cf->opcode == opcode) return cf;
 	}
 
@@ -775,7 +775,7 @@ static HCL_INLINE hcl_cframe2_t* find_cframe_from_top (hcl_t* hcl, int opcode)
 #define PUSH_SUBCFRAME(hcl,opcode,operand) \
 	do { if (push_subcframe(hcl,opcode,operand) <= -1) return -1; } while(0)
 
-#define GET_SUBCFRAME(hcl) (&hcl->c->cfs2.ptr[hcl->c->cfs2.top - 1])
+#define GET_SUBCFRAME(hcl) (&hcl->c->cfs.ptr[hcl->c->cfs.top - 1])
 
 enum 
 {
@@ -918,17 +918,17 @@ static int compile_break (hcl_t* hcl, hcl_cnode_t* src)
 		return -1;
 	}
 
-	for (i = hcl->c->cfs2.top; i >= 0; --i)
+	for (i = hcl->c->cfs.top; i >= 0; --i)
 	{
-		const hcl_cframe2_t* tcf;
-		tcf = &hcl->c->cfs2.ptr[i];
+		const hcl_cframe_t* tcf;
+		tcf = &hcl->c->cfs.ptr[i];
 
 		if (tcf->opcode == COP_EMIT_LAMBDA) break; /* seems to cross lambda boundary */
 
 		if (tcf->opcode == COP_POST_UNTIL_BODY || tcf->opcode == COP_POST_WHILE_BODY)
 		{
 			hcl_ooi_t jump_inst_pos;
-			hcl_cframe2_t* cf;
+			hcl_cframe_t* cf;
 
 			/* (break) is not really a function call. but to make it look like a
 			 * function call, i generate PUSH_NIL so nil becomes a return value.
@@ -978,10 +978,10 @@ static int compile_continue (hcl_t* hcl, hcl_cnode_t* src)
 		return -1;
 	}
 
-	for (i = hcl->c->cfs2.top; i >= 0; --i)
+	for (i = hcl->c->cfs.top; i >= 0; --i)
 	{
-		const hcl_cframe2_t* tcf;
-		tcf = &hcl->c->cfs2.ptr[i];
+		const hcl_cframe_t* tcf;
+		tcf = &hcl->c->cfs.ptr[i];
 
 		if (tcf->opcode == COP_EMIT_LAMBDA) break; /* seems to cross lambda boundary */
 
@@ -1006,7 +1006,7 @@ static int compile_continue (hcl_t* hcl, hcl_cnode_t* src)
 static int compile_if (hcl_t* hcl, hcl_cnode_t* src)
 {
 	hcl_cnode_t* cmd, * obj, * cond;
-	hcl_cframe2_t* cf;
+	hcl_cframe_t* cf;
 
 	HCL_ASSERT (hcl, HCL_CNODE_IS_CONS(src));
 	HCL_ASSERT (hcl, HCL_CNODE_IS_SYMBOL_SYNCODED(HCL_CNODE_CONS_CAR(src), HCL_SYNCODE_IF));
@@ -1059,7 +1059,7 @@ static int compile_lambda (hcl_t* hcl, hcl_cnode_t* src, int defun)
 	hcl_ooi_t jump_inst_pos, lfbase_pos, lfsize_pos;
 	hcl_oow_t saved_tv_wcount, tv_dup_start;
 	hcl_cnode_t* defun_name;
-	hcl_cframe2_t* cf;
+	hcl_cframe_t* cf;
 
 	HCL_ASSERT (hcl, HCL_CNODE_IS_CONS(src));
 
@@ -1280,7 +1280,7 @@ static int compile_lambda (hcl_t* hcl, hcl_cnode_t* src, int defun)
 	if (defun)
 	{
 		hcl_oow_t index;
-		hcl_cframe2_t* cf;
+		hcl_cframe_t* cf;
 
 		if (find_temporary_variable_backward(hcl, HCL_CNODE_GET_TOK(defun_name), &index) <= -1)
 		{
@@ -1317,7 +1317,7 @@ static int compile_lambda (hcl_t* hcl, hcl_cnode_t* src, int defun)
 static int compile_return (hcl_t* hcl, hcl_cnode_t* src, int ret_from_home)
 {
 	hcl_cnode_t* obj, * val;
-	hcl_cframe2_t* cf;
+	hcl_cframe_t* cf;
 
 	HCL_ASSERT (hcl, HCL_CNODE_IS_CONS(src));
 	HCL_ASSERT (hcl, HCL_CNODE_IS_SYMBOL_SYNCODED(HCL_CNODE_CONS_CAR(src), HCL_SYNCODE_RETURN) || 
@@ -1361,7 +1361,7 @@ static int compile_return (hcl_t* hcl, hcl_cnode_t* src, int ret_from_home)
 
 static int compile_set (hcl_t* hcl, hcl_cnode_t* src)
 {
-	hcl_cframe2_t* cf;
+	hcl_cframe_t* cf;
 	hcl_cnode_t* cmd, * obj, * var, * val;
 	hcl_oow_t index;
 
@@ -1479,7 +1479,7 @@ static int compile_while (hcl_t* hcl, hcl_cnode_t* src, int next_cop)
 	 * (until (xxxx) ... ) */
 	hcl_cnode_t* cmd, * obj, * cond;
 	hcl_oow_t cond_pos;
-	hcl_cframe2_t* cf;
+	hcl_cframe_t* cf;
 
 	HCL_ASSERT (hcl, HCL_CNODE_IS_CONS(src));
 	HCL_ASSERT (hcl, HCL_CNODE_IS_SYMBOL_SYNCODED(HCL_CNODE_CONS_CAR(src), HCL_SYNCODE_UNTIL) ||
@@ -1524,7 +1524,7 @@ static int compile_cons_array_expression (hcl_t* hcl, hcl_cnode_t* obj)
 {
 	/* [ ] */
 	hcl_ooi_t nargs;
-	hcl_cframe2_t* cf;
+	hcl_cframe_t* cf;
 
 	nargs = hcl_countcnodecons(hcl, obj);
 	if (nargs > MAX_CODE_PARAM) 
@@ -1549,7 +1549,7 @@ static int compile_cons_bytearray_expression (hcl_t* hcl, hcl_cnode_t* obj)
 {
 	/* #[ ] - e.g. #[1, 2, 3] or #[ 1 2 3 ] */
 	hcl_ooi_t nargs;
-	hcl_cframe2_t* cf;
+	hcl_cframe_t* cf;
 
 	nargs = hcl_countcnodecons(hcl, obj);
 	if (nargs > MAX_CODE_PARAM) 
@@ -1574,7 +1574,7 @@ static int compile_cons_dic_expression (hcl_t* hcl, hcl_cnode_t* obj)
 {
 	/* { } - e.g. {1:2, 3:4,"abc":def, "hwaddr":"00:00:00:01"} or { 1 2 3 4 } */
 	hcl_ooi_t nargs;
-	hcl_cframe2_t* cf;
+	hcl_cframe_t* cf;
 
 	nargs = hcl_countcnodecons(hcl, obj);
 	if (nargs > MAX_CODE_PARAM) 
@@ -1702,7 +1702,7 @@ static int compile_cons_xlist_expression (hcl_t* hcl, hcl_cnode_t* obj)
 		 *  (<operator> <operand1> ...) */
 		hcl_ooi_t nargs;
 		hcl_ooi_t oldtop;
-		hcl_cframe2_t* cf;
+		hcl_cframe_t* cf;
 		hcl_cnode_t* cdr;
 
 		/* NOTE: cframe management functions don't use the object memory.
@@ -2000,7 +2000,7 @@ static hcl_oop_t string_to_fpdec (hcl_t* hcl, hcl_oocs_t* str, const hcl_ioloc_t
 
 static int compile_object (hcl_t* hcl)
 {
-	hcl_cframe2_t* cf;
+	hcl_cframe_t* cf;
 	hcl_cnode_t* oprnd;
 	hcl_oop_t lit;
 
@@ -2159,7 +2159,7 @@ done:
 
 static int compile_object_list (hcl_t* hcl)
 {
-	hcl_cframe2_t* cf;
+	hcl_cframe_t* cf;
 	hcl_cnode_t* oprnd;
 	int cop;
 
@@ -2265,7 +2265,7 @@ done:
 
 static int compile_array_list (hcl_t* hcl)
 {
-	hcl_cframe2_t* cf;
+	hcl_cframe_t* cf;
 	hcl_cnode_t* oprnd;
 
 	cf = GET_TOP_CFRAME(hcl);
@@ -2311,7 +2311,7 @@ static int compile_array_list (hcl_t* hcl)
 
 static int compile_bytearray_list (hcl_t* hcl)
 {
-	hcl_cframe2_t* cf;
+	hcl_cframe_t* cf;
 	hcl_cnode_t* oprnd;
 
 	cf = GET_TOP_CFRAME(hcl);
@@ -2358,7 +2358,7 @@ static int compile_bytearray_list (hcl_t* hcl)
 
 static int compile_dic_list (hcl_t* hcl)
 {
-	hcl_cframe2_t* cf;
+	hcl_cframe_t* cf;
 	hcl_cnode_t* oprnd;
 
 	cf = GET_TOP_CFRAME(hcl);
@@ -2407,7 +2407,7 @@ static int compile_dic_list (hcl_t* hcl)
 
 static int compile_qlist (hcl_t* hcl)
 {
-	hcl_cframe2_t* cf;
+	hcl_cframe_t* cf;
 	hcl_cnode_t* oprnd;
 
 	cf = GET_TOP_CFRAME(hcl);
@@ -2457,7 +2457,7 @@ static HCL_INLINE int patch_nearest_post_if_body (hcl_t* hcl, hcl_cnode_t* cmd)
 {
 	hcl_ooi_t jump_inst_pos, body_pos;
 	hcl_ooi_t jip, jump_offset;
-	hcl_cframe2_t* cf;
+	hcl_cframe_t* cf;
 
 	cf = find_cframe_from_top(hcl, COP_POST_IF_BODY);
 	HCL_ASSERT (hcl, cf != HCL_NULL);
@@ -2511,7 +2511,7 @@ static HCL_INLINE int patch_nearest_post_if_body (hcl_t* hcl, hcl_cnode_t* cmd)
 static HCL_INLINE int subcompile_elif (hcl_t* hcl)
 {
 	hcl_cnode_t* cmd, * obj, * cond, * src;
-	hcl_cframe2_t* cf;
+	hcl_cframe_t* cf;
 
 	cf = GET_TOP_CFRAME(hcl);
 	HCL_ASSERT (hcl, cf->opcode == COP_SUBCOMPILE_ELIF);
@@ -2551,7 +2551,7 @@ static HCL_INLINE int subcompile_elif (hcl_t* hcl)
 static HCL_INLINE int subcompile_else (hcl_t* hcl)
 {
 	hcl_cnode_t* cmd, * obj, * src;
-	hcl_cframe2_t* cf;
+	hcl_cframe_t* cf;
 
 	cf = GET_TOP_CFRAME(hcl);
 	HCL_ASSERT (hcl, cf->opcode == COP_SUBCOMPILE_ELSE);
@@ -2584,7 +2584,7 @@ static HCL_INLINE int subcompile_else (hcl_t* hcl)
 static HCL_INLINE int subcompile_and_expr (hcl_t* hcl)
 {
 	hcl_cnode_t* obj, * expr;
-	hcl_cframe2_t* cf;
+	hcl_cframe_t* cf;
 	hcl_ooi_t jump_inst_pos;
 	
 	cf = GET_TOP_CFRAME(hcl);
@@ -2621,7 +2621,7 @@ static HCL_INLINE int subcompile_and_expr (hcl_t* hcl)
 
 static HCL_INLINE int post_and_expr (hcl_t* hcl)
 {
-	hcl_cframe2_t* cf;
+	hcl_cframe_t* cf;
 	hcl_ooi_t jip;
 	hcl_oow_t jump_offset;
 
@@ -2645,7 +2645,7 @@ static HCL_INLINE int post_and_expr (hcl_t* hcl)
 static HCL_INLINE int subcompile_or_expr (hcl_t* hcl)
 {
 	hcl_cnode_t* obj, * expr;
-	hcl_cframe2_t* cf;
+	hcl_cframe_t* cf;
 	hcl_ooi_t jump_inst_pos;
 	
 	cf = GET_TOP_CFRAME(hcl);
@@ -2683,7 +2683,7 @@ static HCL_INLINE int subcompile_or_expr (hcl_t* hcl)
 
 static HCL_INLINE int post_or_expr (hcl_t* hcl)
 {
-	hcl_cframe2_t* cf;
+	hcl_cframe_t* cf;
 	hcl_ooi_t jip;
 	hcl_oow_t jump_offset;
 
@@ -2706,7 +2706,7 @@ static HCL_INLINE int post_or_expr (hcl_t* hcl)
 
 static HCL_INLINE int post_if_cond (hcl_t* hcl)
 {
-	hcl_cframe2_t* cf;
+	hcl_cframe_t* cf;
 	hcl_ooi_t jump_inst_pos;
 	hcl_ooi_t body_pos;
 
@@ -2735,7 +2735,7 @@ static HCL_INLINE int post_if_cond (hcl_t* hcl)
 
 static HCL_INLINE int post_if_body (hcl_t* hcl)
 {
-	hcl_cframe2_t* cf;
+	hcl_cframe_t* cf;
 	hcl_ooi_t jip;
 	hcl_oow_t jump_offset;
 
@@ -2768,7 +2768,7 @@ static HCL_INLINE int post_if_body (hcl_t* hcl)
 /* ========================================================================= */
 static HCL_INLINE int post_while_cond (hcl_t* hcl)
 {
-	hcl_cframe2_t* cf;
+	hcl_cframe_t* cf;
 	hcl_ooi_t jump_inst_pos;
 	hcl_ooi_t cond_pos, body_pos;
 	hcl_ioloc_t start_loc;
@@ -2829,7 +2829,7 @@ static HCL_INLINE int post_while_cond (hcl_t* hcl)
 
 static HCL_INLINE int post_while_body (hcl_t* hcl)
 {
-	hcl_cframe2_t* cf;
+	hcl_cframe_t* cf;
 	hcl_ooi_t jip;
 	hcl_ooi_t jump_offset;
 
@@ -2875,7 +2875,7 @@ static HCL_INLINE int post_while_body (hcl_t* hcl)
 
 static int update_break (hcl_t* hcl)
 {
-	hcl_cframe2_t* cf;
+	hcl_cframe_t* cf;
 	hcl_ooi_t jip, jump_offset;
 
 	cf = GET_TOP_CFRAME(hcl);
@@ -2901,7 +2901,7 @@ static int update_break (hcl_t* hcl)
 
 static HCL_INLINE int emit_call (hcl_t* hcl)
 {
-	hcl_cframe2_t* cf;
+	hcl_cframe_t* cf;
 	int n;
 
 	cf = GET_TOP_CFRAME(hcl);
@@ -2916,7 +2916,7 @@ static HCL_INLINE int emit_call (hcl_t* hcl)
 
 static HCL_INLINE int emit_make_array (hcl_t* hcl)
 {
-	hcl_cframe2_t* cf;
+	hcl_cframe_t* cf;
 	int n;
 
 	cf = GET_TOP_CFRAME(hcl);
@@ -2931,7 +2931,7 @@ static HCL_INLINE int emit_make_array (hcl_t* hcl)
 
 static HCL_INLINE int emit_make_bytearray (hcl_t* hcl)
 {
-	hcl_cframe2_t* cf;
+	hcl_cframe_t* cf;
 	int n;
 
 	cf = GET_TOP_CFRAME(hcl);
@@ -2946,7 +2946,7 @@ static HCL_INLINE int emit_make_bytearray (hcl_t* hcl)
 
 static HCL_INLINE int emit_make_dic (hcl_t* hcl)
 {
-	hcl_cframe2_t* cf;
+	hcl_cframe_t* cf;
 	int n;
 
 	cf = GET_TOP_CFRAME(hcl);
@@ -2961,7 +2961,7 @@ static HCL_INLINE int emit_make_dic (hcl_t* hcl)
 
 static HCL_INLINE int emit_make_cons (hcl_t* hcl)
 {
-	hcl_cframe2_t* cf;
+	hcl_cframe_t* cf;
 	int n;
 
 	cf = GET_TOP_CFRAME(hcl);
@@ -2976,7 +2976,7 @@ static HCL_INLINE int emit_make_cons (hcl_t* hcl)
 
 static HCL_INLINE int emit_pop_into_array (hcl_t* hcl)
 {
-	hcl_cframe2_t* cf;
+	hcl_cframe_t* cf;
 	int n;
 
 	cf = GET_TOP_CFRAME(hcl);
@@ -2991,7 +2991,7 @@ static HCL_INLINE int emit_pop_into_array (hcl_t* hcl)
 
 static HCL_INLINE int emit_pop_into_bytearray (hcl_t* hcl)
 {
-	hcl_cframe2_t* cf;
+	hcl_cframe_t* cf;
 	int n;
 
 	cf = GET_TOP_CFRAME(hcl);
@@ -3006,7 +3006,7 @@ static HCL_INLINE int emit_pop_into_bytearray (hcl_t* hcl)
 
 static HCL_INLINE int emit_pop_into_dic (hcl_t* hcl)
 {
-	hcl_cframe2_t* cf;
+	hcl_cframe_t* cf;
 	int n;
 
 	cf = GET_TOP_CFRAME(hcl);
@@ -3021,7 +3021,7 @@ static HCL_INLINE int emit_pop_into_dic (hcl_t* hcl)
 
 static HCL_INLINE int emit_pop_into_cons (hcl_t* hcl, int cmd)
 {
-	hcl_cframe2_t* cf;
+	hcl_cframe_t* cf;
 	int n;
 
 	cf = GET_TOP_CFRAME(hcl);
@@ -3038,7 +3038,7 @@ static HCL_INLINE int emit_pop_into_cons (hcl_t* hcl, int cmd)
 
 static HCL_INLINE int emit_lambda (hcl_t* hcl)
 {
-	hcl_cframe2_t* cf;
+	hcl_cframe_t* cf;
 	hcl_oow_t block_code_size, lfsize;
 	hcl_ooi_t jip;
 
@@ -3085,7 +3085,7 @@ static HCL_INLINE int emit_lambda (hcl_t* hcl)
 
 static HCL_INLINE int emit_pop_stacktop (hcl_t* hcl)
 {
-	hcl_cframe2_t* cf;
+	hcl_cframe_t* cf;
 	int n;
 
 	cf = GET_TOP_CFRAME(hcl);
@@ -3100,7 +3100,7 @@ static HCL_INLINE int emit_pop_stacktop (hcl_t* hcl)
 
 static HCL_INLINE int emit_return (hcl_t* hcl)
 {
-	hcl_cframe2_t* cf;
+	hcl_cframe_t* cf;
 	int n;
 
 	cf = GET_TOP_CFRAME(hcl);
@@ -3115,7 +3115,7 @@ static HCL_INLINE int emit_return (hcl_t* hcl)
 
 static HCL_INLINE int emit_set (hcl_t* hcl)
 {
-	hcl_cframe2_t* cf;
+	hcl_cframe_t* cf;
 
 	cf = GET_TOP_CFRAME(hcl);
 	HCL_ASSERT (hcl, cf->opcode == COP_EMIT_SET);
@@ -3210,7 +3210,7 @@ int hcl_compile (hcl_t* hcl, hcl_cnode_t* obj)
 
 	while (GET_TOP_CFRAME_INDEX(hcl) >= 0)
 	{
-		hcl_cframe2_t* cf;
+		hcl_cframe_t* cf;
 
 		cf = GET_TOP_CFRAME(hcl);
 

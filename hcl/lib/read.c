@@ -2086,20 +2086,14 @@ static void gc_compiler (hcl_t* hcl)
 	hcl->c->r.s = hcl_moveoop (hcl, hcl->c->r.s);
 	hcl->c->r.e = hcl_moveoop (hcl, hcl->c->r.e);
 
-
-	for (i = 0; i <= hcl->c->cfs.top; i++)
-	{
-		hcl->c->cfs.ptr[i].operand = hcl_moveoop(hcl, hcl->c->cfs.ptr[i].operand);
-	}
-
 	for (i = 0; i < hcl->c->tv.size; i++)
 	{
-		hcl->c->tv.ptr[i] = hcl_moveoop (hcl, hcl->c->tv.ptr[i]);
+		hcl->c->tv.ptr[i] = hcl_moveoop(hcl, hcl->c->tv.ptr[i]);
 	}
 
 	for (i = 0; i < hcl->c->r.salit.size; i++)
 	{
-		hcl->c->r.salit.ptr[i] = hcl_moveoop (hcl, hcl->c->r.salit.ptr[i]);
+		hcl->c->r.salit.ptr[i] = hcl_moveoop(hcl, hcl->c->r.salit.ptr[i]);
 	}
 }
 
@@ -2130,14 +2124,6 @@ static void fini_compiler (hcl_t* hcl)
 			hcl->c->cfs.ptr = HCL_NULL;
 			hcl->c->cfs.top = -1;
 			hcl->c->cfs.capa = 0;
-		}
-
-		if (hcl->c->cfs2.ptr)
-		{
-			hcl_freemem (hcl, hcl->c->cfs2.ptr);
-			hcl->c->cfs2.ptr = HCL_NULL;
-			hcl->c->cfs2.top = -1;
-			hcl->c->cfs2.capa = 0;
 		}
 
 		if (hcl->c->tv.ptr)
@@ -2212,7 +2198,6 @@ int hcl_attachio (hcl_t* hcl, hcl_ioimpl_t reader, hcl_ioimpl_t printer)
 		hcl->c->r.e = hcl->_nil;
 
 		hcl->c->cfs.top = -1;
-		hcl->c->cfs2.top = -1;
 		hcl->c->blk.depth = -1;
 	}
 	else if (hcl->c->reader || hcl->c->printer)

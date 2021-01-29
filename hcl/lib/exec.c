@@ -3280,7 +3280,6 @@ static int execute (hcl_t* hcl)
 				break;
 			}
 
-
 			case HCL_CODE_MAKE_DIC:
 			{
 				hcl_oop_t t;
