@@ -994,7 +994,6 @@ static int compile_continue (hcl_t* hcl, hcl_cnode_t* src)
 			if (jump_offset > 3) jump_offset += HCL_HCL_CODE_LONG_PARAM_SIZE;
 			if (emit_single_param_instruction(hcl, HCL_CODE_JUMP_BACKWARD_0, jump_offset, HCL_CNODE_GET_LOC(cmd)) <= -1) return -1;
 
-
 			POP_CFRAME (hcl);
 			return 0;
 		}

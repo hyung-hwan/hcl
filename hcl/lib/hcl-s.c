@@ -1437,8 +1437,9 @@ int hcl_server_proto_handle_request (hcl_server_proto_t* proto)
 
 		case HCL_SERVER_PROTO_TOKEN_SCRIPT:
 		{
-			hcl_oop_t obj;
+			hcl_cnode_t* obj;
 			hcl_ooci_t c;
+			int n;
 
 			hcl_setinloc (proto->hcl, 1, 1);
 
@@ -1456,22 +1457,29 @@ int hcl_server_proto_handle_request (hcl_server_proto_t* proto)
 			if (proto->req.state == HCL_SERVER_PROTO_REQ_IN_TOP_LEVEL) hcl_reset(proto->hcl);
 
 			proto->worker->opstate = HCL_SERVER_WORKER_OPSTATE_READ;
-			obj = hcl_read(proto->hcl);
+			obj = hcl_read2(proto->hcl);
 			if (!obj)
 			{
 				if (hcl_geterrnum(proto->hcl) == HCL_ESYNERR) reformat_synerr (proto->hcl);
 				goto fail_with_errmsg;
 			}
 
-			if (get_token(proto) <= -1) goto fail_with_errmsg;
+			if (get_token(proto) <= -1) 
+			{
+				hcl_freecnode (proto->hcl, obj);
+				goto fail_with_errmsg;
+			}
 			if (proto->tok.type != HCL_SERVER_PROTO_TOKEN_NL)
 			{
 				hcl_seterrbfmt (proto->hcl, HCL_EINVAL, "No new line after .SCRIPT contents");
+				hcl_freecnode (proto->hcl, obj);
 				goto fail_with_errmsg;
 			}
 
 			proto->worker->opstate = HCL_SERVER_WORKER_OPSTATE_COMPILE;
-			if (hcl_compile(proto->hcl, obj) <= -1)
+			n = hcl_compile2(proto->hcl, obj);
+			hcl_freecnode (proto->hcl, obj);
+			if (n <= -1)
 			{
 				if (hcl_geterrnum(proto->hcl) == HCL_ESYNERR) reformat_synerr (proto->hcl);
 				goto fail_with_errmsg;

@@ -1173,12 +1173,16 @@ hcl_logufmt (hcl, HCL_LOG_WARN, fmt, ustr, 0x6789);
 }
 #endif
 
-#if 1
 	while (1)
 	{
 		hcl_cnode_t* obj;
 		int n;
 
+/*
+static int count = 0;
+if (count %5 == 0) hcl_reset (hcl);
+count++;
+*/
 		obj = hcl_read2(hcl);
 		if (!obj)
 		{
@@ -1269,111 +1273,6 @@ hcl_logufmt (hcl, HCL_LOG_WARN, fmt, ustr, 0x6789);
 			g_hcl = HCL_NULL;
 		}
 	}
-#else
-
-	while (1)
-	{
-		hcl_oop_t obj;
-/*
-static int count = 0;
-if (count %5 == 0) hcl_reset (hcl);
-count++;
-*/
-		obj = hcl_read(hcl);
-		if (!obj)
-		{
-			if (hcl->errnum == HCL_EFINIS)
-			{
-				/* end of input */
-				break;
-			}
-			else if (hcl->errnum == HCL_ESYNERR)
-			{
-				print_synerr (hcl);
-				if (xtn->reader_istty && hcl_getsynerrnum(hcl) != HCL_SYNERR_EOF) 
-				{
-					/* TODO: drain remaining data in the reader including the actual inputstream and buffered data in hcl */	
-					continue;
-				}
-			}
-			else
-			{
-				hcl_logbfmt (hcl, HCL_LOG_STDERR, "ERROR: cannot read object - [%d] %js\n", hcl_geterrnum(hcl), hcl_geterrmsg(hcl));
-			}
-			goto oops;
-		}
-
-		if (verbose && hcl_print(hcl, obj) <= -1)
-		{
-			hcl_logbfmt (hcl, HCL_LOG_STDERR, "ERROR: cannot print object - [%d] %js\n", hcl_geterrnum(hcl), hcl_geterrmsg(hcl));
-		}
-		else
-		{
-			if (xtn->reader_istty)
-			{
-				/* clear the byte code buffer */
-				/* TODO: create a proper function for this and call it */
-				hcl->code.bc.len = 0;
-				hcl->code.lit.len = 0;
-			}
-
-			if (verbose) hcl_prbfmt (hcl, "\n"); /* flush the output buffer by hcl_print above */
-
-			if (hcl_compile(hcl, obj) <= -1)
-			{
-				if (hcl->errnum == HCL_ESYNERR)
-				{
-					print_synerr (hcl);
-				}
-				else
-				{
-					hcl_logbfmt (hcl, HCL_LOG_STDERR, "ERROR: cannot compile object - [%d] %js\n", hcl_geterrnum(hcl), hcl_geterrmsg(hcl));
-				}
-				/* carry on? */
-
-				if (!xtn->reader_istty) goto oops;
-			}
-			else if (xtn->reader_istty)
-			{
-				/* interactive mode */
-				hcl_oop_t retv;
-
-				hcl_decode (hcl, 0, hcl_getbclen(hcl));
-				HCL_LOG0 (hcl, HCL_LOG_MNEMONIC, "------------------------------------------\n");
-				g_hcl = hcl;
-				//setup_tick ();
-
-				retv = hcl_execute(hcl);
-
-				/* flush pending output data in the interactive mode(e.g. printf without a newline) */
-				hcl_flushio (hcl); 
-
-				if (!retv)
-				{
-					hcl_logbfmt (hcl, HCL_LOG_STDERR, "ERROR: cannot execute - [%d] %js\n", hcl_geterrnum(hcl), hcl_geterrmsg(hcl));
-				}
-				else
-				{
-					/* print the result in the interactive mode regardless 'verbose' */
-					hcl_logbfmt (hcl, HCL_LOG_STDOUT, "%O\n", retv);
-
-					/*
-					 * print the value of ERRSTR.
-					hcl_oop_cons_t cons = hcl_getatsysdic(hcl, xtn->sym_errstr);
-					if (cons)
-					{
-						HCL_ASSERT (hcl, HCL_IS_CONS(hcl, cons));
-						HCL_ASSERT (hcl, HCL_CONS_CAR(cons) == xtn->sym_errstr);
-						hcl_print (hcl, HCL_CONS_CDR(cons));
-					}
-					*/
-				}
-				//cancel_tick();
-				g_hcl = HCL_NULL;
-			}
-		}
-	}
-#endif
 
 	if (!xtn->reader_istty && hcl_getbclen(hcl) > 0)
 	{

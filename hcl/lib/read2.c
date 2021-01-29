@@ -2075,8 +2075,6 @@ hcl_cnodetoobj (hcl_t* hcl, hcl_cnode_t* x)
 }
 */
  
-#if 0
-/* ========================================================================= */
 
 /* TODO: rename compiler to something else that can include reader, printer, and compiler
  * move compiler intialization/finalization here to more common place */
@@ -2134,6 +2132,14 @@ static void fini_compiler (hcl_t* hcl)
 			hcl->c->cfs.capa = 0;
 		}
 
+		if (hcl->c->cfs2.ptr)
+		{
+			hcl_freemem (hcl, hcl->c->cfs2.ptr);
+			hcl->c->cfs2.ptr = HCL_NULL;
+			hcl->c->cfs2.top = -1;
+			hcl->c->cfs2.capa = 0;
+		}
+
 		if (hcl->c->tv.ptr)
 		{
 			hcl_freemem (hcl, hcl->c->tv.ptr);
@@ -2142,14 +2148,16 @@ static void fini_compiler (hcl_t* hcl)
 			hcl->c->tv.capa = 0;
 		}
 
-		if (hcl->c->tv2.ptr)
+		if (hcl->c->tv2.s.ptr)
 		{
-			hcl_freemem (hcl, hcl->c->tv2.ptr);
-			hcl->c->tv2.ptr = HCL_NULL;
-			hcl->c->tv2.len = 0;
+			hcl_freemem (hcl, hcl->c->tv2.s.ptr);
+			hcl->c->tv2.s.ptr = HCL_NULL;
+			hcl->c->tv2.s.len = 0;
 			hcl->c->tv2.capa = 0;
 			hcl->c->tv2.wcount = 0;
 		}
+		HCL_ASSERT (hcl, hcl->c->tv2.capa == 0);
+		HCL_ASSERT (hcl, hcl->c->tv2.wcount == 0);
 
 		if (hcl->c->blk.info)
 		{
@@ -2204,6 +2212,7 @@ int hcl_attachio (hcl_t* hcl, hcl_ioimpl_t reader, hcl_ioimpl_t printer)
 		hcl->c->r.e = hcl->_nil;
 
 		hcl->c->cfs.top = -1;
+		hcl->c->cfs2.top = -1;
 		hcl->c->blk.depth = -1;
 	}
 	else if (hcl->c->reader || hcl->c->printer)
@@ -2321,4 +2330,3 @@ int hcl_unreadchar (hcl_t* hcl, const hcl_iolxc_t* c)
 	unget_char (hcl, c);
 	return 0;
 }
-#endif
