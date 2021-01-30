@@ -205,9 +205,9 @@ static HCL_INLINE int open_input (hcl_t* hcl, hcl_ioinarg_t* arg)
 	}
 
 #if defined(__DOS__) || defined(_WIN32) || defined(__OS2__)
-	bb->fp = fopen (bb->fn, "rb");
+	bb->fp = fopen(bb->fn, "rb");
 #else
-	bb->fp = fopen (bb->fn, "r");
+	bb->fp = fopen(bb->fn, "r");
 #endif
 	if (!bb->fp)
 	{
@@ -223,6 +223,18 @@ static HCL_INLINE int open_input (hcl_t* hcl, hcl_ioinarg_t* arg)
 	}
 
 	arg->handle = bb;
+
+/* HACK */
+	if (!arg->includer) 
+	{
+		HCL_ASSERT (hcl, arg->name == HCL_NULL);
+		arg->name = hcl_dupbtooocstr(hcl, xtn->read_path, HCL_NULL);
+		/* ignore duplication failure */
+/* TODO: change the type of arg->name from const hcl_ooch_t* to hcl_ooch_t*.
+ *       change its specification from [IN] only to [INOUT] in hcl_ioinarg_t. */
+	}
+/* END HACK */
+
 	return 0;
 
 oops:
@@ -241,6 +253,14 @@ static HCL_INLINE int close_input (hcl_t* hcl, hcl_ioinarg_t* arg)
 
 	bb = (bb_t*)arg->handle;
 	HCL_ASSERT (hcl, bb != HCL_NULL && bb->fp != HCL_NULL);
+
+/* HACK */
+	if (!arg->includer && arg->name)
+	{
+		hcl_freemem (hcl, arg->name);
+		arg->name = HCL_NULL;
+	}
+/* END HACK */
 
 	fclose (bb->fp);
 	hcl_freemem (hcl, bb);

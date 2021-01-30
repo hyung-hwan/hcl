@@ -2066,6 +2066,26 @@ hcl_cnode_t* hcl_read (hcl_t* hcl)
 	return read_object(hcl);
 }
 
+/* ------------------------------------------------------------------------ */
+
+hcl_iolxc_t* hcl_readchar (hcl_t* hcl)
+{
+	int n = get_char(hcl);
+	if (n <= -1) return HCL_NULL;
+	return &hcl->c->lxc;
+}
+
+int hcl_unreadchar (hcl_t* hcl, const hcl_iolxc_t* c)
+{
+	if (hcl->c->nungots >= HCL_COUNTOF(hcl->c->ungot))
+	{
+		hcl_seterrbfmt (hcl, HCL_EBUFFULL, "character unread buffer full");
+		return -1;
+	}
+
+	unget_char (hcl, c);
+	return 0;
+}
 
 /* TODO:
 hcl_cnodetoobj (hcl_t* hcl, hcl_cnode_t* x)
@@ -2073,8 +2093,9 @@ hcl_cnodetoobj (hcl_t* hcl, hcl_cnode_t* x)
  * drop location information and compose object ??
  * is it doable? can convert a dotted symbol to a proper value? 
 }
-*/
- 
+*/ 
+
+/* ------------------------------------------------------------------------ */
 
 /* TODO: rename compiler to something else that can include reader, printer, and compiler
  * move compiler intialization/finalization here to more common place */
@@ -2297,21 +2318,3 @@ void hcl_detachio (hcl_t* hcl)
 	}
 }
 
-hcl_iolxc_t* hcl_readchar (hcl_t* hcl)
-{
-	int n = get_char(hcl);
-	if (n <= -1) return HCL_NULL;
-	return &hcl->c->lxc;
-}
-
-int hcl_unreadchar (hcl_t* hcl, const hcl_iolxc_t* c)
-{
-	if (hcl->c->nungots >= HCL_COUNTOF(hcl->c->ungot))
-	{
-		hcl_seterrbfmt (hcl, HCL_EBUFFULL, "character unread buffer full");
-		return -1;
-	}
-
-	unget_char (hcl, c);
-	return 0;
-}

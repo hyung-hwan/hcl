@@ -3387,37 +3387,6 @@ else
 					HCL_STACK_PUSH (hcl, t);
 				}
 
-#if 0
-				if (b1 == 1 || b1 == 3)
-				{
-					if (t3 == hcl->_nil)
-					{
-						((hcl_oop_oop_t)t2)->slot[0] = t1;
-						if (b1 == 1) HCL_STACK_PUSH (hcl, t2); /* push self again */
-					}
-					else
-					{
-						hcl_oop_t t;
-
-						t = hcl_makecons(hcl, t1, hcl->_nil);
-						if (HCL_UNLIKELY(!t)) goto oops;
-
-						((hcl_oop_oop_t)t3)->slot[1] = t;
-						if (b1 == 1) HCL_STACK_PUSH (hcl, t);
-					}
-				}
-				else if (b1 == 2)
-				{
-					if (t3 == hcl->_nil)
-					{
-						((hcl_oop_oop_t)t2)->slot[1] = t1;
-					} 
-					else
-					{
-						((hcl_oop_oop_t)t3)->slot[1] = t1;
-					}
-				}
-#endif
 				break;
 			}
 

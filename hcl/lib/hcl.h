@@ -1167,7 +1167,7 @@ struct hcl_ioinarg_t
 	/**
 	 * [OUT] place data here for #HCL_IO_READ
 	 */
-	hcl_ooch_t buf[2048];
+	hcl_ooch_t buf[2048]; /* TODO: resize this if necessary */
 
 	/**
 	 * [OUT] place the number of characters read here for #HCL_IO_READ
