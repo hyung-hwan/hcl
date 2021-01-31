@@ -2571,19 +2571,35 @@ static void xma_dumper (void* ctx, const char* fmt, ...)
 	va_end (ap);
 }
 
+static void supplement_errmsg (hcl_t* hcl, hcl_ooi_t ip)
+{
+	if (hcl->active_function->dbgi != hcl->_nil)
+	{
+		hcl_dbgl_t* dbgl;
+		static hcl_ooch_t dash[] = { '-', '\0' };
+		const hcl_ooch_t* orgmsg = hcl_backuperrmsg(hcl);
+		hcl_errnum_t orgnum = hcl_geterrnum(hcl);
+
+		HCL_ASSERT (hcl, HCL_IS_BYTEARRAY(hcl, hcl->active_function->dbgi));
+		dbgl = (hcl_dbgl_t*)HCL_OBJ_GET_BYTE_SLOT(hcl->active_function->dbgi);
+
+		hcl_seterrbfmt (hcl, orgnum, "%js (%js:%zu)", orgmsg,
+			(dbgl[ip].fname? dbgl[ip].fname: dash), dbgl[ip].sline);
+	}
+}
+
 static int execute (hcl_t* hcl)
 {
 	hcl_oob_t bcode;
 	hcl_oow_t b1, b2;
 	hcl_oop_t return_value;
+	hcl_ooi_t fetched_instruction_pointer;
 
 #if defined(HCL_PROFILE_VM)
 	hcl_uintmax_t inst_counter = 0;
 #endif
 
-#if defined(HCL_DEBUG_VM_EXEC)
-	hcl_ooi_t fetched_instruction_pointer;
-#endif
+
 
 	HCL_ASSERT (hcl, hcl->active_context != HCL_NULL);
 
@@ -2612,9 +2628,7 @@ static int execute (hcl_t* hcl)
 			goto handle_return;
 		}
 
-	#if defined(HCL_DEBUG_VM_EXEC)
 		fetched_instruction_pointer = hcl->ip;
-	#endif
 		FETCH_BYTE_CODE_TO (hcl, bcode);
 		/*while (bcode == HCL_CODE_NOOP) FETCH_BYTE_CODE_TO (hcl, bcode);*/
 
@@ -2986,24 +3000,8 @@ static int execute (hcl_t* hcl)
 				{
 				cannot_call:
 					/* run time error */
-if (hcl->active_function->dbgi != hcl->_nil)
-{
-	hcl_dbgl_t* dbgl;
-	hcl_ooi_t ip;
-	static hcl_ooch_t dash[] = { '-', '\0' };
-
-	HCL_ASSERT (hcl, HCL_IS_BYTEARRAY(hcl, hcl->active_function->dbgi));
-	dbgl = (hcl_dbgl_t*)HCL_OBJ_GET_BYTE_SLOT(hcl->active_function->dbgi);	
-	ip = hcl->ip - 1;
-	if (bcode == HCL_CODE_CALL_X) ip -= HCL_CODE_LONG_PARAM_SIZE;
-
-hcl_seterrbfmt (hcl, HCL_ECALL, "cannot call %O (%js %zu)", 
-	rcv, (dbgl[ip].fname? dbgl[ip].fname: dash), dbgl[ip].sline);
-}
-else
-{
 					hcl_seterrbfmt (hcl, HCL_ECALL, "cannot call %O", rcv);
-}
+					supplement_errmsg (hcl, fetched_instruction_pointer);
 					goto oops;
 				}
 				break;
@@ -3252,7 +3250,11 @@ else
 
 				/* create an empty array */
 				t = hcl_makearray(hcl, b1, 0);
-				if (HCL_UNLIKELY(!t)) goto oops;
+				if (HCL_UNLIKELY(!t)) 
+				{
+					supplement_errmsg (hcl, fetched_instruction_pointer);
+					goto oops;
+				}
 
 				HCL_STACK_PUSH (hcl, t); /* push the array created */
 				break;
@@ -3285,7 +3287,11 @@ else
 
 				/* create an empty array */
 				t = hcl_makebytearray(hcl, HCL_NULL, b1);
-				if (HCL_UNLIKELY(!t)) goto oops;
+				if (HCL_UNLIKELY(!t)) 
+				{
+					supplement_errmsg (hcl, fetched_instruction_pointer);
+					goto oops;
+				}
 
 				HCL_STACK_PUSH (hcl, t); /* push the byte array created */
 				break;
@@ -3318,7 +3324,11 @@ else
 				FETCH_PARAM_CODE_TO (hcl, b1);
 				LOG_INST_1 (hcl, "make_dic %zu", b1);
 				t = (hcl_oop_t)hcl_makedic(hcl, b1 + 10);
-				if (HCL_UNLIKELY(!t)) goto oops;
+				if (HCL_UNLIKELY(!t))
+				{
+					supplement_errmsg (hcl, fetched_instruction_pointer);
+					goto oops;
+				}
 				HCL_STACK_PUSH (hcl, t);
 				break;
 			}
@@ -3344,7 +3354,11 @@ else
 				LOG_INST_0 (hcl, "make_cons");
 
 				t = hcl_makecons(hcl, hcl->_nil, hcl->_nil);
-				if (HCL_UNLIKELY(!t)) goto oops;
+				if (HCL_UNLIKELY(!t)) 
+				{
+					supplement_errmsg (hcl, fetched_instruction_pointer);
+					goto oops;
+				}
 
 				HCL_STACK_PUSH (hcl, t); /* push the head cons cell */
 				HCL_STACK_PUSH (hcl, hcl->_nil); /* sentinnel */
