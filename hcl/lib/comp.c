@@ -3079,7 +3079,7 @@ static HCL_INLINE int post_lambda (hcl_t* hcl)
 		 *     (set x 10)  ; this x refers to the local variable.
 		 * )
 		 *
-		 * the block has been exited(blk.depth--)  before finding 'x' in the outer scope.
+		 * the block has been exited(blk.depth--) before finding 'x' in the outer scope.
 		 */
 		hcl_cnode_t* defun_name = cf->operand;
 		hcl_oow_t index;
@@ -3087,14 +3087,14 @@ static HCL_INLINE int post_lambda (hcl_t* hcl)
 		if (find_temporary_variable_backward(hcl, HCL_CNODE_GET_TOK(defun_name), &index) <= -1)
 		{
 			SWITCH_TOP_CFRAME (hcl, COP_EMIT_SET, defun_name);
-			cf = GET_SUBCFRAME(hcl);
+			cf = GET_TOP_CFRAME(hcl);
 			cf->u.set.var_type = VAR_NAMED;
 		}
 		else
 		{
 			HCL_ASSERT (hcl, index <= HCL_SMOOI_MAX); 
 			SWITCH_TOP_CFRAME (hcl, COP_EMIT_SET, defun_name); 
-			cf = GET_SUBCFRAME(hcl);
+			cf = GET_TOP_CFRAME(hcl);
 			cf->u.set.var_type = VAR_INDEXED;
 			cf->u.set.index = index;
 		}
