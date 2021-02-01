@@ -838,6 +838,11 @@ static pf_t builtin_prims[] =
 	{ 2, HCL_TYPE_MAX(hcl_oow_t), pf_integer_rem,      3,  { 'r','e','m' } },
 	{ 1, HCL_TYPE_MAX(hcl_oow_t), pf_integer_mquo,     4,  { 'm','d','i','v' } },
 	{ 2, HCL_TYPE_MAX(hcl_oow_t), pf_integer_mod,      3,  { 'm','o','d' } },
+
+	{ 1, 1,                       hcl_pf_process_fork,    4,  { 'f','o','r','k'} },
+	{ 1, 1,                       hcl_pf_process_resume,  7,  { 'r','e','s','u','m','e' } },
+	{ 0, 1,                       hcl_pf_process_suspend, 8,  { 's','u','s','p','e','n','d' } },
+	{ 0, 0,                       hcl_pf_process_yield,   5,  { 'y','i','e','l','d'} }
 };
 
 

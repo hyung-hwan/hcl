@@ -222,7 +222,7 @@ typedef enum hcl_cnode_type_t hcl_cnode_type_t;
 
 
 #define HCL_CNODE_IS_ELIST(x) ((x)->cn_type == HCL_CNODE_ELIST)
-#define HCL_CNODE_IS_ELIST_CONCODED(x) ((x)->cn_type == HCL_CNODE_ELIST && (x)->u.elist.concode == (code))
+#define HCL_CNODE_IS_ELIST_CONCODED(x, code) ((x)->cn_type == HCL_CNODE_ELIST && (x)->u.elist.concode == (code))
 #define HCL_CNODE_ELIST_CONCODE(x) ((x)->u.elist.concode)
 
 /* NOTE: hcl_cnode_t used by the built-in compiler is not an OOP object */
@@ -347,7 +347,7 @@ struct hcl_cframe_t
 			int from_home;
 		} _return;
 
-		/* COP_UPDATE_BREAK */
+		/* COP_POST_BREAK */
 		struct
 		{
 			hcl_ooi_t jump_inst_pos;
@@ -417,20 +417,6 @@ struct hcl_compiler_t
 		hcl_oop_t s;  /* stack for reading */
 		hcl_oop_t e;  /* last object read */
 		hcl_rstl_t* st;
-
-		struct
-		{
-			hcl_oob_t* ptr;
-			hcl_oow_t size;
-			hcl_oow_t capa;
-		} balit;
-
-		struct
-		{
-			hcl_oop_t* ptr;
-			hcl_oow_t size;
-			hcl_oow_t capa;
-		} salit;
 	} r; /* reading */
 	/* == END READER == */
 
@@ -445,17 +431,10 @@ struct hcl_compiler_t
 
 	struct
 	{
-		hcl_oop_t* ptr;
-		hcl_oow_t size;
-		hcl_oow_t capa;
-	} tv; /* temporary variables including arguments */
-
-	struct
-	{
 		hcl_oocs_t s; /* buffer */
 		hcl_oow_t capa; /* bufer capacity */
 		hcl_oow_t wcount; /* word count */
-	} tv2;
+	} tv; /* temporary variables including arguments */
 
 	struct
 	{
@@ -1362,9 +1341,21 @@ void hcl_freesinglecnode (hcl_t* hcl, hcl_cnode_t* c);
 void hcl_freecnode (hcl_t* hcl, hcl_cnode_t* c);
 hcl_oow_t hcl_countcnodecons (hcl_t* hcl, hcl_cnode_t* cons);
 
+
+/* ========================================================================= */
+/* exec.c                                                                    */
+/* ========================================================================= */
+hcl_pfrc_t hcl_pf_process_fork (hcl_t* hcl, hcl_mod_t* mod, hcl_ooi_t nargs);
+hcl_pfrc_t hcl_pf_process_resume (hcl_t* hcl, hcl_mod_t* mod, hcl_ooi_t nargs);
+hcl_pfrc_t hcl_pf_process_suspend (hcl_t* hcl, hcl_mod_t* mod, hcl_ooi_t nargs);
+hcl_pfrc_t hcl_pf_process_yield (hcl_t* hcl, hcl_mod_t* mod, hcl_ooi_t nargs);
+hcl_pfrc_t hcl_pf_process_sleep (hcl_t* hcl, hcl_mod_t* mod, hcl_ooi_t nargs);
+
 #if defined(__cplusplus)
 }
 #endif
+
+
 
 
 #endif

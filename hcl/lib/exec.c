@@ -527,7 +527,6 @@ static HCL_INLINE void switch_to_process_from_nil (hcl_t* hcl, hcl_oop_process_t
 static HCL_INLINE hcl_oop_process_t find_next_runnable_process (hcl_t* hcl)
 {
 	hcl_oop_process_t nrp;
-
 	HCL_ASSERT (hcl, hcl->processor->active->state == HCL_SMOOI_TO_OOP(PROC_STATE_RUNNING));
 	nrp = hcl->processor->active->ps.next;
 	if ((hcl_oop_t)nrp == hcl->_nil) nrp = hcl->processor->runnable.first;
@@ -537,7 +536,6 @@ static HCL_INLINE hcl_oop_process_t find_next_runnable_process (hcl_t* hcl)
 static HCL_INLINE void switch_to_next_runnable_process (hcl_t* hcl)
 {
 	hcl_oop_process_t nrp;
-
 	nrp = find_next_runnable_process (hcl);
 	if (nrp != hcl->processor->active) switch_to_process (hcl, nrp, PROC_STATE_RUNNABLE);
 }
@@ -2441,6 +2439,7 @@ switch_to_next:
 
 	return 1;
 }
+
 /* ------------------------------------------------------------------------- */
 
 static HCL_INLINE int do_return (hcl_t* hcl, hcl_oop_t return_value)
@@ -2979,15 +2978,15 @@ static int execute (hcl_t* hcl)
 					switch (HCL_OBJ_GET_FLAGS_BRAND(rcv))
 					{
 						case HCL_BRAND_FUNCTION:
-							if (activate_function(hcl, b1) <= -1) goto oops;
+							if (activate_function(hcl, b1) <= -1) goto call_failed;
 							break;
 
 						case HCL_BRAND_BLOCK:
-							if (activate_block(hcl, b1) <= -1) goto oops;
+							if (activate_block(hcl, b1) <= -1) goto call_failed;
 							break;
 
 						case HCL_BRAND_PRIM:
-							if (call_primitive(hcl, b1) <= -1) goto oops;
+							if (call_primitive(hcl, b1) <= -1) goto call_failed;
 							break;
 
 						default:
@@ -2999,6 +2998,7 @@ static int execute (hcl_t* hcl)
 				cannot_call:
 					/* run time error */
 					hcl_seterrbfmt (hcl, HCL_ECALL, "cannot call %O", rcv);
+				call_failed:
 					supplement_errmsg (hcl, fetched_instruction_pointer);
 					goto oops;
 				}
@@ -3721,4 +3721,83 @@ hcl_oop_t hcl_execute (hcl_t* hcl)
 void hcl_abort (hcl_t* hcl)
 {
 	hcl->abort_req = 1;
+}
+
+/* ------------------------------------------------------------------------- */
+
+
+hcl_pfrc_t hcl_pf_process_fork (hcl_t* hcl, hcl_mod_t* mod, hcl_ooi_t nargs)
+{
+	hcl_oop_t blk;
+	hcl_oop_context_t newctx;
+	hcl_oop_process_t newprc;
+
+	blk = (hcl_oop_t)HCL_STACK_GETARG(hcl, nargs, 0);
+	if (!HCL_IS_BLOCK(hcl, blk))
+	{
+		hcl_seterrbfmt (hcl, HCL_EINVAL, "parameter not block - %O", blk);
+		return HCL_PF_FAILURE;
+	}
+
+/* TODO: fill arguments. check argument count... */
+
+	newctx = make_context(hcl, 0);
+	if (HCL_UNLIKELY(!newctx)) return HCL_PF_FAILURE;
+
+	newprc = make_process(hcl, newctx);
+	if (HCL_UNLIKELY(!newprc)) return HCL_PF_FAILURE;
+
+	chain_into_processor (hcl, newprc, PROC_STATE_RUNNABLE);
+
+	HCL_STACK_SETRET (hcl, nargs, (hcl_oop_t)newprc);
+	return HCL_PF_SUCCESS;
+}
+
+hcl_pfrc_t hcl_pf_process_resume (hcl_t* hcl, hcl_mod_t* mod, hcl_ooi_t nargs)
+{
+	hcl_oop_process_t prc;
+
+	prc = (hcl_oop_process_t)HCL_STACK_GETARG(hcl, nargs, 0);
+	if (!HCL_IS_PROCESS(hcl, prc))
+	{
+		hcl_seterrbfmt (hcl, HCL_EINVAL, "parameter not process - %O", prc);
+		return HCL_PF_FAILURE;
+	}
+
+	resume_process (hcl, prc);
+	return  HCL_PF_SUCCESS;
+}
+
+hcl_pfrc_t hcl_pf_process_yield (hcl_t* hcl, hcl_mod_t* mod, hcl_ooi_t nargs)
+{
+	yield_process (hcl, hcl->processor->active);
+	return  HCL_PF_SUCCESS;
+}
+
+hcl_pfrc_t hcl_pf_process_suspend (hcl_t* hcl, hcl_mod_t* mod, hcl_ooi_t nargs)
+{
+	hcl_oop_process_t prc;
+
+	if (nargs >= 1)
+	{
+		prc = (hcl_oop_process_t)HCL_STACK_GETARG(hcl, nargs, 0);
+		if (!HCL_IS_PROCESS(hcl, prc))
+		{
+			hcl_seterrbfmt (hcl, HCL_EINVAL, "parameter not process - %O", prc);
+			return HCL_PF_FAILURE;
+		}
+	}
+	else
+	{
+		prc = hcl->processor->active;
+	}
+
+	suspend_process (hcl, prc);
+	return  HCL_PF_SUCCESS;
+}
+
+hcl_pfrc_t hcl_pf_process_sleep (hcl_t* hcl, hcl_mod_t* mod, hcl_ooi_t nargs)
+{
+	/* TODO: sleep the current process */
+	return  HCL_PF_SUCCESS;
 }

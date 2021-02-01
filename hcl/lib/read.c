@@ -2102,20 +2102,8 @@ hcl_cnodetoobj (hcl_t* hcl, hcl_cnode_t* x)
 
 static void gc_compiler (hcl_t* hcl)
 {
-	hcl_ooi_t i;
-
-	hcl->c->r.s = hcl_moveoop (hcl, hcl->c->r.s);
-	hcl->c->r.e = hcl_moveoop (hcl, hcl->c->r.e);
-
-	for (i = 0; i < hcl->c->tv.size; i++)
-	{
-		hcl->c->tv.ptr[i] = hcl_moveoop(hcl, hcl->c->tv.ptr[i]);
-	}
-
-	for (i = 0; i < hcl->c->r.salit.size; i++)
-	{
-		hcl->c->r.salit.ptr[i] = hcl_moveoop(hcl, hcl->c->r.salit.ptr[i]);
-	}
+	hcl->c->r.s = hcl_moveoop(hcl, hcl->c->r.s);
+	hcl->c->r.e = hcl_moveoop(hcl, hcl->c->r.e);
 }
 
 static void fini_compiler (hcl_t* hcl)
@@ -2123,22 +2111,6 @@ static void fini_compiler (hcl_t* hcl)
 	/* called before the hcl object is closed */
 	if (hcl->c)
 	{
-		if (hcl->c->r.balit.ptr)
-		{
-			hcl_freemem (hcl, hcl->c->r.balit.ptr);
-			hcl->c->r.balit.ptr = HCL_NULL;
-			hcl->c->r.balit.size = 0;
-			hcl->c->r.balit.capa = 0;
-		}
-
-		if (hcl->c->r.salit.ptr)
-		{
-			hcl_freemem (hcl, hcl->c->r.salit.ptr);
-			hcl->c->r.salit.ptr = HCL_NULL;
-			hcl->c->r.salit.size = 0;
-			hcl->c->r.salit.capa = 0;
-		}
-
 		if (hcl->c->cfs.ptr)
 		{
 			hcl_freemem (hcl, hcl->c->cfs.ptr);
@@ -2147,24 +2119,16 @@ static void fini_compiler (hcl_t* hcl)
 			hcl->c->cfs.capa = 0;
 		}
 
-		if (hcl->c->tv.ptr)
+		if (hcl->c->tv.s.ptr)
 		{
-			hcl_freemem (hcl, hcl->c->tv.ptr);
-			hcl->c->tv.ptr = HCL_NULL;
-			hcl->c->tv.size = 0;
+			hcl_freemem (hcl, hcl->c->tv.s.ptr);
+			hcl->c->tv.s.ptr = HCL_NULL;
+			hcl->c->tv.s.len = 0;
 			hcl->c->tv.capa = 0;
+			hcl->c->tv.wcount = 0;
 		}
-
-		if (hcl->c->tv2.s.ptr)
-		{
-			hcl_freemem (hcl, hcl->c->tv2.s.ptr);
-			hcl->c->tv2.s.ptr = HCL_NULL;
-			hcl->c->tv2.s.len = 0;
-			hcl->c->tv2.capa = 0;
-			hcl->c->tv2.wcount = 0;
-		}
-		HCL_ASSERT (hcl, hcl->c->tv2.capa == 0);
-		HCL_ASSERT (hcl, hcl->c->tv2.wcount == 0);
+		HCL_ASSERT (hcl, hcl->c->tv.capa == 0);
+		HCL_ASSERT (hcl, hcl->c->tv.wcount == 0);
 
 		if (hcl->c->blk.info)
 		{
