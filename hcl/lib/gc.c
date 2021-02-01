@@ -813,19 +813,19 @@ int hcl_ignite (hcl_t* hcl)
 		hcl->code.bc.capa = HCL_BC_BUFFER_INIT;
 	}
 
-	if (!hcl->code.locptr)
+	if (!hcl->code.dbgi)
 	{
-		hcl->code.locptr = (hcl_oow_t*)hcl_allocmem(hcl, HCL_SIZEOF(*hcl->code.locptr) * HCL_BC_BUFFER_INIT);
-		if (HCL_UNLIKELY(!hcl->code.locptr)) 
+		hcl->code.dbgi = (hcl_oow_t*)hcl_allocmem(hcl, HCL_SIZEOF(*hcl->code.dbgi) * HCL_BC_BUFFER_INIT);
+		if (HCL_UNLIKELY(!hcl->code.dbgi)) 
 		{
-			/* bc.ptr and locptr go together. so free bc.ptr if locptr allocation fails */
+			/* bc.ptr and dbgi go together. so free bc.ptr if dbgi allocation fails */
 			hcl_freemem (hcl, hcl->code.bc.ptr);
 			hcl->code.bc.ptr = HCL_NULL;
 			hcl->code.bc.capa = 0;
 			return -1;
 		}
 
-		HCL_MEMSET (hcl->code.locptr, 0, HCL_SIZEOF(*hcl->code.locptr) * HCL_BC_BUFFER_INIT);
+		HCL_MEMSET (hcl->code.dbgi, 0, HCL_SIZEOF(*hcl->code.dbgi) * HCL_BC_BUFFER_INIT);
 	}
 
 	/* TODO: move code.lit.arr creation to hcl_init() after swithching to hcl_allocmem? */

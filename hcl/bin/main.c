@@ -843,7 +843,7 @@ static int handle_dbgopt (hcl_t* hcl, const hcl_bch_t* str)
 		cm = hcl_find_bchar_in_bcstr(flt, ',');
 		len = cm? (cm - flt): hcl_count_bcstr(flt);
 		if (hcl_comp_bchars_bcstr (flt, len, "gc") == 0)  dbgopt |= HCL_TRAIT_DEBUG_GC;
-		else if (hcl_comp_bchars_bcstr (flt, len, "bigint") == 0)  dbgopt |= HCL_DEBUG_BIGINT;
+		else if (hcl_comp_bchars_bcstr (flt, len, "bigint") == 0)  dbgopt |= HCL_TRAIT_DEBUG_BIGINT;
 		else
 		{
 			fprintf (stderr, "ERROR: unknown debug option value - %.*s\n", (int)len, flt);

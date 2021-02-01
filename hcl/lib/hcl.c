@@ -258,10 +258,10 @@ void hcl_fini (hcl_t* hcl)
 		hcl->proc_map_free_last = -1;
 	}
 
-	if (hcl->code.locptr)
+	if (hcl->code.dbgi)
 	{
-		hcl_freemem (hcl, hcl->code.locptr);
-		hcl->code.locptr = HCL_NULL;
+		hcl_freemem (hcl, hcl->code.dbgi);
+		hcl->code.dbgi = HCL_NULL;
 	}
 
 	if (hcl->code.bc.ptr)
@@ -310,7 +310,6 @@ void hcl_fini (hcl_t* hcl)
 	}
 
 	hcl_killheap (hcl, hcl->heap);
-	hcl_finidbgi (hcl);
 
 	if (hcl->log.ptr) 
 	{
@@ -384,7 +383,7 @@ int hcl_setoption (hcl_t* hcl, hcl_option_t id, const void* value)
 		case HCL_TRAIT:
 			hcl->option.trait = *(const hcl_bitmask_t*)value;
 		#if defined(HCL_BUILD_DEBUG)
-			hcl->option.karatsuba_cutoff = ((hcl->option.trait & HCL_DEBUG_BIGINT)? HCL_KARATSUBA_CUTOFF_DEBUG: HCL_KARATSUBA_CUTOFF);
+			hcl->option.karatsuba_cutoff = ((hcl->option.trait & HCL_TRAIT_DEBUG_BIGINT)? HCL_KARATSUBA_CUTOFF_DEBUG: HCL_KARATSUBA_CUTOFF);
 		#endif
 			return 0;
 

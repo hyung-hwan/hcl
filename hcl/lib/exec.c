@@ -261,7 +261,7 @@ static HCL_INLINE hcl_oop_context_t make_context (hcl_t* hcl, hcl_ooi_t ntmprs)
 	return (hcl_oop_context_t)hcl_allocoopobj(hcl, HCL_BRAND_CONTEXT, HCL_CONTEXT_NAMED_INSTVARS + (hcl_oow_t)ntmprs);
 }
 
-static HCL_INLINE hcl_oop_function_t make_function (hcl_t* hcl, hcl_oow_t lfsize, const hcl_oob_t* bptr, hcl_oow_t blen, hcl_dbgl_t* locptr)
+static HCL_INLINE hcl_oop_function_t make_function (hcl_t* hcl, hcl_oow_t lfsize, const hcl_oob_t* bptr, hcl_oow_t blen, hcl_dbgi_t* dbgi)
 {
 	hcl_oop_function_t func;
 
@@ -270,11 +270,11 @@ static HCL_INLINE hcl_oop_function_t make_function (hcl_t* hcl, hcl_oow_t lfsize
 	func = (hcl_oop_function_t)hcl_allocoopobjwithtrailer(hcl, HCL_BRAND_FUNCTION, HCL_FUNCTION_NAMED_INSTVARS + lfsize, bptr, blen);
 	if (HCL_UNLIKELY(!func)) return HCL_NULL;
 	
-	if (locptr)
+	if (dbgi)
 	{
 		hcl_oop_t tmp;
 		hcl_pushvolat (hcl, (hcl_oop_t*)&func);
-		tmp = hcl_makebytearray(hcl, (hcl_oob_t*)locptr, HCL_SIZEOF(*locptr) * blen);
+		tmp = hcl_makebytearray(hcl, (hcl_oob_t*)dbgi, HCL_SIZEOF(*dbgi) * blen);
 		hcl_popvolat (hcl);
 		if (tmp) func->dbgi = tmp;
 	}
@@ -2575,16 +2575,16 @@ static void supplement_errmsg (hcl_t* hcl, hcl_ooi_t ip)
 {
 	if (hcl->active_function->dbgi != hcl->_nil)
 	{
-		hcl_dbgl_t* dbgl;
+		hcl_dbgi_t* dbgi;
 		static hcl_ooch_t dash[] = { '-', '\0' };
 		const hcl_ooch_t* orgmsg = hcl_backuperrmsg(hcl);
 		hcl_errnum_t orgnum = hcl_geterrnum(hcl);
 
 		HCL_ASSERT (hcl, HCL_IS_BYTEARRAY(hcl, hcl->active_function->dbgi));
-		dbgl = (hcl_dbgl_t*)HCL_OBJ_GET_BYTE_SLOT(hcl->active_function->dbgi);
+		dbgi = (hcl_dbgi_t*)HCL_OBJ_GET_BYTE_SLOT(hcl->active_function->dbgi);
 
 		hcl_seterrbfmt (hcl, orgnum, "%js (%js:%zu)", orgmsg,
-			(dbgl[ip].fname? dbgl[ip].fname: dash), dbgl[ip].sline);
+			(dbgi[ip].fname? dbgi[ip].fname: dash), dbgi[ip].sline);
 	}
 }
 
@@ -2598,8 +2598,6 @@ static int execute (hcl_t* hcl)
 #if defined(HCL_PROFILE_VM)
 	hcl_uintmax_t inst_counter = 0;
 #endif
-
-
 
 	HCL_ASSERT (hcl, hcl->active_context != HCL_NULL);
 
@@ -3659,7 +3657,7 @@ hcl_oop_t hcl_execute (hcl_t* hcl)
 	}
 
 	/* create a virtual function object that hold the bytes codes generated */
-	func = make_function(hcl, hcl->code.lit.len, hcl->code.bc.ptr, hcl->code.bc.len, hcl->code.locptr);
+	func = make_function(hcl, hcl->code.lit.len, hcl->code.bc.ptr, hcl->code.bc.len, hcl->code.dbgi);
 	if (HCL_UNLIKELY(!func)) return HCL_NULL;
 
 	/* pass nil for the home context of the initial function */
