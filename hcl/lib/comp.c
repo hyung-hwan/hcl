@@ -3389,7 +3389,6 @@ int hcl_compile (hcl_t* hcl, hcl_cnode_t* obj)
 	}
 
 	/* emit the pop instruction to clear the final result */
-/* TODO: for interactive use, this value must be accessible by the executor... how to do it? */
 	if (emit_byte_instruction(hcl, HCL_CODE_POP_STACKTOP, HCL_NULL) <= -1) goto oops;
 
 	HCL_ASSERT (hcl, GET_TOP_CFRAME_INDEX(hcl) < 0);

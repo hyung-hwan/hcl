@@ -1718,7 +1718,7 @@ void hcl_releaseiohandle (hcl_t* hcl, hcl_ooi_t io_handle)
 
 /* ------------------------------------------------------------------------- */
 
-static int __activate_block (hcl_t* hcl, hcl_oop_block_t rcv_blk, hcl_ooi_t nargs, hcl_oop_context_t* pnewctx)
+static int prepare_new_block (hcl_t* hcl, hcl_oop_block_t rcv_blk, hcl_ooi_t nargs, int nargs_offset, hcl_oop_context_t* pnewctx)
 {
 	/* prepare a new block context for activation.
 	 * the receiver must be a block context which becomes the base
@@ -1741,7 +1741,7 @@ static int __activate_block (hcl_t* hcl, hcl_oop_block_t rcv_blk, hcl_ooi_t narg
 	/* the receiver must be a block context */
 	HCL_ASSERT (hcl, HCL_IS_BLOCK(hcl, rcv_blk));
 
-	if (HCL_OOP_TO_SMOOI(rcv_blk->nargs) != nargs)
+	if (HCL_OOP_TO_SMOOI(rcv_blk->nargs) != nargs - nargs_offset)
 	{
 		HCL_LOG3 (hcl, HCL_LOG_IC | HCL_LOG_ERROR, 
 			"Error - wrong number of arguments to a block %O - expecting %zd, got %zd\n",
@@ -1782,10 +1782,8 @@ static int __activate_block (hcl_t* hcl, hcl_oop_block_t rcv_blk, hcl_ooi_t narg
 		blkctx->slot[i] = HCL_STACK_GETARG(hcl, nargs, i);
 	}
 
-	HCL_STACK_POPS (hcl, nargs + 1); /* pop arguments and receiver */
-
-	blkctx->sender = hcl->active_context;
 	HCL_ASSERT (hcl, (hcl_oop_t)blkctx->home != hcl->_nil); /* if not intial context, the home must not be null */
+	HCL_ASSERT (hcl, (hcl_oop_t)blkctx->sender == hcl->_nil); /* the sender is not set. the caller must set this if needed */
 
 	*pnewctx = blkctx;
 	return 0;
@@ -1800,8 +1798,11 @@ static HCL_INLINE int activate_block (hcl_t* hcl, hcl_ooi_t nargs)
 	rcv = (hcl_oop_block_t)HCL_STACK_GETRCV(hcl, nargs);
 	HCL_ASSERT (hcl, HCL_IS_BLOCK(hcl, rcv));
 
-	x = __activate_block(hcl, rcv, nargs, &newctx);
+	x = prepare_new_block(hcl, rcv, nargs, 0, &newctx);
 	if (HCL_UNLIKELY(x <= -1)) return -1;
+
+	HCL_STACK_POPS (hcl, nargs + 1); /* pop arguments and receiver */
+	newctx->sender = hcl->active_context;
 
 	SWITCH_ACTIVE_CONTEXT (hcl, newctx);
 	return 0;
@@ -2458,7 +2459,7 @@ static HCL_INLINE int do_return (hcl_t* hcl, hcl_oop_t return_value)
 			 *  (printf "xxx %d\n" (return-from-home 999))
 			 *  -----------------------------------------------
 			 *  (if (>  19 (return-from-home 20)) 30) */
-			HCL_LOG0 (hcl, HCL_LOG_IC | HCL_LOG_WARN, "Warning - stack not empty on return-from-home\n"); /* TODO: include line number and file name */
+			HCL_LOG1 (hcl, HCL_LOG_IC | HCL_LOG_WARN, "Warning - stack not empty on return-from-home - SP %zd\n", hcl->sp); /* TODO: include line number and file name */
 		}
 
 		terminate_process (hcl, hcl->processor->active);
@@ -2489,7 +2490,7 @@ static HCL_INLINE int do_return (hcl_t* hcl, hcl_oop_t return_value)
 			/* return-from-home has been called from where it shouldn't be
 			 *  (defun y(x) (return-from-home (* x x)))
 			 *  (printf "xxx %d\n" (y 999)) */
-			HCL_LOG0 (hcl, HCL_LOG_IC | HCL_LOG_WARN, "Warning - stack not empty on non-local return-from-home\n"); /* TODO: include line number and file name */
+			HCL_LOG1 (hcl, HCL_LOG_IC | HCL_LOG_WARN, "Warning - stack not empty on non-local return-from-home - SP %zd\n", hcl->sp); /* TODO: include line number and file name */
 		}
 
 		terminate_process (hcl, hcl->processor->active);
@@ -2542,7 +2543,7 @@ static HCL_INLINE int do_return (hcl_t* hcl, hcl_oop_t return_value)
 static HCL_INLINE void do_return_from_block (hcl_t* hcl)
 {
 	/*if (hcl->active_context == hcl->processor->active->initial_context)*/
-	if (hcl->active_context->home == hcl->_nil)
+	if ((hcl_oop_t)hcl->active_context->home == hcl->_nil)
 	{
 		/* the active context to return from is an initial context of
 		 * the active process. let's terminate the process. 
@@ -3618,7 +3619,7 @@ oops:
 	/* TODO: anything to do here? */
 	if (hcl->processor->active != hcl->nil_process) 
 	{
-		HCL_LOG1 (hcl, HCL_LOG_IC | HCL_LOG_INFO, "TERMINATING ACTIVE PROCESS %zd for execution error\n", HCL_OOP_TO_SMOOI(hcl->processor->active->id));
+		HCL_LOG2 (hcl, HCL_LOG_IC | HCL_LOG_INFO, "TERMINATING ACTIVE PROCESS %zd for execution error - %js\n", HCL_OOP_TO_SMOOI(hcl->processor->active->id), hcl_geterrmsg(hcl));
 		terminate_process (hcl, hcl->processor->active);
 	}
 	return -1;
@@ -3728,23 +3729,27 @@ void hcl_abort (hcl_t* hcl)
 
 hcl_pfrc_t hcl_pf_process_fork (hcl_t* hcl, hcl_mod_t* mod, hcl_ooi_t nargs)
 {
-	hcl_oop_t blk;
+	hcl_oop_block_t blk;
 	hcl_oop_context_t newctx;
 	hcl_oop_process_t newprc;
+	int x;
 
-	blk = (hcl_oop_t)HCL_STACK_GETARG(hcl, nargs, 0);
+	blk = (hcl_oop_block_t)HCL_STACK_GETARG(hcl, nargs, 0);
 	if (!HCL_IS_BLOCK(hcl, blk))
 	{
 		hcl_seterrbfmt (hcl, HCL_EINVAL, "parameter not block - %O", blk);
 		return HCL_PF_FAILURE;
 	}
 
-/* TODO: fill arguments. check argument count... */
+	x = prepare_new_block(hcl, blk, nargs, 1, &newctx);
+	if (HCL_UNLIKELY(x <= -1)) return HCL_PF_FAILURE;
 
-	newctx = make_context(hcl, 0);
-	if (HCL_UNLIKELY(!newctx)) return HCL_PF_FAILURE;
+	HCL_ASSERT (hcl, (hcl_oop_t)newctx->sender == hcl->_nil);
+	newctx->home = hcl->_nil; /* the new context is the initial context in the new process. so reset it to nil */
 
+	hcl_pushvolat (hcl, (hcl_oop_t*)&newctx);
 	newprc = make_process(hcl, newctx);
+	hcl_popvolat (hcl);
 	if (HCL_UNLIKELY(!newprc)) return HCL_PF_FAILURE;
 
 	chain_into_processor (hcl, newprc, PROC_STATE_RUNNABLE);
