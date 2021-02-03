@@ -492,6 +492,17 @@ struct hcl_trailer_t
 #define HCL_OBJ_GET_TRAILER_BYTE(oop) ((hcl_oob_t*)&((hcl_oop_oop_t)oop)->slot[HCL_OBJ_GET_SIZE(oop) + 1])
 #define HCL_OBJ_GET_TRAILER_SIZE(oop) ((hcl_oow_t)((hcl_oop_oop_t)oop)->slot[HCL_OBJ_GET_SIZE(oop)])
 
+#define HCL_PRIM_NUM_WORDS 4
+typedef struct hcl_prim_t hcl_prim_t;
+typedef struct hcl_prim_t* hcl_oop_prim_t;
+struct hcl_prim_t
+{
+	HCL_OBJ_HEADER;
+	hcl_oow_t impl;
+	hcl_oow_t min_nargs;
+	hcl_oow_t max_nargs;
+	hcl_oow_t mod;
+};
 
 #define HCL_CONS_NAMED_INSTVARS 2
 typedef struct hcl_cons_t hcl_cons_t;
@@ -1562,6 +1573,11 @@ struct hcl_t
 #define HCL_STACK_PUSH(hcl,v) \
 	do { \
 		(hcl)->sp = (hcl)->sp + 1; \
+		if ((hcl)->sp >= (hcl_ooi_t)(HCL_OBJ_GET_SIZE((hcl)->processor->active) - HCL_PROCESS_NAMED_INSTVARS)) \
+		{ \
+			hcl_seterrbfmt (hcl, HCL_EOOMEM, "process stack overflow"); \
+			(hcl)->abort_req = -1; \
+		} \
 		(hcl)->processor->active->slot[(hcl)->sp] = v; \
 	} while (0)
 
@@ -1575,8 +1591,13 @@ struct hcl_t
 #define HCL_STACK_POPS(hcl,count) ((hcl)->sp = (hcl)->sp - (count))
 #define HCL_STACK_ISEMPTY(hcl) ((hcl)->sp <= -1)
 
+/* get the stack pointer of the argument at the given index */
+#define HCL_STACK_GETARGSP(hcl,nargs,idx) ((hcl)->sp - ((nargs) - (idx) - 1))
+/* get the argument at the given index */
 #define HCL_STACK_GETARG(hcl,nargs,idx) HCL_STACK_GET(hcl, (hcl)->sp - ((nargs) - (idx) - 1))
-#define HCL_STACK_GETRCV(hcl,nargs) HCL_STACK_GET(hcl, (hcl)->sp - nargs);
+/* get the receiver of a message */
+#define HCL_STACK_GETRCV(hcl,nargs) HCL_STACK_GET(hcl, (hcl)->sp - nargs)
+
 
 /* you can't access arguments and receiver after this macro. 
  * also you must not call this macro more than once */

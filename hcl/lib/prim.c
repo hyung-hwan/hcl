@@ -41,15 +41,15 @@ typedef struct pf_t pf_t;
 
 hcl_oop_t hcl_makeprim (hcl_t* hcl, hcl_pfimpl_t primimpl, hcl_oow_t minargs, hcl_oow_t maxargs, hcl_mod_t* mod)
 {
-	hcl_oop_word_t obj;
+	hcl_oop_prim_t obj; /* in principle, hcl_oop_word_t with HCL_PRIM_NUM_WORDS elements */
 
-	obj = (hcl_oop_word_t)hcl_allocwordobj (hcl, HCL_BRAND_PRIM, HCL_NULL, 4);
+	obj = (hcl_oop_prim_t)hcl_allocwordobj(hcl, HCL_BRAND_PRIM, HCL_NULL, HCL_PRIM_NUM_WORDS);
 	if (obj)
 	{
-		obj->slot[0] = (hcl_oow_t)primimpl;
-		obj->slot[1] = minargs;
-		obj->slot[2] = maxargs;
-		obj->slot[3] = (hcl_oow_t)mod;
+		obj->impl = (hcl_oow_t)primimpl;
+		obj->min_nargs = minargs;
+		obj->max_nargs = maxargs;
+		obj->mod = (hcl_oow_t)mod;
 	}
 
 	return (hcl_oop_t)obj;
