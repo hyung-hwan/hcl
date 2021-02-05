@@ -3702,7 +3702,15 @@ hcl_oop_t hcl_execute (hcl_t* hcl)
 
 	hcl->initial_context = HCL_NULL;
 	hcl->active_context = HCL_NULL;
-	HCL_ASSERT (hcl, hcl->processor->total_count == HCL_SMOOI_TO_OOP(0));
+	if (hcl->processor->total_count != HCL_SMOOI_TO_OOP(0))
+	{
+		/* if there is a suspended process, your program is probably wrong */
+		HCL_LOG3 (hcl, HCL_LOG_WARN, "Warning - non-zero number of processes - total: %zd runnable: %zd suspended: %zd\n", 
+			(hcl_ooi_t)HCL_OOP_TO_SMOOI(hcl->processor->total_count),
+			(hcl_ooi_t)HCL_OOP_TO_SMOOI(hcl->processor->runnable.count),
+			(hcl_ooi_t)HCL_OOP_TO_SMOOI(hcl->processor->suspended.count));
+	}
+
 	HCL_ASSERT (hcl, hcl->processor->active == hcl->nil_process);
 	LOAD_ACTIVE_SP (hcl); /* sync hcl->nil_process->sp with hcl->sp */
 	HCL_ASSERT (hcl, hcl->sp == -1);
@@ -3800,38 +3808,34 @@ hcl_pfrc_t hcl_pf_process_suspend (hcl_t* hcl, hcl_mod_t* mod, hcl_ooi_t nargs)
 	return  HCL_PF_SUCCESS;
 }
 
-#if 0
 /* ------------------------------------------------------------------ */
-hcl_pfrc_t hcl_pf_semaphore_signal (hcl_t* hcl, hcl_mod_t* mod, hcl_ooi_t nargs)
+hcl_pfrc_t hcl_pf_semaphore_new (hcl_t* hcl, hcl_mod_t* mod, hcl_ooi_t nargs)
 {
-	hcl_oop_t rcv;
+	hcl_oop_semaphore_t sem;
 
-	sem = HCL_STACK_GETARG(hcl, nargs, 0);
-	if (!HCL_IS_SEMAPHORE(hcl, sem))
-	{
-		hcl_seterrbfmt (hcl, HCL_EINVAL, "parameter not process - %O", prc);
-		return HCL_PF_FAILURE;
-	}
+	sem = (hcl_oop_semaphore_t)hcl_allocoopobj(hcl, HCL_BRAND_SEMAPHORE, HCL_SEMAPHORE_NAMED_INSTVARS);
+	if (HCL_UNLIKELY(!sem)) return  HCL_PF_FAILURE;
 
-	/* signal_semaphore() may change the active process though the 
-	 * implementation as of this writing makes runnable the process waiting
-	 * on the signal to be processed. it is safer to set the return value
-	 * before calling signal_sempahore() */
-	HCL_STACK_SETRETTORCV (hcl, nargs);
+	sem->count = HCL_SMOOI_TO_OOP(0);
+/* TODO: sem->signal_action? */
+	/* other fields are all set to nil */
 
-	signal_semaphore (hcl, (hcl_oop_semaphore_t)rcv);
-
+	HCL_STACK_SETRET (hcl, nargs, (hcl_oop_t)sem);
 	return HCL_PF_SUCCESS;
 }
 
 hcl_pfrc_t hcl_pf_semaphore_wait (hcl_t* hcl, hcl_mod_t* mod, hcl_ooi_t nargs)
 {
-	hcl_oop_t rcv;
+	hcl_oop_semaphore_t sem;
 
-	rcv = HCL_STACK_GETRCV(hcl, nargs);
-	HCL_PF_CHECK_RCV (hcl, hcl_iskindof(hcl, rcv, hcl->_semaphore)); 
+	sem = (hcl_oop_semaphore_t)HCL_STACK_GETARG(hcl, nargs, 0);
+	if (!HCL_IS_SEMAPHORE(hcl, sem))
+	{
+		hcl_seterrbfmt (hcl, HCL_EINVAL, "parameter not semaphore - %O", sem);
+		return HCL_PF_FAILURE;
+	}
 
-	if (!can_await_semaphore(hcl, (hcl_oop_semaphore_t)rcv))
+	if (!can_await_semaphore(hcl, sem))
 	{
 		hcl_seterrbfmt (hcl, HCL_EPERM, "not allowed to wait on a semaphore that belongs to a semaphore group");
 		return HCL_PF_FAILURE;
@@ -3841,37 +3845,38 @@ hcl_pfrc_t hcl_pf_semaphore_wait (hcl_t* hcl, hcl_mod_t* mod, hcl_ooi_t nargs)
 	 * await_semaphore() may switch the active process and the stack
 	 * manipulation macros target at the active process. i'm not supposed
 	 * to change the return value of a new active process. */
-	HCL_STACK_SETRETTORCV (hcl, nargs);
-	await_semaphore (hcl, (hcl_oop_semaphore_t)rcv);
+	HCL_STACK_SETRET (hcl, nargs, (hcl_oop_t)sem);
 
+	await_semaphore (hcl, sem);
 	return HCL_PF_SUCCESS;
 }
 
-hcl_pfrc_t hcl_pf_semaphore_signal_on_gcfin (hcl_t* hcl, hcl_mod_t* mod, hcl_ooi_t nargs)
-{
-	hcl_oop_semaphore_t sem;
-
-	sem = (hcl_oop_semaphore_t)HCL_STACK_GETRCV(hcl, nargs);
-	HCL_PF_CHECK_RCV (hcl, hcl_iskindof(hcl, (hcl_oop_t)sem, hcl->_semaphore)); 
-
-/* TODO: should i prevent overwriting? */
-	hcl->sem_gcfin = sem;
-
-	HCL_STACK_SETRETTORCV (hcl, nargs); /* ^self */
-	return HCL_PF_SUCCESS;
-}
-
-hcl_pfrc_t hcl_pf_semaphore_signal_timed (hcl_t* hcl, hcl_mod_t* mod, hcl_ooi_t nargs)
+hcl_pfrc_t hcl_pf_semaphore_signal (hcl_t* hcl, hcl_mod_t* mod, hcl_ooi_t nargs)
 {
 	hcl_oop_semaphore_t sem;
 	hcl_oop_t sec, nsec;
 	hcl_ntime_t now, ft;
 
-	sem = (hcl_oop_semaphore_t)HCL_STACK_GETRCV(hcl, nargs);
-	HCL_PF_CHECK_RCV (hcl, hcl_iskindof(hcl, (hcl_oop_t)sem, hcl->_semaphore)); 
+	sem = (hcl_oop_semaphore_t)HCL_STACK_GETARG(hcl, nargs, 0);
+	if (!HCL_IS_SEMAPHORE(hcl, sem))
+	{
+		hcl_seterrbfmt (hcl, HCL_EINVAL, "parameter not semaphore - %O", sem);
+		return HCL_PF_FAILURE;
+	}
 
-	sec = HCL_STACK_GETARG(hcl, nargs, 0);
-	nsec = (nargs == 2? HCL_STACK_GETARG(hcl, nargs, 1): HCL_SMOOI_TO_OOP(0));
+	if (nargs <= 1)
+	{
+		/* signal_semaphore() may change the active process though the 
+		 * implementation as of this writing makes runnable the process waiting
+		 * on the signal to be processed. it is safer to set the return value
+		 * before calling signal_sempahore() */
+		HCL_STACK_SETRET (hcl, nargs, (hcl_oop_t)sem);
+		signal_semaphore (hcl, sem);
+		return HCL_PF_SUCCESS;
+	}
+
+	sec = HCL_STACK_GETARG(hcl, nargs, 1);
+	nsec = (nargs >= 3? HCL_STACK_GETARG(hcl, nargs, 2): HCL_SMOOI_TO_OOP(0));
 
 	if (!HCL_OOP_IS_SMOOI(sec))
 	{
@@ -3929,9 +3934,9 @@ hcl_pfrc_t hcl_pf_semaphore_signal_timed (hcl_t* hcl, hcl_mod_t* mod, hcl_ooi_t 
 	if (ft.sec < 0 || ft.sec > HCL_SMOOI_MAX) 
 	{
 		/* soft error - cannot represent the expiry time in a small integer. */
-		HCL_LOG3 (hcl, HCL_LOG_PRIMITIVE | HCL_LOG_ERROR, 
-			"Error(%hs) - time (%ld) out of range(0 - %zd) when adding a timed semaphore\n", 
-			__PRIMITIVE_NAME__, (unsigned long int)ft.sec, (hcl_ooi_t)HCL_SMOOI_MAX);
+		HCL_LOG2 (hcl, HCL_LOG_PRIMITIVE | HCL_LOG_ERROR, 
+			"Error - time (%ld) out of range(0 - %zd) when adding a timed semaphore\n", 
+			(unsigned long int)ft.sec, (hcl_ooi_t)HCL_SMOOI_MAX);
 
 		hcl_seterrnum (hcl, HCL_ERANGE);
 		return HCL_PF_FAILURE;
@@ -3940,13 +3945,14 @@ hcl_pfrc_t hcl_pf_semaphore_signal_timed (hcl_t* hcl, hcl_mod_t* mod, hcl_ooi_t 
 	sem->u.timed.ftime_sec = HCL_SMOOI_TO_OOP(ft.sec);
 	sem->u.timed.ftime_nsec = HCL_SMOOI_TO_OOP(ft.nsec);
 
-	if (add_to_sem_heap(hcl, sem) <= -1) return HCL_PF_HARD_FAILURE;
+	if (add_to_sem_heap(hcl, sem) <= -1) return HCL_PF_FAILURE;
 	HCL_ASSERT (hcl, sem->subtype == HCL_SMOOI_TO_OOP(HCL_SEMAPHORE_SUBTYPE_TIMED));
 
-	HCL_STACK_SETRETTORCV (hcl, nargs); /* ^self */
+	HCL_STACK_SETRET (hcl, nargs, (hcl_oop_t)sem);
 	return HCL_PF_SUCCESS;
 }
 
+#if 0
 static hcl_pfrc_t __semaphore_signal_on_io (hcl_t* hcl, hcl_ooi_t nargs, hcl_semaphore_io_type_t io_type)
 {
 	hcl_oop_semaphore_t sem;
@@ -4005,19 +4011,41 @@ hcl_pfrc_t hcl_pf_semaphore_signal_on_output (hcl_t* hcl, hcl_mod_t* mod, hcl_oo
 	return __semaphore_signal_on_io(hcl, nargs, HCL_SEMAPHORE_IO_TYPE_OUTPUT);
 }
 
+hcl_pfrc_t hcl_pf_semaphore_signal_on_gcfin (hcl_t* hcl, hcl_mod_t* mod, hcl_ooi_t nargs)
+{
+	hcl_oop_semaphore_t sem;
+
+	sem = (hcl_oop_semaphore_t)HCL_STACK_GETRCV(hcl, nargs);
+	HCL_PF_CHECK_RCV (hcl, hcl_iskindof(hcl, (hcl_oop_t)sem, hcl->_semaphore)); 
+
+/* TODO: should i prevent overwriting? */
+	hcl->sem_gcfin = sem;
+
+	HCL_STACK_SETRETTORCV (hcl, nargs); /* ^self */
+	return HCL_PF_SUCCESS;
+}
+#endif
+
 hcl_pfrc_t hcl_pf_semaphore_unsignal (hcl_t* hcl, hcl_mod_t* mod, hcl_ooi_t nargs)
 {
 	/* remove a semaphore from processor's signal scheduling.
 	 * it takes no effect on a plain semaphore. */
 	hcl_oop_semaphore_t sem;
 
-	sem = (hcl_oop_semaphore_t)HCL_STACK_GETRCV(hcl, nargs);
-	HCL_PF_CHECK_RCV (hcl, hcl_iskindof(hcl, (hcl_oop_t)sem, hcl->_semaphore)); 
+	sem = (hcl_oop_semaphore_t)HCL_STACK_GETARG(hcl, nargs, 0);
+	if (!HCL_IS_SEMAPHORE(hcl, sem))
+	{
+		hcl_seterrbfmt (hcl, HCL_EINVAL, "parameter not semaphore - %O", sem);
+		return HCL_PF_FAILURE;
+	}
 
+/*
+TODO: add this back if gcfin support is added
 	if (sem == hcl->sem_gcfin)
 	{
 		hcl->sem_gcfin = (hcl_oop_semaphore_t)hcl->_nil;
 	}
+*/
 
 	if (sem->subtype == HCL_SMOOI_TO_OOP(HCL_SEMAPHORE_SUBTYPE_TIMED))
 	{
@@ -4058,22 +4086,47 @@ hcl_pfrc_t hcl_pf_semaphore_unsignal (hcl_t* hcl, hcl_mod_t* mod, hcl_ooi_t narg
 	}
 	HCL_ASSERT (hcl, sem->subtype == hcl->_nil);
 
-	HCL_STACK_SETRETTORCV (hcl, nargs); /* ^self */
+	HCL_STACK_SETRET (hcl, nargs, (hcl_oop_t)sem);
 	return HCL_PF_SUCCESS;
 }
 
 /* ------------------------------------------------------------------ */
+
+/* ------------------------------------------------------------------ */
+hcl_pfrc_t hcl_pf_semaphore_group_new (hcl_t* hcl, hcl_mod_t* mod, hcl_ooi_t nargs)
+{
+	hcl_oop_semaphore_group_t sg;
+
+	sg = (hcl_oop_semaphore_group_t)hcl_allocoopobj(hcl, HCL_BRAND_SEMAPHORE_GROUP, HCL_SEMAPHORE_GROUP_NAMED_INSTVARS);
+	if (HCL_UNLIKELY(!sg)) return  HCL_PF_FAILURE;
+
+	sg->sem_io_count = HCL_SMOOI_TO_OOP(0);
+	sg->sem_count = HCL_SMOOI_TO_OOP(0);
+/* TODO: sem->signal_action? */
+	/* other fields are all set to nil */
+
+	HCL_STACK_SETRET (hcl, nargs, (hcl_oop_t)sg);
+	return HCL_PF_SUCCESS;
+}
 
 hcl_pfrc_t hcl_pf_semaphore_group_add_semaphore (hcl_t* hcl, hcl_mod_t* mod, hcl_ooi_t nargs)
 {
 	hcl_oop_semaphore_group_t sg;
 	hcl_oop_semaphore_t sem;
 
-	sg = (hcl_oop_semaphore_group_t)HCL_STACK_GETRCV(hcl, nargs);
-	HCL_PF_CHECK_RCV (hcl, hcl_iskindof(hcl, (hcl_oop_t)sg, hcl->_semaphore_group)); 
+	sg = (hcl_oop_semaphore_group_t)HCL_STACK_GETARG(hcl, nargs, 0);
+	if (!HCL_IS_SEMAPHORE_GROUP(hcl, sg))
+	{
+		hcl_seterrbfmt (hcl, HCL_EINVAL, "parameter not semaphore group - %O", sg);
+		return HCL_PF_FAILURE;
+	}
 
-	sem = (hcl_oop_semaphore_t)HCL_STACK_GETARG(hcl, nargs, 0);
-	HCL_PF_CHECK_ARGS (hcl, nargs, hcl_iskindof(hcl, (hcl_oop_t)sem, hcl->_semaphore));
+	sem = (hcl_oop_semaphore_t)HCL_STACK_GETARG(hcl, nargs, 1);
+	if (!HCL_IS_SEMAPHORE(hcl, sem))
+	{
+		hcl_seterrbfmt (hcl, HCL_EINVAL, "parameter not semaphore - %O", sem);
+		return HCL_PF_FAILURE;
+	}
 
 	if ((hcl_oop_t)sem->group == hcl->_nil)
 	{
@@ -4083,7 +4136,7 @@ hcl_pfrc_t hcl_pf_semaphore_group_add_semaphore (hcl_t* hcl, hcl_mod_t* mod, hcl
 
 		sems_idx = HCL_OOP_TO_SMOOI(sem->count) > 0? HCL_SEMAPHORE_GROUP_SEMS_SIG: HCL_SEMAPHORE_GROUP_SEMS_UNSIG;
 		HCL_APPEND_TO_OOP_LIST (hcl, &sg->sems[sems_idx], hcl_oop_semaphore_t, sem, grm);
-		HCL_STORE_OOP (hcl, (hcl_oop_t*)&sem->group, (hcl_oop_t)sg);
+		sem->group = sg;
 
 		count = HCL_OOP_TO_SMOOI(sg->sem_count);
 		HCL_ASSERT (hcl, count >= 0);
@@ -4125,12 +4178,12 @@ hcl_pfrc_t hcl_pf_semaphore_group_add_semaphore (hcl_t* hcl, hcl_mod_t* mod, hcl
 			}
 		}
 
-		HCL_STACK_SETRETTORCV (hcl, nargs);
+		HCL_STACK_SETRET (hcl, nargs, (hcl_oop_t)sg);
 	}
 	else if (sem->group == sg)
 	{
 		/* do nothing. don't change the group of the semaphore */
-		HCL_STACK_SETRETTORCV (hcl, nargs);
+		HCL_STACK_SETRET (hcl, nargs, (hcl_oop_t)sg);
 	}
 	else
 	{
@@ -4145,22 +4198,30 @@ hcl_pfrc_t hcl_pf_semaphore_group_add_semaphore (hcl_t* hcl, hcl_mod_t* mod, hcl
 
 hcl_pfrc_t hcl_pf_semaphore_group_remove_semaphore (hcl_t* hcl, hcl_mod_t* mod, hcl_ooi_t nargs)
 {
-	hcl_oop_semaphore_group_t rcv;
+	hcl_oop_semaphore_group_t sg;
 	hcl_oop_semaphore_t sem;
 	hcl_ooi_t count;
 
-	rcv = (hcl_oop_semaphore_group_t)HCL_STACK_GETRCV(hcl, nargs);
-	HCL_PF_CHECK_RCV (hcl, hcl_iskindof(hcl, (hcl_oop_t)rcv, hcl->_semaphore_group)); 
+	sg = (hcl_oop_semaphore_group_t)HCL_STACK_GETARG(hcl, nargs, 0);
+	if (!HCL_IS_SEMAPHORE_GROUP(hcl, sg))
+	{
+		hcl_seterrbfmt (hcl, HCL_EINVAL, "parameter not semaphore group - %O", sg);
+		return HCL_PF_FAILURE;
+	}
 
-	sem = (hcl_oop_semaphore_t)HCL_STACK_GETARG (hcl, nargs, 0);
-	HCL_PF_CHECK_ARGS (hcl, nargs, hcl_iskindof(hcl, (hcl_oop_t)sem, hcl->_semaphore));
+	sem = (hcl_oop_semaphore_t)HCL_STACK_GETARG(hcl, nargs, 1);
+	if (!HCL_IS_SEMAPHORE(hcl, sem))
+	{
+		hcl_seterrbfmt (hcl, HCL_EINVAL, "parameter not semaphore - %O", sem);
+		return HCL_PF_FAILURE;
+	}
 
-	if (sem->group == rcv)
+	if (sem->group == sg)
 	{
 		int sems_idx;
 
 #if 0
-		if ((hcl_oop_t)rcv->waiting.first != hcl->_nil)
+		if ((hcl_oop_t)sg->waiting.first != hcl->_nil)
 		{
 			/* there is a process waiting on this semaphore group.
 			 * i don't allow a semaphore to be removed from the group.
@@ -4180,15 +4241,15 @@ hcl_pfrc_t hcl_pf_semaphore_group_remove_semaphore (hcl_t* hcl, hcl_mod_t* mod, 
 #endif
 
 		sems_idx = HCL_OOP_TO_SMOOI(sem->count) > 0? HCL_SEMAPHORE_GROUP_SEMS_SIG: HCL_SEMAPHORE_GROUP_SEMS_UNSIG;
-		HCL_DELETE_FROM_OOP_LIST (hcl, &rcv->sems[sems_idx], sem, grm);
+		HCL_DELETE_FROM_OOP_LIST (hcl, &sg->sems[sems_idx], sem, grm);
 		sem->grm.prev = (hcl_oop_semaphore_t)hcl->_nil;
 		sem->grm.next = (hcl_oop_semaphore_t)hcl->_nil;
 		sem->group = (hcl_oop_semaphore_group_t)hcl->_nil;
 		
-		count = HCL_OOP_TO_SMOOI(rcv->sem_count);
+		count = HCL_OOP_TO_SMOOI(sg->sem_count);
 		HCL_ASSERT (hcl, count > 0);
 		count--;
-		rcv->sem_count = HCL_SMOOI_TO_OOP(count);
+		sg->sem_count = HCL_SMOOI_TO_OOP(count);
 
 		if (sem->subtype == HCL_SMOOI_TO_OOP(HCL_SEMAPHORE_SUBTYPE_IO))
 		{
@@ -4196,16 +4257,16 @@ hcl_pfrc_t hcl_pf_semaphore_group_remove_semaphore (hcl_t* hcl, hcl_mod_t* mod, 
 			                 HCL_OOP_TO_SMOOI(sem->u.io.index) >= 0 &&
 			                 HCL_OOP_TO_SMOOI(sem->u.io.index) < hcl->sem_io_tuple_count);
 
-			count = HCL_OOP_TO_SMOOI(rcv->sem_io_count);
+			count = HCL_OOP_TO_SMOOI(sg->sem_io_count);
 			HCL_ASSERT (hcl, count > 0);
 			count--;
-			rcv->sem_io_count = HCL_SMOOI_TO_OOP(count);
+			sg->sem_io_count = HCL_SMOOI_TO_OOP(count);
 
 			if (count == 0)
 			{
 				hcl_oop_process_t wp;
 				/* TODO: add sem_wait_count to process. no traversal... */
-				for (wp = rcv->waiting.first; (hcl_oop_t)wp != hcl->_nil; wp = wp->sem_wait.next)
+				for (wp = sg->waiting.first; (hcl_oop_t)wp != hcl->_nil; wp = wp->sem_wait.next)
 				{
 					HCL_ASSERT (hcl, hcl->sem_io_wait_count > 0);
 					hcl->sem_io_wait_count--;
@@ -4214,7 +4275,7 @@ hcl_pfrc_t hcl_pf_semaphore_group_remove_semaphore (hcl_t* hcl, hcl_mod_t* mod, 
 			}
 		}
 
-		HCL_STACK_SETRETTORCV (hcl, nargs);
+		HCL_STACK_SETRET (hcl, nargs, (hcl_oop_t)sg);
 		return HCL_PF_SUCCESS;
 	}
 
@@ -4225,10 +4286,16 @@ hcl_pfrc_t hcl_pf_semaphore_group_remove_semaphore (hcl_t* hcl, hcl_mod_t* mod, 
 
 hcl_pfrc_t hcl_pf_semaphore_group_wait (hcl_t* hcl, hcl_mod_t* mod, hcl_ooi_t nargs)
 {
-	hcl_oop_t rcv, sem;
+	hcl_oop_semaphore_group_t sg;
+	hcl_oop_t sem;
 
-	rcv = HCL_STACK_GETRCV(hcl, nargs);
-	HCL_PF_CHECK_RCV (hcl, hcl_iskindof(hcl, rcv, hcl->_semaphore_group)); 
+
+	sg = (hcl_oop_semaphore_group_t)HCL_STACK_GETARG(hcl, nargs, 0);
+	if (!HCL_IS_SEMAPHORE_GROUP(hcl, sg))
+	{
+		hcl_seterrbfmt (hcl, HCL_EINVAL, "parameter not semaphore group - %O", sg);
+		return HCL_PF_FAILURE;
+	}
 
 	/* i must set the return value before calling await_semaphore_group().
 	 * HCL_STACK_SETRETTORCV() manipulates the stack of the currently active
@@ -4237,9 +4304,9 @@ hcl_pfrc_t hcl_pf_semaphore_group_wait (hcl_t* hcl, hcl_mod_t* mod, hcl_ooi_t na
 	 * it is safer to set the return value of the calling method here.
 	 * but the arguments and the receiver information will be lost from 
 	 * the stack from this moment on. */
-	HCL_STACK_SETRETTORCV (hcl, nargs);
+	HCL_STACK_SETRET (hcl, nargs, (hcl_oop_t)sg);
 
-	sem = await_semaphore_group(hcl, (hcl_oop_semaphore_group_t)rcv);
+	sem = await_semaphore_group(hcl, sg);
 	if (sem != hcl->_nil)
 	{
 		/* there was a signaled semaphore. the active process won't get
@@ -4253,4 +4320,3 @@ hcl_pfrc_t hcl_pf_semaphore_group_wait (hcl_t* hcl, hcl_mod_t* mod, hcl_ooi_t na
 	return HCL_PF_SUCCESS;
 }
 
-#endif
