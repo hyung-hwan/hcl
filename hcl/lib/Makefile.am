@@ -84,6 +84,7 @@ libhcl_la_SOURCES = \
 	print.c \
 	rbt.c \
 	read.c \
+	std.c \
 	sym.c \
 	utf8.c \
 	utl.c \

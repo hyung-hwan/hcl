@@ -163,6 +163,7 @@ enum hcl_option_t
 	HCL_TRAIT,
 	HCL_LOG_MASK,
 	HCL_LOG_MAXCAPA,
+	HCL_LOG_TARGET,
 	HCL_SYMTAB_SIZE,  /* default system table size */
 	HCL_SYSDIC_SIZE,  /* default system dictionary size */
 	HCL_PROCSTK_SIZE, /* default process stack size */
@@ -1183,6 +1184,7 @@ typedef int (*hcl_ioimpl_t) (
  * ========================================================================= */
 
 
+typedef void (*hcl_cb_opt_set_t) (hcl_t* hcl, hcl_option_t id, const void* val);
 typedef void (*hcl_cb_fini_t) (hcl_t* hcl);
 typedef void (*hcl_cb_gc_t) (hcl_t* hcl);
 typedef int (*hcl_cb_vm_startup_t) (hcl_t* hcl);
@@ -1192,6 +1194,7 @@ typedef void (*hcl_cb_vm_checkbc_t) (hcl_t* hcl, hcl_oob_t bcode);
 typedef struct hcl_cb_t hcl_cb_t;
 struct hcl_cb_t
 {
+	hcl_cb_opt_set_t opt_set;
 	hcl_cb_gc_t gc;
 	hcl_cb_fini_t fini;
 
@@ -1356,6 +1359,12 @@ struct hcl_t
 		hcl_bitmask_t trait;
 		hcl_bitmask_t log_mask;
 		hcl_oow_t log_maxcapa;
+		hcl_ooch_t* log_target;
+	#if defined(HCL_OOCH_IS_UCH)
+		hcl_bch_t* log_targetx;
+	#else
+		hcl_uch_t* log_targetx;
+	#endif
 		hcl_oow_t dfl_symtab_size;
 		hcl_oow_t dfl_sysdic_size;
 		hcl_oow_t dfl_procstk_size; 
@@ -1734,6 +1743,12 @@ HCL_EXPORT hcl_t* hcl_open (
 	hcl_oow_t           xtnsize,
 	hcl_oow_t           heapsize,
 	const hcl_vmprim_t* vmprim,
+	hcl_errnum_t*       errnum
+);
+
+HCL_EXPORT hcl_t* hcl_openstd (
+	hcl_oow_t           xtnsize,
+	hcl_oow_t           heapsize,
 	hcl_errnum_t*       errnum
 );
 

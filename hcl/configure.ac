@@ -120,14 +120,15 @@ dnl	[],
 dnl	[#include <stddef.h>])
 
 dnl check functions
-
 AC_CHECK_FUNCS([gettimeofday settimeofday clock_gettime clock_settime getitimer setitimer])
 AC_CHECK_FUNCS([backtrace backtrace_symbols])
 AC_CHECK_FUNCS([makecontext swapcontext getcontext setcontext])
 AC_CHECK_FUNCS([clock_nanosleep nanosleep usleep])
 AC_CHECK_FUNCS([localtime_r gmtime_r])
-AC_CHECK_FUNCS([snprintf _vsnprintf _vsnwprintf])
-AC_CHECK_FUNCS([isatty mmap munmap readv writev])
+AC_CHECK_FUNCS([sigaction signal])
+AC_CHECK_FUNCS([snprintf _vsnprintf _vsnwprintf strerror_r])
+AC_CHECK_FUNCS([accept4 pipe2 epoll_create epoll_create1 kqueue kqueue1])
+AC_CHECK_FUNCS([isatty mmap munmap])
 
 save_LIBS="$LIBS"
 AC_SEARCH_LIBS([dlopen], [dl dld], [

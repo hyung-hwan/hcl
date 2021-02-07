@@ -3824,33 +3824,6 @@ hcl_pfrc_t hcl_pf_semaphore_new (hcl_t* hcl, hcl_mod_t* mod, hcl_ooi_t nargs)
 	return HCL_PF_SUCCESS;
 }
 
-hcl_pfrc_t hcl_pf_semaphore_wait (hcl_t* hcl, hcl_mod_t* mod, hcl_ooi_t nargs)
-{
-	hcl_oop_semaphore_t sem;
-
-	sem = (hcl_oop_semaphore_t)HCL_STACK_GETARG(hcl, nargs, 0);
-	if (!HCL_IS_SEMAPHORE(hcl, sem))
-	{
-		hcl_seterrbfmt (hcl, HCL_EINVAL, "parameter not semaphore - %O", sem);
-		return HCL_PF_FAILURE;
-	}
-
-	if (!can_await_semaphore(hcl, sem))
-	{
-		hcl_seterrbfmt (hcl, HCL_EPERM, "not allowed to wait on a semaphore that belongs to a semaphore group");
-		return HCL_PF_FAILURE;
-	}
-	
-	/* i must set the return value before calling await_semaphore().
-	 * await_semaphore() may switch the active process and the stack
-	 * manipulation macros target at the active process. i'm not supposed
-	 * to change the return value of a new active process. */
-	HCL_STACK_SETRET (hcl, nargs, (hcl_oop_t)sem);
-
-	await_semaphore (hcl, sem);
-	return HCL_PF_SUCCESS;
-}
-
 hcl_pfrc_t hcl_pf_semaphore_signal (hcl_t* hcl, hcl_mod_t* mod, hcl_ooi_t nargs)
 {
 	hcl_oop_semaphore_t sem;
@@ -3952,16 +3925,19 @@ hcl_pfrc_t hcl_pf_semaphore_signal (hcl_t* hcl, hcl_mod_t* mod, hcl_ooi_t nargs)
 	return HCL_PF_SUCCESS;
 }
 
-#if 0
 static hcl_pfrc_t __semaphore_signal_on_io (hcl_t* hcl, hcl_ooi_t nargs, hcl_semaphore_io_type_t io_type)
 {
 	hcl_oop_semaphore_t sem;
 	hcl_oop_t fd;
 
-	sem = (hcl_oop_semaphore_t)HCL_STACK_GETRCV(hcl, nargs);
-	HCL_PF_CHECK_RCV (hcl, hcl_iskindof(hcl, (hcl_oop_t)sem, hcl->_semaphore)); 
+	sem = (hcl_oop_semaphore_t)HCL_STACK_GETARG(hcl, nargs, 0);
+	if (!HCL_IS_SEMAPHORE(hcl, sem))
+	{
+		hcl_seterrbfmt (hcl, HCL_EINVAL, "parameter not semaphore - %O", sem);
+		return HCL_PF_FAILURE;
+	}
 
-	fd = HCL_STACK_GETARG(hcl, nargs, 0);
+	fd = HCL_STACK_GETARG(hcl, nargs, 1);
 
 	if (!HCL_OOP_IS_SMOOI(fd))
 	{
@@ -3997,7 +3973,7 @@ static hcl_pfrc_t __semaphore_signal_on_io (hcl_t* hcl, hcl_ooi_t nargs, hcl_sem
 		return HCL_PF_FAILURE;
 	}
 
-	HCL_STACK_SETRETTORCV (hcl, nargs); /* ^self */
+	HCL_STACK_SETRET (hcl, nargs, (hcl_oop_t)sem);
 	return HCL_PF_SUCCESS;
 }
 
@@ -4011,6 +3987,7 @@ hcl_pfrc_t hcl_pf_semaphore_signal_on_output (hcl_t* hcl, hcl_mod_t* mod, hcl_oo
 	return __semaphore_signal_on_io(hcl, nargs, HCL_SEMAPHORE_IO_TYPE_OUTPUT);
 }
 
+#if 0
 hcl_pfrc_t hcl_pf_semaphore_signal_on_gcfin (hcl_t* hcl, hcl_mod_t* mod, hcl_ooi_t nargs)
 {
 	hcl_oop_semaphore_t sem;
@@ -4025,6 +4002,34 @@ hcl_pfrc_t hcl_pf_semaphore_signal_on_gcfin (hcl_t* hcl, hcl_mod_t* mod, hcl_ooi
 	return HCL_PF_SUCCESS;
 }
 #endif
+
+hcl_pfrc_t hcl_pf_semaphore_wait (hcl_t* hcl, hcl_mod_t* mod, hcl_ooi_t nargs)
+{
+	hcl_oop_semaphore_t sem;
+
+	sem = (hcl_oop_semaphore_t)HCL_STACK_GETARG(hcl, nargs, 0);
+	if (!HCL_IS_SEMAPHORE(hcl, sem))
+	{
+		hcl_seterrbfmt (hcl, HCL_EINVAL, "parameter not semaphore - %O", sem);
+		return HCL_PF_FAILURE;
+	}
+
+	if (!can_await_semaphore(hcl, sem))
+	{
+		hcl_seterrbfmt (hcl, HCL_EPERM, "not allowed to wait on a semaphore that belongs to a semaphore group");
+		return HCL_PF_FAILURE;
+	}
+	
+	/* i must set the return value before calling await_semaphore().
+	 * await_semaphore() may switch the active process and the stack
+	 * manipulation macros target at the active process. i'm not supposed
+	 * to change the return value of a new active process. */
+	HCL_STACK_SETRET (hcl, nargs, (hcl_oop_t)sem);
+
+	await_semaphore (hcl, sem);
+	return HCL_PF_SUCCESS;
+}
+
 
 hcl_pfrc_t hcl_pf_semaphore_unsignal (hcl_t* hcl, hcl_mod_t* mod, hcl_ooi_t nargs)
 {
@@ -4089,8 +4094,6 @@ TODO: add this back if gcfin support is added
 	HCL_STACK_SETRET (hcl, nargs, (hcl_oop_t)sem);
 	return HCL_PF_SUCCESS;
 }
-
-/* ------------------------------------------------------------------ */
 
 /* ------------------------------------------------------------------ */
 hcl_pfrc_t hcl_pf_semaphore_group_new (hcl_t* hcl, hcl_mod_t* mod, hcl_ooi_t nargs)

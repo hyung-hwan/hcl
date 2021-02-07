@@ -318,6 +318,18 @@ void hcl_fini (hcl_t* hcl)
 		hcl->log.len = 0;
 	}
 
+	if (hcl->option.log_target)
+	{
+		hcl_freemem (hcl, hcl->option.log_target);
+		hcl->option.log_target = HCL_NULL;
+	}
+
+	if (hcl->option.log_targetx)
+	{
+		hcl_freemem (hcl, hcl->option.log_targetx);
+		hcl->option.log_targetx = HCL_NULL;
+	}
+
 	if (hcl->inttostr.xbuf.ptr)
 	{
 		hcl_freemem (hcl, hcl->inttostr.xbuf.ptr);
@@ -378,6 +390,8 @@ void hcl_setinloc (hcl_t* hcl, hcl_oow_t line, hcl_oow_t colm)
 
 int hcl_setoption (hcl_t* hcl, hcl_option_t id, const void* value)
 {
+	hcl_cb_t* cb;
+
 	switch (id)
 	{
 		case HCL_TRAIT:
@@ -385,15 +399,43 @@ int hcl_setoption (hcl_t* hcl, hcl_option_t id, const void* value)
 		#if defined(HCL_BUILD_DEBUG)
 			hcl->option.karatsuba_cutoff = ((hcl->option.trait & HCL_TRAIT_DEBUG_BIGINT)? HCL_KARATSUBA_CUTOFF_DEBUG: HCL_KARATSUBA_CUTOFF);
 		#endif
-			return 0;
+			break;
 
 		case HCL_LOG_MASK:
 			hcl->option.log_mask = *(const hcl_bitmask_t*)value;
-			return 0;
+			break;
 
 		case HCL_LOG_MAXCAPA:
 			hcl->option.log_maxcapa = *(hcl_oow_t*)value;
-			return 0;
+			break;
+
+		case HCL_LOG_TARGET:
+		{
+			hcl_ooch_t* v1;
+		#if defined(HCL_OOCH_IS_UCH)
+			hcl_bch_t* v2;
+		#else
+			hcl_uch_t* v2;
+		#endif
+
+			v1 = hcl_dupoochars(hcl, value, hcl_count_oocstr(value));
+			if (HCL_UNLIKELY(!v1)) return -1;
+
+		#if defined(HCL_OOCH_IS_UCH)
+			v2 = hcl_dupootobcstr(hcl, value, HCL_NULL);
+		#else
+			v2 = hcl_dupootoucstr(hcl, value, HCL_NULL);
+		#endif
+			if (HCL_UNLIKELY(!v2))
+			{
+				hcl_freemem (hcl, v1);
+				return -1;
+			}
+			hcl->option.log_targetx = v2;
+			hcl->option.log_target = v1;
+			break;
+		}
+
 
 		case HCL_SYMTAB_SIZE:
 		{
@@ -403,7 +445,7 @@ int hcl_setoption (hcl_t* hcl, hcl_option_t id, const void* value)
 			if (w <= 0 || w > HCL_SMOOI_MAX) goto einval;
 
 			hcl->option.dfl_symtab_size = *(hcl_oow_t*)value;
-			return 0;
+			break;
 		}
 
 		case HCL_SYSDIC_SIZE:
@@ -414,7 +456,7 @@ int hcl_setoption (hcl_t* hcl, hcl_option_t id, const void* value)
 			if (w <= 0 || w > HCL_SMOOI_MAX) goto einval;
 
 			hcl->option.dfl_sysdic_size = *(hcl_oow_t*)value;
-			return 0;
+			break;
 		}
 
 		case HCL_PROCSTK_SIZE:
@@ -425,14 +467,25 @@ int hcl_setoption (hcl_t* hcl, hcl_option_t id, const void* value)
 			if (w <= 0 || w > HCL_SMOOI_MAX) goto einval;
 
 			hcl->option.dfl_procstk_size = *(hcl_oow_t*)value;
-			return 0;
+			break;
 		}
 		
 		case HCL_MOD_INCTX:
 			hcl->option.mod_inctx = *(void**)value;
-			return 0;
+			break;
+
+
+		default:
+			goto einval;
 	}
 
+	for (cb = hcl->cblist; cb; cb = cb->next) 
+	{
+		if (cb->opt_set) cb->opt_set (hcl, id, value);
+	}
+
+	return 0;
+	
 einval:
 	hcl_seterrnum (hcl, HCL_EINVAL);
 	return -1;
@@ -452,6 +505,10 @@ int hcl_getoption (hcl_t* hcl, hcl_option_t id, void* value)
 
 		case HCL_LOG_MAXCAPA:
 			*(hcl_oow_t*)value = hcl->option.log_maxcapa;
+			return 0;
+
+		case HCL_LOG_TARGET:
+			*(hcl_ooch_t**)value = hcl->option.log_target;
 			return 0;
 
 		case HCL_SYMTAB_SIZE:

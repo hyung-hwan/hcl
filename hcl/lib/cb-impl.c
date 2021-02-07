@@ -19,9 +19,23 @@
 #		define USE_WIN_DLL
 #	endif
 
+
+#	include "poll-msw.h"
+#	define USE_POLL
+#	define XPOLLIN POLLIN
+#	define XPOLLOUT POLLOUT
+#	define XPOLLERR POLLERR
+#	define XPOLLHUP POLLHUP
+
+
+#if !defined(SIZE_T)
+#	define SIZE_T unsigned long int
+#endif
+
 #elif defined(__OS2__)
 #	define INCL_DOSMODULEMGR
 #	define INCL_DOSPROCESS
+#	define INCL_DOSSEMAPHORES
 #	define INCL_DOSEXCEPTIONS
 #	define INCL_DOSMISC
 #	define INCL_DOSDATETIME
@@ -29,7 +43,16 @@
 #	define INCL_DOSERRORS
 #	include <os2.h>
 #	include <time.h>
+#	include <fcntl.h>
 #	include <io.h>
+
+#	include <errno.h>
+
+	/* fake XPOLLXXX values */
+#	define XPOLLIN  (1 << 0)
+#	define XPOLLOUT (1 << 1)
+#	define XPOLLERR (1 << 2)
+#	define XPOLLHUP (1 << 3)
 
 #elif defined(__DOS__)
 #	include <dos.h>
@@ -37,12 +60,22 @@
 #	include <io.h>
 #	include <signal.h>
 #	include <errno.h>
+#	include <fcntl.h>
+#	include <conio.h> /* inp, outp */
 
 #	if defined(_INTELC32_)
 #		define DOS_EXIT 0x4C
+#		include <i32.h>
+#		include <stk.h>
 #	else
 #		include <dosfunc.h>
 #	endif
+
+	/* fake XPOLLXXX values */
+#	define XPOLLIN  (1 << 0)
+#	define XPOLLOUT (1 << 1)
+#	define XPOLLERR (1 << 2)
+#	define XPOLLHUP (1 << 3)
 
 #elif defined(macintosh)
 #	include <Types.h>
@@ -84,6 +117,65 @@
 #		include <mach-o/dyld.h>
 #	else
 #		error UNSUPPORTED DYNAMIC LINKER
+#	endif
+
+#	if defined(HAVE_TIME_H)
+#		include <time.h>
+#	endif
+#	if defined(HAVE_SYS_TIME_H)
+#		include <sys/time.h>
+#	endif
+#	if defined(HAVE_SIGNAL_H)
+#		include <signal.h>
+#	endif
+#	if defined(HAVE_SYS_MMAN_H)
+#		include <sys/mman.h>
+#	endif
+
+#	if defined(USE_THREAD)
+#		include <pthread.h>
+#		include <sched.h>
+#	endif
+
+#	if defined(HAVE_SYS_DEVPOLL_H)
+		/* solaris */
+#		include <sys/devpoll.h>
+#		define USE_DEVPOLL
+#		define XPOLLIN POLLIN
+#		define XPOLLOUT POLLOUT
+#		define XPOLLERR POLLERR
+#		define XPOLLHUP POLLHUP
+#	elif defined(HAVE_SYS_EVENT_H) && defined(HAVE_KQUEUE)
+		/* netbsd, openbsd, etc */
+#		include <sys/event.h>
+#		define USE_KQUEUE
+		/* fake XPOLLXXX values */
+#		define XPOLLIN  (1 << 0)
+#		define XPOLLOUT (1 << 1)
+#		define XPOLLERR (1 << 2)
+#		define XPOLLHUP (1 << 3)
+#	elif defined(HAVE_SYS_EPOLL_H) && defined(HAVE_EPOLL_CREATE)
+		/* linux */
+#		include <sys/epoll.h>
+#		define USE_EPOLL
+#		define XPOLLIN EPOLLIN
+#		define XPOLLOUT EPOLLOUT
+#		define XPOLLERR EPOLLERR
+#		define XPOLLHUP EPOLLHUP
+#	elif defined(HAVE_POLL_H)
+#		include <poll.h>
+#		define USE_POLL
+#		define XPOLLIN POLLIN
+#		define XPOLLOUT POLLOUT
+#		define XPOLLERR POLLERR
+#		define XPOLLHUP POLLHUP
+#	else
+#		define USE_SELECT
+		/* fake XPOLLXXX values */
+#		define XPOLLIN  (1 << 0)
+#		define XPOLLOUT (1 << 1)
+#		define XPOLLERR (1 << 2)
+#		define XPOLLHUP (1 << 3)
 #	endif
 #endif
 
@@ -535,7 +627,7 @@ void hcl_vmprim_vm_gettime (hcl_t* hcl, hcl_ntime_t* now)
 	hcl_uint64_t bigsec, bigmsec;
 	bigmsec = GetTickCount64();
 	#else
-	xtn_t* xtn = (xtn_t*)hcl_getxtn(hcl);
+	xtn_t* xtn = GET_XTN(hcl);
 	hcl_uint64_t bigsec, bigmsec;
 	DWORD msec;
 
@@ -556,7 +648,7 @@ void hcl_vmprim_vm_gettime (hcl_t* hcl, hcl_ntime_t* now)
 	HCL_INIT_NTIME(now, bigsec, HCL_MSEC_TO_NSEC(bigmsec));
 
 #elif defined(__OS2__)
-	xtn_t* xtn = (xtn_t*)hcl_getxtn(hcl);
+	xtn_t* xtn = GET_XTN(hcl);
 	hcl_uint64_t bigsec, bigmsec;
 	ULONG msec;
 
@@ -615,11 +707,983 @@ void hcl_vmprim_vm_gettime (hcl_t* hcl, hcl_ntime_t* now)
 }
 
 /* -----------------------------------------------------------------
- * TODO: MUX
+ * IO MULTIPLEXING
  * ----------------------------------------------------------------- */
-
 #if 0
-TODO TODO TODO 
+static int _add_poll_fd (hcl_t* hcl, int fd, int event_mask)
+{
+#if defined(USE_DEVPOLL)
+	xtn_t* xtn = GET_XTN(hcl);
+	struct pollfd ev;
+
+	HCL_ASSERT (hcl, xtn->ep >= 0);
+	ev.fd = fd;
+	ev.events = event_mask;
+	ev.revents = 0;
+	if (write(xtn->ep, &ev, HCL_SIZEOF(ev)) != HCL_SIZEOF(ev))
+	{
+		hcl_seterrwithsyserr (hcl, 0, errno);
+		HCL_DEBUG2 (hcl, "Cannot add file descriptor %d to devpoll - %hs\n", fd, strerror(errno));
+		return -1;
+	}
+
+	return 0;
+
+#elif defined(USE_KQUEUE)
+	xtn_t* xtn = GET_XTN(hcl);
+	struct kevent ev;
+	hcl_oow_t rindex, roffset;
+	hcl_oow_t rv = 0;
+
+	rindex = (hcl_oow_t)fd / (HCL_BITSOF(hcl_oow_t) >> 1);
+	roffset = ((hcl_oow_t)fd << 1) % HCL_BITSOF(hcl_oow_t);
+
+	if (rindex >= xtn->ev.reg.capa)
+	{
+		hcl_oow_t* tmp;
+		hcl_oow_t newcapa;
+
+		HCL_STATIC_ASSERT (HCL_SIZEOF(*tmp) == HCL_SIZEOF(*xtn->ev.reg.ptr));
+
+		newcapa = rindex + 1;
+		newcapa = HCL_ALIGN_POW2(newcapa, 16);
+
+		tmp = (hcl_oow_t*)hcl_reallocmem(hcl, xtn->ev.reg.ptr, newcapa * HCL_SIZEOF(*tmp));
+		if (!tmp)
+		{
+			const hcl_ooch_t* oldmsg = hcl_backuperrmsg(hcl);
+			hcl_seterrbfmt (hcl, HCL_ESYSERR, "unable to add file descriptor %d to kqueue - %js", fd, oldmsg);
+			HCL_DEBUG1 (hcl, "%js", hcl_geterrmsg(hcl));
+			return -1;
+		}
+
+		HCL_MEMSET (&tmp[xtn->ev.reg.capa], 0, newcapa - xtn->ev.reg.capa);
+		xtn->ev.reg.ptr = tmp;
+		xtn->ev.reg.capa = newcapa;
+	}
+
+	if (event_mask & XPOLLIN) 
+	{
+		/*EV_SET (&ev, fd, EVFILT_READ, EV_ADD | EV_CLEAR, 0, 0, 0);*/
+		HCL_MEMSET (&ev, 0, HCL_SIZEOF(ev));
+		ev.ident = fd;
+		ev.flags = EV_ADD;
+	#if defined(USE_THREAD)
+		ev.flags |= EV_CLEAR; /* EV_CLEAR for edge trigger? */
+	#endif
+		ev.filter = EVFILT_READ;
+		if (kevent(xtn->ep, &ev, 1, HCL_NULL, 0, HCL_NULL) == -1)
+		{
+			hcl_seterrwithsyserr (hcl, 0, errno);
+			HCL_DEBUG2 (hcl, "Cannot add file descriptor %d to kqueue for read - %hs\n", fd, strerror(errno));
+			return -1;
+		}
+
+		rv |= 1;
+	}
+	if (event_mask & XPOLLOUT)
+	{
+		/*EV_SET (&ev, fd, EVFILT_WRITE, EV_ADD | EV_CLEAR, 0, 0, 0);*/
+		HCL_MEMSET (&ev, 0, HCL_SIZEOF(ev));
+		ev.ident = fd;
+		ev.flags = EV_ADD;
+	#if defined(USE_THREAD)
+		ev.flags |= EV_CLEAR; /* EV_CLEAR for edge trigger? */
+	#endif
+		ev.filter = EVFILT_WRITE;
+		if (kevent(xtn->ep, &ev, 1, HCL_NULL, 0, HCL_NULL) == -1)
+		{
+			hcl_seterrwithsyserr (hcl, 0, errno);
+			HCL_DEBUG2 (hcl, "Cannot add file descriptor %d to kqueue for write - %hs\n", fd, strerror(errno));
+
+			if (event_mask & XPOLLIN)
+			{
+				HCL_MEMSET (&ev, 0, HCL_SIZEOF(ev));
+				ev.ident = fd;
+				ev.flags = EV_DELETE;
+				ev.filter = EVFILT_READ;
+				kevent(xtn->ep, &ev, 1, HCL_NULL, 0, HCL_NULL);
+			}
+			return -1;
+		}
+
+		rv |= 2;
+	}
+
+	HCL_SETBITS (hcl_oow_t, xtn->ev.reg.ptr[rindex], roffset, 2, rv);
+	return 0;
+
+#elif defined(USE_EPOLL)
+	xtn_t* xtn = GET_XTN(hcl);
+	struct epoll_event ev;
+
+	HCL_ASSERT (hcl, xtn->ep >= 0);
+	HCL_MEMSET (&ev, 0, HCL_SIZEOF(ev));
+	ev.events = event_mask;
+	#if defined(USE_THREAD) && defined(EPOLLET)
+	/* epoll_wait may return again if the worker thread consumes events.
+	 * switch to level-trigger. */
+	/* TODO: verify if EPOLLLET is desired */
+	ev.events |= EPOLLET/*  | EPOLLRDHUP | EPOLLHUP */;
+	#endif
+	/*ev.data.ptr = (void*)event_data;*/
+	ev.data.fd = fd;
+	if (epoll_ctl(xtn->ep, EPOLL_CTL_ADD, fd, &ev) == -1)
+	{
+		hcl_seterrwithsyserr (hcl, 0, errno);
+		HCL_DEBUG2 (hcl, "Cannot add file descriptor %d to epoll - %hs\n", fd, strerror(errno));
+		return -1;
+	}
+	return 0;
+
+#elif defined(USE_POLL)
+	xtn_t* xtn = GET_XTN(hcl);
+
+	MUTEX_LOCK (&xtn->ev.reg.pmtx);
+	if (xtn->ev.reg.len >= xtn->ev.reg.capa)
+	{
+		struct pollfd* tmp, * tmp2;
+		hcl_oow_t newcapa;
+
+		newcapa = HCL_ALIGN_POW2 (xtn->ev.reg.len + 1, 256);
+		tmp = (struct pollfd*)hcl_reallocmem(hcl, xtn->ev.reg.ptr, newcapa * HCL_SIZEOF(*tmp));
+		tmp2 = (struct pollfd*)hcl_reallocmem(hcl, xtn->ev.buf, newcapa * HCL_SIZEOF(*tmp2));
+		if (!tmp || !tmp2)
+		{
+			HCL_DEBUG2 (hcl, "Cannot add file descriptor %d to poll - %hs\n", fd, strerror(errno));
+			MUTEX_UNLOCK (&xtn->ev.reg.pmtx);
+			if (tmp) hcl_freemem (hcl, tmp);
+			return -1;
+		}
+
+		xtn->ev.reg.ptr = tmp;
+		xtn->ev.reg.capa = newcapa;
+
+		xtn->ev.buf = tmp2;
+	}
+
+	xtn->ev.reg.ptr[xtn->ev.reg.len].fd = fd;
+	xtn->ev.reg.ptr[xtn->ev.reg.len].events = event_mask;
+	xtn->ev.reg.ptr[xtn->ev.reg.len].revents = 0;
+	xtn->ev.reg.len++;
+	MUTEX_UNLOCK (&xtn->ev.reg.pmtx);
+
+	return 0;
+
+#elif defined(USE_SELECT)
+	xtn_t* xtn = GET_XTN(hcl);
+
+	MUTEX_LOCK (&xtn->ev.reg.smtx);
+	if (event_mask & XPOLLIN) 
+	{
+		FD_SET (fd, &xtn->ev.reg.rfds);
+		if (fd > xtn->ev.reg.maxfd) xtn->ev.reg.maxfd = fd;
+	}
+	if (event_mask & XPOLLOUT) 
+	{
+		FD_SET (fd, &xtn->ev.reg.wfds);
+		if (fd > xtn->ev.reg.maxfd) xtn->ev.reg.maxfd = fd;
+	}
+	MUTEX_UNLOCK (&xtn->ev.reg.smtx);
+
+	return 0;
+
+#else
+
+	HCL_DEBUG1 (hcl, "Cannot add file descriptor %d to poll - not implemented\n", fd);
+	hcl_seterrnum (hcl, HCL_ENOIMPL);
+	return -1;
+#endif
+
+}
+
+static int _del_poll_fd (hcl_t* hcl, int fd)
+{
+
+#if defined(USE_DEVPOLL)
+	xtn_t* xtn = GET_XTN(hcl);
+	struct pollfd ev;
+
+	HCL_ASSERT (hcl, xtn->ep >= 0);
+	ev.fd = fd;
+	ev.events = POLLREMOVE;
+	ev.revents = 0;
+	if (write(xtn->ep, &ev, HCL_SIZEOF(ev)) != HCL_SIZEOF(ev))
+	{
+		hcl_seterrwithsyserr (hcl, 0, errno);
+		HCL_DEBUG2 (hcl, "Cannot remove file descriptor %d from devpoll - %hs\n", fd, strerror(errno));
+		return -1;
+	}
+
+	return 0;
+
+#elif defined(USE_KQUEUE)
+	xtn_t* xtn = GET_XTN(hcl);
+	hcl_oow_t rindex, roffset;
+	int rv;
+	struct kevent ev;
+
+	rindex = (hcl_oow_t)fd / (HCL_BITSOF(hcl_oow_t) >> 1);
+	roffset = ((hcl_oow_t)fd << 1) % HCL_BITSOF(hcl_oow_t);
+
+	if (rindex >= xtn->ev.reg.capa)
+	{
+		hcl_seterrbfmt (hcl, HCL_EINVAL, "unknown file descriptor %d", fd);
+		HCL_DEBUG2 (hcl, "Cannot remove file descriptor %d from kqueue - %js\n", fd, hcl_geterrmsg(hcl));
+		return -1;
+	};
+
+	rv = HCL_GETBITS (hcl_oow_t, xtn->ev.reg.ptr[rindex], roffset, 2);
+
+	if (rv & 1)
+	{
+		/*EV_SET (&ev, fd, EVFILT_READ, EV_DELETE, 0, 0, 0);*/
+		HCL_MEMSET (&ev, 0, HCL_SIZEOF(ev));
+		ev.ident = fd;
+		ev.flags = EV_DELETE;
+		ev.filter = EVFILT_READ;
+		kevent(xtn->ep, &ev, 1, HCL_NULL, 0, HCL_NULL);
+		/* no error check for now */
+	}
+
+	if (rv & 2)
+	{
+		/*EV_SET (&ev, fd, EVFILT_WRITE, EV_DELETE, 0, 0, 0);*/
+		HCL_MEMSET (&ev, 0, HCL_SIZEOF(ev));
+		ev.ident = fd;
+		ev.flags = EV_DELETE;
+		ev.filter = EVFILT_WRITE;
+		kevent(xtn->ep, &ev, 1, HCL_NULL, 0, HCL_NULL);
+		/* no error check for now */
+	}
+
+	HCL_SETBITS (hcl_oow_t, xtn->ev.reg.ptr[rindex], roffset, 2, 0);
+	return 0;
+
+#elif defined(USE_EPOLL)
+	xtn_t* xtn = GET_XTN(hcl);
+	struct epoll_event ev;
+
+	HCL_ASSERT (hcl, xtn->ep >= 0);
+	HCL_MEMSET (&ev, 0, HCL_SIZEOF(ev));
+	if (epoll_ctl(xtn->ep, EPOLL_CTL_DEL, fd, &ev) == -1)
+	{
+		hcl_seterrwithsyserr (hcl, 0, errno);
+		HCL_DEBUG2 (hcl, "Cannot remove file descriptor %d from epoll - %hs\n", fd, strerror(errno));
+		return -1;
+	}
+	return 0;
+
+#elif defined(USE_POLL)
+	xtn_t* xtn = GET_XTN(hcl);
+	hcl_oow_t i;
+
+	/* TODO: performance boost. no linear search */
+	MUTEX_LOCK (&xtn->ev.reg.pmtx);
+	for (i = 0; i < xtn->ev.reg.len; i++)
+	{
+		if (xtn->ev.reg.ptr[i].fd == fd)
+		{
+			xtn->ev.reg.len--;
+			HCL_MEMMOVE (&xtn->ev.reg.ptr[i], &xtn->ev.reg.ptr[i+1], (xtn->ev.reg.len - i) * HCL_SIZEOF(*xtn->ev.reg.ptr));
+			MUTEX_UNLOCK (&xtn->ev.reg.pmtx);
+			return 0;
+		}
+	}
+	MUTEX_UNLOCK (&xtn->ev.reg.pmtx);
+
+
+	HCL_DEBUG1 (hcl, "Cannot remove file descriptor %d from poll - not found\n", fd);
+	hcl_seterrnum (hcl, HCL_ENOENT);
+	return -1;
+
+#elif defined(USE_SELECT)
+	xtn_t* xtn = GET_XTN(hcl);
+
+	MUTEX_LOCK (&xtn->ev.reg.smtx);
+	FD_CLR (fd, &xtn->ev.reg.rfds);
+	FD_CLR (fd, &xtn->ev.reg.wfds);
+	if (fd >= xtn->ev.reg.maxfd)
+	{
+		int i;
+		/* TODO: any way to make this search faster or to do without the search like this */
+		for (i = fd - 1; i >= 0; i--)
+		{
+			if (FD_ISSET(i, &xtn->ev.reg.rfds) || FD_ISSET(i, &xtn->ev.reg.wfds)) break;
+		}
+		xtn->ev.reg.maxfd = i;
+	}
+	MUTEX_UNLOCK (&xtn->ev.reg.smtx);
+
+	return 0;
+
+#else
+
+	HCL_DEBUG1 (hcl, "Cannot remove file descriptor %d from poll - not implemented\n", fd);
+	hcl_seterrnum (hcl, HCL_ENOIMPL);
+	return -1;
+#endif
+}
+
+
+static int _mod_poll_fd (hcl_t* hcl, int fd, int event_mask)
+{
+#if defined(USE_DEVPOLL)
+
+	if (_del_poll_fd (hcl, fd) <= -1) return -1;
+
+	if (_add_poll_fd (hcl, fd, event_mask) <= -1) 
+	{
+		/* TODO: any good way to rollback successful deletion? */
+		return -1;
+	}
+
+	return 0;
+#elif defined(USE_KQUEUE)
+	xtn_t* xtn = GET_XTN(hcl);
+	hcl_oow_t rindex, roffset;
+	int rv, newrv = 0;
+	struct kevent ev;
+
+	rindex = (hcl_oow_t)fd / (HCL_BITSOF(hcl_oow_t) >> 1);
+	roffset = ((hcl_oow_t)fd << 1) % HCL_BITSOF(hcl_oow_t);
+
+	if (rindex >= xtn->ev.reg.capa)
+	{
+		hcl_seterrbfmt (hcl, HCL_EINVAL, "unknown file descriptor %d", fd);
+		HCL_DEBUG2 (hcl, "Cannot modify file descriptor %d in kqueue - %js\n", fd, hcl_geterrmsg(hcl));
+		return -1;
+	};
+
+	rv = HCL_GETBITS(hcl_oow_t, xtn->ev.reg.ptr[rindex], roffset, 2);
+
+	if (rv & 1)
+	{
+		if (!(event_mask & XPOLLIN))
+		{
+			HCL_MEMSET (&ev, 0, HCL_SIZEOF(ev));
+			ev.ident = fd;
+			ev.flags = EV_DELETE;
+			ev.filter = EVFILT_READ;
+			if (kevent(xtn->ep, &ev, 1, HCL_NULL, 0, HCL_NULL) == -1) goto kqueue_syserr;
+
+			newrv &= ~1;
+		}
+	}
+	else
+	{
+		if (event_mask & XPOLLIN)
+		{
+			HCL_MEMSET (&ev, 0, HCL_SIZEOF(ev));
+			ev.ident = fd;
+			ev.flags = EV_ADD;
+		#if defined(USE_THREAD)
+			ev.flags |= EV_CLEAR; /* EV_CLEAR for edge trigger? */
+		#endif
+			ev.filter = EVFILT_READ;
+			if (kevent(xtn->ep, &ev, 1, HCL_NULL, 0, HCL_NULL) == -1) goto kqueue_syserr;
+
+			newrv |= 1;
+		}
+	}
+
+	if (rv & 2)
+	{
+		if (!(event_mask & XPOLLOUT))
+		{
+			HCL_MEMSET (&ev, 0, HCL_SIZEOF(ev));
+			ev.ident = fd;
+			ev.flags = EV_DELETE;
+			ev.filter = EVFILT_WRITE;
+			/* there is no operation rollback for the (rv & 1) case.
+			 * the rollback action may fail again even if i try it */
+			if (kevent(xtn->ep, &ev, 1, HCL_NULL, 0, HCL_NULL) == -1) goto kqueue_syserr;
+
+			newrv &= ~2;
+		}
+	}
+	else
+	{
+		if (event_mask & XPOLLOUT)
+		{
+			HCL_MEMSET (&ev, 0, HCL_SIZEOF(ev));
+			ev.ident = fd;
+			ev.flags = EV_ADD;
+		#if defined(USE_THREAD)
+			ev.flags |= EV_CLEAR; /* EV_CLEAR for edge trigger? */
+		#endif
+			ev.filter = EVFILT_WRITE;
+
+			/* there is no operation rollback for the (rv & 1) case.
+			 * the rollback action may fail again even if i try it */
+			if (kevent(xtn->ep, &ev, 1, HCL_NULL, 0, HCL_NULL) == -1) goto kqueue_syserr;
+
+			newrv |= 2;
+		}
+	}
+
+	HCL_SETBITS (hcl_oow_t, xtn->ev.reg.ptr[rindex], roffset, 2, newrv);
+	return 0;
+
+kqueue_syserr:
+	hcl_seterrwithsyserr (hcl, 0, errno);
+	HCL_DEBUG2 (hcl, "Cannot modify file descriptor %d in kqueue - %hs\n", fd, strerror(errno));
+	return -1;
+
+#elif defined(USE_EPOLL)
+	xtn_t* xtn = GET_XTN(hcl);
+	struct epoll_event ev;
+
+	HCL_ASSERT (hcl, xtn->ep >= 0);
+	HCL_MEMSET (&ev, 0, HCL_SIZEOF(ev));
+	ev.events = event_mask;
+	#if defined(USE_THREAD) && defined(EPOLLET)
+	/* epoll_wait may return again if the worker thread consumes events.
+	 * switch to level-trigger. */
+	/* TODO: verify if EPOLLLET is desired */
+	ev.events |= EPOLLET;
+	#endif
+	ev.data.fd = fd;
+	if (epoll_ctl(xtn->ep, EPOLL_CTL_MOD, fd, &ev) == -1)
+	{
+		hcl_seterrwithsyserr (hcl, 0, errno);
+		HCL_DEBUG2 (hcl, "Cannot modify file descriptor %d in epoll - %hs\n", fd, strerror(errno));
+		return -1;
+	}
+
+	return 0;
+
+#elif defined(USE_POLL)
+
+	xtn_t* xtn = GET_XTN(hcl);
+	hcl_oow_t i;
+
+	MUTEX_LOCK (&xtn->ev.reg.pmtx);
+	for (i = 0; i < xtn->ev.reg.len; i++)
+	{
+		if (xtn->ev.reg.ptr[i].fd == fd)
+		{
+			HCL_MEMMOVE (&xtn->ev.reg.ptr[i], &xtn->ev.reg.ptr[i+1], (xtn->ev.reg.len - i - 1) * HCL_SIZEOF(*xtn->ev.reg.ptr));
+			xtn->ev.reg.ptr[i].fd = fd;
+			xtn->ev.reg.ptr[i].events = event_mask;
+			xtn->ev.reg.ptr[i].revents = 0;
+			MUTEX_UNLOCK (&xtn->ev.reg.pmtx);
+
+			return 0;
+		}
+	}
+	MUTEX_UNLOCK (&xtn->ev.reg.pmtx);
+
+	HCL_DEBUG1 (hcl, "Cannot modify file descriptor %d in poll - not found\n", fd);
+	hcl_seterrnum (hcl, HCL_ENOENT);
+	return -1;
+
+#elif defined(USE_SELECT)
+
+	xtn_t* xtn = GET_XTN(hcl);
+
+	MUTEX_LOCK (&xtn->ev.reg.smtx);
+	HCL_ASSERT (hcl, fd <= xtn->ev.reg.maxfd);
+
+	if (event_mask & XPOLLIN) 
+		FD_SET (fd, &xtn->ev.reg.rfds);
+	else 
+		FD_CLR (fd, &xtn->ev.reg.rfds);
+
+	if (event_mask & XPOLLOUT) 
+		FD_SET (fd, &xtn->ev.reg.wfds);
+	else
+		FD_CLR (fd, &xtn->ev.reg.wfds);
+	MUTEX_UNLOCK (&xtn->ev.reg.smtx);
+
+	return 0;
+
+#else
+	HCL_DEBUG1 (hcl, "Cannot modify file descriptor %d in poll - not implemented\n", fd);
+	hcl_seterrnum (hcl, HCL_ENOIMPL);
+	return -1;
+#endif
+}
+
+int hcl_vmprim_vm_muxadd (hcl_t* hcl, hcl_ooi_t io_handle, hcl_ooi_t mask)
+{
+	int event_mask;
+
+	event_mask = 0;
+	if (mask & HCL_SEMAPHORE_IO_MASK_INPUT) event_mask |= XPOLLIN; 
+	if (mask & HCL_SEMAPHORE_IO_MASK_OUTPUT) event_mask |= XPOLLOUT;
+
+	if (event_mask == 0)
+	{
+		HCL_DEBUG2 (hcl, "<vm_muxadd> Invalid semaphore mask %zd on handle %zd\n", mask, io_handle);
+		hcl_seterrbfmt (hcl, HCL_EINVAL, "invalid semaphore mask %zd on handle %zd", mask, io_handle);
+		return -1;
+	}
+
+	return _add_poll_fd(hcl, io_handle, event_mask);
+}
+
+int hcl_vmprim_vm_muxmod (hcl_t* hcl, hcl_ooi_t io_handle, hcl_ooi_t mask)
+{
+	int event_mask;
+
+	event_mask = 0;
+	if (mask & HCL_SEMAPHORE_IO_MASK_INPUT) event_mask |= XPOLLIN; 
+	if (mask & HCL_SEMAPHORE_IO_MASK_OUTPUT) event_mask |= XPOLLOUT;
+
+	if (event_mask == 0)
+	{
+		HCL_DEBUG2 (hcl, "<vm_muxadd> Invalid semaphore mask %zd on handle %zd\n", mask, io_handle);
+		hcl_seterrbfmt (hcl, HCL_EINVAL, "invalid semaphore mask %zd on handle %zd", mask, io_handle);
+		return -1;
+	}
+
+	return _mod_poll_fd(hcl, io_handle, event_mask);
+}
+
+int hcl_vmprim_vm_muxdel (hcl_t* hcl, hcl_ooi_t io_handle)
+{
+	return _del_poll_fd(hcl, io_handle);
+}
+
+#if defined(USE_THREAD)
+static void* iothr_main (void* arg)
+{
+	hcl_t* hcl = (hcl_t*)arg;
+	xtn_t* xtn = GET_XTN(hcl);
+
+	/*while (!hcl->abort_req)*/
+	while (!xtn->iothr.abort)
+	{
+		if (xtn->ev.len <= 0) /* TODO: no mutex needed for this check? */
+		{
+			int n;
+		#if defined(USE_DEVPOLL)
+			struct dvpoll dvp;
+		#elif defined(USE_KQUEUE)
+			struct timespec ts;
+		#elif defined(USE_POLL)
+			hcl_oow_t nfds;
+		#elif defined(USE_SELECT)
+			struct timeval tv;
+			fd_set rfds;
+			fd_set wfds;
+			int maxfd;
+		#endif
+
+		poll_for_event:
+		
+		#if defined(USE_DEVPOLL)
+			dvp.dp_timeout = 10000; /* milliseconds */
+			dvp.dp_fds = xtn->ev.buf;
+			dvp.dp_nfds = HCL_COUNTOF(xtn->ev.buf);
+			n = ioctl (xtn->ep, DP_POLL, &dvp);
+		#elif defined(USE_KQUEUE)
+			ts.tv_sec = 10;
+			ts.tv_nsec = 0;
+			n = kevent(xtn->ep, HCL_NULL, 0, xtn->ev.buf, HCL_COUNTOF(xtn->ev.buf), &ts);
+			/* n == 0: timeout
+			 * n == -1: error */
+		#elif defined(USE_EPOLL)
+			n = epoll_wait(xtn->ep, xtn->ev.buf, HCL_COUNTOF(xtn->ev.buf), 10000); /* TODO: make this timeout value in the io thread */
+		#elif defined(USE_POLL)
+			MUTEX_LOCK (&xtn->ev.reg.pmtx);
+			HCL_MEMCPY (xtn->ev.buf, xtn->ev.reg.ptr, xtn->ev.reg.len * HCL_SIZEOF(*xtn->ev.buf));
+			nfds = xtn->ev.reg.len;
+			MUTEX_UNLOCK (&xtn->ev.reg.pmtx);
+			n = poll(xtn->ev.buf, nfds, 10000);
+			if (n > 0) 
+			{
+				/* compact the return buffer as poll() doesn't */
+				hcl_oow_t i, j;
+				for (i = 0, j = 0; i < nfds && j < n; i++)
+				{
+					if (xtn->ev.buf[i].revents)
+					{
+						if (j != i) xtn->ev.buf[j] = xtn->ev.buf[i];
+						j++;
+					}
+				}
+				n = j;
+			}
+		#elif defined(USE_SELECT)
+			tv.tv_sec = 10;
+			tv.tv_usec = 0;
+			MUTEX_LOCK (&xtn->ev.reg.smtx);
+			maxfd = xtn->ev.reg.maxfd;
+			HCL_MEMCPY (&rfds, &xtn->ev.reg.rfds, HCL_SIZEOF(rfds));
+			HCL_MEMCPY (&wfds, &xtn->ev.reg.wfds, HCL_SIZEOF(wfds));
+			MUTEX_UNLOCK (&xtn->ev.reg.smtx);
+			n = select (maxfd + 1, &rfds, &wfds, HCL_NULL, &tv);
+			if (n > 0)
+			{
+				int fd, count = 0;
+				for (fd = 0;  fd <= maxfd; fd++)
+				{
+					int events = 0;
+					if (FD_ISSET(fd, &rfds)) events |= XPOLLIN;
+					if (FD_ISSET(fd, &wfds)) events |= XPOLLOUT;
+
+					if (events)
+					{
+						HCL_ASSERT (hcl, count < HCL_COUNTOF(xtn->ev.buf));
+						xtn->ev.buf[count].fd = fd;
+						xtn->ev.buf[count].events = events;
+						count++;
+					}
+				}
+
+				n = count;
+				HCL_ASSERT (hcl, n > 0);
+			}
+		#endif
+
+			pthread_mutex_lock (&xtn->ev.mtx);
+			if (n <= -1)
+			{
+				/* TODO: don't use HCL_DEBUG2. it's not thread safe... */
+				/* the following call has a race-condition issue when called in this separate thread */
+				/*HCL_DEBUG2 (hcl, "Warning: multiplexer wait failure - %d, %hs\n", errno, strerror(errno));*/
+			}
+			else if (n > 0)
+			{
+				xtn->ev.len = n;
+			}
+			pthread_cond_signal (&xtn->ev.cnd2);
+			pthread_mutex_unlock (&xtn->ev.mtx);
+		}
+		else
+		{
+			/* the event buffer has not been emptied yet */
+			struct timespec ts;
+
+			pthread_mutex_lock (&xtn->ev.mtx);
+			if (xtn->ev.len <= 0)
+			{
+				/* it got emptied between the if check and pthread_mutex_lock() above */
+				pthread_mutex_unlock (&xtn->ev.mtx);
+				goto poll_for_event;
+			}
+
+		#if defined(HAVE_CLOCK_GETTIME) && defined(CLOCK_REALTIME)
+			clock_gettime (CLOCK_REALTIME, &ts);
+		#else
+			{
+				struct timeval tv;
+				gettimeofday (&tv, HCL_NULL);
+				ts.tv_sec = tv.tv_sec;
+				ts.tv_nsec = HCL_USEC_TO_NSEC(tv.tv_usec);
+			}
+		#endif
+			ts.tv_sec += 10;
+			pthread_cond_timedwait (&xtn->ev.cnd, &xtn->ev.mtx, &ts);
+			pthread_mutex_unlock (&xtn->ev.mtx);
+		}
+
+		/*sched_yield ();*/
+	}
+
+	return HCL_NULL;
+}
+#endif
+
+void hcl_vmprim_vm_muxwait (hcl_t* hcl, const hcl_ntime_t* dur, hcl_vmprim_muxwait_cb_t muxwcb)
+{
+	xtn_t* xtn = GET_XTN(hcl);
+
+#if defined(USE_THREAD)
+	int n;
+
+	/* create a thread if mux wait is started at least once. */
+	if (!xtn->iothr.up) 
+	{
+		xtn->iothr.up = 1;
+		if (pthread_create(&xtn->iothr.thr, HCL_NULL, iothr_main, hcl) != 0)
+		{
+			HCL_LOG2 (hcl, HCL_LOG_WARN, "Warning: pthread_create failure - %d, %hs\n", errno, strerror(errno));
+			xtn->iothr.up = 0;
+/* TODO: switch to the non-threaded mode? */
+		}
+	}
+
+	if (xtn->iothr.abort) return;
+
+	if (xtn->ev.len <= 0) 
+	{
+		struct timespec ts;
+		hcl_ntime_t ns;
+
+		if (!dur) return; /* immediate check is requested. and there is no event */
+
+	#if defined(HAVE_CLOCK_GETTIME) && defined(CLOCK_REALTIME)
+		clock_gettime (CLOCK_REALTIME, &ts);
+		ns.sec = ts.tv_sec;
+		ns.nsec = ts.tv_nsec;
+	#else
+		{
+			struct timeval tv;
+			gettimeofday (&tv, HCL_NULL);
+			ns.sec = tv.tv_sec;
+			ns.nsec = HCL_USEC_TO_NSEC(tv.tv_usec);
+		}
+	#endif
+		HCL_ADD_NTIME (&ns, &ns, dur);
+		ts.tv_sec = ns.sec;
+		ts.tv_nsec = ns.nsec;
+
+		pthread_mutex_lock (&xtn->ev.mtx);
+		if (xtn->ev.len <= 0)
+		{
+			/* the event buffer is still empty */
+			pthread_cond_timedwait (&xtn->ev.cnd2, &xtn->ev.mtx, &ts);
+		}
+		pthread_mutex_unlock (&xtn->ev.mtx);
+	}
+
+	n = xtn->ev.len;
+
+	if (n > 0)
+	{
+		do
+		{
+			--n;
+
+		#if defined(USE_DEVPOLL)
+			if (xtn->ev.buf[n].fd == xtn->iothr.p[0])
+		#elif defined(USE_KQUEUE)
+			if (xtn->ev.buf[n].ident == xtn->iothr.p[0])
+		#elif defined(USE_EPOLL)
+			/*if (xtn->ev.buf[n].data.ptr == (void*)HCL_TYPE_MAX(hcl_oow_t))*/
+			if (xtn->ev.buf[n].data.fd == xtn->iothr.p[0])
+		#elif defined(USE_POLL)
+			if (xtn->ev.buf[n].fd == xtn->iothr.p[0])
+		#elif defined(USE_SELECT)
+			if (xtn->ev.buf[n].fd == xtn->iothr.p[0])
+		#else
+		#	error UNSUPPORTED
+		#endif
+			{
+				hcl_uint8_t u8;
+				while (read(xtn->iothr.p[0], &u8, HCL_SIZEOF(u8)) > 0) 
+				{
+					/* consume as much as possible */;
+					if (u8 == 'Q') xtn->iothr.abort = 1;
+				}
+			}
+			else if (muxwcb)
+			{
+				int revents;
+				hcl_ooi_t mask;
+
+			#if defined(USE_DEVPOLL)
+				revents = xtn->ev.buf[n].revents;
+			#elif defined(USE_KQUEUE)
+				if (xtn->ev.buf[n].filter == EVFILT_READ) mask = HCL_SEMAPHORE_IO_MASK_INPUT;
+				else if (xtn->ev.buf[n].filter == EVFILT_WRITE) mask = HCL_SEMAPHORE_IO_MASK_OUTPUT;
+				else mask = 0;
+				goto call_muxwcb_kqueue;
+			#elif defined(USE_EPOLL)
+				revents = xtn->ev.buf[n].events;
+			#elif defined(USE_POLL)
+				revents = xtn->ev.buf[n].revents;
+			#elif defined(USE_SELECT)
+				revents = xtn->ev.buf[n].events;
+			#endif
+
+				mask = 0;
+				if (revents & XPOLLIN) mask |= HCL_SEMAPHORE_IO_MASK_INPUT;
+				if (revents & XPOLLOUT) mask |= HCL_SEMAPHORE_IO_MASK_OUTPUT;
+				if (revents & XPOLLERR) mask |= HCL_SEMAPHORE_IO_MASK_ERROR;
+				if (revents & XPOLLHUP) mask |= HCL_SEMAPHORE_IO_MASK_HANGUP;
+
+			#if defined(USE_DEVPOLL)
+				muxwcb (hcl, xtn->ev.buf[n].fd, mask);
+			#elif defined(USE_KQUEUE)
+			call_muxwcb_kqueue:
+				muxwcb (hcl, xtn->ev.buf[n].ident, mask);
+			#elif defined(USE_EPOLL)
+				muxwcb (hcl, xtn->ev.buf[n].data.fd, mask);
+			#elif defined(USE_POLL)
+				muxwcb (hcl, xtn->ev.buf[n].fd, mask);
+			#elif defined(USE_SELECT)
+				muxwcb (hcl, xtn->ev.buf[n].fd, mask);
+			#else
+			#	error UNSUPPORTED
+			#endif
+			}
+		}
+		while (n > 0);
+
+		pthread_mutex_lock (&xtn->ev.mtx);
+		xtn->ev.len = 0;
+		pthread_cond_signal (&xtn->ev.cnd);
+		pthread_mutex_unlock (&xtn->ev.mtx);
+	}
+
+#else /* USE_THREAD */
+	int n;
+	#if defined(USE_DEVPOLL)
+	int tmout;
+	struct dvpoll dvp;
+	#elif defined(USE_KQUEUE)
+	struct timespec ts;
+	#elif defined(USE_EPOLL)
+	int tmout;
+	#elif defined(USE_POLL)
+	int tmout;
+	#elif defined(USE_SELECT)
+	struct timeval tv;
+	fd_set rfds, wfds;
+	int maxfd;
+	#endif
+
+
+	#if defined(USE_DEVPOLL)
+	tmout = dur? HCL_SECNSEC_TO_MSEC(dur->sec, dur->nsec): 0;
+
+	dvp.dp_timeout = tmout; /* milliseconds */
+	dvp.dp_fds = xtn->ev.buf;
+	dvp.dp_nfds = HCL_COUNTOF(xtn->ev.buf);
+	n = ioctl(xtn->ep, DP_POLL, &dvp);
+
+	#elif defined(USE_KQUEUE)
+	
+	if (dur)
+	{
+		ts.tv_sec = dur->sec;
+		ts.tv_nsec = dur->nsec; 
+	}
+	else
+	{
+		ts.tv_sec = 0;
+		ts.tv_nsec = 0;
+	}
+
+	n = kevent(xtn->ep, HCL_NULL, 0, xtn->ev.buf, HCL_COUNTOF(xtn->ev.buf), &ts);
+	/* n == 0: timeout
+	 * n == -1: error */
+
+	#elif defined(USE_EPOLL)
+	tmout = dur? HCL_SECNSEC_TO_MSEC(dur->sec, dur->nsec): 0;
+	n = epoll_wait(xtn->ep, xtn->ev.buf, HCL_COUNTOF(xtn->ev.buf), tmout);
+
+	#elif defined(USE_POLL)
+	tmout = dur? HCL_SECNSEC_TO_MSEC(dur->sec, dur->nsec): 0;
+	HCL_MEMCPY (xtn->ev.buf, xtn->ev.reg.ptr, xtn->ev.reg.len * HCL_SIZEOF(*xtn->ev.buf));
+	n = poll(xtn->ev.buf, xtn->ev.reg.len, tmout);
+	if (n > 0) 
+	{
+		/* compact the return buffer as poll() doesn't */
+		hcl_oow_t i, j;
+		for (i = 0, j = 0; i < xtn->ev.reg.len && j < n; i++)
+		{
+			if (xtn->ev.buf[i].revents)
+			{
+				if (j != i) xtn->ev.buf[j] = xtn->ev.buf[i];
+				j++;
+			}
+		}
+		n = j;
+	}
+	#elif defined(USE_SELECT)
+	if (dur)
+	{
+		tv.tv_sec = dur->sec;
+		tv.tv_usec = HCL_NSEC_TO_USEC(dur->nsec); 
+	}
+	else
+	{
+		tv.tv_sec = 0;
+		tv.tv_usec = 0;
+	}
+	maxfd = xtn->ev.reg.maxfd;
+	HCL_MEMCPY (&rfds, &xtn->ev.reg.rfds, HCL_SIZEOF(rfds));
+	HCL_MEMCPY (&wfds, &xtn->ev.reg.wfds, HCL_SIZEOF(wfds));
+	n = select(maxfd + 1, &rfds, &wfds, HCL_NULL, &tv);
+	if (n > 0)
+	{
+		int fd, count = 0;
+		for (fd = 0; fd <= maxfd; fd++)
+		{
+			int events = 0;
+			if (FD_ISSET(fd, &rfds)) events |= XPOLLIN;
+			if (FD_ISSET(fd, &wfds)) events |= XPOLLOUT;
+
+			if (events)
+			{
+				HCL_ASSERT (hcl, count < HCL_COUNTOF(xtn->ev.buf));
+				xtn->ev.buf[count].fd = fd;
+				xtn->ev.buf[count].events = events;
+				count++;
+			}
+		}
+
+		n = count;
+		HCL_ASSERT (hcl, n > 0);
+	}
+	#endif
+
+	if (n <= -1)
+	{
+		hcl_seterrwithsyserr (hcl, 0, errno);
+		HCL_DEBUG2 (hcl, "Warning: multiplexer wait failure - %d, %s\n", errno, hcl_geterrmsg(hcl));
+	}
+	else
+	{
+		xtn->ev.len = n;
+	}
+
+	/* the muxwcb must be valid all the time in a non-threaded mode */
+	HCL_ASSERT (hcl, muxwcb != HCL_NULL);
+
+	while (n > 0)
+	{
+		int revents;
+		hcl_ooi_t mask;
+
+		--n;
+
+	#if defined(USE_DEVPOLL)
+		revents = xtn->ev.buf[n].revents;
+	#elif defined(USE_KQUEUE)
+		if (xtn->ev.buf[n].filter == EVFILT_READ) mask = HCL_SEMAPHORE_IO_MASK_INPUT;
+		else if (xtn->ev.buf[n].filter == EVFILT_WRITE) mask = HCL_SEMAPHORE_IO_MASK_OUTPUT;
+		else mask = 0;
+		goto call_muxwcb_kqueue;
+	#elif defined(USE_EPOLL)
+		revents = xtn->ev.buf[n].events;
+	#elif defined(USE_POLL)
+		revents = xtn->ev.buf[n].revents;
+	#elif defined(USE_SELECT)
+		revents = xtn->ev.buf[n].events;
+	#else
+		revents = 0; /* TODO: fake. unsupported but to compile on such an unsupported system.*/
+	#endif
+
+		mask = 0;
+		if (revents & XPOLLIN) mask |= HCL_SEMAPHORE_IO_MASK_INPUT;
+		if (revents & XPOLLOUT) mask |= HCL_SEMAPHORE_IO_MASK_OUTPUT;
+		if (revents & XPOLLERR) mask |= HCL_SEMAPHORE_IO_MASK_ERROR;
+		if (revents & XPOLLHUP) mask |= HCL_SEMAPHORE_IO_MASK_HANGUP;
+
+	#if defined(USE_DEVPOLL)
+		muxwcb (hcl, xtn->ev.buf[n].fd, mask);
+	#elif defined(USE_KQUEUE)
+	call_muxwcb_kqueue:
+		muxwcb (hcl, xtn->ev.buf[n].ident, mask);
+	#elif defined(USE_EPOLL)
+		muxwcb (hcl, xtn->ev.buf[n].data.fd, mask);
+	#elif defined(USE_POLL)
+		muxwcb (hcl, xtn->ev.buf[n].fd, mask);
+	#elif defined(USE_SELECT)
+		muxwcb (hcl, xtn->ev.buf[n].fd, mask);
+	#endif
+	}
+
+	xtn->ev.len = 0;
+#endif  /* USE_THREAD */
+}
+
 #endif
 
 /* ----------------------------------------------------------------- 
@@ -638,7 +1702,7 @@ TODO TODO TODO
 int hcl_vmprim_vm_sleep (hcl_t* hcl, const hcl_ntime_t* dur)
 {
 #if defined(_WIN32)
-	xtn_t* xtn = (xtn_t*)hcl_getxtn(hcl);
+	xtn_t* xtn = GET_XTN(hcl);
 	if (xtn->waitable_timer)
 	{
 		LARGE_INTEGER li;

@@ -848,6 +848,8 @@ static pf_t builtin_prims[] =
 	{ 0, 0,                       hcl_pf_semaphore_new,      7,  { 's','e','m','-','n','e','w'} },
 	{ 1, 1,                       hcl_pf_semaphore_wait,     8,  { 's','e','m','-','w','a','i','t'} },
 	{ 1, 3,                       hcl_pf_semaphore_signal,   10, { 's','e','m','-','s','i','g','n','a','l'} },
+	{ 2, 2,                       hcl_pf_semaphore_signal_on_input,   19, { 's','e','m','-','s','i','g','n','a','l','-','o','n','-','i','n','p','u','t'} },
+	{ 2, 2,                       hcl_pf_semaphore_signal_on_output,  20, { 's','e','m','-','s','i','g','n','a','l','-','o','n','-','o','u','t','p','u','t'} },
 	{ 1, 1,                       hcl_pf_semaphore_unsignal, 12, { 's','e','m','-','u','n','s','i','g','n','a','l'} },
 
 	{ 0, 0,                       hcl_pf_semaphore_group_new, 9, { 's','e','m','g','r','-','n','e','w'} },
