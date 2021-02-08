@@ -338,6 +338,124 @@ void hcl_seterrwithsyserr (hcl_t* hcl, int syserr_type, int syserr_code)
 	}
 }
 
+void hcl_seterrbfmtwithsyserr (hcl_t* hcl, int syserr_type, int syserr_code, const hcl_bch_t* fmt, ...)
+{
+	hcl_errnum_t errnum;
+	hcl_oow_t ucslen, bcslen;
+	va_list ap;
+
+	if (hcl->shuterr) return;
+	
+	if (hcl->vmprim.syserrstrb)
+	{
+		errnum = hcl->vmprim.syserrstrb(hcl, syserr_type, syserr_code, hcl->errmsg.tmpbuf.bch, HCL_COUNTOF(hcl->errmsg.tmpbuf.bch));
+		
+		va_start (ap, fmt);
+		hcl_seterrbfmtv (hcl, errnum, fmt, ap);
+		va_end (ap);
+
+		if (HCL_COUNTOF(hcl->errmsg.buf) - hcl->errmsg.len >= 5)
+		{
+			hcl->errmsg.buf[hcl->errmsg.len++] = ' ';
+			hcl->errmsg.buf[hcl->errmsg.len++] = '-';
+			hcl->errmsg.buf[hcl->errmsg.len++] = ' ';
+
+		#if defined(HCL_OOCH_IS_BCH)
+			hcl->errmsg.len += hcl_copy_bcstr(&hcl->errmsg.buf[hcl->errmsg.len], HCL_COUNTOF(hcl->errmsg.buf) - hcl->errmsg.len, hcl->errmsg.tmpbuf.bch);
+		#else
+			ucslen = HCL_COUNTOF(hcl->errmsg.buf) - hcl->errmsg.len;
+			hcl_convbtoucstr (hcl, hcl->errmsg.tmpbuf.bch, &bcslen, &hcl->errmsg.buf[hcl->errmsg.len], &ucslen);
+			hcl->errmsg.len += ucslen;
+		#endif
+		}
+	}
+	else
+	{
+		HCL_ASSERT (hcl, hcl->vmprim.syserrstru != HCL_NULL);
+		errnum = hcl->vmprim.syserrstru(hcl, syserr_type, syserr_code, hcl->errmsg.tmpbuf.uch, HCL_COUNTOF(hcl->errmsg.tmpbuf.uch));
+
+		va_start (ap, fmt);
+		hcl_seterrbfmtv (hcl, errnum, fmt, ap);
+		va_end (ap);
+
+		if (HCL_COUNTOF(hcl->errmsg.buf) - hcl->errmsg.len >= 5)
+		{
+			hcl->errmsg.buf[hcl->errmsg.len++] = ' ';
+			hcl->errmsg.buf[hcl->errmsg.len++] = '-';
+			hcl->errmsg.buf[hcl->errmsg.len++] = ' ';
+
+		#if defined(HCL_OOCH_IS_BCH)
+			bcslen = HCL_COUNTOF(hcl->errmsg.buf) - hcl->errmsg.len;
+			hcl_convutobcstr (hcl, hcl->errmsg.tmpbuf.uch, &ucslen, &hcl->errmsg.buf[hcl->errmsg.len], &bcslen);
+			hcl->errmsg.len += bcslen;
+		#else
+			hcl->errmsg.len += hcl_copy_ucstr(&hcl->errmsg.buf[hcl->errmsg.len], HCL_COUNTOF(hcl->errmsg.buf) - hcl->errmsg.len, hcl->errmsg.tmpbuf.uch);
+		#endif
+		}
+	}
+}
+
+void hcl_seterrufmtwithsyserr (hcl_t* hcl, int syserr_type, int syserr_code, const hcl_uch_t* fmt, ...)
+{
+	hcl_errnum_t errnum;
+	hcl_oow_t ucslen, bcslen;
+	va_list ap;
+
+	if (hcl->shuterr) return;
+	
+	if (hcl->vmprim.syserrstrb)
+	{
+		errnum = hcl->vmprim.syserrstrb(hcl, syserr_type, syserr_code, hcl->errmsg.tmpbuf.bch, HCL_COUNTOF(hcl->errmsg.tmpbuf.bch));
+
+		va_start (ap, fmt);
+		hcl_seterrufmtv (hcl, errnum, fmt, ap);
+		va_end (ap);
+
+		if (HCL_COUNTOF(hcl->errmsg.buf) - hcl->errmsg.len >= 5)
+		{
+			hcl->errmsg.buf[hcl->errmsg.len++] = ' ';
+			hcl->errmsg.buf[hcl->errmsg.len++] = '-';
+			hcl->errmsg.buf[hcl->errmsg.len++] = ' ';
+
+		#if defined(HCL_OOCH_IS_BCH)
+			hcl->errmsg.len += hcl_copy_bcstr(&hcl->errmsg.buf[hcl->errmsg.len], HCL_COUNTOF(hcl->errmsg.buf) - hcl->errmsg.len, hcl->errmsg.tmpbuf.bch);
+		#else
+			ucslen = HCL_COUNTOF(hcl->errmsg.buf) - hcl->errmsg.len;
+			hcl_convbtoucstr (hcl, hcl->errmsg.tmpbuf.bch, &bcslen, &hcl->errmsg.buf[hcl->errmsg.len], &ucslen);
+			hcl->errmsg.len += ucslen;
+		#endif
+		}
+	}
+	else
+	{
+		HCL_ASSERT (hcl, hcl->vmprim.syserrstru != HCL_NULL);
+		errnum = hcl->vmprim.syserrstru(hcl, syserr_type, syserr_code, hcl->errmsg.tmpbuf.uch, HCL_COUNTOF(hcl->errmsg.tmpbuf.uch));
+
+		va_start (ap, fmt);
+		hcl_seterrufmtv (hcl, errnum, fmt, ap);
+		va_end (ap);
+
+		if (HCL_COUNTOF(hcl->errmsg.buf) - hcl->errmsg.len >= 5)
+		{
+			hcl->errmsg.buf[hcl->errmsg.len++] = ' ';
+			hcl->errmsg.buf[hcl->errmsg.len++] = '-';
+			hcl->errmsg.buf[hcl->errmsg.len++] = ' ';
+
+		#if defined(HCL_OOCH_IS_BCH)
+			bcslen = HCL_COUNTOF(hcl->errmsg.buf) - hcl->errmsg.len;
+			hcl_convutobcstr (hcl, hcl->errmsg.tmpbuf.uch, &ucslen, &hcl->errmsg.buf[hcl->errmsg.len], &bcslen);
+			hcl->errmsg.len += bcslen;
+		#else
+			hcl->errmsg.len += hcl_copy_ucstr(&hcl->errmsg.buf[hcl->errmsg.len], HCL_COUNTOF(hcl->errmsg.buf) - hcl->errmsg.len, hcl->errmsg.tmpbuf.uch);
+		#endif
+		}
+	}
+}
+
+/* --------------------------------------------------------------------------
+ * SYNTAX ERROR HANDLING
+ * -------------------------------------------------------------------------- */
+
 void hcl_getsynerr (hcl_t* hcl, hcl_synerr_t* synerr)
 {
 	HCL_ASSERT (hcl, hcl->c != HCL_NULL);

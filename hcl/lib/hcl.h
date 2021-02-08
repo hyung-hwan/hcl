@@ -1810,6 +1810,22 @@ HCL_EXPORT void hcl_seterrwithsyserr (
 	int          syserr_code
 );
 
+void hcl_seterrbfmtwithsyserr (
+	hcl_t*           hcl, 
+	int              syserr_type, 
+	int              syserr_code,
+	const hcl_bch_t* fmt,
+       	...
+);
+
+void hcl_seterrufmtwithsyserr (
+	hcl_t*           hcl, 
+	int              syserr_type, 
+	int              syserr_code,
+	const hcl_uch_t* fmt,
+       	...
+);
+
 HCL_EXPORT void hcl_seterrbfmt (
 	hcl_t*           hcl,
 	hcl_errnum_t     errnum,

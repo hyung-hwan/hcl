@@ -2620,15 +2620,174 @@ static void cb_opt_set (hcl_t* hcl, hcl_option_t id, const void* value)
 	}
 }
 
+static int open_pipes (hcl_t* hcl, int p[2])
+{
+	int flags;
+
+#if defined(_WIN32)
+	if (_pipe(p, 256, _O_BINARY | _O_NOINHERIT) == -1)
+#elif defined(HAVE_PIPE2) && defined(O_CLOEXEC) && defined(O_NONBLOCK)
+	if (pipe2(p, O_CLOEXEC | O_NONBLOCK) == -1)
+#else
+	if (pipe(p) == -1)
+#endif
+	{
+		hcl_seterrbfmtwithsyserr (hcl, 0, errno, "unable to create pipes for iothr management");
+		return -1;
+	}
+
+#if defined(HAVE_PIPE2) && defined(O_CLOEXEC) && defined(O_NONBLOCK)
+		/* do nothing */
+#else
+	#if defined(FD_CLOEXEC)
+	flags = fcntl(p[0], F_GETFD);
+	if (flags >= 0) fcntl (p[0], F_SETFD, flags | FD_CLOEXEC);
+	flags = fcntl(p[1], F_GETFD);
+	if (flags >= 0) fcntl (p[1], F_SETFD, flags | FD_CLOEXEC);
+	#endif
+	#if defined(O_NONBLOCK)
+	flags = fcntl(p[0], F_GETFL);
+	if (flags >= 0) fcntl (p[0], F_SETFL, flags | O_NONBLOCK);
+	flags = fcntl(p[1], F_GETFL);
+	if (flags >= 0) fcntl (p[1], F_SETFL, flags | O_NONBLOCK);
+	#endif
+#endif
+
+	return 0;
+}
+static void close_pipes (hcl_t* hcl, int p[2])
+{
+#if defined(_WIN32)
+	_close (p[0]);
+	_close (p[1]);
+#else
+	close (p[0]);
+	close (p[1]);
+#endif
+	p[0] = -1;
+	p[1] = -1;
+}
+
 static int cb_vm_startup (hcl_t* hcl)
 {
 	xtn_t* xtn = GET_XTN(hcl);
+	int sigfd_pcount = 0;
+	int iothr_pcount = 0, flags;
 
 #if defined(_WIN32)
 	xtn->waitable_timer = CreateWaitableTimer(HCL_NULL, TRUE, HCL_NULL);
 #endif
 
+#if defined(USE_DEVPOLL)
+	xtn->ep = open("/dev/poll", O_RDWR);
+	if (xtn->ep == -1) 
+	{
+		hcl_seterrwithsyserr (hcl, 0, errno);
+		HCL_DEBUG1 (hcl, "Cannot create devpoll - %hs\n", strerror(errno));
+		goto oops;
+	}
+
+	#if defined(FD_CLOEXEC)
+	flags = fcntl(xtn->ep, F_GETFD);
+	if (flags >= 0) fcntl (xtn->ep, F_SETFD, flags | FD_CLOEXEC);
+	#endif
+
+#elif defined(USE_KQUEUE)
+	#if defined(HAVE_KQUEUE1) && defined(O_CLOEXEC)
+	xtn->ep = kqueue1(O_CLOEXEC);
+	if (xtn->ep == -1) xtn->ep = kqueue();
+	#else
+	xtn->ep = kqueue();
+	#endif
+	if (xtn->ep == -1)
+	{
+		hcl_seterrwithsyserr (hcl, 0, errno);
+		HCL_DEBUG1 (hcl, "Cannot create kqueue - %hs\n", strerror(errno));
+		goto oops;
+	}
+
+	#if defined(FD_CLOEXEC)
+	flags = fcntl(xtn->ep, F_GETFD);
+	if (flags >= 0 && !(flags & FD_CLOEXEC)) fcntl (xtn->ep, F_SETFD, flags | FD_CLOEXEC);
+	#endif
+
+#elif defined(USE_EPOLL)
+	#if defined(HAVE_EPOLL_CREATE1) && defined(EPOLL_CLOEXEC)
+	xtn->ep = epoll_create1(EPOLL_CLOEXEC);
+	if (xtn->ep == -1) xtn->ep = epoll_create(1024); 
+	#else
+	xtn->ep = epoll_create(1024);
+	#endif
+	if (xtn->ep == -1) 
+	{
+		hcl_seterrwithsyserr (hcl, 0, errno);
+		HCL_DEBUG1 (hcl, "Cannot create epoll - %hs\n", strerror(errno));
+		goto oops;
+	}
+
+	#if defined(FD_CLOEXEC)
+	flags = fcntl(xtn->ep, F_GETFD);
+	if (flags >= 0 && !(flags & FD_CLOEXEC)) fcntl (xtn->ep, F_SETFD, flags | FD_CLOEXEC);
+	#endif
+
+#elif defined(USE_POLL)
+
+	MUTEX_INIT (&xtn->ev.reg.pmtx);
+
+#elif defined(USE_SELECT)
+	FD_ZERO (&xtn->ev.reg.rfds);
+	FD_ZERO (&xtn->ev.reg.wfds);
+	xtn->ev.reg.maxfd = -1;
+	MUTEX_INIT (&xtn->ev.reg.smtx);
+#endif /* USE_DEVPOLL */
+
+	if (open_pipes(hcl, xtn->sigfd.p) <= -1) goto oops;
+	sigfd_pcount = 2;
+
+#if defined(USE_THREAD)
+	if (open_pipes(hcl, xtn->iothr.p) <= -1) goto oops;
+	iothr_pcount = 2;
+
+	if (_add_poll_fd(hcl, xtn->iothr.p[0], XPOLLIN) <= -1) goto oops;
+
+	pthread_mutex_init (&xtn->ev.mtx, HCL_NULL);
+	pthread_cond_init (&xtn->ev.cnd, HCL_NULL);
+	pthread_cond_init (&xtn->ev.cnd2, HCL_NULL);
+	xtn->ev.halting = 0;
+
+	xtn->iothr.abort = 0;
+	xtn->iothr.up = 0;
+	/*pthread_create (&xtn->iothr, HCL_NULL, iothr_main, hcl);*/
+
+#endif /* USE_THREAD */
+
+	xtn->vm_running = 1;
 	return 0;
+
+oops:
+#if defined(USE_THREAD)
+	if (iothr_pcount > 0)
+	{
+		close (xtn->iothr.p[0]);
+		close (xtn->iothr.p[1]);
+	}
+#endif
+
+	if (sigfd_pcount > 0)
+	{
+		close (xtn->sigfd.p[0]);
+		close (xtn->sigfd.p[1]);
+	}
+
+#if defined(USE_DEVPOLL) || defined(USE_EPOLL)
+	if (xtn->ep >= 0)
+	{
+		close (xtn->ep);
+		xtn->ep = -1;
+	}
+#endif
+
+	return -1;
 }
 
 static void cb_vm_cleanup (hcl_t* hcl)
@@ -2636,7 +2795,7 @@ static void cb_vm_cleanup (hcl_t* hcl)
 	xtn_t* xtn = GET_XTN(hcl);
 
 	xtn->vm_running = 0;
-	
+
 #if defined(_WIN32)
 	if (xtn->waitable_timer)
 	{
@@ -2644,8 +2803,67 @@ static void cb_vm_cleanup (hcl_t* hcl)
 		xtn->waitable_timer = HCL_NULL;
 	}
 #endif
-}
 
+#if defined(USE_THREAD)
+	if (xtn->iothr.up)
+	{
+		xtn->iothr.abort = 1;
+		write (xtn->iothr.p[1], "Q", 1);
+		pthread_cond_signal (&xtn->ev.cnd);
+		pthread_join (xtn->iothr.thr, HCL_NULL);
+		xtn->iothr.up = 0;
+	}
+	pthread_cond_destroy (&xtn->ev.cnd);
+	pthread_cond_destroy (&xtn->ev.cnd2);
+	pthread_mutex_destroy (&xtn->ev.mtx);
+
+	_del_poll_fd (hcl, xtn->iothr.p[0]);
+	close_pipes (hcl, xtn->iothr.p);
+#endif /* USE_THREAD */
+
+	close_pipes (hcl, xtn->sigfd.p);
+
+#if defined(USE_DEVPOLL) 
+	if (xtn->ep >= 0)
+	{
+		close (xtn->ep);
+		xtn->ep = -1;
+	}
+	/*destroy_poll_data_space (hcl);*/
+#elif defined(USE_KQUEUE)
+	if (xtn->ep >= 0)
+	{
+		close (xtn->ep);
+		xtn->ep = -1;
+	}
+#elif defined(USE_EPOLL)
+	if (xtn->ep >= 0)
+	{
+		close (xtn->ep);
+		xtn->ep = -1;
+	}
+#elif defined(USE_POLL)
+	if (xtn->ev.reg.ptr)
+	{
+		hcl_freemem (hcl, xtn->ev.reg.ptr);
+		xtn->ev.reg.ptr = HCL_NULL;
+		xtn->ev.reg.len = 0;
+		xtn->ev.reg.capa = 0;
+	}
+	if (xtn->ev.buf)
+	{
+		hcl_freemem (hcl, xtn->ev.buf);
+		xtn->ev.buf = HCL_NULL;
+	}
+	/*destroy_poll_data_space (hcl);*/
+	MUTEX_DESTROY (&xtn->ev.reg.pmtx);
+#elif defined(USE_SELECT)
+	FD_ZERO (&xtn->ev.reg.rfds);
+	FD_ZERO (&xtn->ev.reg.wfds);
+	xtn->ev.reg.maxfd = -1;
+	MUTEX_DESTROY (&xtn->ev.reg.smtx);
+#endif
+}
 /* ----------------------------------------------------------------- 
  * STANDARD HCL
  * ----------------------------------------------------------------- */
