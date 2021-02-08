@@ -28,7 +28,6 @@
 #include "hcl-prv.h"
 #include "hcl-tmr.h"
 #include "hcl-xutl.h"
-#include "cb-impl.h"
 
 #include <stdio.h>
 #include <string.h>
@@ -685,13 +684,12 @@ hcl_server_proto_t* hcl_server_proto_open (hcl_oow_t xtnsize, hcl_server_worker_
 	proto->worker = worker;
 	proto->exec_runtime_event_index = HCL_TMR_INVALID_INDEX;
 
-#if 0
-	/*proto->hcl = hcl_open(hcl_server_getmmgr(proto->worker->server), HCL_SIZEOF(*xtn), worker->server->cfg.actor_heap_size, &vmprim, HCL_NULL);*/
-#endif
-	/* TODO: set the log write handerl to log_write .. */
 	/* TODO: LARGE_PAGES */
 	proto->hcl = hcl_openstdwithmmgr(hcl_server_getmmgr(proto->worker->server), HCL_SIZEOF(*xtn), worker->server->cfg.actor_heap_size, HCL_NULL);
 	if (!proto->hcl) goto oops;
+
+	/* change the log_write primitive forcibly */
+	proto->hcl->vmprim.log_write = log_write;
 
 	xtn = (worker_hcl_xtn_t*)hcl_getxtn(proto->hcl);
 	xtn->proto = proto;
@@ -1531,7 +1529,6 @@ hcl_server_t* hcl_server_open (hcl_mmgr_t* mmgr, hcl_oow_t xtnsize, hcl_server_p
 {
 	hcl_server_t* server = HCL_NULL;
 	hcl_t* hcl = HCL_NULL;
-	hcl_vmprim_t vmprim;
 	hcl_tmr_t* tmr = HCL_NULL;
 	server_hcl_xtn_t* xtn;
 	int pfd[2], fcv;
@@ -1544,20 +1541,10 @@ hcl_server_t* hcl_server_open (hcl_mmgr_t* mmgr, hcl_oow_t xtnsize, hcl_server_p
 		return HCL_NULL;
 	}
 
-	HCL_MEMSET (&vmprim, 0, HCL_SIZEOF(vmprim));
-	vmprim.log_write = log_write_for_dummy;
-	vmprim.syserrstrb = hcl_vmprim_syserrstrb;
-	vmprim.assertfail = hcl_vmprim_assertfail;
-	vmprim.dl_startup = hcl_vmprim_dl_startup;
-	vmprim.dl_cleanup = hcl_vmprim_dl_cleanup;
-	vmprim.dl_open = hcl_vmprim_dl_open;
-	vmprim.dl_close = hcl_vmprim_dl_close;
-	vmprim.dl_getsym = hcl_vmprim_dl_getsym;
-	vmprim.vm_gettime = hcl_vmprim_vm_gettime;
-	vmprim.vm_sleep = hcl_vmprim_vm_sleep;
-
-	hcl = hcl_open(mmgr, HCL_SIZEOF(*xtn), 2048, &vmprim, errnum);
+	hcl = hcl_openstdwithmmgr(mmgr, HCL_SIZEOF(*xtn), 2048, errnum);
 	if (!hcl) goto oops;
+
+	hcl->vmprim.log_write = log_write_for_dummy;
 
 	tmr = hcl_tmr_open(hcl, 0, 1024); /* TOOD: make the timer's default size configurable */
 	if (!tmr)
@@ -1568,7 +1555,7 @@ hcl_server_t* hcl_server_open (hcl_mmgr_t* mmgr, hcl_oow_t xtnsize, hcl_server_p
 
 	if (pipe(pfd) <= -1)
 	{
-		if (errnum) *errnum = hcl_vmprim_syserrstrb(hcl, 0, errno, HCL_NULL, 0);
+		if (errnum) *errnum = hcl->vmprim.syserrstrb(hcl, 0, errno, HCL_NULL, 0);
 		goto oops;
 	}
 

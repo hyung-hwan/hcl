@@ -107,7 +107,6 @@ libhclx_la_SOURCES = \
 	tmr.c hcl-tmr.h \
 	xutl.c xutl-sa.h hcl-xutl.h \
 	json.c hcl-json.h \
-	cb-impl.h cb-impl.c \
 	hcl-s.c hcl-s.h \
 	hcl-c.c hcl-c.h
 libhclx_la_CPPFLAGS = $(CPPFLAGS_LIB_COMMON) $(CPPFLAGS_PFMOD)

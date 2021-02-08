@@ -801,7 +801,6 @@ hcl_client_t* hcl_client_open (hcl_mmgr_t* mmgr, hcl_oow_t xtnsize, hcl_client_p
 {
 	hcl_client_t* client;
 	hcl_t* hcl;
-	hcl_vmprim_t vmprim;
 	client_hcl_xtn_t* xtn;
 
 	client = (hcl_client_t*)HCL_MMGR_ALLOC(mmgr, HCL_SIZEOF(*client) + xtnsize);
@@ -811,17 +810,14 @@ hcl_client_t* hcl_client_open (hcl_mmgr_t* mmgr, hcl_oow_t xtnsize, hcl_client_p
 		return HCL_NULL;
 	}
 
-	HCL_MEMSET (&vmprim, 0, HCL_SIZEOF(vmprim));
-	vmprim.log_write = log_write_for_dummy;
-	vmprim.syserrstrb = hcl_vmprim_syserrstrb;
-	vmprim.assertfail = hcl_vmprim_assertfail;
-
-	hcl = hcl_open(mmgr, HCL_SIZEOF(*xtn), 2048, &vmprim, errnum);
+	hcl = hcl_openstdwithmmgr(mmgr, HCL_SIZEOF(*xtn), 2048, errnum);
 	if (!hcl) 
 	{
 		HCL_MMGR_FREE (mmgr, client);
 		return HCL_NULL;
 	}
+
+	hcl->vmprim.log_write = log_write_for_dummy;
 
 	xtn = (client_hcl_xtn_t*)hcl_getxtn(hcl);
 	xtn->client = client;

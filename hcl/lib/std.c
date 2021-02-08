@@ -2878,7 +2878,7 @@ hcl_t* hcl_openstdwithmmgr (hcl_mmgr_t* mmgr, hcl_oow_t xtnsize, hcl_oow_t heaps
 	//if (large_pages)
 	//{
 		vmprim.alloc_heap = alloc_heap;
-		vmprim.free_heap = 	free_heap;
+		vmprim.free_heap = free_heap;
 	//}
 	vmprim.log_write = log_write;
 	vmprim.syserrstrb = _syserrstrb;

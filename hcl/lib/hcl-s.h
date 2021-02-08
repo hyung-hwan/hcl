@@ -64,7 +64,7 @@ typedef enum hcl_server_trait_t hcl_server_trait_t;
 typedef void (*hcl_server_log_write_t) (
 	hcl_server_t*     server,
 	hcl_oow_t         wid,
-	hcl_bitmask_t   mask,
+	hcl_bitmask_t     mask,
 	const hcl_ooch_t* msg,
 	hcl_oow_t         len
 );
