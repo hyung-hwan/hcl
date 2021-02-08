@@ -24,15 +24,12 @@ LIBADD_COMMON += $(DL_LIBS)
 endif
 
 bin_PROGRAMS = hcl
-hcl_SOURCES = main.c ../lib/cb-impl.h ../lib/cb-impl.c
+hcl_SOURCES = main.c
 hcl_CPPFLAGS = $(CPPFLAGS_COMMON) 
 hcl_LDFLAGS = $(LDFLAGS_COMMON)
 hcl_LDADD = ../lib/libhcl.la $(LIBADD_COMMON)
 
 if ENABLE_HCLX
-
-## cb-impl.c is included in libhclx.
-## so ../lib/cb-impl.h and ../lib/cb-impl.c are not listed as sources
 
 bin_PROGRAMS += hcls
 hcls_SOURCES = main-s.c

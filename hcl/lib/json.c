@@ -26,7 +26,6 @@
 
 #include "hcl-json.h"
 #include "hcl-prv.h"
-#include "cb-impl.h"
 
 #include <string.h>
 #include <errno.h>

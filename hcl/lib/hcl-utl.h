@@ -288,6 +288,19 @@
 #define HCL_HASH_MORE_UCSTR(hv, ptr) HCL_HASH_MORE_VPTR(hv, ptr, const hcl_uch_t)
 
 
+/* =========================================================================
+ * PATH-RELATED MACROS
+ * ========================================================================= */
+#if defined(_WIN32) || defined(__OS2__) || defined(__DOS__)
+#	define HCL_IS_PATH_SEP(c) ((c) == '/' || (c) == '\\')
+#else
+#	define HCL_IS_PATH_SEP(c) ((c) == '/')
+#endif
+
+/* TODO: handle path with a drive letter or in the UNC notation */
+#define HCL_IS_PATH_ABSOLUTE(x) HCL_IS_PATH_SEP(x[0])
+
+
 #if defined(__cplusplus)
 extern "C" {
 #endif

@@ -114,8 +114,7 @@ CONFIG_CLEAN_VPATH_FILES =
 @ENABLE_HCLX_TRUE@	hclj$(EXEEXT)
 am__installdirs = "$(DESTDIR)$(bindir)"
 PROGRAMS = $(bin_PROGRAMS)
-am__dirstamp = $(am__leading_dot)dirstamp
-am_hcl_OBJECTS = hcl-main.$(OBJEXT) ../lib/hcl-cb-impl.$(OBJEXT)
+am_hcl_OBJECTS = hcl-main.$(OBJEXT)
 hcl_OBJECTS = $(am_hcl_OBJECTS)
 am__DEPENDENCIES_1 =
 @ENABLE_LIBLTDL_TRUE@am__DEPENDENCIES_2 = $(am__DEPENDENCIES_1)
@@ -168,9 +167,9 @@ am__v_at_1 =
 DEFAULT_INCLUDES = 
 depcomp = $(SHELL) $(top_srcdir)/ac/depcomp
 am__maybe_remake_depfiles = depfiles
-am__depfiles_remade = ../lib/$(DEPDIR)/hcl-cb-impl.Po \
-	./$(DEPDIR)/hcl-main.Po ./$(DEPDIR)/hclc-main-c.Po \
-	./$(DEPDIR)/hclj-main-j.Po ./$(DEPDIR)/hcls-main-s.Po
+am__depfiles_remade = ./$(DEPDIR)/hcl-main.Po \
+	./$(DEPDIR)/hclc-main-c.Po ./$(DEPDIR)/hclj-main-j.Po \
+	./$(DEPDIR)/hcls-main-s.Po
 am__mv = mv -f
 COMPILE = $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) \
 	$(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS)
@@ -366,7 +365,7 @@ CPPFLAGS_COMMON = \
 CFLAGS_COMMON = 
 LDFLAGS_COMMON = -L$(abs_builddir)/../lib -L$(libdir)
 LIBADD_COMMON = $(am__append_1) $(am__append_2)
-hcl_SOURCES = main.c ../lib/cb-impl.h ../lib/cb-impl.c
+hcl_SOURCES = main.c
 hcl_CPPFLAGS = $(CPPFLAGS_COMMON) 
 hcl_LDFLAGS = $(LDFLAGS_COMMON)
 hcl_LDADD = ../lib/libhcl.la $(LIBADD_COMMON)
@@ -464,14 +463,6 @@ clean-binPROGRAMS:
 	list=`for p in $$list; do echo "$$p"; done | sed 's/$(EXEEXT)$$//'`; \
 	echo " rm -f" $$list; \
 	rm -f $$list
-../lib/$(am__dirstamp):
-	@$(MKDIR_P) ../lib
-	@: > ../lib/$(am__dirstamp)
-../lib/$(DEPDIR)/$(am__dirstamp):
-	@$(MKDIR_P) ../lib/$(DEPDIR)
-	@: > ../lib/$(DEPDIR)/$(am__dirstamp)
-../lib/hcl-cb-impl.$(OBJEXT): ../lib/$(am__dirstamp) \
-	../lib/$(DEPDIR)/$(am__dirstamp)
 
 hcl$(EXEEXT): $(hcl_OBJECTS) $(hcl_DEPENDENCIES) $(EXTRA_hcl_DEPENDENCIES) 
 	@rm -f hcl$(EXEEXT)
@@ -491,12 +482,10 @@ hcls$(EXEEXT): $(hcls_OBJECTS) $(hcls_DEPENDENCIES) $(EXTRA_hcls_DEPENDENCIES)
 
 mostlyclean-compile:
 	-rm -f *.$(OBJEXT)
-	-rm -f ../lib/*.$(OBJEXT)
 
 distclean-compile:
 	-rm -f *.tab.c
 
-@AMDEP_TRUE@@am__include@ @am__quote@../lib/$(DEPDIR)/hcl-cb-impl.Po@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/hcl-main.Po@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/hclc-main-c.Po@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/hclj-main-j.Po@am__quote@ # am--include-marker
@@ -545,20 +534,6 @@ hcl-main.obj: main.c
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='main.c' object='hcl-main.obj' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(hcl_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o hcl-main.obj `if test -f 'main.c'; then $(CYGPATH_W) 'main.c'; else $(CYGPATH_W) '$(srcdir)/main.c'; fi`
-
-../lib/hcl-cb-impl.o: ../lib/cb-impl.c
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(hcl_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT ../lib/hcl-cb-impl.o -MD -MP -MF ../lib/$(DEPDIR)/hcl-cb-impl.Tpo -c -o ../lib/hcl-cb-impl.o `test -f '../lib/cb-impl.c' || echo '$(srcdir)/'`../lib/cb-impl.c
-@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) ../lib/$(DEPDIR)/hcl-cb-impl.Tpo ../lib/$(DEPDIR)/hcl-cb-impl.Po
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='../lib/cb-impl.c' object='../lib/hcl-cb-impl.o' libtool=no @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(hcl_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o ../lib/hcl-cb-impl.o `test -f '../lib/cb-impl.c' || echo '$(srcdir)/'`../lib/cb-impl.c
-
-../lib/hcl-cb-impl.obj: ../lib/cb-impl.c
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(hcl_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT ../lib/hcl-cb-impl.obj -MD -MP -MF ../lib/$(DEPDIR)/hcl-cb-impl.Tpo -c -o ../lib/hcl-cb-impl.obj `if test -f '../lib/cb-impl.c'; then $(CYGPATH_W) '../lib/cb-impl.c'; else $(CYGPATH_W) '$(srcdir)/../lib/cb-impl.c'; fi`
-@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) ../lib/$(DEPDIR)/hcl-cb-impl.Tpo ../lib/$(DEPDIR)/hcl-cb-impl.Po
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='../lib/cb-impl.c' object='../lib/hcl-cb-impl.obj' libtool=no @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(hcl_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o ../lib/hcl-cb-impl.obj `if test -f '../lib/cb-impl.c'; then $(CYGPATH_W) '../lib/cb-impl.c'; else $(CYGPATH_W) '$(srcdir)/../lib/cb-impl.c'; fi`
 
 hclc-main-c.o: main-c.c
 @am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(hclc_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT hclc-main-c.o -MD -MP -MF $(DEPDIR)/hclc-main-c.Tpo -c -o hclc-main-c.o `test -f 'main-c.c' || echo '$(srcdir)/'`main-c.c
@@ -726,8 +701,6 @@ clean-generic:
 distclean-generic:
 	-test -z "$(CONFIG_CLEAN_FILES)" || rm -f $(CONFIG_CLEAN_FILES)
 	-test . = "$(srcdir)" || test -z "$(CONFIG_CLEAN_VPATH_FILES)" || rm -f $(CONFIG_CLEAN_VPATH_FILES)
-	-rm -f ../lib/$(DEPDIR)/$(am__dirstamp)
-	-rm -f ../lib/$(am__dirstamp)
 
 maintainer-clean-generic:
 	@echo "This command is intended for maintainers to use"
@@ -737,8 +710,7 @@ clean: clean-am
 clean-am: clean-binPROGRAMS clean-generic clean-libtool mostlyclean-am
 
 distclean: distclean-am
-		-rm -f ../lib/$(DEPDIR)/hcl-cb-impl.Po
-	-rm -f ./$(DEPDIR)/hcl-main.Po
+		-rm -f ./$(DEPDIR)/hcl-main.Po
 	-rm -f ./$(DEPDIR)/hclc-main-c.Po
 	-rm -f ./$(DEPDIR)/hclj-main-j.Po
 	-rm -f ./$(DEPDIR)/hcls-main-s.Po
@@ -787,8 +759,7 @@ install-ps-am:
 installcheck-am:
 
 maintainer-clean: maintainer-clean-am
-		-rm -f ../lib/$(DEPDIR)/hcl-cb-impl.Po
-	-rm -f ./$(DEPDIR)/hcl-main.Po
+		-rm -f ./$(DEPDIR)/hcl-main.Po
 	-rm -f ./$(DEPDIR)/hclc-main-c.Po
 	-rm -f ./$(DEPDIR)/hclj-main-j.Po
 	-rm -f ./$(DEPDIR)/hcls-main-s.Po
