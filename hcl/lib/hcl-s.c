@@ -41,12 +41,6 @@
 #if defined(_WIN32)
 #	include <windows.h>
 #	include <tchar.h>
-#	if defined(HCL_HAVE_CFG_H) && defined(HCL_ENABLE_LIBLTDL)
-#		include <ltdl.h>
-#		define USE_LTDL
-#	else
-#		define USE_WIN_DLL
-#	endif
 #elif defined(__OS2__)
 #	define INCL_DOSMODULEMGR
 #	define INCL_DOSPROCESS
@@ -58,19 +52,6 @@
 #elif defined(macintosh)
 #	include <Timer.h>
 #else
-
-#	if defined(HCL_ENABLE_LIBLTDL)
-#		include <ltdl.h>
-#		define USE_LTDL
-#	elif defined(HAVE_DLFCN_H)
-#		include <dlfcn.h>
-#		define USE_DLFCN
-#	elif defined(__APPLE__) || defined(__MACOSX__)
-#		define USE_MACH_O_DYLD
-#		include <mach-o/dyld.h>
-#	else
-#		error UNSUPPORTED DYNAMIC LINKER
-#	endif
 
 #	if defined(HAVE_TIME_H)
 #		include <time.h>
@@ -98,40 +79,6 @@
 #	include <netinet/in.h>
 #	include <pthread.h>
 #	include <poll.h>
-#endif
-
-#if !defined(HCL_DEFAULT_PFMODDIR)
-#	define HCL_DEFAULT_PFMODDIR ""
-#endif
-
-#if !defined(HCL_DEFAULT_PFMODPREFIX)
-#	if defined(_WIN32)
-#		define HCL_DEFAULT_PFMODPREFIX "hcl-"
-#	elif defined(__OS2__)
-#		define HCL_DEFAULT_PFMODPREFIX "hcl"
-#	elif defined(__DOS__)
-#		define HCL_DEFAULT_PFMODPREFIX "hcl"
-#	else
-#		define HCL_DEFAULT_PFMODPREFIX "libhcl-"
-#	endif
-#endif
-
-#if !defined(HCL_DEFAULT_PFMODPOSTFIX)
-#	if defined(_WIN32)
-#		define HCL_DEFAULT_PFMODPOSTFIX ""
-#	elif defined(__OS2__)
-#		define HCL_DEFAULT_PFMODPOSTFIX ""
-#	elif defined(__DOS__)
-#		define HCL_DEFAULT_PFMODPOSTFIX ""
-#	else
-#		if defined(USE_DLFCN)
-#			define HCL_DEFAULT_PFMODPOSTFIX ".so"
-#		elif defined(USE_MACH_O_DYLD)
-#			define HCL_DEFAULT_PFMODPOSTFIX ".dylib"
-#		else
-#			define HCL_DEFAULT_PFMODPOSTFIX ""
-#		endif
-#	endif
 #endif
 
 struct bb_t
@@ -712,6 +659,7 @@ hcl_server_proto_t* hcl_server_proto_open (hcl_oow_t xtnsize, hcl_server_worker_
 	worker_hcl_xtn_t* xtn;
 	hcl_bitmask_t trait;
 
+#if 0
 	HCL_MEMSET (&vmprim, 0, HCL_SIZEOF(vmprim));
 	if (worker->server->cfg.trait & HCL_SERVER_TRAIT_USE_LARGE_PAGES)
 	{
@@ -728,6 +676,7 @@ hcl_server_proto_t* hcl_server_proto_open (hcl_oow_t xtnsize, hcl_server_worker_
 	vmprim.dl_getsym = hcl_vmprim_dl_getsym;
 	vmprim.vm_gettime = hcl_vmprim_vm_gettime;
 	vmprim.vm_sleep = hcl_vmprim_vm_sleep;
+#endif
 
 	proto = (hcl_server_proto_t*)hcl_server_allocmem(worker->server, HCL_SIZEOF(*proto));
 	if (!proto) return HCL_NULL;
@@ -736,7 +685,12 @@ hcl_server_proto_t* hcl_server_proto_open (hcl_oow_t xtnsize, hcl_server_worker_
 	proto->worker = worker;
 	proto->exec_runtime_event_index = HCL_TMR_INVALID_INDEX;
 
-	proto->hcl = hcl_open(hcl_server_getmmgr(proto->worker->server), HCL_SIZEOF(*xtn), worker->server->cfg.actor_heap_size, &vmprim, HCL_NULL);
+#if 0
+	/*proto->hcl = hcl_open(hcl_server_getmmgr(proto->worker->server), HCL_SIZEOF(*xtn), worker->server->cfg.actor_heap_size, &vmprim, HCL_NULL);*/
+#endif
+	/* TODO: set the log write handerl to log_write .. */
+	/* TODO: LARGE_PAGES */
+	proto->hcl = hcl_openstdwithmmgr(hcl_server_getmmgr(proto->worker->server), HCL_SIZEOF(*xtn), worker->server->cfg.actor_heap_size, HCL_NULL);
 	if (!proto->hcl) goto oops;
 
 	xtn = (worker_hcl_xtn_t*)hcl_getxtn(proto->hcl);
@@ -1601,10 +1555,6 @@ hcl_server_t* hcl_server_open (hcl_mmgr_t* mmgr, hcl_oow_t xtnsize, hcl_server_p
 	vmprim.dl_getsym = hcl_vmprim_dl_getsym;
 	vmprim.vm_gettime = hcl_vmprim_vm_gettime;
 	vmprim.vm_sleep = hcl_vmprim_vm_sleep;
-
-#if defined(USE_LTDL)
-	lt_dlinit ();
-#endif
 
 	hcl = hcl_open(mmgr, HCL_SIZEOF(*xtn), 2048, &vmprim, errnum);
 	if (!hcl) goto oops;

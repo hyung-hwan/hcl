@@ -1746,6 +1746,13 @@ HCL_EXPORT hcl_t* hcl_open (
 	hcl_errnum_t*       errnum
 );
 
+HCL_EXPORT hcl_t* hcl_openstdwithmmgr (
+	hcl_mmgr_t*         mmgr,
+	hcl_oow_t           xtnsize,
+	hcl_oow_t           heapsize,
+	hcl_errnum_t*       errnum
+);
+
 HCL_EXPORT hcl_t* hcl_openstd (
 	hcl_oow_t           xtnsize,
 	hcl_oow_t           heapsize,

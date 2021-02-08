@@ -2868,7 +2868,7 @@ static void cb_vm_cleanup (hcl_t* hcl)
  * STANDARD HCL
  * ----------------------------------------------------------------- */
 
-hcl_t* hcl_openstd (hcl_oow_t xtnsize, hcl_oow_t heapsize, hcl_errnum_t* errnum)
+hcl_t* hcl_openstdwithmmgr (hcl_mmgr_t* mmgr, hcl_oow_t xtnsize, hcl_oow_t heapsize, hcl_errnum_t* errnum)
 {
 	hcl_t* hcl;
 	hcl_vmprim_t vmprim;
@@ -2895,7 +2895,7 @@ hcl_t* hcl_openstd (hcl_oow_t xtnsize, hcl_oow_t heapsize, hcl_errnum_t* errnum)
 	vmprim.vm_muxwait = vm_muxwait;
 	vmprim.vm_sleep = vm_sleep;
 
-	hcl = hcl_open(&sys_mmgr, HCL_SIZEOF(xtn_t) + xtnsize, heapsize, &vmprim, errnum);
+	hcl = hcl_open(mmgr, HCL_SIZEOF(xtn_t) + xtnsize, heapsize, &vmprim, errnum);
 	if (HCL_UNLIKELY(!hcl)) return HCL_NULL;
 
 	/* adjust the object size by the sizeof xtn_t so that moo_getxtn() returns the right pointer. */
@@ -2916,4 +2916,9 @@ hcl_t* hcl_openstd (hcl_oow_t xtnsize, hcl_oow_t heapsize, hcl_errnum_t* errnum)
 	}
 
 	return hcl;
+}
+
+hcl_t* hcl_openstd (hcl_oow_t xtnsize, hcl_oow_t heapsize, hcl_errnum_t* errnum)
+{
+	return hcl_openstdwithmmgr(&sys_mmgr, xtnsize, heapsize, errnum);
 }
