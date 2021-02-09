@@ -293,8 +293,10 @@
  * ========================================================================= */
 #if defined(_WIN32) || defined(__OS2__) || defined(__DOS__)
 #	define HCL_IS_PATH_SEP(c) ((c) == '/' || (c) == '\\')
+#	define HCL_DFL_PATH_SEP ('\\')
 #else
 #	define HCL_IS_PATH_SEP(c) ((c) == '/')
+#	define HCL_DFL_PATH_SEP ('/')
 #endif
 
 /* TODO: handle path with a drive letter or in the UNC notation */

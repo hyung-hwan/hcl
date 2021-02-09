@@ -301,18 +301,6 @@ struct hcl_server_t
 
 /* ========================================================================= */
 
-#if defined(_WIN32) || defined(__OS2__) || defined(__DOS__)
-#	define HCL_IS_PATH_SEP(c) ((c) == '/' || (c) == '\\')
-#	define PATH_SEP_CHAR ('\\')
-#else
-#	define HCL_IS_PATH_SEP(c) ((c) == '/')
-#	define PATH_SEP_CHAR ('/')
-#endif
-
-/* TODO: handle path with a drive letter or in the UNC notation */
-#define HCL_IS_PATH_ABSOLUTE(x) HCL_IS_PATH_SEP(x[0])
-
-
 static const hcl_bch_t* get_base_name (const hcl_bch_t* path)
 {
 	const hcl_bch_t* p, * last = HCL_NULL;
@@ -374,7 +362,7 @@ static HCL_INLINE int open_input (hcl_t* hcl, hcl_ioinarg_t* arg)
 		#else
 			hcl_copy_bchars (bb->fn, server->cfg.script_include_path, parlen);
 		#endif
-			if (!HCL_IS_PATH_SEP(bb->fn[parlen])) bb->fn[parlen++] = PATH_SEP_CHAR; /* +2 was used in hcl_callocmem() for this (+1 for this, +1 for '\0' */
+			if (!HCL_IS_PATH_SEP(bb->fn[parlen])) bb->fn[parlen++] = HCL_DFL_PATH_SEP; /* +2 was used in hcl_callocmem() for this (+1 for this, +1 for '\0' */
 		}
 		else
 		{

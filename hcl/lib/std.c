@@ -240,16 +240,17 @@
 #	endif
 #endif
 
-
-#if defined(_WIN32) || defined(__OS2__) || defined(__DOS__)
-#	define HCL_IS_PATH_SEP(c) ((c) == '/' || (c) == '\\')
+#if defined(USE_THREAD)
+#	define MUTEX_INIT(x) pthread_mutex_init((x), MOO_NULL)
+#	define MUTEX_DESTROY(x) pthread_mutex_destroy(x)
+#	define MUTEX_LOCK(x) pthread_mutex_lock(x)
+#	define MUTEX_UNLOCK(x) pthread_mutex_unlock(x)
 #else
-#	define HCL_IS_PATH_SEP(c) ((c) == '/')
+#	define MUTEX_INIT(x)
+#	define MUTEX_DESTROY(x)
+#	define MUTEX_LOCK(x) 
+#	define MUTEX_UNLOCK(x) 
 #endif
-
-/* TODO: handle path with a drive letter or in the UNC notation */
-#define HCL_IS_PATH_ABSOLUTE(x) HCL_IS_PATH_SEP(x[0])
-
 
 
 typedef struct xtn_t xtn_t;
