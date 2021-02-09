@@ -975,7 +975,36 @@ static void _assertfail (hcl_t* hcl, const hcl_bch_t* expr, const hcl_bch_t* fil
  * HEAP ALLOCATION
  * ----------------------------------------------------------------- */
 
-static void* alloc_heap (hcl_t* hcl, hcl_oow_t size)
+static int get_huge_page_size (hcl_t* hcl, hcl_oow_t* page_size)
+{
+	FILE* fp;
+	char buf[256];
+	
+	fp = fopen("/proc/meminfo", "r");
+	if (!fp) return -1;
+
+	while (!feof(fp))
+	{
+		if (fgets(buf, sizeof(buf) - 1, fp) == NULL) goto oops;
+
+		if (strncmp(buf, "Hugepagesize: ", 13) == 0)
+		{
+			unsigned long int tmp;
+			tmp = strtoul(&buf[13], NULL, 10);
+			if (tmp == HCL_TYPE_MAX(unsigned long int) && errno == ERANGE) goto oops;
+
+			*page_size = tmp * 1024; /* KBytes to Bytes */
+			fclose (fp);
+			return 0;
+		}
+	}
+
+oops:
+	fclose (fp);
+	return -1;
+}
+
+static void* alloc_heap (hcl_t* hcl, hcl_oow_t* size)
 {
 #if defined(HAVE_MMAP) && defined(HAVE_MUNMAP) && defined(MAP_ANONYMOUS)
 	/* It's called via hcl_makeheap() when HCL creates a GC heap.
@@ -990,37 +1019,60 @@ static void* alloc_heap (hcl_t* hcl, hcl_oow_t size)
 
 	hcl_oow_t* ptr;
 	int flags;
-	hcl_oow_t actual_size;
+	hcl_oow_t req_size, align, aligned_size;
 
+	req_size = HCL_SIZEOF(hcl_oow_t) + *size;
 	flags = MAP_PRIVATE | MAP_ANONYMOUS;
-
-	#if defined(MAP_HUGETLB)
-	flags |= MAP_HUGETLB;
-	#endif
 
 	#if defined(MAP_UNINITIALIZED)
 	flags |= MAP_UNINITIALIZED;
 	#endif
 
-	actual_size = HCL_SIZEOF(hcl_oow_t) + size;
-	actual_size = HCL_ALIGN_POW2(actual_size, 2 * 1024 * 1024);
-	ptr = (hcl_oow_t*)mmap(NULL, actual_size, PROT_READ | PROT_WRITE, flags, -1, 0);
+	#if defined(MAP_HUGETLB)
+	if (get_huge_page_size(hcl, &align) <= -1) align = 2 * 1024 * 1024; /* default to 2MB */
+	if (req_size > align / 2)
+	{
+		/* if the requested size is large enough, attempt HUGETLB */
+		flags |= MAP_HUGETLB;
+	}
+	else
+	{
+		align = sysconf(_SC_PAGESIZE);
+	}
+	#else
+	align = sysconf(_SC_PAGESIZE);
+	#endif
+
+	aligned_size = HCL_ALIGN_POW2(req_size, align);
+	ptr = (hcl_oow_t*)mmap(NULL, aligned_size, PROT_READ | PROT_WRITE, flags, -1, 0);
+	#if defined(MAP_HUGETLB)
+	if (ptr == MAP_FAILED && (flags & MAP_HUGETLB)) 
+	{
+		flags &= ~MAP_HUGETLB;
+		align = sysconf(_SC_PAGESIZE);
+		aligned_size = HCL_ALIGN_POW2(req_size, align);
+		ptr = (hcl_oow_t*)mmap(NULL, aligned_size, PROT_READ | PROT_WRITE, flags, -1, 0);
+		if (ptr == MAP_FAILED) 
+		{
+			hcl_seterrwithsyserr (hcl, 0, errno);
+			return HCL_NULL;
+		}
+	}
+	#else
 	if (ptr == MAP_FAILED) 
 	{
-	#if defined(MAP_HUGETLB)
-		flags &= ~MAP_HUGETLB;
-		ptr = (hcl_oow_t*)mmap(NULL, actual_size, PROT_READ | PROT_WRITE, flags, -1, 0);
-		if (ptr == MAP_FAILED) return HCL_NULL;
-	#else
+		hcl_seterrwithsyserr (hcl, 0, errno);
 		return HCL_NULL;
-	#endif
 	}
-	*ptr = actual_size;
+	#endif
+
+	*ptr = aligned_size;
+	*size = aligned_size - HCL_SIZEOF(hcl_oow_t);
 
 	return (void*)(ptr + 1);
 
 #else
-	return HCL_MMGR_ALLOC(hcl->_mmgr, size);
+	return HCL_MMGR_ALLOC(hcl->_mmgr, *size);
 #endif
 }
 
@@ -2864,6 +2916,7 @@ static void cb_vm_cleanup (hcl_t* hcl)
 	MUTEX_DESTROY (&xtn->ev.reg.smtx);
 #endif
 }
+
 /* ----------------------------------------------------------------- 
  * STANDARD HCL
  * ----------------------------------------------------------------- */
@@ -2875,11 +2928,8 @@ hcl_t* hcl_openstdwithmmgr (hcl_mmgr_t* mmgr, hcl_oow_t xtnsize, hcl_oow_t heaps
 	hcl_cb_t cb;
 
 	HCL_MEMSET (&vmprim, 0, HCL_SIZEOF(vmprim));
-	//if (large_pages)
-	//{
-		vmprim.alloc_heap = alloc_heap;
-		vmprim.free_heap = free_heap;
-	//}
+	vmprim.alloc_heap = alloc_heap;
+	vmprim.free_heap = free_heap;
 	vmprim.log_write = log_write;
 	vmprim.syserrstrb = _syserrstrb;
 	vmprim.assertfail = _assertfail;

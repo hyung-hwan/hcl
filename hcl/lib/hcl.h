@@ -918,7 +918,7 @@ typedef enum hcl_log_mask_t hcl_log_mask_t;
 
 typedef void* (*hcl_alloc_heap_t) (
 	hcl_t*             hcl,
-	hcl_oow_t          size
+	hcl_oow_t*         size /* [IN] requested size, [OUT] allocated size */
 );
 
 typedef void (*hcl_free_heap_t) (
@@ -1392,6 +1392,7 @@ struct hcl_t
 	} log;
 	/* ========================= */
 
+	hcl_oow_t _reqheapsz;
 	hcl_heap_t* heap;
 
 	/* ========================= */

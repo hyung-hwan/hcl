@@ -816,6 +816,7 @@ hcl_client_t* hcl_client_open (hcl_mmgr_t* mmgr, hcl_oow_t xtnsize, hcl_client_p
 		return HCL_NULL;
 	}
 
+	/* replace the vmprim.log_write function */
 	hcl->vmprim.log_write = log_write_for_dummy;
 
 	xtn = (client_hcl_xtn_t*)hcl_getxtn(hcl);

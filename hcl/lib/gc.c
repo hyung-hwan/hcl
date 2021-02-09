@@ -740,6 +740,12 @@ int hcl_ignite (hcl_t* hcl)
 {
 	hcl_oow_t i;
 
+	if (!hcl->heap)
+	{
+		hcl->heap = hcl_makeheap(hcl, hcl->_reqheapsz);
+		if (HCL_UNLIKELY(!hcl->heap)) return -1;
+	}
+
 	if (!hcl->_nil) 
 	{
 		hcl->_nil = hcl_makenil(hcl);

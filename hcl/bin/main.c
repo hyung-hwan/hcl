@@ -665,7 +665,6 @@ int main (int argc, char* argv[])
 		{ ":heapsize",    '\0' },
 		{ ":log",         'l' },
 
-		{ "large-pages",  '\0' },
 		{ HCL_NULL,       '\0' }
 	};
 	static hcl_bopt_t opt =
@@ -677,7 +676,6 @@ int main (int argc, char* argv[])
 	const char* logopt = HCL_NULL;
 	hcl_oow_t heapsize = DEFAULT_HEAPSIZE;
 	int verbose = 0;
-	int large_pages = 0;
 
 #if defined(HCL_BUILD_DEBUG)
 	const char* dbgopt = HCL_NULL;
@@ -709,11 +707,6 @@ int main (int argc, char* argv[])
 				if (hcl_comp_bcstr(opt.lngopt, "heapsize") == 0)
 				{
 					heapsize = strtoul(opt.arg, HCL_NULL, 0);
-					break;
-				}
-				else if (hcl_comp_bcstr(opt.lngopt, "large-pages") == 0)
-				{
-					large_pages = 1;
 					break;
 				}
 			#if defined(HCL_BUILD_DEBUG)

@@ -653,29 +653,9 @@ static void fini_hcl (hcl_t* hcl)
 hcl_server_proto_t* hcl_server_proto_open (hcl_oow_t xtnsize, hcl_server_worker_t* worker)
 {
 	hcl_server_proto_t* proto;
-	hcl_vmprim_t vmprim;
 	hcl_cb_t hclcb;
 	worker_hcl_xtn_t* xtn;
 	hcl_bitmask_t trait;
-
-#if 0
-	HCL_MEMSET (&vmprim, 0, HCL_SIZEOF(vmprim));
-	if (worker->server->cfg.trait & HCL_SERVER_TRAIT_USE_LARGE_PAGES)
-	{
-		vmprim.alloc_heap = hcl_vmprim_alloc_heap;
-		vmprim.free_heap = hcl_vmprim_free_heap;
-	}
-	vmprim.log_write = log_write;
-	vmprim.syserrstrb = hcl_vmprim_syserrstrb;
-	vmprim.assertfail = hcl_vmprim_assertfail;
-	vmprim.dl_startup = hcl_vmprim_dl_startup;
-	vmprim.dl_cleanup = hcl_vmprim_dl_cleanup;
-	vmprim.dl_open = hcl_vmprim_dl_open;
-	vmprim.dl_close = hcl_vmprim_dl_close;
-	vmprim.dl_getsym = hcl_vmprim_dl_getsym;
-	vmprim.vm_gettime = hcl_vmprim_vm_gettime;
-	vmprim.vm_sleep = hcl_vmprim_vm_sleep;
-#endif
 
 	proto = (hcl_server_proto_t*)hcl_server_allocmem(worker->server, HCL_SIZEOF(*proto));
 	if (!proto) return HCL_NULL;
@@ -684,11 +664,10 @@ hcl_server_proto_t* hcl_server_proto_open (hcl_oow_t xtnsize, hcl_server_worker_
 	proto->worker = worker;
 	proto->exec_runtime_event_index = HCL_TMR_INVALID_INDEX;
 
-	/* TODO: LARGE_PAGES */
 	proto->hcl = hcl_openstdwithmmgr(hcl_server_getmmgr(proto->worker->server), HCL_SIZEOF(*xtn), worker->server->cfg.actor_heap_size, HCL_NULL);
 	if (!proto->hcl) goto oops;
 
-	/* change the log_write primitive forcibly */
+	/* replace the vmprim.log_write function */
 	proto->hcl->vmprim.log_write = log_write;
 
 	xtn = (worker_hcl_xtn_t*)hcl_getxtn(proto->hcl);
@@ -1544,6 +1523,7 @@ hcl_server_t* hcl_server_open (hcl_mmgr_t* mmgr, hcl_oow_t xtnsize, hcl_server_p
 	hcl = hcl_openstdwithmmgr(mmgr, HCL_SIZEOF(*xtn), 2048, errnum);
 	if (!hcl) goto oops;
 
+	/* replace the vmprim.log_write function */
 	hcl->vmprim.log_write = log_write_for_dummy;
 
 	tmr = hcl_tmr_open(hcl, 0, 1024); /* TOOD: make the timer's default size configurable */

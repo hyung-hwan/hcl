@@ -44,8 +44,10 @@ static void xma_free (hcl_mmgr_t* mmgr, void* ptr)
 hcl_heap_t* hcl_makeheap (hcl_t* hcl, hcl_oow_t size)
 {
 	hcl_heap_t* heap;
+	hcl_oow_t alloc_size;
 
-	heap = (hcl_heap_t*)hcl->vmprim.alloc_heap(hcl, HCL_SIZEOF(*heap) + size);
+	alloc_size = HCL_SIZEOF(*heap) + size;
+	heap = (hcl_heap_t*)hcl->vmprim.alloc_heap(hcl, &alloc_size);
 	if (HCL_UNLIKELY(!heap))
 	{
 		const hcl_ooch_t* oldmsg = hcl_backuperrmsg(hcl);
@@ -53,11 +55,13 @@ hcl_heap_t* hcl_makeheap (hcl_t* hcl, hcl_oow_t size)
 		return HCL_NULL;
 	}
 
-	HCL_MEMSET (heap, 0, HCL_SIZEOF(*heap) + size);
+	/* the vmprim.alloc_heap() function is allowed to create a bigger heap than the requested size.
+	 * if the created heap is bigger than requested, the heap will be utilized in full. */
+	HCL_ASSERT (hcl, alloc_size >= HCL_SIZEOF(*heap) + size);
+	HCL_MEMSET (heap, 0, alloc_size);
 
 	heap->base = (hcl_uint8_t*)(heap + 1);
-	heap->size = size;
-
+	heap->size = alloc_size;
 
 	if (size <= 0)
 	{
@@ -71,7 +75,7 @@ hcl_heap_t* hcl_makeheap (hcl_t* hcl, hcl_oow_t size)
 		if (HCL_UNLIKELY(!heap->xma))
 		{
 			hcl->vmprim.free_heap (hcl, heap);
-			hcl_seterrbfmt (hcl, HCL_ESYSMEM, "unable to allocate xma");
+			hcl_seterrbfmt (hcl, HCL_ESYSMEM, "unable to allocate a memory manager over a heap");
 			return HCL_NULL;
 		}
 

@@ -504,7 +504,6 @@ int main (int argc, char* argv[])
 	static hcl_bopt_lng_t lopt[] =
 	{
 		{ ":log",                  'l'  },
-		{ "large-pages",           '\0' },
 		{ ":worker-max-count",     '\0' },
 		{ ":worker-stack-size",    '\0' },
 		{ ":worker-idle-timeout",  '\0' },
@@ -535,8 +534,6 @@ int main (int argc, char* argv[])
 	hcl_ntime_t worker_idle_timeout = { 0, 0 };
 	hcl_oow_t actor_heap_size = MIN_ACTOR_HEAP_SIZE;
 	hcl_ntime_t actor_max_runtime = { 0, 0 };
-	int large_pages = 0;
-	hcl_bitmask_t trait;
 
 	setlocale (LC_ALL, "");
 
@@ -557,15 +554,11 @@ int main (int argc, char* argv[])
 
 			case 'm':
 				actor_heap_size = strtoul(opt.arg, HCL_NULL, 0);
-				if (actor_heap_size <= MIN_ACTOR_HEAP_SIZE) actor_heap_size = MIN_ACTOR_HEAP_SIZE;
+				if (actor_heap_size > 0 && actor_heap_size <= MIN_ACTOR_HEAP_SIZE) actor_heap_size = MIN_ACTOR_HEAP_SIZE;
 				break;
 
 			case '\0':
-				if (hcl_comp_bcstr(opt.lngopt, "large-pages") == 0)
-				{
-					large_pages = 1;
-				}
-				else if (hcl_comp_bcstr(opt.lngopt, "worker-max-count") == 0)
+				if (hcl_comp_bcstr(opt.lngopt, "worker-max-count") == 0)
 				{
 					worker_max_count = strtoul(opt.arg, HCL_NULL, 0);
 				}
@@ -645,11 +638,6 @@ int main (int argc, char* argv[])
 	{
 		if (handle_incpath(server, incpath) <= -1) goto oops;
 	}
-
-	hcl_server_getoption (server, HCL_SERVER_TRAIT, &trait);
-	if (large_pages) trait |= HCL_SERVER_TRAIT_USE_LARGE_PAGES;
-	else trait &= ~HCL_SERVER_TRAIT_USE_LARGE_PAGES;
-	hcl_server_setoption (server, HCL_SERVER_TRAIT, &trait);
 
 	hcl_server_setoption (server, HCL_SERVER_WORKER_MAX_COUNT, &worker_max_count);
 	hcl_server_setoption (server, HCL_SERVER_WORKER_STACK_SIZE, &worker_stack_size);

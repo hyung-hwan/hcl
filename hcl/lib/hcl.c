@@ -157,14 +157,13 @@ int hcl_init (hcl_t* hcl, hcl_mmgr_t* mmgr, hcl_oow_t heapsz, const hcl_vmprim_t
 	hcl->proc_map_free_first = -1;
 	hcl->proc_map_free_last = -1;
 
-	hcl->heap = hcl_makeheap(hcl, heapsz);
-	if (HCL_UNLIKELY(!hcl->heap)) goto oops;
+	/* remember the requested heap size. but push back the actuall heap creation to hcl_ignite() */
+	hcl->_reqheapsz = heapsz;
 
 	if (hcl->vmprim.dl_startup) hcl->vmprim.dl_startup (hcl);
 	return 0;
 
 oops:
-	if (hcl->heap) hcl_killheap (hcl, hcl->heap);
 	if (modtab_inited) hcl_rbt_fini (&hcl->modtab);
 	if (hcl->gci.stack.ptr)
 	{
@@ -309,7 +308,7 @@ void hcl_fini (hcl_t* hcl)
 		hcl->gci.stack.len = 0;
 	}
 
-	hcl_killheap (hcl, hcl->heap);
+	if (hcl->heap) hcl_killheap (hcl, hcl->heap);
 
 	if (hcl->log.ptr) 
 	{

@@ -51,10 +51,8 @@ enum hcl_server_trait_t
 {
 #if defined(HCL_BUILD_DEBUG)
 	HCL_SERVER_TRAIT_DEBUG_GC         = (1 << 0),
-	HCL_SERVER_TRAIT_DEBUG_BIGINT     = (1 << 1),
+	HCL_SERVER_TRAIT_DEBUG_BIGINT     = (1 << 1)
 #endif
-
-	HCL_SERVER_TRAIT_USE_LARGE_PAGES  = (1 << 2)
 };
 typedef enum hcl_server_trait_t hcl_server_trait_t;
 
