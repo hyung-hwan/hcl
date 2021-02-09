@@ -652,7 +652,7 @@ hcl_server_proto_t* hcl_server_proto_open (hcl_oow_t xtnsize, hcl_server_worker_
 	proto->worker = worker;
 	proto->exec_runtime_event_index = HCL_TMR_INVALID_INDEX;
 
-	proto->hcl = hcl_openstdwithmmgr(hcl_server_getmmgr(proto->worker->server), HCL_SIZEOF(*xtn), worker->server->cfg.actor_heap_size, HCL_NULL);
+	proto->hcl = hcl_openstdwithmmgr(hcl_server_getmmgr(proto->worker->server), HCL_SIZEOF(*xtn), HCL_NULL);
 	if (!proto->hcl) goto oops;
 
 	/* replace the vmprim.log_write function */
@@ -680,7 +680,7 @@ hcl_server_proto_t* hcl_server_proto_open (hcl_oow_t xtnsize, hcl_server_worker_
 	hclcb.vm_checkbc = vm_checkbc;
 	hcl_regcb (proto->hcl, &hclcb);
 
-	if (hcl_ignite(proto->hcl) <= -1) goto oops;
+	if (hcl_ignite(proto->hcl, worker->server->cfg.actor_heap_size) <= -1) goto oops;
 	if (hcl_addbuiltinprims(proto->hcl) <= -1) goto oops;
 
 	if (hcl_attachio(proto->hcl, read_handler, print_handler) <= -1) goto oops;
@@ -1508,7 +1508,7 @@ hcl_server_t* hcl_server_open (hcl_mmgr_t* mmgr, hcl_oow_t xtnsize, hcl_server_p
 		return HCL_NULL;
 	}
 
-	hcl = hcl_openstdwithmmgr(mmgr, HCL_SIZEOF(*xtn), 2048, errnum);
+	hcl = hcl_openstdwithmmgr(mmgr, HCL_SIZEOF(*xtn), errnum);
 	if (!hcl) goto oops;
 
 	/* replace the vmprim.log_write function */

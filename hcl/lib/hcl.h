@@ -1392,7 +1392,6 @@ struct hcl_t
 	} log;
 	/* ========================= */
 
-	hcl_oow_t _reqheapsz;
 	hcl_heap_t* heap;
 
 	/* ========================= */
@@ -1742,7 +1741,6 @@ extern "C" {
 HCL_EXPORT hcl_t* hcl_open (
 	hcl_mmgr_t*         mmgr,
 	hcl_oow_t           xtnsize,
-	hcl_oow_t           heapsize,
 	const hcl_vmprim_t* vmprim,
 	hcl_errnum_t*       errnum
 );
@@ -1750,13 +1748,11 @@ HCL_EXPORT hcl_t* hcl_open (
 HCL_EXPORT hcl_t* hcl_openstdwithmmgr (
 	hcl_mmgr_t*         mmgr,
 	hcl_oow_t           xtnsize,
-	hcl_oow_t           heapsize,
 	hcl_errnum_t*       errnum
 );
 
 HCL_EXPORT hcl_t* hcl_openstd (
 	hcl_oow_t           xtnsize,
-	hcl_oow_t           heapsize,
 	hcl_errnum_t*       errnum
 );
 
@@ -1767,7 +1763,6 @@ HCL_EXPORT void hcl_close (
 HCL_EXPORT int hcl_init (
 	hcl_t*              hcl,
 	hcl_mmgr_t*         mmgr,
-	hcl_oow_t           heapsize,
 	const hcl_vmprim_t* vmprim
 );
 
@@ -1935,19 +1930,20 @@ hcl_oop_t hcl_moveoop (
 );
 
 HCL_EXPORT hcl_oop_t hcl_shallowcopy (
-	hcl_t*          hcl,
-	hcl_oop_t       oop
+	hcl_t*      hcl,
+	hcl_oop_t   oop
 );
 
 /**
  * The hcl_ignite() function creates key initial objects.
  */
 HCL_EXPORT int hcl_ignite (
-	hcl_t* hcl
+	hcl_t*      hcl,
+	hcl_oow_t   heapsize
 );
 
 HCL_EXPORT int hcl_addbuiltinprims (
-	hcl_t*         hcl
+	hcl_t*      hcl
 );
 
 /**

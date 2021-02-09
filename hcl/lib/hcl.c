@@ -27,7 +27,7 @@
 #include "hcl-prv.h"
 
 
-hcl_t* hcl_open (hcl_mmgr_t* mmgr, hcl_oow_t xtnsize, hcl_oow_t heapsize, const hcl_vmprim_t* vmprim, hcl_errnum_t* errnum)
+hcl_t* hcl_open (hcl_mmgr_t* mmgr, hcl_oow_t xtnsize, const hcl_vmprim_t* vmprim, hcl_errnum_t* errnum)
 {
 	hcl_t* hcl;
 
@@ -37,7 +37,7 @@ hcl_t* hcl_open (hcl_mmgr_t* mmgr, hcl_oow_t xtnsize, hcl_oow_t heapsize, const 
 	hcl = (hcl_t*)HCL_MMGR_ALLOC(mmgr, HCL_SIZEOF(*hcl) + xtnsize);
 	if (hcl)
 	{
-		if (hcl_init(hcl, mmgr, heapsize, vmprim) <= -1)
+		if (hcl_init(hcl, mmgr, vmprim) <= -1)
 		{
 			if (errnum) *errnum = hcl->errnum;
 			HCL_MMGR_FREE (mmgr, hcl);
@@ -93,7 +93,7 @@ static void free_heap (hcl_t* hcl, void* ptr)
 	hcl_freemem (hcl, ptr);
 }
 
-int hcl_init (hcl_t* hcl, hcl_mmgr_t* mmgr, hcl_oow_t heapsz, const hcl_vmprim_t* vmprim)
+int hcl_init (hcl_t* hcl, hcl_mmgr_t* mmgr, const hcl_vmprim_t* vmprim)
 {
 	int modtab_inited = 0;
 	int n;
@@ -156,9 +156,6 @@ int hcl_init (hcl_t* hcl, hcl_mmgr_t* mmgr, hcl_oow_t heapsz, const hcl_vmprim_t
 
 	hcl->proc_map_free_first = -1;
 	hcl->proc_map_free_last = -1;
-
-	/* remember the requested heap size. but push back the actuall heap creation to hcl_ignite() */
-	hcl->_reqheapsz = heapsz;
 
 	if (hcl->vmprim.dl_startup) hcl->vmprim.dl_startup (hcl);
 	return 0;

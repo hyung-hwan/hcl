@@ -736,13 +736,13 @@ hcl_oop_t hcl_shallowcopy (hcl_t* hcl, hcl_oop_t oop)
 /* ========================================================================= */
 
 
-int hcl_ignite (hcl_t* hcl)
+int hcl_ignite (hcl_t* hcl, hcl_oow_t heapsize)
 {
 	hcl_oow_t i;
 
 	if (!hcl->heap)
 	{
-		hcl->heap = hcl_makeheap(hcl, hcl->_reqheapsz);
+		hcl->heap = hcl_makeheap(hcl, heapsize);
 		if (HCL_UNLIKELY(!hcl->heap)) return -1;
 	}
 

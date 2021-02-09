@@ -735,7 +735,7 @@ int main (int argc, char* argv[])
 	if (opt.ind >= argc) goto print_usage;
 #endif
 
-	hcl = hcl_openstd(HCL_SIZEOF(xtn_t), heapsize, HCL_NULL);
+	hcl = hcl_openstd(HCL_SIZEOF(xtn_t), HCL_NULL);
 	if (HCL_UNLIKELY(!hcl))
 	{
 		printf ("ERROR: cannot open hcl\n");
@@ -786,7 +786,7 @@ int main (int argc, char* argv[])
 	}
 #endif
 
-	if (hcl_ignite(hcl) <= -1)
+	if (hcl_ignite(hcl, heapsize) <= -1)
 	{
 		hcl_logbfmt (hcl, HCL_LOG_STDERR, "cannot ignite hcl - [%d] %js\n", hcl_geterrnum(hcl), hcl_geterrmsg(hcl));
 		goto oops;

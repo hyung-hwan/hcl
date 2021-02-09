@@ -809,7 +809,7 @@ hcl_client_t* hcl_client_open (hcl_mmgr_t* mmgr, hcl_oow_t xtnsize, hcl_client_p
 		return HCL_NULL;
 	}
 
-	hcl = hcl_openstdwithmmgr(mmgr, HCL_SIZEOF(*xtn), 2048, errnum);
+	hcl = hcl_openstdwithmmgr(mmgr, HCL_SIZEOF(*xtn), errnum);
 	if (!hcl) 
 	{
 		HCL_MMGR_FREE (mmgr, client);
