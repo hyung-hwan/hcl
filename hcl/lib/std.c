@@ -904,7 +904,7 @@ static void backtrace_stack_frames (hcl_t* hcl)
 		}
 
 		hcl_logbfmt (hcl, HCL_LOG_UNTYPED | HCL_LOG_DEBUG, 
-			"#%02d ip=0x%*p sp=0x%*p %s+0x%zu\n", 
+			"#%02d ip=0x%*p sp=0x%*p %hs+0x%zu\n", 
 			n, HCL_SIZEOF(void*) * 2, (void*)ip, HCL_SIZEOF(void*) * 2, (void*)sp, symbol, (hcl_oow_t)off);
 	}
 }
@@ -925,7 +925,7 @@ static void backtrace_stack_frames (hcl_t* hcl)
 
 		for (i = 0; i < btsize; i++)
 		{
-			hcl_logbfmt(hcl, HCL_LOG_UNTYPED | HCL_LOG_DEBUG, "  %s\n", btsyms[i]);
+			hcl_logbfmt (hcl, HCL_LOG_UNTYPED | HCL_LOG_DEBUG, "  %hs\n", btsyms[i]);
 		}
 		free (btsyms);
 	}
@@ -939,7 +939,7 @@ static void backtrace_stack_frames (hcl_t* hcl)
 
 static void _assertfail (hcl_t* hcl, const hcl_bch_t* expr, const hcl_bch_t* file, hcl_oow_t line)
 {
-	hcl_logbfmt (hcl, HCL_LOG_UNTYPED | HCL_LOG_FATAL, "ASSERTION FAILURE: %s at %s:%zu\n", expr, file, line);
+	hcl_logbfmt (hcl, HCL_LOG_UNTYPED | HCL_LOG_FATAL, "ASSERTION FAILURE: %hs at %hs:%zu\n", expr, file, line);
 	backtrace_stack_frames (hcl);
 
 #if defined(_WIN32)
@@ -2099,7 +2099,7 @@ static void vm_muxwait (hcl_t* hcl, const hcl_ntime_t* dur, hcl_vmprim_muxwait_c
 	if (n <= -1)
 	{
 		hcl_seterrwithsyserr (hcl, 0, errno);
-		HCL_DEBUG2 (hcl, "Warning: multiplexer wait failure - %d, %s\n", errno, hcl_geterrmsg(hcl));
+		HCL_DEBUG2 (hcl, "Warning: multiplexer wait failure - %d, %js\n", errno, hcl_geterrmsg(hcl));
 	}
 	else
 	{
@@ -2502,7 +2502,7 @@ static void* dl_open (hcl_t* hcl, const hcl_ooch_t* name, int flags)
 			{
 				const hcl_bch_t* dl_errstr;
 				dl_errstr = sys_dl_error();
-				HCL_DEBUG2 (hcl, "Unable to open(ext) DL %hs - %s\n", bufptr, dl_errstr);
+				HCL_DEBUG2 (hcl, "Unable to open(ext) DL %hs - %hs\n", bufptr, dl_errstr);
 				hcl_seterrbfmt (hcl, HCL_ESYSERR, "unable to open(ext) DL %js - %hs", name, dl_errstr);
 			}
 			else HCL_DEBUG2 (hcl, "Opened(ext) DL %hs handle %p\n", bufptr, handle);

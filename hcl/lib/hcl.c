@@ -120,7 +120,8 @@ int hcl_init (hcl_t* hcl, hcl_mmgr_t* mmgr, const hcl_vmprim_t* vmprim)
 	if (!hcl->vmprim.alloc_heap) hcl->vmprim.alloc_heap = alloc_heap;
 	if (!hcl->vmprim.free_heap) hcl->vmprim.free_heap = free_heap;
 
-	hcl->option.log_mask = ~(hcl_bitmask_t)0;
+	/*hcl->option.log_mask = HCL_LOG_ALL_LEVELS | HCL_LOG_ALL_TYPES;*/
+	hcl->option.log_mask = (hcl_bitmask_t)0; /* log nothing by default */
 	hcl->option.log_maxcapa = HCL_DFL_LOG_MAXCAPA;
 	hcl->option.dfl_symtab_size = HCL_DFL_SYMTAB_SIZE;
 	hcl->option.dfl_sysdic_size = HCL_DFL_SYSDIC_SIZE;
