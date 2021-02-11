@@ -46,8 +46,22 @@ hcl_heap_t* hcl_makeheap (hcl_t* hcl, hcl_oow_t size)
 	hcl_heap_t* heap;
 	hcl_oow_t alloc_size;
 
-	alloc_size = HCL_SIZEOF(*heap) + size;
-	heap = (hcl_heap_t*)hcl->vmprim.alloc_heap(hcl, &alloc_size);
+	if (size <= HCL_SIZEOF(*heap)) /* 0 or smaller than the heap header */
+	{
+		/* make a zero-sized heap using the default memory manager.
+		 * this zero-sized heap contains only the heap header */
+		size = 0;
+		alloc_size = HCL_SIZEOF(*heap);
+		heap = (hcl_heap_t*)hcl_allocmem(hcl, alloc_size);
+	}
+	else
+	{
+		/* if a non-zero heap size is given, create the heap with
+		 * the dedicated heap allocator which is allowed to create
+		 * a bigger heap than requested  */
+		alloc_size = size;
+		heap = (hcl_heap_t*)hcl->vmprim.alloc_heap(hcl, &alloc_size);
+	}
 	if (HCL_UNLIKELY(!heap))
 	{
 		const hcl_ooch_t* oldmsg = hcl_backuperrmsg(hcl);
@@ -57,15 +71,17 @@ hcl_heap_t* hcl_makeheap (hcl_t* hcl, hcl_oow_t size)
 
 	/* the vmprim.alloc_heap() function is allowed to create a bigger heap than the requested size.
 	 * if the created heap is bigger than requested, the heap will be utilized in full. */
-	HCL_ASSERT (hcl, alloc_size >= HCL_SIZEOF(*heap) + size);
+	HCL_ASSERT (hcl, alloc_size >= HCL_SIZEOF(*heap));
 	HCL_MEMSET (heap, 0, alloc_size);
 
+	alloc_size -= HCL_SIZEOF(*heap); /* exclude the header size */
 	heap->base = (hcl_uint8_t*)(heap + 1);
 	heap->size = alloc_size;
 
-	if (size <= 0)
+	if (size == 0)
 	{
 		/* use the existing memory allocator */
+		HCL_ASSERT (hcl, alloc_size == 0);
 		heap->xmmgr = *hcl_getmmgr(hcl);
 	}
 	else
@@ -90,8 +106,15 @@ hcl_heap_t* hcl_makeheap (hcl_t* hcl, hcl_oow_t size)
 
 void hcl_killheap (hcl_t* hcl, hcl_heap_t* heap)
 {
-	if (heap->xma) hcl_xma_close (heap->xma);
-	hcl->vmprim.free_heap (hcl, heap);
+	if (heap->size == 0)
+	{
+		hcl_freemem (hcl, heap);
+	}
+	else
+	{
+		if (heap->xma) hcl_xma_close (heap->xma);
+		hcl->vmprim.free_heap (hcl, heap);
+	}
 }
 
 void* hcl_callocheapmem (hcl_t* hcl, hcl_heap_t* heap, hcl_oow_t size)
