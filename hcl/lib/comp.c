@@ -781,11 +781,13 @@ enum
 {
 	COP_COMPILE_OBJECT,
 
-	COP_COMPILE_OBJECT_LIST,
-	COP_COMPILE_IF_OBJECT_LIST,
 	COP_COMPILE_ARGUMENT_LIST,
-	COP_COMPILE_OBJECT_LIST_TAIL,
+	COP_COMPILE_OBJECT_LIST,
+	COP_COMPILE_OBJECT_LIST_TAIL,	
+	COP_COMPILE_IF_OBJECT_LIST,
 	COP_COMPILE_IF_OBJECT_LIST_TAIL,
+	COP_COMPILE_TRY_OBJECT_LIST,
+	COP_COMPILE_TRY_OBJECT_LIST_TAIL,
 
 	COP_COMPILE_ARRAY_LIST,
 	COP_COMPILE_BYTEARRAY_LIST,
@@ -794,6 +796,7 @@ enum
 
 	COP_SUBCOMPILE_ELIF,
 	COP_SUBCOMPILE_ELSE,
+	COP_SUBCOMPILE_CATCH,
 	COP_SUBCOMPILE_AND_EXPR,
 	COP_SUBCOMPILE_OR_EXPR,	
 
@@ -1003,6 +1006,41 @@ static int compile_continue (hcl_t* hcl, hcl_cnode_t* src)
 	return -1;
 }
 
+
+static int compile_do (hcl_t* hcl, hcl_cnode_t* src)
+{
+	hcl_cnode_t* cmd, * obj;
+
+	/* (do 
+	 *   (+ 10 20)
+	 *   (* 2 30)
+	 *  ...
+	 * ) 
+	 * you can use this to combine multiple expressions to a single expression
+	 */
+
+	HCL_ASSERT (hcl, HCL_CNODE_IS_CONS(src));
+	HCL_ASSERT (hcl, HCL_CNODE_IS_SYMBOL_SYNCODED(HCL_CNODE_CONS_CAR(src), HCL_SYNCODE_DO));
+
+	cmd = HCL_CNODE_CONS_CDR(src);
+	obj = HCL_CNODE_CONS_CDR(src);
+
+	if (!obj)
+	{
+		/* no value */
+		hcl_setsynerrbfmt (hcl, HCL_SYNERR_ARGCOUNT, HCL_CNODE_GET_LOC(src), HCL_NULL, "no expression specified in %.*js", HCL_CNODE_GET_TOKLEN(cmd), HCL_CNODE_GET_TOKPTR(cmd)); 
+		return -1;
+	}
+	else if (!HCL_CNODE_IS_CONS(obj))
+	{
+		hcl_setsynerrbfmt (hcl, HCL_SYNERR_DOTBANNED, HCL_CNODE_GET_LOC(obj), HCL_CNODE_GET_TOK(obj), "redundant cdr in %.*js", HCL_CNODE_GET_TOKLEN(cmd), HCL_CNODE_GET_TOKPTR(cmd));
+		return -1;
+	}
+
+	SWITCH_TOP_CFRAME (hcl, COP_COMPILE_OBJECT_LIST, obj); 
+	return 0;
+}
+
 static int compile_if (hcl_t* hcl, hcl_cnode_t* src)
 {
 	hcl_cnode_t* cmd, * obj, * cond;
@@ -1042,6 +1080,7 @@ static int compile_if (hcl_t* hcl, hcl_cnode_t* src)
 	PUSH_SUBCFRAME (hcl, COP_POST_IF_COND, obj); /* 2 */
 	cf = GET_SUBCFRAME(hcl);
 	cf->u.post_if.body_pos = -1; /* unknown yet */
+	cf->u.post_if.jump_inst_pos = -1; /* not needed */
 	cf->u.post_if.start_loc = *HCL_CNODE_GET_LOC(src);
 /* TODO: OPTIMIZATION:
  *       pass information on the conditional if it's an absoluate true or absolute false to
@@ -1416,22 +1455,23 @@ static int compile_set (hcl_t* hcl, hcl_cnode_t* src)
 	return 0;
 }
 
-
-static int compile_do (hcl_t* hcl, hcl_cnode_t* src)
+static int compile_try (hcl_t* hcl, hcl_cnode_t* src)
 {
-	hcl_cnode_t* cmd, * obj;
-
-	/* (do 
-	 *   (+ 10 20)
-	 *   (* 2 30)
-	 *  ...
-	 * ) 
-	 * you can use this to combine multiple expressions to a single expression
-	 */
+	hcl_cnode_t* cmd, * obj, * cond;
+	hcl_cframe_t* cf;
 
 	HCL_ASSERT (hcl, HCL_CNODE_IS_CONS(src));
-	HCL_ASSERT (hcl, HCL_CNODE_IS_SYMBOL_SYNCODED(HCL_CNODE_CONS_CAR(src), HCL_SYNCODE_DO));
 
+	HCL_ASSERT (hcl, HCL_CNODE_IS_SYMBOL_SYNCODED(HCL_CNODE_CONS_CAR(src), HCL_SYNCODE_TRY));
+
+	/* (try
+	 *   (perform this)
+	 *   (perform that)
+	 *  catch (x)
+	 *   (perform xxx)
+	 *   (perform yyy)
+	 * )
+	 */
 	cmd = HCL_CNODE_CONS_CDR(src);
 	obj = HCL_CNODE_CONS_CDR(src);
 
@@ -1447,7 +1487,7 @@ static int compile_do (hcl_t* hcl, hcl_cnode_t* src)
 		return -1;
 	}
 
-	SWITCH_TOP_CFRAME (hcl, COP_COMPILE_OBJECT_LIST, obj); 
+	SWITCH_TOP_CFRAME (hcl, COP_COMPILE_TRY_OBJECT_LIST, obj); 
 	return 0;
 }
 
@@ -1496,6 +1536,7 @@ static int compile_while (hcl_t* hcl, hcl_cnode_t* src, int next_cop)
 
 	return 0;
 }
+
 /* ========================================================================= */
 
 static int compile_cons_array_expression (hcl_t* hcl, hcl_cnode_t* obj)
@@ -1610,6 +1651,10 @@ static int compile_cons_xlist_expression (hcl_t* hcl, hcl_cnode_t* obj)
 				if (compile_break(hcl, obj) <= -1) return -1;
 				break;
 
+			case HCL_SYNCODE_CATCH:
+				hcl_setsynerrbfmt (hcl, HCL_SYNERR_ELIF, HCL_CNODE_GET_LOC(car), HCL_CNODE_GET_TOK(car), "catch without try");
+				return -1;
+
 			case HCL_SYNCODE_CONTINUE:
 				/* (continue)*/
 				if (compile_continue(hcl, obj) <= -1) return -1;
@@ -1658,6 +1703,10 @@ static int compile_cons_xlist_expression (hcl_t* hcl, hcl_cnode_t* obj)
 
 			case HCL_SYNCODE_RETURN_FROM_HOME:
 				if (compile_return(hcl, obj, 1) <= -1) return -1;
+				break;
+
+			case HCL_SYNCODE_TRY:
+				if (compile_try(hcl, obj) <= -1) return -1;
 				break;
 
 			case HCL_SYNCODE_UNTIL:
@@ -2142,11 +2191,13 @@ static int compile_object_list (hcl_t* hcl)
 	int cop;
 
 	cf = GET_TOP_CFRAME(hcl);
-	HCL_ASSERT (hcl, cf->opcode == COP_COMPILE_OBJECT_LIST ||
+	HCL_ASSERT (hcl, cf->opcode == COP_COMPILE_ARGUMENT_LIST || 
+	                 cf->opcode == COP_COMPILE_OBJECT_LIST ||
+	                 cf->opcode == COP_COMPILE_OBJECT_LIST_TAIL ||
 	                 cf->opcode == COP_COMPILE_IF_OBJECT_LIST ||
-	                 cf->opcode == COP_COMPILE_ARGUMENT_LIST ||
 	                 cf->opcode == COP_COMPILE_IF_OBJECT_LIST_TAIL ||
-	                 cf->opcode == COP_COMPILE_OBJECT_LIST_TAIL);
+	                 cf->opcode == COP_COMPILE_TRY_OBJECT_LIST ||
+	                 cf->opcode == COP_COMPILE_TRY_OBJECT_LIST_TAIL);
 
 	cop = cf->opcode;
 	oprnd = cf->operand;
@@ -2205,6 +2256,14 @@ static int compile_object_list (hcl_t* hcl)
 				goto done;
 			}
 		}
+		else if (cop == COP_COMPILE_TRY_OBJECT_LIST || cop == COP_COMPILE_TRY_OBJECT_LIST_TAIL)
+		{
+			if (HCL_CNODE_IS_SYMBOL_SYNCODED(car, HCL_SYNCODE_CATCH))
+			{
+				SWITCH_TOP_CFRAME (hcl, COP_SUBCOMPILE_CATCH, oprnd);
+				goto done;
+			}
+		}
 
 		SWITCH_TOP_CFRAME (hcl, COP_COMPILE_OBJECT, car);
 
@@ -2224,12 +2283,14 @@ static int compile_object_list (hcl_t* hcl)
 			 */
 			int nextcop;
 			nextcop = (cop == COP_COMPILE_OBJECT_LIST)?    COP_COMPILE_OBJECT_LIST_TAIL:
-			          (cop == COP_COMPILE_IF_OBJECT_LIST)? COP_COMPILE_IF_OBJECT_LIST_TAIL: cop;
+			          (cop == COP_COMPILE_IF_OBJECT_LIST)? COP_COMPILE_IF_OBJECT_LIST_TAIL:
+			          (cop == COP_COMPILE_TRY_OBJECT_LIST)? COP_COMPILE_TRY_OBJECT_LIST_TAIL: cop;
 			PUSH_SUBCFRAME (hcl, nextcop, cdr);
 		}
 
 		if (cop == COP_COMPILE_OBJECT_LIST_TAIL ||
-		    cop == COP_COMPILE_IF_OBJECT_LIST_TAIL)
+		    cop == COP_COMPILE_IF_OBJECT_LIST_TAIL ||
+		    cop == COP_COMPILE_TRY_OBJECT_LIST_TAIL)
 		{
 			/* emit POP_STACKTOP before evaluating the second objects 
 			 * and onwards. this goes above COP_COMPILE_OBJECT */
@@ -2541,6 +2602,37 @@ static HCL_INLINE int subcompile_else (hcl_t* hcl)
 	cmd = HCL_CNODE_CONS_CAR(src);
 	obj = HCL_CNODE_CONS_CDR(src);
 
+	if (obj && !HCL_CNODE_IS_CONS(obj))
+	{
+		hcl_setsynerrbfmt (hcl, HCL_SYNERR_DOTBANNED, HCL_CNODE_GET_LOC(obj), HCL_CNODE_GET_TOK(obj), "redundant cdr in %.*js", HCL_CNODE_GET_TOKLEN(cmd), HCL_CNODE_GET_TOKPTR(cmd));
+		return -1;
+	}
+	else
+	{
+		SWITCH_TOP_CFRAME (hcl, COP_COMPILE_OBJECT_LIST, obj);
+	}
+
+	return patch_nearest_post_if_body(hcl, cmd);
+}
+
+/* ========================================================================= */
+
+static HCL_INLINE int subcompile_catch (hcl_t* hcl)
+{
+	hcl_cnode_t* cmd, * obj, * src;
+	hcl_cframe_t* cf;
+
+	cf = GET_TOP_CFRAME(hcl);
+	HCL_ASSERT (hcl, cf->opcode == COP_SUBCOMPILE_CATCH);
+
+	src = cf->operand;
+	HCL_ASSERT (hcl, HCL_CNODE_IS_CONS(src));
+	HCL_ASSERT (hcl, HCL_CNODE_IS_SYMBOL_SYNCODED(HCL_CNODE_CONS_CAR(src), HCL_SYNCODE_CATCH));
+
+	cmd = HCL_CNODE_CONS_CAR(src);
+	obj = HCL_CNODE_CONS_CDR(src);
+
+
 	if (!obj)
 	{
 		hcl_setsynerrbfmt (hcl, HCL_SYNERR_ARGCOUNT, HCL_CNODE_GET_LOC(src), HCL_NULL, "no condition in %.*js", HCL_CNODE_GET_TOKLEN(cmd), HCL_CNODE_GET_TOKPTR(cmd));
@@ -2553,8 +2645,8 @@ static HCL_INLINE int subcompile_else (hcl_t* hcl)
 	}
 
 	SWITCH_TOP_CFRAME (hcl, COP_COMPILE_OBJECT_LIST, obj);
-
-	return patch_nearest_post_if_body(hcl, cmd);
+/* TODO: do extra work */
+	return 0;
 }
 
 /* ========================================================================= */
@@ -2684,30 +2776,36 @@ static HCL_INLINE int post_or_expr (hcl_t* hcl)
 
 static HCL_INLINE int post_if_cond (hcl_t* hcl)
 {
-	hcl_cframe_t* cf;
+	hcl_cframe_t* cf, * cf2;
 	hcl_ooi_t jump_inst_pos;
 	hcl_ooi_t body_pos;
 
 	cf = GET_TOP_CFRAME(hcl);
 	HCL_ASSERT (hcl, cf->opcode == COP_POST_IF_COND);
-	HCL_ASSERT (hcl, cf->operand != HCL_NULL);
+	/* cf->operand can be HCL_NULL in these expressions
+	 *   (if true)
+	 *   (if false)
+	 *   (if true 20 elif false)
+	 */
+	/*HCL_ASSERT (hcl, cf->operand != HCL_NULL);*/
 
 	HCL_ASSERT (hcl, hcl->code.bc.len < HCL_SMOOI_MAX);
 	jump_inst_pos = hcl->code.bc.len;
 
-	if (emit_single_param_instruction(hcl, HCL_CODE_JUMP_FORWARD_IF_FALSE, MAX_CODE_JUMP, HCL_CNODE_GET_LOC(cf->operand)) <= -1) return -1;
+	if (emit_single_param_instruction(hcl, HCL_CODE_JUMP_FORWARD_IF_FALSE, MAX_CODE_JUMP, &cf->u.post_if.start_loc) <= -1) return -1;
 
 	/* to drop the result of the conditional when it is true */
-	if (emit_byte_instruction(hcl, HCL_CODE_POP_STACKTOP, HCL_CNODE_GET_LOC(cf->operand)) <= -1) return -1; 
+	if (emit_byte_instruction(hcl, HCL_CODE_POP_STACKTOP, &cf->u.post_if.start_loc) <= -1) return -1; 
 
 	HCL_ASSERT (hcl, hcl->code.bc.len < HCL_SMOOI_MAX);
 	body_pos = hcl->code.bc.len;
 
 	SWITCH_TOP_CFRAME (hcl, COP_COMPILE_IF_OBJECT_LIST, cf->operand); /* 1 */
 	PUSH_SUBCFRAME (hcl, COP_POST_IF_BODY, cf->operand); /* 2 */
-	cf = GET_SUBCFRAME(hcl);
-	cf->u.post_if.body_pos = body_pos;
-	cf->u.post_if.jump_inst_pos = jump_inst_pos;
+	cf2 = GET_SUBCFRAME(hcl);
+	cf2->u.post_if.body_pos = body_pos;
+	cf2->u.post_if.jump_inst_pos = jump_inst_pos;
+	cf2->u.post_if.start_loc = cf->u.post_if.start_loc;
 	return 0;
 }
 
@@ -2719,14 +2817,20 @@ static HCL_INLINE int post_if_body (hcl_t* hcl)
 
 	cf = GET_TOP_CFRAME(hcl);
 	HCL_ASSERT (hcl, cf->opcode == COP_POST_IF_BODY);
-	HCL_ASSERT (hcl, cf->operand != HCL_NULL);
+
+	/* cf->operand can be HCL_NULL in these expressions
+	 *   (if true)
+	 *   (if false)
+	 *   (if true 20 elif false)
+	 */
+	/*HCL_ASSERT (hcl, cf->operand != HCL_NULL);*/
 
 	jip = cf->u.post_if.jump_inst_pos;
 
 	if (hcl->code.bc.len <= cf->u.post_if.body_pos)
 	{
 		/* if body is empty */
-		if (emit_byte_instruction(hcl, HCL_CODE_PUSH_NIL, HCL_CNODE_GET_LOC(cf->operand)) <= -1) return -1;
+		if (emit_byte_instruction(hcl, HCL_CODE_PUSH_NIL, &cf->u.post_if.start_loc) <= -1) return -1;
 	}
 
 	/* HCL_CODE_LONG_PARAM_SIZE + 1 => size of the long JUMP_FORWARD_IF_FALSE instruction */
@@ -3247,11 +3351,13 @@ int hcl_compile (hcl_t* hcl, hcl_cnode_t* obj)
 				if (compile_object(hcl) <= -1) goto oops;
 				break;
 
+			case COP_COMPILE_ARGUMENT_LIST:
 			case COP_COMPILE_OBJECT_LIST:
 			case COP_COMPILE_OBJECT_LIST_TAIL:
 			case COP_COMPILE_IF_OBJECT_LIST:
 			case COP_COMPILE_IF_OBJECT_LIST_TAIL:
-			case COP_COMPILE_ARGUMENT_LIST:
+			case COP_COMPILE_TRY_OBJECT_LIST:
+			case COP_COMPILE_TRY_OBJECT_LIST_TAIL:
 				if (compile_object_list(hcl) <= -1) goto oops;
 				break;
 
@@ -3277,6 +3383,10 @@ int hcl_compile (hcl_t* hcl, hcl_cnode_t* obj)
 
 			case COP_SUBCOMPILE_ELSE:
 				if (subcompile_else(hcl) <= -1) goto oops;
+				break;
+
+			case COP_SUBCOMPILE_CATCH:
+				if (subcompile_catch(hcl) <= -1) goto oops;
 				break;
 
 			case COP_SUBCOMPILE_AND_EXPR:

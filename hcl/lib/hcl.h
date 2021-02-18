@@ -1401,6 +1401,7 @@ struct hcl_t
 
 	hcl_oop_t _and;    /* symbol */
 	hcl_oop_t _break;  /* symbol */
+	hcl_oop_t _catch; /* symbol */
 	hcl_oop_t _continue; /* symbol */
 	hcl_oop_t _defun;  /* symbol */
 	hcl_oop_t _do;     /* symbol */
@@ -1412,6 +1413,7 @@ struct hcl_t
 	hcl_oop_t _return; /* symbol */
 	hcl_oop_t _return_from_home; /* symbol */
 	hcl_oop_t _set;    /* symbol */
+	hcl_oop_t _try;    /* symbol */
 	hcl_oop_t _until;  /* symbol */
 	hcl_oop_t _while;  /* symbol */
 
@@ -1672,6 +1674,7 @@ enum hcl_syncode_t
 	/* these enumerators can be set in the SYNCODE flags for a symbol */
 	HCL_SYNCODE_AND = 1,
 	HCL_SYNCODE_BREAK,
+	HCL_SYNCODE_CATCH,
 	HCL_SYNCODE_CONTINUE,
 	HCL_SYNCODE_DEFUN,
 	HCL_SYNCODE_DO,
@@ -1683,6 +1686,7 @@ enum hcl_syncode_t
 	HCL_SYNCODE_RETURN,
 	HCL_SYNCODE_RETURN_FROM_HOME,
 	HCL_SYNCODE_SET,
+	HCL_SYNCODE_TRY,
 	HCL_SYNCODE_UNTIL,
 	HCL_SYNCODE_WHILE
 };

@@ -2618,7 +2618,7 @@ static void* dl_getsym (hcl_t* hcl, void* handle, const hcl_ooch_t* name)
  * EVENT CALLBACKS
  * ----------------------------------------------------------------- */
 
-#define ENABLE_LOG_INITIALLY
+/*#define ENABLE_LOG_INITIALLY*/
 
 static HCL_INLINE void reset_log_to_default (xtn_t* xtn)
 {
