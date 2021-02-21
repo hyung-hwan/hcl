@@ -1459,6 +1459,7 @@ static int compile_try (hcl_t* hcl, hcl_cnode_t* src)
 {
 	hcl_cnode_t* cmd, * obj, * cond;
 	hcl_cframe_t* cf;
+	hcl_ooi_t jump_inst_pos;
 
 	HCL_ASSERT (hcl, HCL_CNODE_IS_CONS(src));
 
@@ -1487,7 +1488,15 @@ static int compile_try (hcl_t* hcl, hcl_cnode_t* src)
 		return -1;
 	}
 
-	SWITCH_TOP_CFRAME (hcl, COP_COMPILE_TRY_OBJECT_LIST, obj); 
+	jump_inst_pos = hcl->code.bc.len;
+	if (emit_single_param_instruction(hcl, HCL_CODE_JUMP_FORWARD_0, MAX_CODE_JUMP, HCL_CNODE_GET_LOC(cmd)) <= -1) return -1;
+	
+	SWITCH_TOP_CFRAME (hcl, COP_COMPILE_TRY_OBJECT_LIST, obj);  /* 1 */
+
+	PUSH_SUBCFRAME (hcl, COP_EMIT_LAMBDA, src); /* 2 */
+	cf = GET_SUBCFRAME(hcl);
+	cf->u.lambda.jump_inst_pos = jump_inst_pos;
+
 	return 0;
 }
 
