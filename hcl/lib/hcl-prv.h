@@ -315,6 +315,12 @@ struct hcl_cframe_t
 			hcl_ooi_t jump_inst_pos;
 		} post_or;
 
+		/* COP_POST_TRY, COP_POST_CATCH */
+		struct
+		{
+			hcl_oow_t jump_inst_pos;
+		} post_try_catch;
+
 		/* COP_COMPILE_ARRAY_LIST, COP_POP_INTO_ARRAY, COP_EMIT_MAKE_ARRAY */
 		struct
 		{
@@ -333,6 +339,7 @@ struct hcl_cframe_t
 			hcl_ooi_t index;
 		} dic_list;
 
+		
 		/* COP_EMIT_LAMBDA */
 		struct
 		{
