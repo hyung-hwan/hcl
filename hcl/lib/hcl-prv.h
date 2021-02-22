@@ -752,7 +752,8 @@ enum hcl_bcode_t
 	HCL_CODE_JUMP2_BACKWARD_IF_FALSE  = 0xD3, /* 211 */
 
 	HCL_CODE_CALL_X                   = 0xD4, /* 212 */
-	/* UNUSED - 0xD5 - 0xD7 */
+	HCL_CODE_TRY_CATCH                = 0xD5, /* 213 */
+	/* UNUSED - 0xD6 - 0xD7 */
 
 	HCL_CODE_STORE_INTO_CTXTEMPVAR_X  = 0xD8, /* 216 ## */
 	/* UNUSED - 0xD9 - 0xDB */

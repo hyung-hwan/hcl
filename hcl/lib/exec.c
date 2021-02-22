@@ -1905,9 +1905,32 @@ static HCL_INLINE int call_primitive (hcl_t* hcl, hcl_ooi_t nargs)
 		return -1;
 	}
 
-	return ((hcl_pfimpl_t)rcv->impl) (hcl, (hcl_mod_t*)rcv->mod, nargs);
+	return ((hcl_pfimpl_t)rcv->impl)(hcl, (hcl_mod_t*)rcv->mod, nargs);
 }
 
+/* ------------------------------------------------------------------------- */
+
+static HCL_INLINE int call_try_catch (hcl_t* hcl)
+{
+	int x;
+	hcl_oop_block_t rcv;
+	hcl_oop_context_t newctx;
+	hcl_ooi_t nargs = 1;
+
+	rcv = (hcl_oop_block_t)HCL_STACK_GETRCV(hcl, nargs);
+	HCL_ASSERT (hcl, HCL_IS_BLOCK(hcl, rcv));
+
+/* TODO: make this block a try catch block */
+	x = prepare_new_block(hcl, rcv, 0, 0, &newctx);
+	if (HCL_UNLIKELY(x <= -1)) return -1;
+
+	HCL_STACK_POPS (hcl, nargs + 1); /* pop arguments and receiver */
+	newctx->sender = hcl->active_context;
+
+	SWITCH_ACTIVE_CONTEXT (hcl, newctx);
+	return 0;
+}
+/* ------------------------------------------------------------------------- */
 
 
 #if 0
@@ -3005,7 +3028,16 @@ static int execute (hcl_t* hcl)
 				}
 				break;
 			}
-			
+
+			/* -------------------------------------------------------- */
+			case HCL_CODE_TRY_CATCH:
+				LOG_INST_0 (hcl, "try_catch");
+				if (call_try_catch(hcl) <= -1) 
+				{
+					supplement_errmsg (hcl, fetched_instruction_pointer);
+					goto oops;
+				}
+				break;
 			/* -------------------------------------------------------- */
 
 			case HCL_CODE_PUSH_CTXTEMPVAR_X:

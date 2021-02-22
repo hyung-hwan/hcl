@@ -1885,6 +1885,7 @@ static HCL_INLINE int compile_catch (hcl_t* hcl)
 	patch_nearest_post_try (hcl);
 
 /* TODO: HCL_TRAIT_INTERACTIVE??? */
+/* TODO: nargs -> 1 ntmprs  -> 1 */
 	if (emit_double_param_instruction(hcl, HCL_CODE_MAKE_BLOCK, 0, 0, HCL_CNODE_GET_LOC(cmd)) <= -1) return -1;
 
 	jump_inst_pos = hcl->code.bc.len;
@@ -1941,12 +1942,7 @@ static HCL_INLINE int post_catch (hcl_t* hcl)
 	}
 	patch_long_jump (hcl, jip, block_code_size);
 
-#if 0
-/* beginning of the elif/else block code */
-	/* to drop the result of the conditional when the conditional is false */
-	if (emit_byte_instruction (hcl, HCL_CODE_POP_STACKTOP, HCL_CNODE_GET_LOC(cf->operand)) <= -1) return -1; 
-#endif
-/* TODO: activate two blocks with special frame arrangement..EMIT_CALL for try...catch... with 2 args???*/
+	if (emit_byte_instruction(hcl, HCL_CODE_TRY_CATCH, HCL_CNODE_GET_LOC(cf->operand)) <= -1) return -1;
 
 	hcl->c->blk.depth--; 
 	POP_CFRAME (hcl);
