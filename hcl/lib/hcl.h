@@ -552,7 +552,7 @@ typedef struct hcl_function_t* hcl_oop_function_t;
 typedef struct hcl_block_t hcl_block_t;
 typedef struct hcl_block_t* hcl_oop_block_t;
 
-#define HCL_CONTEXT_NAMED_INSTVARS 7
+#define HCL_CONTEXT_NAMED_INSTVARS 8
 typedef struct hcl_context_t hcl_context_t;
 typedef struct hcl_context_t* hcl_oop_context_t;
 
@@ -581,13 +581,16 @@ struct hcl_block_t
 	HCL_OBJ_HEADER;
 	hcl_oop_t          ntmprs; /* smooi. number of temporaries. includes arguments as well */
 	hcl_oop_t          nargs; /* smooi. number of arguments */
-	hcl_oop_t          ip; /* smooi. instruction pointer where the byte code begins in home->origin */
 	hcl_oop_context_t  home; /* home context */
+	hcl_oop_t          ip; /* smooi. instruction pointer where the byte code begins in home->origin */
 };
 
 struct hcl_context_t
 {
 	HCL_OBJ_HEADER;
+
+	/* SmallInteger, context flags */
+	hcl_oop_t         flags; 
 
 	/* it points to the active context at the moment when
 	 * this context object has been activated. a new method context

@@ -1766,6 +1766,7 @@ static int prepare_new_block (hcl_t* hcl, hcl_oop_block_t rcv_blk, hcl_ooi_t nar
 		((hcl_oop_oop_t)blkctx)->slot[i] = ((hcl_oop_oop_t)rcv_blk)->slot[i];
 	}
 #else
+	blkctx->flags = HCL_SMOOI_TO_OOP(0);
 	blkctx->ip = rcv_blk->ip;
 	blkctx->ntmprs = rcv_blk->ntmprs;
 	blkctx->nargs = rcv_blk->nargs;
@@ -1847,6 +1848,7 @@ static int __activate_function (hcl_t* hcl, hcl_oop_function_t rcv_func, hcl_ooi
 	hcl_popvolat (hcl);
 	if (HCL_UNLIKELY(!functx)) return -1;
 
+	functx->flags = HCL_SMOOI_TO_OOP(0);
 	functx->ip = HCL_SMOOI_TO_OOP(0);
 	functx->ntmprs = rcv_func->ntmprs;
 	functx->nargs = rcv_func->nargs;
@@ -1920,6 +1922,8 @@ static HCL_INLINE int call_try_catch (hcl_t* hcl)
 	rcv = (hcl_oop_block_t)HCL_STACK_GETRCV(hcl, nargs);
 	HCL_ASSERT (hcl, HCL_IS_BLOCK(hcl, rcv));
 
+	/* this is the catch block HCL_STACK_GETARG(hcl, nargs, 0); 
+	 * this is the finally block? HCL_STACK_GETARG(hcl, nargs, 1) */
 /* TODO: make this block a try catch block */
 	x = prepare_new_block(hcl, rcv, 0, 0, &newctx);
 	if (HCL_UNLIKELY(x <= -1)) return -1;
@@ -2146,6 +2150,7 @@ static int start_initial_process_and_context (hcl_t* hcl, hcl_ooi_t initial_ip)
 	hcl->ip = initial_ip;
 	hcl->sp = -1;
 
+	ctx->flags = HCL_SMOOI_TO_OOP(0);
 	ctx->ip = HCL_SMOOI_TO_OOP(initial_ip);
 	ctx->nargs = HCL_SMOOI_TO_OOP(0);
 	ctx->ntmprs = HCL_SMOOI_TO_OOP(0);
