@@ -753,7 +753,8 @@ enum hcl_bcode_t
 
 	HCL_CODE_CALL_X                   = 0xD4, /* 212 */
 	HCL_CODE_TRY_CATCH                = 0xD5, /* 213 */
-	/* UNUSED - 0xD6 - 0xD7 */
+	HCL_CODE_THROW                    = 0xD6, /* 214 */
+	/* UNUSED - 0xD7 */
 
 	HCL_CODE_STORE_INTO_CTXTEMPVAR_X  = 0xD8, /* 216 ## */
 	/* UNUSED - 0xD9 - 0xDB */

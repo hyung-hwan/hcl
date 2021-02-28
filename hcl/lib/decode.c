@@ -348,9 +348,14 @@ int hcl_decode (hcl_t* hcl, hcl_oow_t start, hcl_oow_t end)
 			handle_call:
 				LOG_INST_1 (hcl, "call %zu", b1);
 				break;
+
 			/* -------------------------------------------------------- */
 			case HCL_CODE_TRY_CATCH:
 				LOG_INST_0 (hcl, "try_catch");
+				break;
+
+			case HCL_CODE_THROW:
+				LOG_INST_0 (hcl, "throw");
 				break;
 			/* -------------------------------------------------------- */
 

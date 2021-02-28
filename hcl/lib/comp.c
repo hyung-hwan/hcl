@@ -817,6 +817,7 @@ enum
 	COP_EMIT_POP_STACKTOP,
 	COP_EMIT_RETURN,
 	COP_EMIT_SET,
+	COP_EMIT_THROW,
 
 	COP_POST_IF_COND,
 	COP_POST_IF_BODY,
@@ -1951,29 +1952,43 @@ static HCL_INLINE int post_catch (hcl_t* hcl)
 
 static int compile_throw (hcl_t* hcl, hcl_cnode_t* src)
 {
-	hcl_cnode_t* cmd, * obj;
+	hcl_cnode_t* obj, * val;
 	hcl_cframe_t* cf;
-	hcl_ooi_t jump_inst_pos;
 
 	HCL_ASSERT (hcl, HCL_CNODE_IS_CONS(src));
-
 	HCL_ASSERT (hcl, HCL_CNODE_IS_SYMBOL_SYNCODED(HCL_CNODE_CONS_CAR(src), HCL_SYNCODE_THROW));
 
-	cmd = HCL_CNODE_CONS_CDR(src);
 	obj = HCL_CNODE_CONS_CDR(src);
 
 	if (!obj)
 	{
+/* TODO: should i allow (throw)? does it return the last value on the stack? */
 		/* no value */
-		hcl_setsynerrbfmt (hcl, HCL_SYNERR_ARGCOUNT, HCL_CNODE_GET_LOC(src), HCL_NULL, "no expression specified in %.*js", HCL_CNODE_GET_TOKLEN(cmd), HCL_CNODE_GET_TOKPTR(cmd)); 
+		hcl_cnode_t* tmp = HCL_CNODE_CONS_CAR(src);
+		hcl_setsynerrbfmt (hcl, HCL_SYNERR_ARGCOUNT, HCL_CNODE_GET_LOC(src), HCL_NULL, "no value specified in %.*js", HCL_CNODE_GET_TOKLEN(tmp), HCL_CNODE_GET_TOKPTR(tmp));
 		return -1;
 	}
 	else if (!HCL_CNODE_IS_CONS(obj))
 	{
-		hcl_setsynerrbfmt (hcl, HCL_SYNERR_DOTBANNED, HCL_CNODE_GET_LOC(obj), HCL_CNODE_GET_TOK(obj), "redundant cdr in %.*js", HCL_CNODE_GET_TOKLEN(cmd), HCL_CNODE_GET_TOKPTR(cmd));
+		hcl_cnode_t* tmp = HCL_CNODE_CONS_CAR(src);
+		hcl_setsynerrbfmt (hcl, HCL_SYNERR_DOTBANNED, HCL_CNODE_GET_LOC(obj), HCL_CNODE_GET_TOK(obj), "redundant cdr in %.*js", HCL_CNODE_GET_TOKLEN(tmp), HCL_CNODE_GET_TOKPTR(tmp));
 		return -1;
 	}
 
+	val = HCL_CNODE_CONS_CAR(obj);
+
+	obj = HCL_CNODE_CONS_CDR(obj);
+	if (obj)
+	{
+		hcl_cnode_t* tmp = HCL_CNODE_CONS_CAR(src);
+		hcl_setsynerrbfmt (hcl, HCL_SYNERR_ARGCOUNT, HCL_CNODE_GET_LOC(obj), HCL_CNODE_GET_TOK(obj), "more than 1 argument in %.*js", HCL_CNODE_GET_TOKLEN(tmp), HCL_CNODE_GET_TOKPTR(tmp));
+		return -1;
+	}
+
+	SWITCH_TOP_CFRAME (hcl, COP_COMPILE_OBJECT, val);
+
+	PUSH_SUBCFRAME (hcl, COP_EMIT_THROW, src);
+	/*cf = GET_SUBCFRAME(hcl);*/
 	return 0;
 }
 
@@ -3466,6 +3481,22 @@ static HCL_INLINE int emit_set (hcl_t* hcl)
 	return 0;
 }
 
+
+static HCL_INLINE int emit_throw (hcl_t* hcl)
+{
+	hcl_cframe_t* cf;
+	int n;
+
+	cf = GET_TOP_CFRAME(hcl);
+	HCL_ASSERT (hcl, cf->opcode == COP_EMIT_THROW);
+	HCL_ASSERT (hcl, cf->operand != HCL_NULL);
+
+	n = emit_byte_instruction(hcl, HCL_CODE_THROW, HCL_CNODE_GET_LOC(cf->operand));
+
+	POP_CFRAME (hcl);
+	return n;
+}
+
 /* ========================================================================= */
 
 int hcl_compile (hcl_t* hcl, hcl_cnode_t* obj)
@@ -3640,6 +3671,10 @@ int hcl_compile (hcl_t* hcl, hcl_cnode_t* obj)
 
 			case COP_EMIT_SET:
 				if (emit_set(hcl) <= -1) goto oops;
+				break;
+
+			case COP_EMIT_THROW:
+				if (emit_throw(hcl) <= -1) goto oops;
 				break;
 
 			case COP_POST_IF_COND:

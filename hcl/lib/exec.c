@@ -1930,10 +1930,35 @@ static HCL_INLINE int call_try_catch (hcl_t* hcl)
 
 	HCL_STACK_POPS (hcl, nargs + 1); /* pop arguments and receiver */
 	newctx->sender = hcl->active_context;
+	newctx->flags = HCL_SMOOI_TO_OOP(1);
 
 	SWITCH_ACTIVE_CONTEXT (hcl, newctx);
 	return 0;
 }
+
+static HCL_INLINE int do_throw (hcl_t* hcl, hcl_oop_t val)
+{
+	hcl_oop_context_t ctx;
+	hcl_ooi_t flags;
+
+	ctx = hcl->active_context;
+	while ((hcl_oop_t)ctx != hcl->_nil)
+	{
+		flags = HCL_OOP_TO_SMOOI(ctx->flags);
+		if (flags &  1) /* TODO: use an enumerator instead of 1 */
+		{
+			printf ("found catch...\n");
+/* TODO: arrange to find the catch block and activate it... */
+			return;
+		}
+
+		ctx = ctx->sender;
+	}
+
+printf ("no catch found...\n");
+	return 0;
+}
+
 /* ------------------------------------------------------------------------- */
 
 
@@ -3042,6 +3067,13 @@ static int execute (hcl_t* hcl)
 					supplement_errmsg (hcl, fetched_instruction_pointer);
 					goto oops;
 				}
+				break;
+
+			case HCL_CODE_THROW:
+				LOG_INST_0 (hcl, "throw");
+				return_value = HCL_STACK_GETTOP(hcl);
+				HCL_STACK_POP (hcl);
+				do_throw (hcl, return_value);
 				break;
 			/* -------------------------------------------------------- */
 
