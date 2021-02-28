@@ -184,7 +184,7 @@ int str_to_sockaddr (hcl_t* hcl, const ooch_t* str, hcl_oow_t len, hcl_sckaddr_t
 		if (*p == '%')
 		{
 			/* handle scope id */
-			hcl_uint32_t x;
+			hcl_uint32_t x, y;
 
 			p++; /* skip % */
 
@@ -198,19 +198,20 @@ int str_to_sockaddr (hcl_t* hcl, const ooch_t* str, hcl_oow_t len, hcl_sckaddr_t
 			if (*p >= '0' && *p <= '9') 
 			{
 				/* numeric scope id */
-				nwad->in6.sin6_scope_id = 0;
+				y = 0;
 				do
 				{
-					x = nwad->in6.sin6_scope_id * 10 + (*p - '0');
-					if (x < nwad->in6.sin6_scope_id) 
+					x = y * 10 + (*p - '0');
+					if (x < y)
 					{
 						if (hcl) hcl_seterrbfmt (hcl, HCL_EINVAL, "scope id too large");
 						return -1; /* overflow */
 					}
-					nwad->in6.sin6_scope_id = x;
+					y = x;
 					p++;
 				}
 				while (p < end && *p >= '0' && *p <= '9');
+				//nwad->in6.sin6_scope_id = y;
 			}
 			else
 			{
@@ -220,7 +221,7 @@ TODO:
 				const ooch_t* stmp = p;
 				unsigned int index;
 				do p++; while (p < end && *p != ']');
-				if (hcl_nwifwcsntoindex (stmp, p - stmp, &index) <= -1) return -1;
+				if (hcl_nwifwcsntoindex(stmp, p - stmp, &index) <= -1) return -1;
 				tmpad.u.in6.scope = index;
 #endif
 			}
@@ -259,7 +260,7 @@ TODO:
 			if (p < end && *p == '%')
 			{
 				/* handle scope id */
-				hcl_uint32_t x;
+				hcl_uint32_t x, y;
 
 				p++; /* skip % */
 
@@ -273,19 +274,20 @@ TODO:
 				if (*p >= '0' && *p <= '9') 
 				{
 					/* numeric scope id */
-					nwad->in6.sin6_scope_id = 0;
+					y = 0;
 					do
 					{
-						x = nwad->in6.sin6_scope_id * 10 + (*p - '0');
-						if (x < nwad->in6.sin6_scope_id) 
+						x = y * 10 + (*p - '0');
+						if (x < y)
 						{
 							if (hcl) hcl_seterrbfmt (hcl, HCL_EINVAL, "scope id too large");
 							return -1; /* overflow */
 						}
-						nwad->in6.sin6_scope_id = x;
+						y = x;
 						p++;
 					}
 					while (p < end && *p >= '0' && *p <= '9');
+					//nwad->in6.sin6_scope_id = y;
 				}
 				else
 				{

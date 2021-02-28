@@ -1416,6 +1416,7 @@ struct hcl_t
 	hcl_oop_t _return; /* symbol */
 	hcl_oop_t _return_from_home; /* symbol */
 	hcl_oop_t _set;    /* symbol */
+	hcl_oop_t _throw;  /* symbol */
 	hcl_oop_t _try;    /* symbol */
 	hcl_oop_t _until;  /* symbol */
 	hcl_oop_t _while;  /* symbol */
@@ -1689,6 +1690,7 @@ enum hcl_syncode_t
 	HCL_SYNCODE_RETURN,
 	HCL_SYNCODE_RETURN_FROM_HOME,
 	HCL_SYNCODE_SET,
+	HCL_SYNCODE_THROW,
 	HCL_SYNCODE_TRY,
 	HCL_SYNCODE_UNTIL,
 	HCL_SYNCODE_WHILE

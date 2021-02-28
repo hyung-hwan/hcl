@@ -38,7 +38,7 @@ static void* xma_realloc (hcl_mmgr_t* mmgr, void* ptr, hcl_oow_t size)
 
 static void xma_free (hcl_mmgr_t* mmgr, void* ptr)
 {
-	return hcl_xma_free (mmgr->ctx, ptr);
+	hcl_xma_free (mmgr->ctx, ptr);
 }
 
 hcl_heap_t* hcl_makeheap (hcl_t* hcl, hcl_oow_t size)

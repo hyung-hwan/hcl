@@ -1949,6 +1949,34 @@ static HCL_INLINE int post_catch (hcl_t* hcl)
 	return 0;
 }
 
+static int compile_throw (hcl_t* hcl, hcl_cnode_t* src)
+{
+	hcl_cnode_t* cmd, * obj;
+	hcl_cframe_t* cf;
+	hcl_ooi_t jump_inst_pos;
+
+	HCL_ASSERT (hcl, HCL_CNODE_IS_CONS(src));
+
+	HCL_ASSERT (hcl, HCL_CNODE_IS_SYMBOL_SYNCODED(HCL_CNODE_CONS_CAR(src), HCL_SYNCODE_THROW));
+
+	cmd = HCL_CNODE_CONS_CDR(src);
+	obj = HCL_CNODE_CONS_CDR(src);
+
+	if (!obj)
+	{
+		/* no value */
+		hcl_setsynerrbfmt (hcl, HCL_SYNERR_ARGCOUNT, HCL_CNODE_GET_LOC(src), HCL_NULL, "no expression specified in %.*js", HCL_CNODE_GET_TOKLEN(cmd), HCL_CNODE_GET_TOKPTR(cmd)); 
+		return -1;
+	}
+	else if (!HCL_CNODE_IS_CONS(obj))
+	{
+		hcl_setsynerrbfmt (hcl, HCL_SYNERR_DOTBANNED, HCL_CNODE_GET_LOC(obj), HCL_CNODE_GET_TOK(obj), "redundant cdr in %.*js", HCL_CNODE_GET_TOKLEN(cmd), HCL_CNODE_GET_TOKPTR(cmd));
+		return -1;
+	}
+
+	return 0;
+}
+
 /* ========================================================================= */
 
 static int compile_while (hcl_t* hcl, hcl_cnode_t* src, int next_cop)
@@ -2163,6 +2191,10 @@ static int compile_cons_xlist_expression (hcl_t* hcl, hcl_cnode_t* obj)
 
 			case HCL_SYNCODE_RETURN_FROM_HOME:
 				if (compile_return(hcl, obj, 1) <= -1) return -1;
+				break;
+
+			case HCL_SYNCODE_THROW:
+				if (compile_throw(hcl, obj) <= -1) return -1;
 				break;
 
 			case HCL_SYNCODE_TRY:
