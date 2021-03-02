@@ -1784,7 +1784,7 @@ static int compile_try (hcl_t* hcl, hcl_cnode_t* src)
 		return -1;
 	}
 	hcl->c->blk.depth++; 
-
+	if (store_temporary_variable_count_for_block(hcl, hcl->c->tv.wcount, hcl->c->tv.s.len, hcl->code.lit.len) <= -1) return -1;
 
 /* TODO: HCL_TRAIT_INTERACTIVE??? */
 	if (emit_double_param_instruction(hcl, HCL_CODE_MAKE_BLOCK, 0, 0, HCL_CNODE_GET_LOC(cmd)) <= -1) return -1;
@@ -1799,7 +1799,6 @@ static int compile_try (hcl_t* hcl, hcl_cnode_t* src)
 
 	return 0;
 }
-
 
 static HCL_INLINE int patch_nearest_post_try (hcl_t* hcl)
 {

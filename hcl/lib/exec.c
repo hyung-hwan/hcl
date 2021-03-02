@@ -53,6 +53,8 @@ static HCL_INLINE const char* proc_state_to_string (int state)
 	return str[state + 1];
 }
 
+static hcl_ooch_t oocstr_dash[] = { '-', '\0' };
+
 #define PROC_MAP_INC 64
 
 /* TODO: adjust these max semaphore pointer buffer capacity,
@@ -1718,7 +1720,7 @@ void hcl_releaseiohandle (hcl_t* hcl, hcl_ooi_t io_handle)
 
 /* ------------------------------------------------------------------------- */
 
-static int prepare_new_block (hcl_t* hcl, hcl_oop_block_t rcv_blk, hcl_ooi_t nargs, int nargs_offset, hcl_oop_context_t* pnewctx)
+static int prepare_new_context (hcl_t* hcl, hcl_oop_block_t rcv_blk, hcl_ooi_t nargs, int nargs_offset, hcl_ooi_t extra_slots, int copy_args, hcl_oop_context_t* pnewctx)
 {
 	/* prepare a new block context for activation.
 	 * the receiver must be a block context which becomes the base
@@ -1755,7 +1757,7 @@ static int prepare_new_block (hcl_t* hcl, hcl_oop_block_t rcv_blk, hcl_ooi_t nar
 
 	/* create a new block context to clone rcv_blk */
 	hcl_pushvolat (hcl, (hcl_oop_t*)&rcv_blk);
-	blkctx = make_context(hcl, local_ntmprs); 
+	blkctx = make_context(hcl, local_ntmprs + extra_slots); 
 	hcl_popvolat (hcl);
 	if (HCL_UNLIKELY(!blkctx)) return -1;
 
@@ -1776,11 +1778,13 @@ static int prepare_new_block (hcl_t* hcl, hcl_oop_block_t rcv_blk, hcl_ooi_t nar
 	blkctx->origin = rcv_blk->home->origin;
 #endif
 
-/* TODO: check the stack size of a block context to see if it's large enough to hold arguments */
-	/* copy the arguments to the stack */
-	for (i = 0; i < nargs; i++)
+	if (HCL_LIKELY(copy_args))
 	{
-		blkctx->slot[i] = HCL_STACK_GETARG(hcl, nargs, i);
+		/* copy the arguments to the stack */
+		for (i = 0; i < nargs; i++)
+		{
+			blkctx->slot[i] = HCL_STACK_GETARG(hcl, nargs, i);
+		}
 	}
 
 	HCL_ASSERT (hcl, (hcl_oop_t)blkctx->home != hcl->_nil); /* if not intial context, the home must not be null */
@@ -1799,7 +1803,12 @@ static HCL_INLINE int activate_block (hcl_t* hcl, hcl_ooi_t nargs)
 	rcv = (hcl_oop_block_t)HCL_STACK_GETRCV(hcl, nargs);
 	HCL_ASSERT (hcl, HCL_IS_BLOCK(hcl, rcv));
 
-	x = prepare_new_block(hcl, rcv, nargs, 0, &newctx);
+	x = prepare_new_context(hcl, rcv,
+		nargs, /* nargs */
+		0, /* nargs_offset */
+		0, /* extra_slots */
+		1, /* copy_args */
+		&newctx);
 	if (HCL_UNLIKELY(x <= -1)) return -1;
 
 	HCL_STACK_POPS (hcl, nargs + 1); /* pop arguments and receiver */
@@ -1915,28 +1924,67 @@ static HCL_INLINE int call_primitive (hcl_t* hcl, hcl_ooi_t nargs)
 static HCL_INLINE int call_try_catch (hcl_t* hcl)
 {
 	int x;
-	hcl_oop_block_t rcv;
+	hcl_oop_block_t rcv, catch_blk;
 	hcl_oop_context_t newctx;
 	hcl_ooi_t nargs = 1;
+
+	/* try is called after two pushes to the stack.
+	 * it is one receiver and one argument */
 
 	rcv = (hcl_oop_block_t)HCL_STACK_GETRCV(hcl, nargs);
 	HCL_ASSERT (hcl, HCL_IS_BLOCK(hcl, rcv));
 
 	/* this is the catch block HCL_STACK_GETARG(hcl, nargs, 0); 
 	 * this is the finally block? HCL_STACK_GETARG(hcl, nargs, 1) */
-/* TODO: make this block a try catch block */
-	x = prepare_new_block(hcl, rcv, 0, 0, &newctx);
+	x = prepare_new_context(hcl, rcv,
+		0, /* nargs - 0 because the block itself doesn't have an argument */
+		0, /* nargs_offset */
+		1, /* extra_slots - secure 1 extra slot to remember the catch block */
+		0, /* copy_args */
+		&newctx);
 	if (HCL_UNLIKELY(x <= -1)) return -1;
+
+	catch_blk = (hcl_oop_block_t)HCL_STACK_GETARG(hcl, nargs, 0);
+	HCL_ASSERT (hcl, HCL_IS_BLOCK(hcl, catch_blk));
+/* TODO: finally block */
 
 	HCL_STACK_POPS (hcl, nargs + 1); /* pop arguments and receiver */
 	newctx->sender = hcl->active_context;
 	newctx->flags = HCL_SMOOI_TO_OOP(1);
+	newctx->slot[0] = (hcl_oop_t)catch_blk; /* remember the catch block */
 
 	SWITCH_ACTIVE_CONTEXT (hcl, newctx);
 	return 0;
 }
 
-static HCL_INLINE int do_throw (hcl_t* hcl, hcl_oop_t val)
+
+static HCL_INLINE int activate_block_for_throw_catch (hcl_t* hcl, hcl_oop_block_t rcv, hcl_oop_t throw_v, hcl_oop_context_t sender)
+{
+	int x;
+	hcl_oop_context_t newctx;
+
+	HCL_ASSERT (hcl, HCL_IS_BLOCK(hcl, rcv));
+
+	hcl_pushvolat (hcl, &throw_v);
+	hcl_pushvolat (hcl, &sender);
+	x = prepare_new_context(hcl, rcv,
+		0, /* nargs TODO: set this to 1...*/
+		0, /* nargs_offset */
+		1, /* extra space */  /* TODO: MOVE THIS TO nargs, set this to 0 */
+		0, /* copy args */
+		&newctx);
+	hcl_popvolats (hcl, 2);
+	if (HCL_UNLIKELY(x <= -1)) return -1;
+
+	/*newctx->sender = hcl->active_context;*/
+	newctx->sender = sender;
+	newctx->slot[0] = throw_v;
+
+	SWITCH_ACTIVE_CONTEXT (hcl, newctx);
+	return 0;
+}
+
+static HCL_INLINE int do_throw (hcl_t* hcl, hcl_oop_t val, hcl_ooi_t ip)
 {
 	hcl_oop_context_t ctx;
 	hcl_ooi_t flags;
@@ -1947,15 +1995,27 @@ static HCL_INLINE int do_throw (hcl_t* hcl, hcl_oop_t val)
 		flags = HCL_OOP_TO_SMOOI(ctx->flags);
 		if (flags &  1) /* TODO: use an enumerator instead of 1 */
 		{
-			printf ("found catch...\n");
-/* TODO: arrange to find the catch block and activate it... */
-			return;
+			return activate_block_for_throw_catch (hcl, (hcl_oop_block_t)ctx->slot[0], val, ctx->sender);
+/* TOOD: arrange to unwind.... */
 		}
 
 		ctx = ctx->sender;
 	}
 
-printf ("no catch found...\n");
+
+	if (hcl->active_function->dbgi != hcl->_nil)
+	{
+		hcl_dbgi_t* dbgi;
+		dbgi = (hcl_dbgi_t*)HCL_OBJ_GET_BYTE_SLOT(hcl->active_function->dbgi);
+		HCL_LOG2 (hcl, HCL_LOG_IC | HCL_LOG_WARN, "exception not handled %js:%zu", (dbgi[ip].fname? dbgi[ip].fname: oocstr_dash), dbgi[ip].sline);
+	}
+	else
+	{
+		HCL_LOG0 (hcl, HCL_LOG_IC | HCL_LOG_WARN, "exception not handled");
+	}
+	
+	/* exception not handled. terminate the active process */
+	terminate_process (hcl, hcl->processor->active);
 	return 0;
 }
 
@@ -2629,7 +2689,6 @@ static void supplement_errmsg (hcl_t* hcl, hcl_ooi_t ip)
 	if (hcl->active_function->dbgi != hcl->_nil)
 	{
 		hcl_dbgi_t* dbgi;
-		static hcl_ooch_t dash[] = { '-', '\0' };
 		const hcl_ooch_t* orgmsg = hcl_backuperrmsg(hcl);
 		hcl_errnum_t orgnum = hcl_geterrnum(hcl);
 
@@ -2637,7 +2696,7 @@ static void supplement_errmsg (hcl_t* hcl, hcl_ooi_t ip)
 		dbgi = (hcl_dbgi_t*)HCL_OBJ_GET_BYTE_SLOT(hcl->active_function->dbgi);
 
 		hcl_seterrbfmt (hcl, orgnum, "%js (%js:%zu)", orgmsg,
-			(dbgi[ip].fname? dbgi[ip].fname: dash), dbgi[ip].sline);
+			(dbgi[ip].fname? dbgi[ip].fname: oocstr_dash), dbgi[ip].sline);
 	}
 }
 
@@ -3073,7 +3132,7 @@ static int execute (hcl_t* hcl)
 				LOG_INST_0 (hcl, "throw");
 				return_value = HCL_STACK_GETTOP(hcl);
 				HCL_STACK_POP (hcl);
-				do_throw (hcl, return_value);
+				do_throw (hcl, return_value, fetched_instruction_pointer);
 				break;
 			/* -------------------------------------------------------- */
 
@@ -3817,7 +3876,12 @@ hcl_pfrc_t hcl_pf_process_fork (hcl_t* hcl, hcl_mod_t* mod, hcl_ooi_t nargs)
 		return HCL_PF_FAILURE;
 	}
 
-	x = prepare_new_block(hcl, blk, nargs, 1, &newctx);
+	x = prepare_new_context(hcl, blk,
+		nargs, /* nargs */
+		1, /* nargs_offset */
+		0, /* extra_slots */
+		1, /* copy_args */
+		&newctx);
 	if (HCL_UNLIKELY(x <= -1)) return HCL_PF_FAILURE;
 
 	HCL_ASSERT (hcl, (hcl_oop_t)newctx->sender == hcl->_nil);
