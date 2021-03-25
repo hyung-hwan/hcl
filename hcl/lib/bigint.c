@@ -315,7 +315,7 @@ int hcl_inttoooi (hcl_t* hcl, hcl_oop_t x, hcl_ooi_t* i)
 	int n;
 
 	n = hcl_inttooow(hcl, x, &w);
-	if (n < 0) 
+	if (n < 0)
 	{
 		HCL_ASSERT (hcl, HCL_TYPE_MAX(hcl_ooi_t) + HCL_TYPE_MIN(hcl_ooi_t) == -1); /* assume 2's complement */
 		if (w > (hcl_oow_t)HCL_TYPE_MAX(hcl_ooi_t) + 1)
@@ -377,7 +377,7 @@ static HCL_INLINE int bigint_to_uintmax (hcl_t* hcl, hcl_oop_t num, hcl_uintmax_
 
 		case 4:
 			*w = ((hcl_uintmax_t)HCL_OBJ_GET_HALFWORD_VAL(num, 0) << HCL_LIW_BITS * 3) | 
-			     ((hcl_uintmax_t)HCL_OBJ_GET_HALFWORD_VAL(num, 1) << HCL_LIW_BITS * 2) |
+				((hcl_uintmax_t)HCL_OBJ_GET_HALFWORD_VAL(num, 1) << HCL_LIW_BITS * 2) |
 			     ((hcl_uintmax_t)HCL_OBJ_GET_HALFWORD_VAL(num, 2) << HCL_LIW_BITS * 1) |
 			     HCL_OBJ_GET_HALFWORD_VAL(num, 3);
 			goto done;
@@ -640,6 +640,9 @@ hcl_oop_t hcl_ooitoint (hcl_t* hcl, hcl_ooi_t i)
 	}
 }
 
+#if (HCL_SIZEOF_UINTMAX_T == HCL_SIZEOF_OOW_T)
+	/* do nothing. required macros are defined in hcl.h */
+#else
 hcl_oop_t hcl_intmaxtoint (hcl_t* hcl, hcl_intmax_t i)
 {
 	if (HCL_IN_SMOOI_RANGE(i))
@@ -663,6 +666,7 @@ hcl_oop_t hcl_uintmaxtoint (hcl_t* hcl, hcl_uintmax_t i)
 		return make_bigint_with_uintmax(hcl, i);
 	}
 }
+#endif
 
 static HCL_INLINE hcl_oop_t expand_bigint (hcl_t* hcl, hcl_oop_t oop, hcl_oow_t inc)
 {

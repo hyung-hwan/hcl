@@ -1084,7 +1084,7 @@ static void free_heap (hcl_t* hcl, void* ptr)
 	actual_ptr = (hcl_oow_t*)ptr - 1;
 	munmap (actual_ptr, *actual_ptr);
 #else
-	return HCL_MMGR_FREE(hcl->_mmgr, ptr);
+	HCL_MMGR_FREE(hcl->_mmgr, ptr);
 #endif
 }
 
