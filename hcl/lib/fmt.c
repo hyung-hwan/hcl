@@ -25,7 +25,7 @@
  */
 
 /*
- * This file contains a formatted output routine derived from kvprintf() 
+ * This file contains a formatted output routine derived from kvprintf()
  * of FreeBSD. It has been heavily modified and bug-fixed.
  */
 
@@ -72,7 +72,7 @@
 
 #include <stdio.h> /* for snrintf(). used for floating-point number formatting */
 #if defined(_MSC_VER) || defined(__BORLANDC__) || (defined(__WATCOMC__) && (__WATCOMC__ < 1200))
-#	define snprintf _snprintf 
+#	define snprintf _snprintf
 #	if !defined(HAVE_SNPRINTF)
 #		define HAVE_SNPRINTF
 #	endif
@@ -83,7 +83,7 @@
 
 #endif
 
-/* Max number conversion buffer length: 
+/* Max number conversion buffer length:
  * hcl_intmax_t in base 2, plus NUL byte. */
 #define MAXNBUF (HCL_SIZEOF(hcl_intmax_t) * HCL_BITS_PER_BYTE + 1)
 
@@ -108,7 +108,7 @@ static struct
 {
 	hcl_uint8_t flag; /* for single occurrence */
 	hcl_uint8_t dflag; /* for double occurrence */
-} lm_tab[26] = 
+} lm_tab[26] =
 {
 	{ 0,    0 }, /* a */
 	{ 0,    0 }, /* b */
@@ -139,7 +139,7 @@ static struct
 };
 
 
-enum 
+enum
 {
 	FLAGC_DOT       = (1 << 0),
 	FLAGC_SPACE     = (1 << 1),
@@ -154,14 +154,14 @@ enum
 	FLAGC_LENMOD    = (1 << 10) /* length modifier */
 };
 
-static const hcl_bch_t hex2ascii_lower[] = 
+static const hcl_bch_t hex2ascii_lower[] =
 {
 	'0','1','2','3','4','5','6','7','8','9',
 	'a','b','c','d','e','f','g','h','i','j','k','l','m',
 	'n','o','p','q','r','s','t','u','v','w','x','y','z'
 };
 
-static const hcl_bch_t hex2ascii_upper[] = 
+static const hcl_bch_t hex2ascii_upper[] =
 {
 	'0','1','2','3','4','5','6','7','8','9',
 	'A','B','C','D','E','F','G','H','I','J','K','L','M',
@@ -188,7 +188,7 @@ static hcl_bch_t bch_nullstr[] = { '(','n','u','l','l', ')','\0' };
 #include "fmt-imp.h"
 
 int hcl_fmt_intmax_to_bcstr (
-	hcl_bch_t* buf, int size, 
+	hcl_bch_t* buf, int size,
 	hcl_intmax_t value, int base_and_flags, int prec,
 	hcl_bch_t fillchar, const hcl_bch_t* prefix)
 {
@@ -220,7 +220,7 @@ int hcl_fmt_intmax_to_bcstr (
 }
 
 int hcl_fmt_uintmax_to_bcstr (
-	hcl_bch_t* buf, int size, 
+	hcl_bch_t* buf, int size,
 	hcl_uintmax_t value, int base_and_flags, int prec,
 	hcl_bch_t fillchar, const hcl_bch_t* prefix)
 {
@@ -246,7 +246,7 @@ int hcl_fmt_uintmax_to_bcstr (
 /* ==================== wide-char ===================================== */
 
 int hcl_fmt_intmax_to_ucstr (
-	hcl_uch_t* buf, int size, 
+	hcl_uch_t* buf, int size,
 	hcl_intmax_t value, int base_and_flags, int prec,
 	hcl_uch_t fillchar, const hcl_uch_t* prefix)
 {
@@ -278,7 +278,7 @@ int hcl_fmt_intmax_to_ucstr (
 }
 
 int hcl_fmt_uintmax_to_ucstr (
-	hcl_uch_t* buf, int size, 
+	hcl_uch_t* buf, int size,
 	hcl_uintmax_t value, int base_and_flags, int prec,
 	hcl_uch_t fillchar, const hcl_uch_t* prefix)
 {
@@ -442,10 +442,10 @@ static int fmt_outv (hcl_fmtout_t* fmtout, va_list ap)
 	fmtptr = (const hcl_uint8_t*)fmtout->fmt_str;
 	switch (fmtout->fmt_type)
 	{
-		case HCL_FMTOUT_FMT_TYPE_BCH: 
+		case HCL_FMTOUT_FMT_TYPE_BCH:
 			fmtchsz = HCL_SIZEOF_BCH_T;
 			break;
-		case HCL_FMTOUT_FMT_TYPE_UCH: 
+		case HCL_FMTOUT_FMT_TYPE_UCH:
 			fmtchsz = HCL_SIZEOF_UCH_T;
 			break;
 	}
@@ -478,9 +478,9 @@ static int fmt_outv (hcl_fmtout_t* fmtout, va_list ap)
 		{
 			const hcl_bch_t* start, * end;
 			start = end = (const hcl_bch_t*)fmtptr;
-			while ((bch = *end++) != '%' || stop) 
+			while ((bch = *end++) != '%' || stop)
 			{
-				if (bch == '\0') 
+				if (bch == '\0')
 				{
 					PUT_BCS (fmtout, start, end - start - 1);
 					goto done;
@@ -496,9 +496,9 @@ static int fmt_outv (hcl_fmtout_t* fmtout, va_list ap)
 		{
 			const hcl_uch_t* start, * end;
 			start = end = (const hcl_uch_t*)fmtptr;
-			while ((uch = *end++) != '%' || stop) 
+			while ((uch = *end++) != '%' || stop)
 			{
-				if (uch == '\0') 
+				if (uch == '\0')
 				{
 					PUT_UCS (fmtout, start, end - start - 1);
 					goto done;
@@ -511,15 +511,15 @@ static int fmt_outv (hcl_fmtout_t* fmtout, va_list ap)
 		goto handle_percent;
 
 	handle_percent:
-		padc = ' '; 
+		padc = ' ';
 		width = 0; precision = 0; neg = 0; sign = 0;
-		lm_flag = 0; lm_dflag = 0; flagc = 0; 
+		lm_flag = 0; lm_dflag = 0; flagc = 0;
 		sprintn = sprintn_lower;
 
 	reswitch:
 		switch (fmtout->fmt_type)
 		{
-			case HCL_FMTOUT_FMT_TYPE_BCH: 
+			case HCL_FMTOUT_FMT_TYPE_BCH:
 				uch = *(const hcl_bch_t*)fmtptr;
 				break;
 			case HCL_FMTOUT_FMT_TYPE_UCH:
@@ -528,7 +528,7 @@ static int fmt_outv (hcl_fmtout_t* fmtout, va_list ap)
 		}
 		fmtptr += fmtchsz;
 
-		switch (uch) 
+		switch (uch)
 		{
 		case '%': /* %% */
 			bch = uch;
@@ -540,7 +540,7 @@ static int fmt_outv (hcl_fmtout_t* fmtout, va_list ap)
 			flagc |= FLAGC_DOT;
 			goto reswitch;
 
-		case '#': 
+		case '#':
 			if (flagc & (FLAGC_WIDTH | FLAGC_DOT | FLAGC_LENMOD)) goto invalid_format;
 			flagc |= FLAGC_SHARP;
 			goto reswitch;
@@ -570,34 +570,34 @@ static int fmt_outv (hcl_fmtout_t* fmtout, va_list ap)
 					flagc &= ~FLAGC_ZEROPAD;
 				}
 			}
-			
+
 			goto reswitch;
 
 		case '*': /* take the length from the parameter */
-			if (flagc & FLAGC_DOT) 
+			if (flagc & FLAGC_DOT)
 			{
 				if (flagc & (FLAGC_STAR2 | FLAGC_PRECISION)) goto invalid_format;
 				flagc |= FLAGC_STAR2;
 
 				precision = va_arg(ap, hcl_ooi_t); /* this deviates from the standard printf that accepts 'int' */
-				if (precision < 0) 
+				if (precision < 0)
 				{
-					/* if precision is less than 0, 
+					/* if precision is less than 0,
 					 * treat it as if no .precision is specified */
 					flagc &= ~FLAGC_DOT;
 					precision = 0;
 				}
-			} 
-			else 
+			}
+			else
 			{
 				if (flagc & (FLAGC_STAR1 | FLAGC_WIDTH)) goto invalid_format;
 				flagc |= FLAGC_STAR1;
 
 				width = va_arg(ap, hcl_ooi_t); /* it deviates from the standard printf that accepts 'int' */
-				if (width < 0) 
+				if (width < 0)
 				{
 					/*
-					if (flagc & FLAGC_LEFTADJ) 
+					if (flagc & FLAGC_LEFTADJ)
 						flagc  &= ~FLAGC_LEFTADJ;
 					else
 					*/
@@ -621,12 +621,12 @@ static int fmt_outv (hcl_fmtout_t* fmtout, va_list ap)
 		case '5': case '6': case '7': case '8': case '9':
 		{
 			if (flagc & FLAGC_LENMOD) goto invalid_format;
-			for (n = 0;; fmtptr += fmtchsz) 
+			for (n = 0;; fmtptr += fmtchsz)
 			{
 				n = n * 10 + uch - '0';
 				switch (fmtout->fmt_type)
 				{
-					case HCL_FMTOUT_FMT_TYPE_BCH: 
+					case HCL_FMTOUT_FMT_TYPE_BCH:
 						uch = *(const hcl_bch_t*)fmtptr;
 						break;
 					case HCL_FMTOUT_FMT_TYPE_UCH:
@@ -635,13 +635,13 @@ static int fmt_outv (hcl_fmtout_t* fmtout, va_list ap)
 				}
 				if (uch < '0' || uch > '9') break;
 			}
-			if (flagc & FLAGC_DOT) 
+			if (flagc & FLAGC_DOT)
 			{
 				if (flagc & FLAGC_STAR2) goto invalid_format;
 				precision = n;
 				flagc |= FLAGC_PRECISION;
 			}
-			else 
+			else
 			{
 				if (flagc & FLAGC_STAR1) goto invalid_format;
 				width = n;
@@ -680,7 +680,7 @@ static int fmt_outv (hcl_fmtout_t* fmtout, va_list ap)
 					goto invalid_format;
 				}
 			}
-			else 
+			else
 			{
 				lm_flag |= lm_tab[uch - 'a'].flag;
 				goto reswitch;
@@ -688,10 +688,10 @@ static int fmt_outv (hcl_fmtout_t* fmtout, va_list ap)
 			break;
 
 		case 'L': /* long double */
-			if (flagc & FLAGC_LENMOD) 
+			if (flagc & FLAGC_LENMOD)
 			{
 				/* conflict with other length modifier */
-				goto invalid_format; 
+				goto invalid_format;
 			}
 			flagc |= FLAGC_LENMOD;
 			lm_flag |= LF_LD;
@@ -701,7 +701,7 @@ static int fmt_outv (hcl_fmtout_t* fmtout, va_list ap)
 			if (flagc & FLAGC_LENMOD)
 			{
 				/* conflict with other length modifier */
-				goto invalid_format; 
+				goto invalid_format;
 			}
 			flagc |= FLAGC_LENMOD;
 			lm_flag |= LF_QD;
@@ -723,12 +723,12 @@ static int fmt_outv (hcl_fmtout_t* fmtout, va_list ap)
 				*(va_arg(ap, short int*)) = fmtout->count;
 			else if (lm_flag & LF_C) /* hh */
 				*(va_arg(ap, char*)) = fmtout->count;
-			else if (flagc & FLAGC_LENMOD) 
+			else if (flagc & FLAGC_LENMOD)
 				goto invalid_format;
 			else
 				*(va_arg(ap, int*)) = fmtout->count;
 			break;
- 
+
 		/* signed integer conversions */
 		case 'd':
 		case 'i': /* signed conversion */
@@ -738,7 +738,7 @@ static int fmt_outv (hcl_fmtout_t* fmtout, va_list ap)
 		/* end of signed integer conversions */
 
 		/* unsigned integer conversions */
-		case 'o': 
+		case 'o':
 			base = 8;
 			goto handle_nosign;
 		case 'u':
@@ -766,7 +766,7 @@ static int fmt_outv (hcl_fmtout_t* fmtout, va_list ap)
 		case 'c':
 		{
 			/* zeropad must not take effect for 'c' */
-			if (flagc & FLAGC_ZEROPAD) padc = ' '; 
+			if (flagc & FLAGC_ZEROPAD) padc = ' ';
 			if (lm_flag & LF_L) goto uppercase_c;
 		#if defined(HCL_OOCH_IS_UCH)
 			if (lm_flag & LF_J) goto uppercase_c;
@@ -874,12 +874,12 @@ static int fmt_outv (hcl_fmtout_t* fmtout, va_list ap)
 			const hcl_uint8_t* bsp;
 			hcl_oow_t k_hex_width;
 
-			/* zeropad must not take effect for 'k' and 'K' 
-			 * 
+			/* zeropad must not take effect for 'k' and 'K'
+			 *
  			 * 'h' & 'l' is not used to differentiate hcl_bch_t and hcl_uch_t
-			 * because 'k' means hcl_byte_t. 
-			 * 'l', results in uppercase hexadecimal letters. 
-			 * 'h' drops the leading \x in the output 
+			 * because 'k' means hcl_byte_t.
+			 * 'l', results in uppercase hexadecimal letters.
+			 * 'h' drops the leading \x in the output
 			 * --------------------------------------------------------
 			 * hk -> \x + non-printable in lowercase hex
 			 * k -> all in lowercase hex
@@ -924,9 +924,9 @@ static int fmt_outv (hcl_fmtout_t* fmtout, va_list ap)
 
 			if (!(flagc & FLAGC_LEFTADJ) && width > 0) PUT_OOCH (fmtout, padc, width);
 
-			while (n--) 
+			while (n--)
 			{
-				if ((lm_flag & LF_H) && BYTE_PRINTABLE(*bsp)) 
+				if ((lm_flag & LF_H) && BYTE_PRINTABLE(*bsp))
 				{
 					PUT_BCH (fmtout, *bsp, 1);
 				}
@@ -948,7 +948,7 @@ static int fmt_outv (hcl_fmtout_t* fmtout, va_list ap)
 		case 'W':
 		{
 			/* unicode string in unicode escape sequence.
-			 * 
+			 *
 			 * hw -> \uXXXX, \UXXXXXXXX, printable-byte(only in ascii range)
 			 * w -> \uXXXX, \UXXXXXXXX
 			 * lw -> all in \UXXXXXXXX
@@ -962,7 +962,7 @@ static int fmt_outv (hcl_fmtout_t* fmtout, va_list ap)
 			if (flagc & FLAGC_DOT)
 			{
 				/* if precision is specifed, it doesn't stop at the value of zero unlike 's' or 'S' */
-				for (n = 0; n < precision; n++) 
+				for (n = 0; n < precision; n++)
 				{
 					if ((lm_flag & LF_H) && BYTE_PRINTABLE(usp[n])) uwid = 1;
 					else if (!(lm_flag & LF_L) && usp[n] <= 0xFFFF) uwid = 6;
@@ -983,13 +983,13 @@ static int fmt_outv (hcl_fmtout_t* fmtout, va_list ap)
 
 			if (!(flagc & FLAGC_LEFTADJ) && width > 0) PUT_OOCH (fmtout, padc, width);
 
-			while (n--) 
+			while (n--)
 			{
-				if ((lm_flag & LF_H) && BYTE_PRINTABLE(*usp)) 
+				if ((lm_flag & LF_H) && BYTE_PRINTABLE(*usp))
 				{
 					PUT_OOCH(fmtout, *usp, 1);
 				}
-				else if (!(lm_flag & LF_L) && *usp <= 0xFFFF) 
+				else if (!(lm_flag & LF_L) && *usp <= 0xFFFF)
 				{
 					hcl_uint16_t u16 = *usp;
 					int extra_flags = ((uch) == 'w'? HCL_BYTE_TO_BCSTR_LOWERCASE: 0);
@@ -1077,7 +1077,7 @@ static int fmt_outv (hcl_fmtout_t* fmtout, va_list ap)
 			{
 				/* hcl_flt_t is limited to double or long double */
 
-				/* precedence goes to double if sizeof(double) == sizeof(long double) 
+				/* precedence goes to double if sizeof(double) == sizeof(long double)
 				 * for example, %Lf didn't work on some old platforms.
 				 * so i prefer the format specifier with no modifier.
 				 */
@@ -1141,18 +1141,18 @@ static int fmt_outv (hcl_fmtout_t* fmtout, va_list ap)
 			if (flagc & FLAGC_ZEROPAD) fb.fmt.ptr[fmtlen++] = '0';
 
 			if (flagc & FLAGC_STAR1) fb.fmt.ptr[fmtlen++] = '*';
-			else if (flagc & FLAGC_WIDTH) 
+			else if (flagc & FLAGC_WIDTH)
 			{
 				fmtlen += hcl_fmt_uintmax_to_bcstr(
-					&fb.fmt.ptr[fmtlen], fb.fmt.capa - fmtlen, 
+					&fb.fmt.ptr[fmtlen], fb.fmt.capa - fmtlen,
 					width, 10, -1, '\0', HCL_NULL);
 			}
 			if (flagc & FLAGC_DOT) fb.fmt.ptr[fmtlen++] = '.';
 			if (flagc & FLAGC_STAR2) fb.fmt.ptr[fmtlen++] = '*';
-			else if (flagc & FLAGC_PRECISION) 
+			else if (flagc & FLAGC_PRECISION)
 			{
 				fmtlen += hcl_fmt_uintmax_to_bcstr(
-					&fb.fmt.ptr[fmtlen], fb.fmt.capa - fmtlen, 
+					&fb.fmt.ptr[fmtlen], fb.fmt.capa - fmtlen,
 					precision, 10, -1, '\0', HCL_NULL);
 			}
 
@@ -1169,12 +1169,12 @@ static int fmt_outv (hcl_fmtout_t* fmtout, va_list ap)
 		#if defined(HAVE_SNPRINTF)
 			/* nothing special here */
 		#else
-			/* best effort to avoid buffer overflow when no snprintf is available. 
+			/* best effort to avoid buffer overflow when no snprintf is available.
 			 * i really can't do much if it happens. */
 			newcapa = precision + width + 32;
 			if (fb.out.capa < newcapa)
 			{
-				HCL_ASSERT (moo, fb.out.ptr == fb.out.sbuf);
+				/*HCL_ASSERT (hcl, fb.out.ptr == fb.out.sbuf);*/
 
 				fb.out.ptr = HCL_MMGR_ALLOC(fmtout->mmgr, HCL_SIZEOF(hcl_bch_t) * (newcapa + 1));
 				if (!fb.out.ptr) goto oops;
@@ -1324,14 +1324,14 @@ static int fmt_outv (hcl_fmtout_t* fmtout, va_list ap)
 				num = va_arg (ap, int);
 
 		number:
-			if (sign && (hcl_intmax_t)num < 0) 
+			if (sign && (hcl_intmax_t)num < 0)
 			{
 				neg = 1;
 				num = -(hcl_intmax_t)num;
 			}
 
 			nbufp = sprintn(nbuf, num, base, &tmp);
-			if ((flagc & FLAGC_SHARP) && num != 0) 
+			if ((flagc & FLAGC_SHARP) && num != 0)
 			{
 				/* #b #o #x */
 				if (base == 2 || base == 8 || base == 16) tmp += 2;
@@ -1341,7 +1341,7 @@ static int fmt_outv (hcl_fmtout_t* fmtout, va_list ap)
 			else if (flagc & FLAGC_SPACE) tmp++;
 
 			numlen = (int)((const hcl_bch_t*)nbufp - (const hcl_bch_t*)nbuf);
-			if ((flagc & FLAGC_DOT) && precision > numlen) 
+			if ((flagc & FLAGC_DOT) && precision > numlen)
 			{
 				/* extra zeros for precision specified */
 				tmp += (precision - numlen);
@@ -1357,19 +1357,19 @@ static int fmt_outv (hcl_fmtout_t* fmtout, va_list ap)
 			else if (flagc & FLAGC_SIGN) PUT_OOCH (fmtout, '+', 1);
 			else if (flagc & FLAGC_SPACE) PUT_OOCH (fmtout, ' ', 1);
 
-			if ((flagc & FLAGC_SHARP) && num != 0) 
+			if ((flagc & FLAGC_SHARP) && num != 0)
 			{
-				if (base == 2) 
+				if (base == 2)
 				{
 					PUT_OOCH (fmtout, '#', 1);
 					PUT_OOCH (fmtout, 'b', 1);
 				}
-				if (base == 8) 
+				if (base == 8)
 				{
 					PUT_OOCH (fmtout, '#', 1);
 					PUT_OOCH (fmtout, 'o', 1);
-				} 
-				else if (base == 16) 
+				}
+				else if (base == 16)
 				{
 					PUT_OOCH (fmtout, '#', 1);
 					PUT_OOCH (fmtout, 'x', 1);
@@ -1525,7 +1525,7 @@ int hcl_ufmt_out (hcl_fmtout_t* fmtout, const hcl_uch_t* fmt, ...)
 	return n;
 }
 
-/* -------------------------------------------------------------------------- 
+/* --------------------------------------------------------------------------
  * FORMATTED LOG OUTPUT
  * -------------------------------------------------------------------------- */
 
@@ -1558,7 +1558,7 @@ redo:
 		hcl_ooch_t* tmp;
 
 		max = HCL_TYPE_MAX(hcl_oow_t) - hcl->log.len;
-		if (len > max) 
+		if (len > max)
 		{
 			/* data too big. */
 			rem += len - max;
@@ -1578,7 +1578,7 @@ redo:
 
 		/* +1 to handle line ending injection more easily */
 		tmp = hcl_reallocmem(hcl, hcl->log.ptr, (newcapa + 1) * HCL_SIZEOF(*tmp));
-		if (!tmp) 
+		if (!tmp)
 		{
 		make_do:
 			if (hcl->log.len > 0)
@@ -1675,17 +1675,17 @@ hcl_ooi_t hcl_logbfmtv (hcl_t* hcl, hcl_bitmask_t mask, const hcl_bch_t* fmt, va
 	int x;
 	hcl_fmtout_t fo;
 
-	if (hcl->log.default_type_mask & HCL_LOG_ALL_TYPES) 
+	if (hcl->log.default_type_mask & HCL_LOG_ALL_TYPES)
 	{
 		/* if a type is given, it's not untyped any more.
 		 * mask off the UNTYPED bit */
-		mask &= ~HCL_LOG_UNTYPED; 
+		mask &= ~HCL_LOG_UNTYPED;
 
 		/* if the default_type_mask has the UNTYPED bit on,
 		 * it'll get turned back on */
 		mask |= (hcl->log.default_type_mask & HCL_LOG_ALL_TYPES);
 	}
-	else if (!(mask & HCL_LOG_ALL_TYPES)) 
+	else if (!(mask & HCL_LOG_ALL_TYPES))
 	{
 		/* no type is set in the given mask and no default type is set.
 		 * make it UNTYPED. */
@@ -1730,17 +1730,17 @@ hcl_ooi_t hcl_logufmtv (hcl_t* hcl, hcl_bitmask_t mask, const hcl_uch_t* fmt, va
 	int x;
 	hcl_fmtout_t fo;
 
-	if (hcl->log.default_type_mask & HCL_LOG_ALL_TYPES) 
+	if (hcl->log.default_type_mask & HCL_LOG_ALL_TYPES)
 	{
 		/* if a type is given, it's not untyped any more.
 		 * mask off the UNTYPED bit */
-		mask &= ~HCL_LOG_UNTYPED; 
+		mask &= ~HCL_LOG_UNTYPED;
 
 		/* if the default_type_mask has the UNTYPED bit on,
 		 * it'll get turned back on */
 		mask |= (hcl->log.default_type_mask & HCL_LOG_ALL_TYPES);
 	}
-	else if (!(mask & HCL_LOG_ALL_TYPES)) 
+	else if (!(mask & HCL_LOG_ALL_TYPES))
 	{
 		/* no type is set in the given mask and no default type is set.
 		 * make it UNTYPED. */
@@ -1923,7 +1923,7 @@ hcl_ooi_t hcl_prbfmt (hcl_t* hcl, const hcl_bch_t* fmt, ...)
 hcl_ooi_t hcl_prufmtv (hcl_t* hcl, const hcl_uch_t* fmt, va_list ap)
 {
 	int x;
-	
+
 	hcl_fmtout_t fo;
 
 	HCL_MEMSET (&fo, 0, HCL_SIZEOF(fo));
@@ -2059,7 +2059,7 @@ static HCL_INLINE int format_stack_args (hcl_fmtout_t* fmtout, hcl_ooi_t nargs, 
 	hcl_ooci_t ch;
 	int flagc, lm_flag;
 
-	struct 
+	struct
 	{
 		hcl_ooi_t idx;
 		int stop;
@@ -2084,7 +2084,7 @@ static HCL_INLINE int format_stack_args (hcl_fmtout_t* fmtout, hcl_ooi_t nargs, 
 	if (!HCL_OOP_IS_POINTER(arg) || HCL_OBJ_GET_FLAGS_TYPE(arg) != HCL_OBJ_TYPE_CHAR)
 	{
 		hcl_ooi_t i;
-		/* if the first argument is not a valid formatting string, 
+		/* if the first argument is not a valid formatting string,
 		 * print all arguments as objects */
 		if (fmtout->putobj(fmtout, arg) <= -1) goto oops;
 		for (i = arg_state.idx; i < nargs; i++)
@@ -2109,11 +2109,11 @@ static HCL_INLINE int format_stack_args (hcl_fmtout_t* fmtout, hcl_ooi_t nargs, 
 			GET_NEXT_CHAR_TO (hcl, fmtptr, fmtend, ch);
 			if (ch == '%' && !arg_state.stop) break;
 
-			if (ch == HCL_OOCI_EOF) 
+			if (ch == HCL_OOCI_EOF)
 			{
 				/* fmt is not advanced when it is length-bounded.
 				 * so not fmt - checkpoint - 1 */
-				PUT_OOCS (fmtout, checkpoint, fmtptr - checkpoint); 
+				PUT_OOCS (fmtout, checkpoint, fmtptr - checkpoint);
 				goto done;
 			}
 		}
@@ -2121,16 +2121,16 @@ static HCL_INLINE int format_stack_args (hcl_fmtout_t* fmtout, hcl_ooi_t nargs, 
 
 		percent = fmtptr - 1;
 
-		padc = ' '; 
+		padc = ' ';
 		width = 0; precision = 0;
 		neg = 0; sign = 0;
 
-		lm_flag = 0; flagc = 0; 
+		lm_flag = 0; flagc = 0;
 		radix_flags = HCL_INTTOSTR_NONEWOBJ;
 
 	reswitch:
 		GET_NEXT_CHAR_TO (hcl, fmtptr, fmtend, ch);
-		switch (ch) 
+		switch (ch)
 		{
 		case '%': /* %% */
 			ooch = ch;
@@ -2142,7 +2142,7 @@ static HCL_INLINE int format_stack_args (hcl_fmtout_t* fmtout, hcl_ooi_t nargs, 
 			flagc |= FLAGC_DOT;
 			goto reswitch;
 
-		case '#': 
+		case '#':
 			if (flagc & (FLAGC_WIDTH | FLAGC_DOT | FLAGC_LENMOD)) goto invalid_format;
 			flagc |= FLAGC_SHARP;
 			goto reswitch;
@@ -2172,33 +2172,33 @@ static HCL_INLINE int format_stack_args (hcl_fmtout_t* fmtout, hcl_ooi_t nargs, 
 					flagc &= ~FLAGC_ZEROPAD;
 				}
 			}
-			
+
 			goto reswitch;
 
 		case '*': /* take the length from the parameter */
-			if (flagc & FLAGC_DOT) 
+			if (flagc & FLAGC_DOT)
 			{
 				if (flagc & (FLAGC_STAR2 | FLAGC_PRECISION)) goto invalid_format;
 				flagc |= FLAGC_STAR2;
 
 				GET_NEXT_ARG_TO (hcl, nargs, &arg_state, arg);
 				if (hcl_inttoooi(hcl, arg, &precision) <= -1) goto invalid_format;
-				if (precision < 0) 
+				if (precision < 0)
 				{
-					/* if precision is less than 0, 
+					/* if precision is less than 0,
 					 * treat it as if no .precision is specified */
 					flagc &= ~FLAGC_DOT;
 					precision = 0;
 				}
-			} 
-			else 
+			}
+			else
 			{
 				if (flagc & (FLAGC_STAR1 | FLAGC_WIDTH)) goto invalid_format;
 				flagc |= FLAGC_STAR1;
 
 				GET_NEXT_ARG_TO (hcl, nargs, &arg_state, arg);
 				if (hcl_inttoooi(hcl, arg, &width) <= -1) goto invalid_format;
-				if (width < 0) 
+				if (width < 0)
 				{
 					flagc |= FLAGC_LEFTADJ;
 					width = -width;
@@ -2219,19 +2219,19 @@ static HCL_INLINE int format_stack_args (hcl_fmtout_t* fmtout, hcl_ooi_t nargs, 
 		case '1': case '2': case '3': case '4':
 		case '5': case '6': case '7': case '8': case '9':
 			if (flagc & FLAGC_LENMOD) goto invalid_format;
-			for (n = 0;; ++fmtptr) 
+			for (n = 0;; ++fmtptr)
 			{
 				n = n * 10 + ch - '0';
 				ch = *fmtptr;
 				if (ch < '0' || ch > '9') break;
 			}
-			if (flagc & FLAGC_DOT) 
+			if (flagc & FLAGC_DOT)
 			{
 				if (flagc & FLAGC_STAR2) goto invalid_format;
 				precision = n;
 				flagc |= FLAGC_PRECISION;
 			}
-			else 
+			else
 			{
 				if (flagc & FLAGC_STAR1) goto invalid_format;
 				width = n;
@@ -2246,14 +2246,14 @@ static HCL_INLINE int format_stack_args (hcl_fmtout_t* fmtout, hcl_ooi_t nargs, 
 			flagc |= FLAGC_LENMOD;
 			lm_flag |= lm_tab[ch - 'a'].flag;
 			goto reswitch;
- 
+
 		/* integer conversions */
 		case 'd':
 		case 'i': /* signed conversion */
 			radix = 10;
 			sign = 1;
 			goto print_integer;
-		case 'o': 
+		case 'o':
 			radix = 8;
 			goto print_integer;
 		case 'u':
@@ -2276,7 +2276,7 @@ static HCL_INLINE int format_stack_args (hcl_fmtout_t* fmtout, hcl_ooi_t nargs, 
 			hcl_oow_t scale = 0;
 
 			GET_NEXT_ARG_TO (hcl, nargs, &arg_state, arg);
-			if (HCL_OOP_IS_CHAR(arg)) 
+			if (HCL_OOP_IS_CHAR(arg))
 			{
 				arg = HCL_SMOOI_TO_OOP(HCL_OOP_TO_CHAR(arg));
 			}
@@ -2287,7 +2287,7 @@ static HCL_INLINE int format_stack_args (hcl_fmtout_t* fmtout, hcl_ooi_t nargs, 
 				arg = fa->value;
 			}
 
-			if (!hcl_inttostr(hcl, arg, 10 | HCL_INTTOSTR_NONEWOBJ)) 
+			if (!hcl_inttostr(hcl, arg, 10 | HCL_INTTOSTR_NONEWOBJ))
 			{
 				HCL_LOG2 (hcl, HCL_LOG_WARN | HCL_LOG_UNTYPED, "unable to convert %O for float output\n", arg, hcl_geterrmsg(hcl));
 				goto invalid_format;
@@ -2305,13 +2305,13 @@ static HCL_INLINE int format_stack_args (hcl_fmtout_t* fmtout, hcl_ooi_t nargs, 
 				neg = 1;
 			}
 
-			if (!(flagc & FLAGC_DOT)) 
+			if (!(flagc & FLAGC_DOT))
 			{
 				precision = scale;
 				if (precision <= 0) precision = 1;
 			}
 
-			if ((flagc & FLAGC_DOT) && precision < scale)  
+			if ((flagc & FLAGC_DOT) && precision < scale)
 			{
 				hcl_oow_t diff  = scale - precision;
 				scale = precision;
@@ -2338,7 +2338,7 @@ static HCL_INLINE int format_stack_args (hcl_fmtout_t* fmtout, hcl_ooi_t nargs, 
 			else if (flagc & FLAGC_SIGN) extra++;
 			else if (flagc & FLAGC_SPACE) extra++;
 
-			if ((flagc & FLAGC_DOT) && precision > scale) 
+			if ((flagc & FLAGC_DOT) && precision > scale)
 			{
 				/* trailing zeros in the fractional part */
 				extra += precision - scale;
@@ -2373,13 +2373,13 @@ static HCL_INLINE int format_stack_args (hcl_fmtout_t* fmtout, hcl_ooi_t nargs, 
 			else
 			{
 				if (nslen > 0) PUT_OOCS (fmtout, nsptr, nslen - scale);
-				if (precision > 0) 
+				if (precision > 0)
 				{
 					PUT_OOCH (fmtout, '.', 1);
 					if (nslen > 0) PUT_OOCS (fmtout, &nsptr[nslen - scale], scale);
 				}
 			}
-			if (precision > scale) 
+			if (precision > scale)
 			{
 				/* trailing zeros in the fractional part */
 				PUT_OOCH (fmtout, '0', precision - scale);
@@ -2402,7 +2402,7 @@ static HCL_INLINE int format_stack_args (hcl_fmtout_t* fmtout, hcl_ooi_t nargs, 
 
 		print_char:
 			/* zeropad must not take effect for 'c' */
-			if (flagc & FLAGC_ZEROPAD) padc = ' '; 
+			if (flagc & FLAGC_ZEROPAD) padc = ' ';
 
 			/* precision 0 doesn't kill the letter */
 			width--;
@@ -2495,7 +2495,7 @@ static HCL_INLINE int format_stack_args (hcl_fmtout_t* fmtout, hcl_ooi_t nargs, 
 				case HCL_OBJ_TYPE_BYTE:
 					bsp = HCL_OBJ_GET_BYTE_SLOT(arg);
 					bsl = HCL_OBJ_GET_SIZE(arg);
-				
+
 				format_byte_in_k:
 					k_hex_width = (lm_flag & (LF_H | LF_L))? 4: 2;
 
@@ -2517,9 +2517,9 @@ static HCL_INLINE int format_stack_args (hcl_fmtout_t* fmtout, hcl_ooi_t nargs, 
 
 					if (!(flagc & FLAGC_LEFTADJ) && width > 0) PUT_OOCH (fmtout, padc, width);
 
-					while (n--) 
+					while (n--)
 					{
-						if ((lm_flag & LF_H) && BYTE_PRINTABLE(*bsp)) 
+						if ((lm_flag & LF_H) && BYTE_PRINTABLE(*bsp))
 						{
 							PUT_BCH (fmtout, *bsp, 1);
 						}
@@ -2553,7 +2553,7 @@ static HCL_INLINE int format_stack_args (hcl_fmtout_t* fmtout, hcl_ooi_t nargs, 
 		case 'W':
 		{
 			/* unicode string in unicode escape sequence.
-			 * 
+			 *
 			 * hw -> \uXXXX, \UXXXXXXXX, printable-byte(only in ascii range)
 			 * w -> \uXXXX, \UXXXXXXXX
 			 * lw -> all in \UXXXXXXXX
@@ -2575,7 +2575,7 @@ static HCL_INLINE int format_stack_args (hcl_fmtout_t* fmtout, hcl_ooi_t nargs, 
 			}
 			else n = usl;
 
-			for (i = 0; i < n; i++) 
+			for (i = 0; i < n; i++)
 			{
 				if ((lm_flag & LF_H) && BYTE_PRINTABLE(usp[n])) uwid = 1;
 				else if (!(lm_flag & LF_L) && usp[n] <= 0xFFFF) uwid = 6;
@@ -2585,13 +2585,13 @@ static HCL_INLINE int format_stack_args (hcl_fmtout_t* fmtout, hcl_ooi_t nargs, 
 
 			if (!(flagc & FLAGC_LEFTADJ) && width > 0) PUT_OOCH (fmtout, padc, width);
 
-			while (n--) 
+			while (n--)
 			{
-				if ((lm_flag & LF_H) && BYTE_PRINTABLE(*usp)) 
+				if ((lm_flag & LF_H) && BYTE_PRINTABLE(*usp))
 				{
 					PUT_OOCH(fmtout, *usp, 1);
 				}
-				else if (!(lm_flag & LF_L) && *usp <= 0xFFFF) 
+				else if (!(lm_flag & LF_L) && *usp <= 0xFFFF)
 				{
 					hcl_uint16_t u16 = *usp;
 					int extra_flags = ((ch) == 'w'? HCL_BYTE_TO_BCSTR_LOWERCASE: 0);
@@ -2639,7 +2639,7 @@ static HCL_INLINE int format_stack_args (hcl_fmtout_t* fmtout, hcl_ooi_t nargs, 
 			hcl_oow_t nslen;
 
 			GET_NEXT_ARG_TO (hcl, nargs, &arg_state, arg);
-			if (HCL_OOP_IS_CHAR(arg)) 
+			if (HCL_OOP_IS_CHAR(arg))
 			{
 				arg = HCL_SMOOI_TO_OOP(HCL_OOP_TO_CHAR(arg));
 			}
@@ -2662,7 +2662,7 @@ static HCL_INLINE int format_stack_args (hcl_fmtout_t* fmtout, hcl_ooi_t nargs, 
 				arg = nv;
 			}
 
-			if (!hcl_inttostr(hcl, arg, radix | radix_flags)) 
+			if (!hcl_inttostr(hcl, arg, radix | radix_flags))
 			{
 				/*hcl_seterrbfmt (hcl, HCL_EINVAL, "not a valid number - %O", arg);
 				goto oops;*/
@@ -2674,19 +2674,19 @@ static HCL_INLINE int format_stack_args (hcl_fmtout_t* fmtout, hcl_ooi_t nargs, 
 			nslen = hcl->inttostr.xbuf.len;
 
 			HCL_ASSERT (hcl, nslen > 0);
-			if (nsptr[0] == '-') 
+			if (nsptr[0] == '-')
 			{
-				/* a negative number was given. i must skip the minus sign 
+				/* a negative number was given. i must skip the minus sign
 				 * added by hcl_inttostr() for a negative number. */
 				HCL_ASSERT (hcl, (HCL_OOP_IS_SMOOI(arg) && HCL_OOP_TO_SMOOI(arg) < 0) || HCL_IS_NBIGINT(hcl,arg));
 				nsptr++;
-				nslen--; 
-			} 
+				nslen--;
+			}
 
 			extra = nslen;
 			if (sign && ((HCL_OOP_IS_SMOOI(arg) && HCL_OOP_TO_SMOOI(arg) < 0) || HCL_IS_NBIGINT(hcl,arg))) neg = 1;
 
-			if ((flagc & FLAGC_SHARP) && arg != HCL_SMOOI_TO_OOP(0)) 
+			if ((flagc & FLAGC_SHARP) && arg != HCL_SMOOI_TO_OOP(0))
 			{
 				/* #b #o #x */
 				if (radix == 2 || radix == 8 || radix == 16) extra += 2;
@@ -2695,7 +2695,7 @@ static HCL_INLINE int format_stack_args (hcl_fmtout_t* fmtout, hcl_ooi_t nargs, 
 			else if (flagc & FLAGC_SIGN) extra++;
 			else if (flagc & FLAGC_SPACE) extra++;
 
-			if ((flagc & FLAGC_DOT) && precision > nslen) 
+			if ((flagc & FLAGC_DOT) && precision > nslen)
 			{
 				/* extra zeros for precision specified */
 				extra += (precision - nslen);
@@ -2711,19 +2711,19 @@ static HCL_INLINE int format_stack_args (hcl_fmtout_t* fmtout, hcl_ooi_t nargs, 
 			else if (flagc & FLAGC_SIGN) PUT_OOCH (fmtout, '+', 1);
 			else if (flagc & FLAGC_SPACE) PUT_OOCH (fmtout, ' ', 1);
 
-			if ((flagc & FLAGC_SHARP) && arg != HCL_SMOOI_TO_OOP(0)) 
+			if ((flagc & FLAGC_SHARP) && arg != HCL_SMOOI_TO_OOP(0))
 			{
-				if (radix == 2) 
+				if (radix == 2)
 				{
 					PUT_OOCH (fmtout, '#', 1);
 					PUT_OOCH (fmtout, 'b', 1);
 				}
-				if (radix == 8) 
+				if (radix == 8)
 				{
 					PUT_OOCH (fmtout, '#', 1);
 					PUT_OOCH (fmtout, 'o', 1);
-				} 
-				else if (radix == 16) 
+				}
+				else if (radix == 16)
 				{
 					PUT_OOCH (fmtout, '#', 1);
 					PUT_OOCH (fmtout, 'x', 1);
@@ -2784,7 +2784,7 @@ int hcl_strfmtcallstack (hcl_t* hcl, hcl_ooi_t nargs)
 	fo.putbchars = sprint_bcs;
 	fo.putuchars = sprint_ucs;
 	fo.putobj = hcl_fmt_object_;
-	/* format_stack_args doesn't use fmt_str and fmt_type. 
+	/* format_stack_args doesn't use fmt_str and fmt_type.
 	 * it takes the format string from the stack. */
 
 	hcl->sprintf.xbuf.len = 0;
@@ -2804,7 +2804,7 @@ int hcl_prfmtcallstack (hcl_t* hcl, hcl_ooi_t nargs)
 	fo.putbchars = print_bcs;
 	fo.putuchars = print_ucs;
 	fo.putobj = hcl_fmt_object_;
-	/* format_stack_args doesn't use fmt_str and fmt_type. 
+	/* format_stack_args doesn't use fmt_str and fmt_type.
 	 * it takes the format string from the stack. */
 	return format_stack_args(&fo, nargs, 0);
 }
@@ -2817,11 +2817,11 @@ int hcl_logfmtcallstack (hcl_t* hcl, hcl_ooi_t nargs)
 	HCL_MEMSET (&fo, 0, HCL_SIZEOF(fo));
 
 	fo.mask = HCL_LOG_FATAL | HCL_LOG_APP;
-	if (hcl->log.default_type_mask & HCL_LOG_ALL_TYPES) 
+	if (hcl->log.default_type_mask & HCL_LOG_ALL_TYPES)
 	{
 		/* if a type is given, it's not untyped any more.
 		 * mask off the UNTYPED bit */
-		fo.mask &= ~HCL_LOG_UNTYPED; 
+		fo.mask &= ~HCL_LOG_UNTYPED;
 
 		/* if the default_type_mask has the UNTYPED bit on,
 		 * it'll get turned back on */
@@ -2833,7 +2833,7 @@ int hcl_logfmtcallstack (hcl_t* hcl, hcl_ooi_t nargs)
 	fo.putbchars = log_bcs;
 	fo.putuchars = log_ucs;
 	fo.putobj = hcl_fmt_object_;
-	/* format_stack_args doesn't use fmt_str and fmt_type. 
+	/* format_stack_args doesn't use fmt_str and fmt_type.
 	 * it takes the format string from the stack. */
 
 	return format_stack_args(&fo, nargs, 0);

@@ -53,7 +53,7 @@ void* hcl_allocbytes (hcl_t* hcl, hcl_oow_t size)
 
 	allocsize = HCL_SIZEOF(*gch) + size;
 
-	if (hcl->gci.bsz >= hcl->gci.threshold) 
+	if (hcl->gci.bsz >= hcl->gci.threshold)
 	{
 		hcl_gc (hcl, 0);
 		hcl->gci.threshold = hcl->gci.bsz + 100000; /* TODO: change this fomula */
@@ -62,7 +62,7 @@ void* hcl_allocbytes (hcl_t* hcl, hcl_oow_t size)
 
 	if (hcl->gci.lazy_sweep) hcl_gc_ms_sweep_lazy (hcl, allocsize);
 
-	gch = (hcl_gchdr_t*)hcl_callocheapmem_noseterr(hcl, hcl->heap, allocsize); 
+	gch = (hcl_gchdr_t*)hcl_callocheapmem_noseterr(hcl, hcl->heap, allocsize);
 	if (!gch)
 	{
 		if (HCL_UNLIKELY(hcl->option.trait & HCL_TRAIT_NOGC)) goto calloc_heapmem_fail;
@@ -71,14 +71,14 @@ void* hcl_allocbytes (hcl_t* hcl, hcl_oow_t size)
 		hcl_gc (hcl, 0);
 		if (hcl->gci.lazy_sweep) hcl_gc_ms_sweep_lazy (hcl, allocsize);
 
-		gch = (hcl_gchdr_t*)hcl_callocheapmem_noseterr(hcl, hcl->heap, allocsize); 
-		if (HCL_UNLIKELY(!gch)) 
+		gch = (hcl_gchdr_t*)hcl_callocheapmem_noseterr(hcl, hcl->heap, allocsize);
+		if (HCL_UNLIKELY(!gch))
 		{
 		sweep_the_rest:
 			if (hcl->gci.lazy_sweep)
 			{
 				hcl_gc_ms_sweep_lazy (hcl, HCL_TYPE_MAX(hcl_oow_t)); /* sweep the rest */
-				gch = (hcl_gchdr_t*)hcl_callocheapmem(hcl, hcl->heap, allocsize); 
+				gch = (hcl_gchdr_t*)hcl_callocheapmem(hcl, hcl->heap, allocsize);
 				if (HCL_UNLIKELY(!gch)) return HCL_NULL;
 			}
 			else
@@ -90,7 +90,7 @@ void* hcl_allocbytes (hcl_t* hcl, hcl_oow_t size)
 		}
 	}
 
-	if (hcl->gci.lazy_sweep && hcl->gci.ls.curr == hcl->gci.b) 
+	if (hcl->gci.lazy_sweep && hcl->gci.ls.curr == hcl->gci.b)
 	{
 		/* if the lazy sweeping point is at the beginning of the allocation block,
 		 * hcl->gc.ls.prev must get updated */
@@ -119,9 +119,9 @@ static HCL_INLINE hcl_oop_t alloc_oop_array (hcl_t* hcl, int brand, hcl_oow_t si
 
 	nbytes = size * HCL_SIZEOF(hcl_oop_t);
 
-	/* this isn't really necessary since nbytes must be 
+	/* this isn't really necessary since nbytes must be
 	 * aligned already. */
-	nbytes_aligned = HCL_ALIGN(nbytes, HCL_SIZEOF(hcl_oop_t)); 
+	nbytes_aligned = HCL_ALIGN(nbytes, HCL_SIZEOF(hcl_oop_t));
 
 	if (HCL_UNLIKELY(ngc))
 	{
@@ -131,7 +131,7 @@ static HCL_INLINE hcl_oop_t alloc_oop_array (hcl_t* hcl, int brand, hcl_oow_t si
 	{
 		/* making the number of bytes to allocate a multiple of
 		 * HCL_SIZEOF(hcl_oop_t) will guarantee the starting address
-		 * of the allocated space to be an even number. 
+		 * of the allocated space to be an even number.
 		 * see HCL_OOP_IS_NUMERIC() and HCL_OOP_IS_POINTER() */
 		hdr = (hcl_oop_oop_t)hcl_allocbytes(hcl, HCL_SIZEOF(hcl_obj_t) + nbytes_aligned);
 	}
@@ -161,7 +161,7 @@ hcl_oop_t hcl_allocoopobjwithtrailer (hcl_t* hcl, int brand, hcl_oow_t size, con
 
 	/* +1 for the trailer size of the hcl_oow_t type */
 	nbytes = (size + 1) * HCL_SIZEOF(hcl_oop_t) + blen;
-	nbytes_aligned = HCL_ALIGN(nbytes, HCL_SIZEOF(hcl_oop_t)); 
+	nbytes_aligned = HCL_ALIGN(nbytes, HCL_SIZEOF(hcl_oop_t));
 
 	hdr = (hcl_oop_oop_t)hcl_allocbytes(hcl, HCL_SIZEOF(hcl_obj_t) + nbytes_aligned);
 	if (HCL_UNLIKELY(!hdr)) return HCL_NULL;
@@ -174,7 +174,7 @@ hcl_oop_t hcl_allocoopobjwithtrailer (hcl_t* hcl, int brand, hcl_oow_t size, con
 	for (i = 0; i < size; i++) hdr->slot[i] = hcl->_nil;
 
 	/* [NOTE] this is not converted to a SMOOI object */
-	hdr->slot[size] = (hcl_oop_t)blen; 
+	hdr->slot[size] = (hcl_oop_t)blen;
 
 	if (bptr)
 	{
@@ -195,16 +195,16 @@ static HCL_INLINE hcl_oop_t alloc_numeric_array (hcl_t* hcl, int brand, const vo
 	hcl_oop_t hdr;
 	hcl_oow_t xbytes, nbytes, nbytes_aligned;
 
-	xbytes = len * unit; 
+	xbytes = len * unit;
 	/* 'extra' indicates an extra unit to append at the end.
 	 * it's useful to store a string with a terminating null */
-	nbytes = extra? xbytes + unit: xbytes; 
+	nbytes = extra? xbytes + unit: xbytes;
 	nbytes_aligned = HCL_ALIGN(nbytes, HCL_SIZEOF(hcl_oop_t));
 /* TODO: check overflow in size calculation*/
 
 	/* making the number of bytes to allocate a multiple of
 	 * HCL_SIZEOF(hcl_oop_t) will guarantee the starting address
-	 * of the allocated space to be an even number. 
+	 * of the allocated space to be an even number.
 	 * see HCL_OOP_IS_NUMERIC() and HCL_OOP_IS_POINTER() */
 	if (HCL_UNLIKELY(ngc))
 		hdr = (hcl_oop_t)hcl_callocmem(hcl, HCL_SIZEOF(hcl_obj_t) + nbytes_aligned);
@@ -215,7 +215,7 @@ static HCL_INLINE hcl_oop_t alloc_numeric_array (hcl_t* hcl, int brand, const vo
 	hdr->_flags = HCL_OBJ_MAKE_FLAGS(type, unit, extra, 0, 0, ngc, 0, 0);
 	hdr->_size = len;
 	HCL_OBJ_SET_SIZE (hdr, len);
-	//HCL_OBJ_SET_CLASS (hdr, hcl->_nil);
+	/*HCL_OBJ_SET_CLASS (hdr, hcl->_nil);*/
 	HCL_OBJ_SET_FLAGS_BRAND (hdr, brand);
 
 	if (ptr)
@@ -321,19 +321,11 @@ hcl_oop_t hcl_makebytearray (hcl_t* hcl, const hcl_oob_t* ptr, hcl_oow_t size)
 	return hcl_allocbyteobj(hcl, HCL_BRAND_BYTE_ARRAY, ptr, size);
 }
 
-hcl_oop_t hcl_makedlist (hcl_t* hcl)
-{
-	//return hcl_allocoopobj(hcl, HCL_BRAND_DLIST);
-hcl_seterrnum (hcl, HCL_ENOIMPL);
-return HCL_NULL;
-}
-
 hcl_oop_t hcl_makestring (hcl_t* hcl, const hcl_ooch_t* ptr, hcl_oow_t len, int ngc)
 {
 	/*return hcl_alloccharobj(hcl, HCL_BRAND_STRING, ptr, len);*/
 	return alloc_numeric_array(hcl, HCL_BRAND_STRING, ptr, len, HCL_OBJ_TYPE_CHAR, HCL_SIZEOF(hcl_ooch_t), 1, ngc);
 }
-
 
 hcl_oop_t hcl_makefpdec (hcl_t* hcl, hcl_oop_t value, hcl_ooi_t scale)
 {
@@ -348,7 +340,7 @@ hcl_oop_t hcl_makefpdec (hcl_t* hcl, hcl_oop_t value, hcl_ooi_t scale)
 		hcl_seterrbfmt (hcl, HCL_EINVAL, "fpdec scale too large - %zd", scale);
 		return HCL_NULL;
 	}
-	
+
 	hcl_pushvolat (hcl, &value);
 	f = (hcl_oop_fpdec_t)hcl_allocoopobj (hcl, HCL_BRAND_FPDEC, HCL_FPDEC_NAMED_INSTVARS);
 	hcl_popvolat (hcl);
@@ -492,7 +484,7 @@ int hcl_hashobj (hcl_t* hcl, hcl_oop_t obj, hcl_oow_t* xhv)
 {
 	hcl_oow_t hv;
 
-	if (obj == hcl->_nil) 
+	if (obj == hcl->_nil)
 	{
 		*xhv = 0;
 		return 0;
@@ -555,7 +547,7 @@ int hcl_hashobj (hcl_t* hcl, hcl_oop_t obj, hcl_oow_t* xhv)
 					break;
 
 				default:
-					/* HCL_OBJ_TYPE_OOP, ... */ 
+					/* HCL_OBJ_TYPE_OOP, ... */
 					hcl_seterrbfmt(hcl, HCL_ENOIMPL, "no builtin hash implemented for %O", obj); /* TODO: better error code? */
 					return -1;
 			}
@@ -563,7 +555,7 @@ int hcl_hashobj (hcl_t* hcl, hcl_oop_t obj, hcl_oow_t* xhv)
 		}
 	}
 
-	/* i assume that hcl_hashxxx() functions limits the return value to fall 
+	/* i assume that hcl_hashxxx() functions limits the return value to fall
 	 * between 0 and HCL_SMOOI_MAX inclusive */
 	HCL_ASSERT (hcl, hv >= 0 && hv <= HCL_SMOOI_MAX);
 	*xhv = hv;
@@ -631,8 +623,8 @@ int hcl_equalobjs (hcl_t* hcl, hcl_oop_t rcv, hcl_oop_t arg)
 
 					if (HCL_IS_PROCESS(hcl,rcv))
 					{
-						/* the stack in a process object doesn't need to be 
-						 * scanned in full. the slots above the stack pointer 
+						/* the stack in a process object doesn't need to be
+						 * scanned in full. the slots above the stack pointer
 						 * are garbages. */
 						size = HCL_PROCESS_NAMED_INSTVARS +
 							  HCL_OOP_TO_SMOOI(((hcl_oop_process_t)rcv)->sp) + 1;
@@ -646,7 +638,7 @@ int hcl_equalobjs (hcl_t* hcl, hcl_oop_t rcv, hcl_oop_t arg)
 					{
 						int n;
 						/* TODO: remove recursion */
-						/* NOTE: even if the object implements the equality method, 
+						/* NOTE: even if the object implements the equality method,
 						 * this primitive method doesn't honor it. */
 						n = hcl_equalobjs(hcl, ((hcl_oop_oop_t)rcv)->slot[i], ((hcl_oop_oop_t)arg)->slot[i]);
 						if (n <= 0) return n;

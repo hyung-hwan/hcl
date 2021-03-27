@@ -450,7 +450,7 @@ int hcl_decode (hcl_t* hcl, hcl_oow_t start, hcl_oow_t end)
 			/* -------------------------------------------------------- */
 			case HCL_CODE_SEND_MESSAGE_X:
 			case HCL_CODE_SEND_MESSAGE_TO_SUPER_X:
-				/* b1 -> number of arguments 
+				/* b1 -> number of arguments
 				 * b2 -> selector index stored in the literal frame */
 				FETCH_PARAM_CODE_TO (hcl, b1);
 				FETCH_PARAM_CODE_TO (hcl, b2);
@@ -469,7 +469,7 @@ int hcl_decode (hcl_t* hcl, hcl_oow_t start, hcl_oow_t end)
 
 			handle_send_message:
 				LOG_INST_3 (hcl, "send_message%hs %zu @%zu", (((bcode >> 2) & 1)? "_to_super": ""), b1, b2);
-				break; 
+				break;
 
 			/* -------------------------------------------------------- */
 
@@ -635,7 +635,7 @@ int hcl_decode (hcl_t* hcl, hcl_oow_t start, hcl_oow_t end)
 		}
 	}
 
-// TODO: this needs changes... */
+/* TODO: this needs changes... */
 	/* print literal frame contents */
 	for (ip = 0; ip < hcl->code.lit.len; ip++)
 	{

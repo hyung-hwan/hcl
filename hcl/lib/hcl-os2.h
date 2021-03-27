@@ -53,7 +53,7 @@
 #	define HCL_SIZEOF_OFF64_T     0
 #	define HCL_SIZEOF_OFF_T       8
 
-/* I don't know the exact mbstate size. 
+/* I don't know the exact mbstate size.
  * but this should be large enough */
 #	define HCL_SIZEOF_MBSTATE_T   HCL_SIZEOF_LONG
 /* TODO: check the exact value */
@@ -73,7 +73,7 @@
 #	define HCL_SIZEOF_VOID_P      4
 #	define HCL_SIZEOF_FLOAT       4
 #	define HCL_SIZEOF_DOUBLE      8
-#	define HCL_SIZEOF_LONG_DOUBLE 8
+#	define HCL_SIZEOF_LONG_DOUBLE 10
 #	define HCL_SIZEOF_WCHAR_T     2
 
 #	define HCL_SIZEOF___INT8      0
@@ -91,6 +91,36 @@
 #	define HCL_SIZEOF_STRUCT_SOCKADDR_IN 32
 #	define HCL_SIZEOF_STRUCT_SOCKADDR_IN6 64
 #	define HCL_SIZEOF_SOCKLEN_T 4
+
+#elif defined(__IBMC__) || defined(__IBMCPP__)
+
+	/* visualage c or c++ */
+#   define HCL_SIZEOF_CHAR        1
+#   define HCL_SIZEOF_SHORT       2
+#   define HCL_SIZEOF_INT         4
+#   define HCL_SIZEOF_LONG        4
+#   define HCL_SIZEOF_LONG_LONG   0
+#   define HCL_SIZEOF_VOID_P      4
+#   define HCL_SIZEOF_FLOAT       4
+#   define HCL_SIZEOF_DOUBLE      8
+#   define HCL_SIZEOF_LONG_DOUBLE 16
+#   define HCL_SIZEOF_WCHAR_T     2
+
+#   define HCL_SIZEOF___INT8      0
+#   define HCL_SIZEOF___INT16     0
+#   define HCL_SIZEOF___INT32     0
+#   define HCL_SIZEOF___INT64     0
+#   define HCL_SIZEOF___INT128    0
+
+#   define HCL_SIZEOF_OFF64_T     0
+#   define HCL_SIZEOF_OFF_T       4
+
+#   define HCL_SIZEOF_MBSTATE_T   HCL_SIZEOF_LONG
+#   define HCL_MBLEN_MAX          8
+
+#   define HCL_SIZEOF_STRUCT_SOCKADDR_IN 32
+#   define HCL_SIZEOF_STRUCT_SOCKADDR_IN6 64
+#   define HCL_SIZEOF_SOCKLEN_T 4
 
 #else
 #	error Define the size of various data types.
