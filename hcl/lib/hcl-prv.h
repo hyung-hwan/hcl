@@ -34,7 +34,7 @@
 /* you can define this to either 1 or 2 */
 #define HCL_CODE_LONG_PARAM_SIZE 2
 
-/* this is useful for debugging. hcl_gc() can be called 
+/* this is useful for debugging. hcl_gc() can be called
  * while hcl has not been fully initialized when this is defined*/
 #define HCL_SUPPORT_GC_DURING_IGNITION
 
@@ -339,7 +339,7 @@ struct hcl_cframe_t
 			hcl_ooi_t index;
 		} dic_list;
 
-		
+
 		/* COP_EMIT_LAMBDA */
 		struct
 		{
@@ -392,7 +392,7 @@ struct hcl_compiler_t
 	hcl_ioimpl_t reader;
 
 	/* static input data buffer */
-	hcl_ioinarg_t  inarg;    
+	hcl_ioinarg_t  inarg;
 
 	/* pointer to the current input data. initially, it points to &inarg */
 	hcl_ioinarg_t* curinp;
@@ -481,7 +481,7 @@ struct hcl_compiler_t
 SHORT INSTRUCTION CODE                                        LONG INSTRUCTION CODE
 ----------------------------------------------------------------------------------------------------------------
                                                                       v v
-0-3      0000 00XX STORE_INTO_INSTVAR                         128  1000 0000 XXXXXXXX STORE_INTO_INSTVAR_X                    (bit 4 off, bit 3 off) 
+0-3      0000 00XX STORE_INTO_INSTVAR                         128  1000 0000 XXXXXXXX STORE_INTO_INSTVAR_X                    (bit 4 off, bit 3 off)
 4-7      0000 01XX STORE_INTO_INSTVAR
 8-11     0000 10XX POP_INTO_INSTVAR                           136  1000 1000 XXXXXXXX POP_INTO_INSTVAR_X                      (bit 4 off, bit 3 on)
 12-15    0000 11XX POP_INTO_INSTVAR
@@ -773,7 +773,7 @@ enum hcl_bcode_t
 	HCL_CODE_MAKE_ARRAY               = 0xE9, /* 233 ## */
 	HCL_CODE_MAKE_BYTEARRAY           = 0xEA, /* 234 ## */
 	HCL_CODE_MAKE_DIC                 = 0xEB, /* 235 ## */
-	
+
 	HCL_CODE_POP_INTO_OBJVAR_X        = 0xEC, /* 236 ## */
 
 	HCL_CODE_POP_INTO_ARRAY           = 0xED, /* 237 ## */
@@ -814,7 +814,7 @@ typedef hcl_ooi_t (*hcl_outbfmt_t) (
 	...
 );
 
-/* i don't want an error raised inside the callback to override 
+/* i don't want an error raised inside the callback to override
  * the existing error number and message. */
 #define vmprim_log_write(hcl,mask,ptr,len) do { \
 		int shuterr = (hcl)->shuterr; \
@@ -837,7 +837,7 @@ extern "C" {
  * \return heap pointer on success and #HCL_NULL on failure.
  */
 hcl_heap_t* hcl_makeheap (
-	hcl_t*     hcl, 
+	hcl_t*     hcl,
 	hcl_oow_t  size
 );
 
@@ -845,11 +845,11 @@ hcl_heap_t* hcl_makeheap (
  * The hcl_killheap() function destroys the heap pointed to by \a heap.
  */
 void hcl_killheap (
-	hcl_t*      hcl, 
+	hcl_t*      hcl,
 	hcl_heap_t* heap
 );
 
-/** 
+/**
  * The hcl_allocheapmem() function allocates \a size bytes from the given heap
  * and clears it with zeros.
  */
@@ -1019,7 +1019,7 @@ int hcl_ucstoutf8 (
  * For a null-terminated string, you can specify ~(hcl_oow_t)0 in
  * \a bcslen. The destination buffer \a ucs also must be large enough to
  * store a terminating null. Otherwise, -2 is returned.
- * 
+ *
  * The resulting \a ucslen can still be greater than 0 even if the return
  * value is negative. The value indiates the number of characters converted
  * before the error has occurred.
@@ -1175,7 +1175,7 @@ hcl_oop_t hcl_strtoint (
 /**
  * The hcl_inttostr() function converts an integer object to a string object
  * printed in the given radix. If HCL_INTTOSTR_NONEWOBJ is set in flags_radix,
- * it returns hcl->_nil but keeps the result in the buffer pointed to by 
+ * it returns hcl->_nil but keeps the result in the buffer pointed to by
  * hcl->inttostr.xbuf.ptr with the length stored in hcl->inttostr.xbuf.len.
  * If the function fails, it returns #HCL_NULL.
  */
@@ -1347,7 +1347,6 @@ hcl_cnode_t* hcl_makecnodecons (hcl_t* hcl, const hcl_ioloc_t* loc, hcl_cnode_t*
 hcl_cnode_t* hcl_makecnodeelist (hcl_t* hcl, const hcl_ioloc_t* loc, hcl_concode_t type);
 hcl_cnode_t* hcl_makecnodeshell (hcl_t* hcl, const hcl_ioloc_t* loc, hcl_cnode_t* obj);
 void hcl_freesinglecnode (hcl_t* hcl, hcl_cnode_t* c);
-void hcl_freecnode (hcl_t* hcl, hcl_cnode_t* c);
 hcl_oow_t hcl_countcnodecons (hcl_t* hcl, hcl_cnode_t* cons);
 
 

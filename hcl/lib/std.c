@@ -248,8 +248,8 @@
 #else
 #	define MUTEX_INIT(x)
 #	define MUTEX_DESTROY(x)
-#	define MUTEX_LOCK(x) 
-#	define MUTEX_UNLOCK(x) 
+#	define MUTEX_LOCK(x)
+#	define MUTEX_UNLOCK(x)
 #endif
 
 
@@ -283,6 +283,7 @@ struct xtn_t
 	DWORD tc_overflow;
 	#elif defined(__OS2__)
 	ULONG tc_last;
+	ULONG tc_overflow;
 	hcl_ntime_t tc_last_ret;
 	#elif defined(__DOS__)
 	clock_t tc_last;
@@ -328,8 +329,8 @@ struct xtn_t
 			hcl_oow_t* ptr;
 			hcl_oow_t capa;
 		} reg;
-		struct kevent buf[64]; 
-	#elif defined(USE_EPOLL) 
+		struct kevent buf[64];
+	#elif defined(USE_EPOLL)
 		/*TODO: make it dynamically changeable depending on the number of
 		 *      file descriptors added */
 		struct epoll_event buf[64]; /* buffer for reading events */
@@ -374,7 +375,7 @@ struct xtn_t
 #define GET_XTN(hcl) ((xtn_t*)((hcl_uint8_t*)hcl_getxtn(hcl) - HCL_SIZEOF(xtn_t)))
 
 
-/* ----------------------------------------------------------------- 
+/* -----------------------------------------------------------------
  * BASIC MEMORY MANAGER
  * ----------------------------------------------------------------- */
 
@@ -401,7 +402,7 @@ static hcl_mmgr_t sys_mmgr =
 	HCL_NULL
 };
 
-/* ----------------------------------------------------------------- 
+/* -----------------------------------------------------------------
  * LOGGING SUPPORT
  * ----------------------------------------------------------------- */
 
@@ -536,7 +537,7 @@ static void log_write (hcl_t* hcl, hcl_bitmask_t mask, const hcl_ooch_t* msg, hc
 	#if defined(_WIN32)
 		tmp = localtime(&now);
 		tslen = strftime(ts, sizeof(ts), "%Y-%m-%d %H:%M:%S %z ", tmp);
-		if (tslen == 0) 
+		if (tslen == 0)
 		{
 			tslen = sprintf(ts, "%04d-%02d-%02d %02d:%02d:%02d ", tmp->tm_year + 1900, tmp->tm_mon + 1, tmp->tm_mday, tmp->tm_hour, tmp->tm_min, tmp->tm_sec);
 		}
@@ -553,7 +554,7 @@ static void log_write (hcl_t* hcl, hcl_bitmask_t mask, const hcl_ooch_t* msg, hc
 		#else
 		tslen = strftime(ts, sizeof(ts), "%Y-%m-%d %H:%M:%S %z ", tmp);
 		#endif
-		if (tslen == 0) 
+		if (tslen == 0)
 		{
 			tslen = sprintf(ts, "%04d-%02d-%02d %02d:%02d:%02d ", tmp->tm_year + 1900, tmp->tm_mon + 1, tmp->tm_mday, tmp->tm_hour, tmp->tm_min, tmp->tm_sec);
 		}
@@ -572,9 +573,9 @@ static void log_write (hcl_t* hcl, hcl_bitmask_t mask, const hcl_ooch_t* msg, hc
 		#if defined(HAVE_STRFTIME_SMALL_Z)
 		tslen = strftime(ts, sizeof(ts), "%Y-%m-%d %H:%M:%S %z ", tmp);
 		#else
-		tslen = strftime(ts, sizeof(ts), "%Y-%m-%d %H:%M:%S %Z ", tmp); 
+		tslen = strftime(ts, sizeof(ts), "%Y-%m-%d %H:%M:%S %Z ", tmp);
 		#endif
-		if (tslen == 0) 
+		if (tslen == 0)
 		{
 			tslen = sprintf(ts, "%04d-%02d-%02d %02d:%02d:%02d ", tmp->tm_year + 1900, tmp->tm_mon + 1, tmp->tm_mday, tmp->tm_hour, tmp->tm_min, tmp->tm_sec);
 		}
@@ -599,9 +600,9 @@ static void log_write (hcl_t* hcl, hcl_bitmask_t mask, const hcl_ooch_t* msg, hc
 		n = hcl_convootobchars(hcl, &msg[msgidx], &ucslen, buf, &bcslen);
 		if (n == 0 || n == -2)
 		{
-			/* n = 0: 
-			 *   converted all successfully 
-			 * n == -2: 
+			/* n = 0:
+			 *   converted all successfully
+			 * n == -2:
 			 *    buffer not sufficient. not all got converted yet.
 			 *    write what have been converted this round. */
 
@@ -635,7 +636,7 @@ static void log_write (hcl_t* hcl, hcl_bitmask_t mask, const hcl_ooch_t* msg, hc
 	flush_log (hcl, logfd);
 }
 
-/* ----------------------------------------------------------------- 
+/* -----------------------------------------------------------------
  * SYSTEM ERROR CONVERSION
  * ----------------------------------------------------------------- */
 static hcl_errnum_t errno_to_errnum (int errcode)
@@ -668,7 +669,7 @@ static hcl_errnum_t errno_to_errnum (int errcode)
 	#endif
 
 	#if defined(EAGAIN) && defined(EWOULDBLOCK) && (EAGAIN != EWOULDBLOCK)
-		case EAGAIN: 
+		case EAGAIN:
 		case EWOULDBLOCK: return HCL_EAGAIN;
 	#elif defined(EAGAIN)
 		case EAGAIN: return HCL_EAGAIN;
@@ -734,14 +735,14 @@ static hcl_errnum_t os2err_to_errnum (APIRET errcode)
 		case ERROR_NOT_ENOUGH_MEMORY:
 			return HCL_ESYSMEM;
 
-		case ERROR_INVALID_PARAMETER: 
+		case ERROR_INVALID_PARAMETER:
 		case ERROR_INVALID_NAME:
 			return HCL_EINVAL;
 
-		case ERROR_INVALID_HANDLE: 
+		case ERROR_INVALID_HANDLE:
 			return HCL_EBADHND;
 
-		case ERROR_ACCESS_DENIED: 
+		case ERROR_ACCESS_DENIED:
 		case ERROR_SHARING_VIOLATION:
 			return HCL_EACCES;
 
@@ -778,7 +779,7 @@ static hcl_errnum_t macerr_to_errnum (int errcode)
 			return HCL_ENOENT;
 
 		/*TODO: add more mappings */
-		default: 
+		default:
 			return HCL_ESYSERR;
 	}
 }
@@ -788,14 +789,14 @@ static hcl_errnum_t _syserrstrb (hcl_t* hcl, int syserr_type, int syserr_code, h
 {
 	switch (syserr_type)
 	{
-		case 1: 
+		case 1:
 		#if defined(_WIN32)
 			if (buf)
 			{
 				DWORD rc;
 				rc = FormatMessageA (
 					FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS,
-					NULL, syserr_code, MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), 
+					NULL, syserr_code, MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT),
 					buf, len, HCL_NULL
 				);
 				while (rc > 0 && buf[rc - 1] == '\r' || buf[rc - 1] == '\n') buf[--rc] = '\0';
@@ -829,7 +830,7 @@ static hcl_errnum_t _syserrstrb (hcl_t* hcl, int syserr_type, int syserr_code, h
 }
 
 
-/* -------------------------------------------------------------------------- 
+/* --------------------------------------------------------------------------
  * ASSERTION SUPPORT
  * -------------------------------------------------------------------------- */
 
@@ -842,7 +843,7 @@ static void _assertfail (hcl_t* hcl, const hcl_bch_t* expr, const hcl_bch_t* fil
 
 #else /* defined(HCL_BUILD_RELEASE) */
 
-/* -------------------------------------------------------------------------- 
+/* --------------------------------------------------------------------------
  * SYSTEM DEPENDENT HEADERS
  * -------------------------------------------------------------------------- */
 
@@ -890,7 +891,7 @@ static void backtrace_stack_frames (hcl_t* hcl)
 	unw_init_local(&cursor, &context);
 
 	hcl_logbfmt (hcl, HCL_LOG_UNTYPED | HCL_LOG_DEBUG, "[BACKTRACE]\n");
-	for (n = 0; unw_step(&cursor) > 0; n++) 
+	for (n = 0; unw_step(&cursor) > 0; n++)
 	{
 		unw_word_t ip, sp, off;
 		char symbol[256];
@@ -898,13 +899,13 @@ static void backtrace_stack_frames (hcl_t* hcl)
 		unw_get_reg (&cursor, UNW_REG_IP, &ip);
 		unw_get_reg (&cursor, UNW_REG_SP, &sp);
 
-		if (unw_get_proc_name(&cursor, symbol, HCL_COUNTOF(symbol), &off)) 
+		if (unw_get_proc_name(&cursor, symbol, HCL_COUNTOF(symbol), &off))
 		{
 			hcl_copy_bcstr (symbol, HCL_COUNTOF(symbol), "<unknown>");
 		}
 
-		hcl_logbfmt (hcl, HCL_LOG_UNTYPED | HCL_LOG_DEBUG, 
-			"#%02d ip=0x%*p sp=0x%*p %hs+0x%zu\n", 
+		hcl_logbfmt (hcl, HCL_LOG_UNTYPED | HCL_LOG_DEBUG,
+			"#%02d ip=0x%*p sp=0x%*p %hs+0x%zu\n",
 			n, HCL_SIZEOF(void*) * 2, (void*)ip, HCL_SIZEOF(void*) * 2, (void*)sp, symbol, (hcl_oow_t)off);
 	}
 }
@@ -972,7 +973,7 @@ static void _assertfail (hcl_t* hcl, const hcl_bch_t* expr, const hcl_bch_t* fil
 #endif /* defined(HCL_BUILD_RELEASE) */
 
 
-/* ----------------------------------------------------------------- 
+/* -----------------------------------------------------------------
  * HEAP ALLOCATION
  * ----------------------------------------------------------------- */
 
@@ -980,7 +981,7 @@ static int get_huge_page_size (hcl_t* hcl, hcl_oow_t* page_size)
 {
 	FILE* fp;
 	char buf[256];
-	
+
 	fp = fopen("/proc/meminfo", "r");
 	if (!fp) return -1;
 
@@ -1047,20 +1048,20 @@ static void* alloc_heap (hcl_t* hcl, hcl_oow_t* size)
 	aligned_size = HCL_ALIGN_POW2(req_size, align);
 	ptr = (hcl_oow_t*)mmap(NULL, aligned_size, PROT_READ | PROT_WRITE, flags, -1, 0);
 	#if defined(MAP_HUGETLB)
-	if (ptr == MAP_FAILED && (flags & MAP_HUGETLB)) 
+	if (ptr == MAP_FAILED && (flags & MAP_HUGETLB))
 	{
 		flags &= ~MAP_HUGETLB;
 		align = sysconf(_SC_PAGESIZE);
 		aligned_size = HCL_ALIGN_POW2(req_size, align);
 		ptr = (hcl_oow_t*)mmap(NULL, aligned_size, PROT_READ | PROT_WRITE, flags, -1, 0);
-		if (ptr == MAP_FAILED) 
+		if (ptr == MAP_FAILED)
 		{
 			hcl_seterrwithsyserr (hcl, 0, errno);
 			return HCL_NULL;
 		}
 	}
 	#else
-	if (ptr == MAP_FAILED) 
+	if (ptr == MAP_FAILED)
 	{
 		hcl_seterrwithsyserr (hcl, 0, errno);
 		return HCL_NULL;
@@ -1088,7 +1089,7 @@ static void free_heap (hcl_t* hcl, void* ptr)
 #endif
 }
 
-/* ----------------------------------------------------------------- 
+/* -----------------------------------------------------------------
  * POSSIBLY MONOTONIC TIME
  * ----------------------------------------------------------------- */
 
@@ -1122,8 +1123,10 @@ void vm_gettime (hcl_t* hcl, hcl_ntime_t* now)
 
 #elif defined(__OS2__)
 	xtn_t* xtn = GET_XTN(hcl);
-	hcl_uint64_t bigsec, bigmsec;
 	ULONG msec;
+
+	#if (HCL_SIZEOF_UINT64_T > 0)
+	hcl_uint64_t bigsec, bigmsec;
 
 /* TODO: use DosTmrQueryTime() and DosTmrQueryFreq()? */
 	DosQuerySysInfo (QSV_MS_COUNT, QSV_MS_COUNT, &msec, HCL_SIZEOF(msec)); /* milliseconds */
@@ -1139,6 +1142,32 @@ void vm_gettime (hcl_t* hcl, hcl_ntime_t* now)
 	bigsec = HCL_MSEC_TO_SEC(bigmsec);
 	bigmsec -= HCL_SEC_TO_MSEC(bigsec);
 	HCL_INIT_NTIME (now, bigsec, HCL_MSEC_TO_NSEC(bigmsec));
+	#else
+    hcl_uint32_t bigsec, bigmsec;
+
+    DosQuerySysInfo (QSV_MS_COUNT, QSV_MS_COUNT, &msec, HCL_SIZEOF(msec));
+	bigsec = HCL_MSEC_TO_SEC(msec);
+	bigmsec = msec - HCL_SEC_TO_MSEC(bigsec);
+	if (msec < xtn->tc_last)
+	{
+		ULONG i;
+		hcl_uint32_t inc;
+
+		xtn->tc_overflow++;
+		inc = HCL_MSEC_TO_SEC(HCL_TYPE_MAX(hcl_uint32_t));
+		for (i = 0; i < xtn->tc_overflow; i++)
+		{
+			ULONG max = HCL_TYPE_MAX(hcl_uint32_t) - bigsec;
+			if (max > inc)
+			{
+				bigsec = HCL_TYPE_MAX(hcl_uint32_t);
+				break;
+			}
+			bigsec += inc;
+		}
+	}
+	HCL_INIT_NTIME (now, bigsec, HCL_MSEC_TO_NSEC(bigmsec));
+    #endif
 
 #elif defined(__DOS__) && (defined(_INTELC32_) || defined(__WATCOMC__))
 	clock_t c;
@@ -1235,7 +1264,7 @@ static int _add_poll_fd (hcl_t* hcl, int fd, int event_mask)
 		xtn->ev.reg.capa = newcapa;
 	}
 
-	if (event_mask & XPOLLIN) 
+	if (event_mask & XPOLLIN)
 	{
 		/*EV_SET (&ev, fd, EVFILT_READ, EV_ADD | EV_CLEAR, 0, 0, 0);*/
 		HCL_MEMSET (&ev, 0, HCL_SIZEOF(ev));
@@ -1347,12 +1376,12 @@ static int _add_poll_fd (hcl_t* hcl, int fd, int event_mask)
 	xtn_t* xtn = GET_XTN(hcl);
 
 	MUTEX_LOCK (&xtn->ev.reg.smtx);
-	if (event_mask & XPOLLIN) 
+	if (event_mask & XPOLLIN)
 	{
 		FD_SET (fd, &xtn->ev.reg.rfds);
 		if (fd > xtn->ev.reg.maxfd) xtn->ev.reg.maxfd = fd;
 	}
-	if (event_mask & XPOLLOUT) 
+	if (event_mask & XPOLLOUT)
 	{
 		FD_SET (fd, &xtn->ev.reg.wfds);
 		if (fd > xtn->ev.reg.maxfd) xtn->ev.reg.maxfd = fd;
@@ -1505,7 +1534,7 @@ static int _mod_poll_fd (hcl_t* hcl, int fd, int event_mask)
 
 	if (_del_poll_fd (hcl, fd) <= -1) return -1;
 
-	if (_add_poll_fd (hcl, fd, event_mask) <= -1) 
+	if (_add_poll_fd (hcl, fd, event_mask) <= -1)
 	{
 		/* TODO: any good way to rollback successful deletion? */
 		return -1;
@@ -1658,12 +1687,12 @@ kqueue_syserr:
 	MUTEX_LOCK (&xtn->ev.reg.smtx);
 	HCL_ASSERT (hcl, fd <= xtn->ev.reg.maxfd);
 
-	if (event_mask & XPOLLIN) 
+	if (event_mask & XPOLLIN)
 		FD_SET (fd, &xtn->ev.reg.rfds);
-	else 
+	else
 		FD_CLR (fd, &xtn->ev.reg.rfds);
 
-	if (event_mask & XPOLLOUT) 
+	if (event_mask & XPOLLOUT)
 		FD_SET (fd, &xtn->ev.reg.wfds);
 	else
 		FD_CLR (fd, &xtn->ev.reg.wfds);
@@ -1683,7 +1712,7 @@ static int vm_muxadd (hcl_t* hcl, hcl_ooi_t io_handle, hcl_ooi_t mask)
 	int event_mask;
 
 	event_mask = 0;
-	if (mask & HCL_SEMAPHORE_IO_MASK_INPUT) event_mask |= XPOLLIN; 
+	if (mask & HCL_SEMAPHORE_IO_MASK_INPUT) event_mask |= XPOLLIN;
 	if (mask & HCL_SEMAPHORE_IO_MASK_OUTPUT) event_mask |= XPOLLOUT;
 
 	if (event_mask == 0)
@@ -1701,7 +1730,7 @@ static int vm_muxmod (hcl_t* hcl, hcl_ooi_t io_handle, hcl_ooi_t mask)
 	int event_mask;
 
 	event_mask = 0;
-	if (mask & HCL_SEMAPHORE_IO_MASK_INPUT) event_mask |= XPOLLIN; 
+	if (mask & HCL_SEMAPHORE_IO_MASK_INPUT) event_mask |= XPOLLIN;
 	if (mask & HCL_SEMAPHORE_IO_MASK_OUTPUT) event_mask |= XPOLLOUT;
 
 	if (event_mask == 0)
@@ -1745,7 +1774,7 @@ static void* iothr_main (void* arg)
 		#endif
 
 		poll_for_event:
-		
+
 		#if defined(USE_DEVPOLL)
 			dvp.dp_timeout = 10000; /* milliseconds */
 			dvp.dp_fds = xtn->ev.buf;
@@ -1765,7 +1794,7 @@ static void* iothr_main (void* arg)
 			nfds = xtn->ev.reg.len;
 			MUTEX_UNLOCK (&xtn->ev.reg.pmtx);
 			n = poll(xtn->ev.buf, nfds, 10000);
-			if (n > 0) 
+			if (n > 0)
 			{
 				/* compact the return buffer as poll() doesn't */
 				hcl_oow_t i, j;
@@ -1868,7 +1897,7 @@ static void vm_muxwait (hcl_t* hcl, const hcl_ntime_t* dur, hcl_vmprim_muxwait_c
 	int n;
 
 	/* create a thread if mux wait is started at least once. */
-	if (!xtn->iothr.up) 
+	if (!xtn->iothr.up)
 	{
 		xtn->iothr.up = 1;
 		if (pthread_create(&xtn->iothr.thr, HCL_NULL, iothr_main, hcl) != 0)
@@ -1881,7 +1910,7 @@ static void vm_muxwait (hcl_t* hcl, const hcl_ntime_t* dur, hcl_vmprim_muxwait_c
 
 	if (xtn->iothr.abort) return;
 
-	if (xtn->ev.len <= 0) 
+	if (xtn->ev.len <= 0)
 	{
 		struct timespec ts;
 		hcl_ntime_t ns;
@@ -1937,7 +1966,7 @@ static void vm_muxwait (hcl_t* hcl, const hcl_ntime_t* dur, hcl_vmprim_muxwait_c
 		#endif
 			{
 				hcl_uint8_t u8;
-				while (read(xtn->iothr.p[0], &u8, HCL_SIZEOF(u8)) > 0) 
+				while (read(xtn->iothr.p[0], &u8, HCL_SIZEOF(u8)) > 0)
 				{
 					/* consume as much as possible */;
 					if (u8 == 'Q') xtn->iothr.abort = 1;
@@ -2020,11 +2049,11 @@ static void vm_muxwait (hcl_t* hcl, const hcl_ntime_t* dur, hcl_vmprim_muxwait_c
 	n = ioctl(xtn->ep, DP_POLL, &dvp);
 
 	#elif defined(USE_KQUEUE)
-	
+
 	if (dur)
 	{
 		ts.tv_sec = dur->sec;
-		ts.tv_nsec = dur->nsec; 
+		ts.tv_nsec = dur->nsec;
 	}
 	else
 	{
@@ -2044,7 +2073,7 @@ static void vm_muxwait (hcl_t* hcl, const hcl_ntime_t* dur, hcl_vmprim_muxwait_c
 	tmout = dur? HCL_SECNSEC_TO_MSEC(dur->sec, dur->nsec): 0;
 	HCL_MEMCPY (xtn->ev.buf, xtn->ev.reg.ptr, xtn->ev.reg.len * HCL_SIZEOF(*xtn->ev.buf));
 	n = poll(xtn->ev.buf, xtn->ev.reg.len, tmout);
-	if (n > 0) 
+	if (n > 0)
 	{
 		/* compact the return buffer as poll() doesn't */
 		hcl_oow_t i, j;
@@ -2062,7 +2091,7 @@ static void vm_muxwait (hcl_t* hcl, const hcl_ntime_t* dur, hcl_vmprim_muxwait_c
 	if (dur)
 	{
 		tv.tv_sec = dur->sec;
-		tv.tv_usec = HCL_NSEC_TO_USEC(dur->nsec); 
+		tv.tv_usec = HCL_NSEC_TO_USEC(dur->nsec);
 	}
 	else
 	{
@@ -2157,12 +2186,12 @@ static void vm_muxwait (hcl_t* hcl, const hcl_ntime_t* dur, hcl_vmprim_muxwait_c
 #endif  /* USE_THREAD */
 }
 
-/* ----------------------------------------------------------------- 
+/* -----------------------------------------------------------------
  * SLEEPING
  * ----------------------------------------------------------------- */
 
-#if defined(__DOS__) 
-#	if defined(_INTELC32_) 
+#if defined(__DOS__)
+#	if defined(_INTELC32_)
 	void _halt_cpu (void);
 #	elif defined(__WATCOMC__)
 	void _halt_cpu (void);
@@ -2189,7 +2218,7 @@ static int vm_sleep (hcl_t* hcl, const hcl_ntime_t* dur)
 	}
 #elif defined(__OS2__)
 
-	/* TODO: in gui mode, this is not a desirable method??? 
+	/* TODO: in gui mode, this is not a desirable method???
 	 *       this must be made event-driven coupled with the main event loop */
 	DosSleep (HCL_SECNSEC_TO_MSEC(dur->sec,dur->nsec));
 
@@ -2218,7 +2247,7 @@ static int vm_sleep (hcl_t* hcl, const hcl_ntime_t* dur)
 
 /* TODO: handle clock overvlow */
 /* TODO: check if there is abortion request or interrupt */
-	while (c > clock()) 
+	while (c > clock())
 	{
 		_halt_cpu();
 	}
@@ -2239,10 +2268,10 @@ static int vm_sleep (hcl_t* hcl, const hcl_ntime_t* dur)
 	return 0;
 }
 
-/* ----------------------------------------------------------------- 
+/* -----------------------------------------------------------------
  * SHARED LIBRARY HANDLING
  * ----------------------------------------------------------------- */
- 
+
 #if defined(USE_LTDL)
 #	define sys_dl_error() lt_dlerror()
 #	define sys_dl_open(x) lt_dlopen(x)
@@ -2282,10 +2311,10 @@ static const char* win_dlerror (void)
 
 	rc = FormatMessageA (
 		FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS,
-		NULL, GetLastError(), MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), 
+		NULL, GetLastError(), MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT),
 		buf, HCL_COUNTOF(buf), HCL_NULL
 	);
-	while (rc > 0 && buf[rc - 1] == '\r' || buf[rc - 1] == '\n') 
+	while (rc > 0 && buf[rc - 1] == '\r' || buf[rc - 1] == '\n')
 	{
 		buf[--rc] = '\0';
 	}
@@ -2302,7 +2331,7 @@ static void* mach_dlopen (const char* path)
 	void* handle;
 
 	mach_dlerror_str = "";
-	if ((rc = NSCreateObjectFileImageFromFile(path, &image)) != NSObjectFileImageSuccess) 
+	if ((rc = NSCreateObjectFileImageFromFile(path, &image)) != NSObjectFileImageSuccess)
 	{
 		switch (rc)
 		{
@@ -2322,7 +2351,7 @@ static void* mach_dlopen (const char* path)
 			case NSObjectFileImageAccess:
 				mach_dlerror_str = "inaccessible file";
 				break;
-				
+
 			default:
 				mach_dlerror_str = "unknown error";
 				break;
@@ -2388,7 +2417,7 @@ static void* dl_open (hcl_t* hcl, const hcl_ooch_t* name, int flags)
 	#else
 	bufcapa = hcl_count_bcstr(name);
 	#endif
-	bufcapa += HCL_COUNTOF(HCL_DEFAULT_PFMODDIR) + HCL_COUNTOF(HCL_DEFAULT_PFMODPREFIX) + HCL_COUNTOF(HCL_DEFAULT_PFMODPOSTFIX) + 1; 
+	bufcapa += HCL_COUNTOF(HCL_DEFAULT_PFMODDIR) + HCL_COUNTOF(HCL_DEFAULT_PFMODPREFIX) + HCL_COUNTOF(HCL_DEFAULT_PFMODPOSTFIX) + 1;
 
 	if (bufcapa <= HCL_COUNTOF(stabuf)) bufptr = stabuf;
 	else
@@ -2403,7 +2432,7 @@ static void* dl_open (hcl_t* hcl, const hcl_ooch_t* name, int flags)
 
 		/* opening a primitive function module - mostly libhcl-xxxx.
 		 * if PFMODPREFIX is absolute, never use PFMODDIR */
-		dlen = HCL_IS_PATH_ABSOLUTE(HCL_DEFAULT_PFMODPREFIX)? 
+		dlen = HCL_IS_PATH_ABSOLUTE(HCL_DEFAULT_PFMODPREFIX)?
 			0: hcl_copy_bcstr(bufptr, bufcapa, HCL_DEFAULT_PFMODDIR);
 		len = hcl_copy_bcstr(bufptr, bufcapa, HCL_DEFAULT_PFMODPREFIX);
 		len += dlen;
@@ -2416,20 +2445,20 @@ static void* dl_open (hcl_t* hcl, const hcl_ooch_t* name, int flags)
 	#endif
 
 		/* length including the directory, the prefix and the name. but excluding the postfix */
-		xlen  = len + bcslen; 
+		xlen  = len + bcslen;
 
-		for (i = len; i < xlen; i++) 
+		for (i = len; i < xlen; i++)
 		{
 			/* convert a period(.) to a dash(-) */
 			if (bufptr[i] == '.') bufptr[i] = '-';
 		}
- 
+
 	retry:
 		hcl_copy_bcstr (&bufptr[xlen], bufcapa - xlen, HCL_DEFAULT_PFMODPOSTFIX);
 
 		/* both prefix and postfix attached. for instance, libhcl-xxx */
 		handle = sys_dl_openext(bufptr);
-		if (!handle) 
+		if (!handle)
 		{
 			HCL_DEBUG3 (hcl, "Unable to open(ext) PFMOD %hs[%js] - %hs\n", &bufptr[dlen], name, sys_dl_error());
 
@@ -2443,7 +2472,7 @@ static void* dl_open (hcl_t* hcl, const hcl_ooch_t* name, int flags)
 			/* try without prefix and postfix */
 			bufptr[xlen] = '\0';
 			handle = sys_dl_openext(&bufptr[len]);
-			if (!handle) 
+			if (!handle)
 			{
 				hcl_bch_t* dash;
 				const hcl_bch_t* dl_errstr;
@@ -2452,9 +2481,9 @@ static void* dl_open (hcl_t* hcl, const hcl_ooch_t* name, int flags)
 				hcl_seterrbfmt (hcl, HCL_ESYSERR, "unable to open(ext) PFMOD %js - %hs", name, dl_errstr);
 
 				dash = hcl_rfind_bchar(bufptr, hcl_count_bcstr(bufptr), '-');
-				if (dash) 
+				if (dash)
 				{
-					/* remove a segment at the back. 
+					/* remove a segment at the back.
 					 * [NOTE] a dash contained in the original name before
 					 *        period-to-dash transformation may cause extraneous/wrong
 					 *        loading reattempts. */
@@ -2462,7 +2491,7 @@ static void* dl_open (hcl_t* hcl, const hcl_ooch_t* name, int flags)
 					goto retry;
 				}
 			}
-			else 
+			else
 			{
 				HCL_DEBUG3 (hcl, "Opened(ext) PFMOD %hs[%js] handle %p\n", &bufptr[len], name, handle);
 			}
@@ -2486,7 +2515,7 @@ static void* dl_open (hcl_t* hcl, const hcl_ooch_t* name, int flags)
 		if (hcl_find_bchar(bufptr, bcslen, '.'))
 		{
 			handle = sys_dl_open(bufptr);
-			if (!handle) 
+			if (!handle)
 			{
 				const hcl_bch_t* dl_errstr;
 				dl_errstr = sys_dl_error();
@@ -2498,7 +2527,7 @@ static void* dl_open (hcl_t* hcl, const hcl_ooch_t* name, int flags)
 		else
 		{
 			handle = sys_dl_openext(bufptr);
-			if (!handle) 
+			if (!handle)
 			{
 				const hcl_bch_t* dl_errstr;
 				dl_errstr = sys_dl_error();
@@ -2580,7 +2609,7 @@ static void* dl_getsym (hcl_t* hcl, void* handle, const hcl_ooch_t* name)
 		sym = sys_dl_getsym(handle, symname);
 		if (!sym)
 		{
-			bufptr[bcslen + 1] = '_'; 
+			bufptr[bcslen + 1] = '_';
 			bufptr[bcslen + 2] = '\0';
 
 			symname = &bufptr[1]; /* try name_ */
@@ -2596,7 +2625,7 @@ static void* dl_getsym (hcl_t* hcl, void* handle, const hcl_ooch_t* name)
 					dl_errstr = sys_dl_error();
 					HCL_DEBUG3 (hcl, "Failed to get module symbol %js from handle %p - %hs\n", name, handle, dl_errstr);
 					hcl_seterrbfmt (hcl, HCL_ENOENT, "unable to get module symbol %hs - %hs", symname, dl_errstr);
-					
+
 				}
 			}
 		}
@@ -2614,7 +2643,7 @@ static void* dl_getsym (hcl_t* hcl, void* handle, const hcl_ooch_t* name)
 #endif
 }
 
-/* ----------------------------------------------------------------- 
+/* -----------------------------------------------------------------
  * EVENT CALLBACKS
  * ----------------------------------------------------------------- */
 
@@ -2679,6 +2708,8 @@ static int open_pipes (hcl_t* hcl, int p[2])
 
 #if defined(_WIN32)
 	if (_pipe(p, 256, _O_BINARY | _O_NOINHERIT) == -1)
+#elif defined(__OS2__)
+	if (_pipe(p, 256, 10) == -1)
 #elif defined(HAVE_PIPE2) && defined(O_CLOEXEC) && defined(O_NONBLOCK)
 	if (pipe2(p, O_CLOEXEC | O_NONBLOCK) == -1)
 #else
@@ -2708,6 +2739,7 @@ static int open_pipes (hcl_t* hcl, int p[2])
 
 	return 0;
 }
+
 static void close_pipes (hcl_t* hcl, int p[2])
 {
 #if defined(_WIN32)
@@ -2733,7 +2765,7 @@ static int cb_vm_startup (hcl_t* hcl)
 
 #if defined(USE_DEVPOLL)
 	xtn->ep = open("/dev/poll", O_RDWR);
-	if (xtn->ep == -1) 
+	if (xtn->ep == -1)
 	{
 		hcl_seterrwithsyserr (hcl, 0, errno);
 		HCL_DEBUG1 (hcl, "Cannot create devpoll - %hs\n", strerror(errno));
@@ -2767,11 +2799,11 @@ static int cb_vm_startup (hcl_t* hcl)
 #elif defined(USE_EPOLL)
 	#if defined(HAVE_EPOLL_CREATE1) && defined(EPOLL_CLOEXEC)
 	xtn->ep = epoll_create1(EPOLL_CLOEXEC);
-	if (xtn->ep == -1) xtn->ep = epoll_create(1024); 
+	if (xtn->ep == -1) xtn->ep = epoll_create(1024);
 	#else
 	xtn->ep = epoll_create(1024);
 	#endif
-	if (xtn->ep == -1) 
+	if (xtn->ep == -1)
 	{
 		hcl_seterrwithsyserr (hcl, 0, errno);
 		HCL_DEBUG1 (hcl, "Cannot create epoll - %hs\n", strerror(errno));
@@ -2876,7 +2908,7 @@ static void cb_vm_cleanup (hcl_t* hcl)
 
 	close_pipes (hcl, xtn->sigfd.p);
 
-#if defined(USE_DEVPOLL) 
+#if defined(USE_DEVPOLL)
 	if (xtn->ep >= 0)
 	{
 		close (xtn->ep);
@@ -2918,7 +2950,7 @@ static void cb_vm_cleanup (hcl_t* hcl)
 #endif
 }
 
-/* ----------------------------------------------------------------- 
+/* -----------------------------------------------------------------
  * STANDARD HCL
  * ----------------------------------------------------------------- */
 

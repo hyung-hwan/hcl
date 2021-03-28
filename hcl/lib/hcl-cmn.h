@@ -27,20 +27,20 @@
 #ifndef _HCL_CMN_H_
 #define _HCL_CMN_H_
 
-/* WARNING: NEVER CHANGE/DELETE THE FOLLOWING HCL_HAVE_CFG_H DEFINITION. 
+/* WARNING: NEVER CHANGE/DELETE THE FOLLOWING HCL_HAVE_CFG_H DEFINITION.
  *          IT IS USED FOR DEPLOYMENT BY MAKEFILE.AM */
 /*#define HCL_HAVE_CFG_H*/
 
 #if defined(HCL_HAVE_CFG_H)
-#	include "hcl-cfg.h"
+#	include <hcl-cfg.h>
 #elif defined(_WIN32)
-#	include "hcl-msw.h"
+#	include <hcl-msw.h>
 #elif defined(__OS2__)
-#	include "hcl-os2.h"
+#	include <hcl-os2.h>
 #elif defined(__DOS__)
-#	include "hcl-dos.h"
+#	include <hcl-dos.h>
 #elif defined(macintosh)
-#	include "hcl-mac.h" /* class mac os */
+#	include <hcl-mac.h> /* classic mac os */
 #else
 #	error UNSUPPORTED SYSTEM
 #endif
@@ -51,7 +51,7 @@
 
 #if defined(EMSCRIPTEN)
 #	if defined(HCL_SIZEOF___INT128)
-#		undef HCL_SIZEOF___INT128 
+#		undef HCL_SIZEOF___INT128
 #		define HCL_SIZEOF___INT128 0
 #	endif
 #	if defined(HCL_SIZEOF_LONG) && defined(HCL_SIZEOF_INT) && (HCL_SIZEOF_LONG > HCL_SIZEOF_INT)
@@ -292,7 +292,7 @@
 	typedef hcl_int64_t hcl_intptr_t;
 	typedef hcl_uint32_t hcl_ushortptr_t;
 	typedef hcl_int32_t hcl_shortptr_t;
-#elif defined(HCL_HAVE_UINT128_T) && (HCL_SIZEOF_VOID_P == 16) 
+#elif defined(HCL_HAVE_UINT128_T) && (HCL_SIZEOF_VOID_P == 16)
 	typedef hcl_uint128_t hcl_uintptr_t;
 	typedef hcl_int128_t hcl_intptr_t;
 	typedef hcl_uint64_t hcl_ushortptr_t;
@@ -407,7 +407,7 @@ typedef unsigned char           hcl_bchu_t; /* unsigned version of hcl_bch_t for
 #	define HCL_SIZEOF_UCH_T 4
 
 #elif defined(__GNUC__) && defined(__CHAR16_TYPE__)
-	typedef __CHAR16_TYPE__    hcl_uch_t; 
+	typedef __CHAR16_TYPE__    hcl_uch_t;
 	typedef hcl_uint16_t       hcl_uchu_t; /* same as hcl_uch_t as it is already unsigned */
 #	define HCL_SIZEOF_UCH_T 2
 #else
@@ -479,7 +479,7 @@ typedef unsigned int hcl_bitmask_t;
 typedef struct hcl_obj_t           hcl_obj_t;
 typedef struct hcl_obj_t*          hcl_oop_t;
 
-/* 
+/*
  * An object pointer(OOP) is an ordinary pointer value to an object.
  * but some simple numeric values are also encoded into OOP using a simple
  * bit-shifting and masking.
@@ -487,15 +487,15 @@ typedef struct hcl_obj_t*          hcl_oop_t;
  * A real OOP is stored without any bit-shifting while a non-pointer value encoded
  * in an OOP is bit-shifted to the left by 2 and the 2 least-significant bits
  * are set to 1 or 2.
- * 
+ *
  * This scheme works because the object allocators aligns the object size to
  * a multiple of sizeof(hcl_oop_t). This way, the 2 least-significant bits
  * of a real OOP are always 0s.
  *
- * With 2 bits, i can encode only 3 special types except object pointers. 
+ * With 2 bits, i can encode only 3 special types except object pointers.
  * Since I need more than 3 special types, I extend the tag bits up to 4 bits
  * to represent a special data type that doesn't require a range as wide
- * as a small integer. A unicode character, for instance, only requires 21 
+ * as a small integer. A unicode character, for instance, only requires 21
  * bits at most. An error doesn't need to be as diverse as a small integer.
  */
 
@@ -537,13 +537,13 @@ typedef struct hcl_obj_t*          hcl_oop_t;
 #define HCL_OOP_TO_ERROR(oop) (((hcl_oow_t)oop) >> (HCL_OOP_TAG_BITS_LO + HCL_OOP_TAG_BITS_LO))
 #define HCL_ERROR_TO_OOP(num) ((hcl_oop_t)((((hcl_oow_t)(num)) << (HCL_OOP_TAG_BITS_LO + HCL_OOP_TAG_BITS_LO)) | HCL_OOP_TAG_ERROR))
 
-/* SMOOI takes up 62 bit on a 64-bit architecture and 30 bits 
+/* SMOOI takes up 62 bit on a 64-bit architecture and 30 bits
  * on a 32-bit architecture. The absolute value takes up 61 bits and 29 bits
  * respectively for the 1 sign bit. */
 #define HCL_SMOOI_BITS (HCL_OOI_BITS - HCL_OOP_TAG_BITS_LO)
 #define HCL_SMOOI_ABS_BITS (HCL_SMOOI_BITS - 1)
 #define HCL_SMOOI_MAX ((hcl_ooi_t)(~((hcl_oow_t)0) >> (HCL_OOP_TAG_BITS_LO + 1)))
-/* Sacrificing 1 bit pattern for a negative SMOOI makes 
+/* Sacrificing 1 bit pattern for a negative SMOOI makes
  * implementation a lot eaisier in many respect. */
 /*#define HCL_SMOOI_MIN (-HCL_SMOOI_MAX - 1)*/
 #define HCL_SMOOI_MIN (-HCL_SMOOI_MAX)
@@ -552,7 +552,7 @@ typedef struct hcl_obj_t*          hcl_oop_t;
 
 /* SMPTR is a special value which has been devised to encode an address value
  * whose low HCL_OOP_TAG_BITS_LO bits are 0. its class is SmallPointer. A pointer
- * returned by most of system functions would be aligned to the pointer size. 
+ * returned by most of system functions would be aligned to the pointer size.
  * you can use the followings macros when converting such a pointer without loss. */
 #define HCL_IN_SMPTR_RANGE(ptr) ((((hcl_oow_t)ptr) & HCL_LBMASK(hcl_oow_t, HCL_OOP_TAG_BITS_LO)) == 0)
 
@@ -691,7 +691,7 @@ struct hcl_ntime_t
 #endif
 
 /* make a bit mask that can mask off low n bits */
-#define HCL_LBMASK(type,n) (~(~((type)0) << (n))) 
+#define HCL_LBMASK(type,n) (~(~((type)0) << (n)))
 #define HCL_LBMASK_SAFE(type,n) (((n) < HCL_BITSOF(type))? HCL_LBMASK(type,n): ~(type)0)
 
 /* make a bit mask that can mask off hig n bits */
@@ -715,7 +715,7 @@ struct hcl_ntime_t
 	(value = (((type)(value)) | (((bits) & HCL_LBMASK(type,length)) << (offset))))
 
 
-/** 
+/**
  * The HCL_BITS_MAX() macros calculates the maximum value that the 'nbits'
  * bits of an unsigned integer of the given 'type' can hold.
  * \code
@@ -730,12 +730,12 @@ struct hcl_ntime_t
  * ========================================================================= */
 typedef struct hcl_mmgr_t hcl_mmgr_t;
 
-/** 
+/**
  * allocate a memory chunk of the size \a n.
  * \return pointer to a memory chunk on success, #HCL_NULL on failure.
  */
 typedef void* (*hcl_mmgr_alloc_t)   (hcl_mmgr_t* mmgr, hcl_oow_t n);
-/** 
+/**
  * resize a memory chunk pointed to by \a ptr to the size \a n.
  * \return pointer to a memory chunk on success, #HCL_NULL on failure.
  */
@@ -748,13 +748,13 @@ typedef void  (*hcl_mmgr_free_t)    (hcl_mmgr_t* mmgr, void* ptr);
 /**
  * The hcl_mmgr_t type defines the memory management interface.
  * As the type is merely a structure, it is just used as a single container
- * for memory management functions with a pointer to user-defined data. 
- * The user-defined data pointer \a ctx is passed to each memory management 
- * function whenever it is called. You can allocate, reallocate, and free 
+ * for memory management functions with a pointer to user-defined data.
+ * The user-defined data pointer \a ctx is passed to each memory management
+ * function whenever it is called. You can allocate, reallocate, and free
  * a memory chunk.
  *
  * For example, a hcl_xxx_open() function accepts a pointer of the hcl_mmgr_t
- * type and the xxx object uses it to manage dynamic data within the object. 
+ * type and the xxx object uses it to manage dynamic data within the object.
  */
 struct hcl_mmgr_t
 {
@@ -771,12 +771,12 @@ struct hcl_mmgr_t
 #define HCL_MMGR_ALLOC(mmgr,size) ((mmgr)->alloc(mmgr,size))
 
 /**
- * The HCL_MMGR_REALLOC() macro resizes a memory block pointed to by \a ptr 
+ * The HCL_MMGR_REALLOC() macro resizes a memory block pointed to by \a ptr
  * to the \a size bytes using the \a mmgr memory manager.
  */
 #define HCL_MMGR_REALLOC(mmgr,ptr,size) ((mmgr)->realloc(mmgr,ptr,size))
 
-/** 
+/**
  * The HCL_MMGR_FREE() macro deallocates the memory block pointed to by \a ptr.
  */
 #define HCL_MMGR_FREE(mmgr,ptr) ((mmgr)->free(mmgr,ptr))
@@ -789,7 +789,7 @@ struct hcl_mmgr_t
 typedef struct hcl_cmgr_t hcl_cmgr_t;
 
 typedef hcl_oow_t (*hcl_cmgr_bctouc_t) (
-	const hcl_bch_t*   mb, 
+	const hcl_bch_t*   mb,
 	hcl_oow_t         size,
 	hcl_uch_t*         wc
 );
@@ -801,8 +801,8 @@ typedef hcl_oow_t (*hcl_cmgr_uctobc_t) (
 );
 
 /**
- * The hcl_cmgr_t type defines the character-level interface to 
- * multibyte/wide-character conversion. This interface doesn't 
+ * The hcl_cmgr_t type defines the character-level interface to
+ * multibyte/wide-character conversion. This interface doesn't
  * provide any facility to store conversion state in a context
  * independent manner. This leads to the limitation that it can
  * handle a stateless multibyte encoding only.
@@ -829,7 +829,7 @@ typedef struct hcl_t hcl_t;
 #elif defined(_WIN32) || (defined(__WATCOMC__) && (__WATCOMC__ >= 1000) && !defined(__WINDOWS_386__))
 #	define HCL_IMPORT __declspec(dllimport)
 #	define HCL_EXPORT __declspec(dllexport)
-#	define HCL_PRIVATE 
+#	define HCL_PRIVATE
 #elif defined(__GNUC__) && ((__GNUC__>= 4) || (__GNUC__ == 3 && __GNUC_MINOR__ >= 3))
 #	define HCL_IMPORT __attribute__((visibility("default")))
 #	define HCL_EXPORT __attribute__((visibility("default")))
@@ -846,12 +846,12 @@ typedef struct hcl_t hcl_t;
 #	define HCL_INLINE inline
 #	define HCL_HAVE_INLINE
 #elif defined(__GNUC__) && defined(__GNUC_GNU_INLINE__)
-	/* gcc disables inline when -std=c89 or -ansi is used. 
+	/* gcc disables inline when -std=c89 or -ansi is used.
 	 * so use __inline__ supported by gcc regardless of the options */
 #	define HCL_INLINE /*extern*/ __inline__
 #	define HCL_HAVE_INLINE
 #else
-#	define HCL_INLINE 
+#	define HCL_INLINE
 #	undef HCL_HAVE_INLINE
 #endif
 
@@ -921,7 +921,7 @@ typedef struct hcl_t hcl_t;
 */
 
 
-#if defined(__has_builtin) 
+#if defined(__has_builtin)
 	#if __has_builtin(__builtin_ctz)
 		#define HCL_HAVE_BUILTIN_CTZ
 	#endif
@@ -941,43 +941,43 @@ typedef struct hcl_t hcl_t;
 	#if __has_builtin(__builtin_clzll)
 		#define HCL_HAVE_BUILTIN_CLZLL
 	#endif
- 
+
 	#if __has_builtin(__builtin_uadd_overflow)
-		#define HCL_HAVE_BUILTIN_UADD_OVERFLOW 
+		#define HCL_HAVE_BUILTIN_UADD_OVERFLOW
 	#endif
 	#if __has_builtin(__builtin_uaddl_overflow)
-		#define HCL_HAVE_BUILTIN_UADDL_OVERFLOW 
+		#define HCL_HAVE_BUILTIN_UADDL_OVERFLOW
 	#endif
 	#if __has_builtin(__builtin_uaddll_overflow)
-		#define HCL_HAVE_BUILTIN_UADDLL_OVERFLOW 
+		#define HCL_HAVE_BUILTIN_UADDLL_OVERFLOW
 	#endif
 	#if __has_builtin(__builtin_umul_overflow)
-		#define HCL_HAVE_BUILTIN_UMUL_OVERFLOW 
+		#define HCL_HAVE_BUILTIN_UMUL_OVERFLOW
 	#endif
 	#if __has_builtin(__builtin_umull_overflow)
-		#define HCL_HAVE_BUILTIN_UMULL_OVERFLOW 
+		#define HCL_HAVE_BUILTIN_UMULL_OVERFLOW
 	#endif
 	#if __has_builtin(__builtin_umulll_overflow)
-		#define HCL_HAVE_BUILTIN_UMULLL_OVERFLOW 
+		#define HCL_HAVE_BUILTIN_UMULLL_OVERFLOW
 	#endif
 
 	#if __has_builtin(__builtin_sadd_overflow)
-		#define HCL_HAVE_BUILTIN_SADD_OVERFLOW 
+		#define HCL_HAVE_BUILTIN_SADD_OVERFLOW
 	#endif
 	#if __has_builtin(__builtin_saddl_overflow)
-		#define HCL_HAVE_BUILTIN_SADDL_OVERFLOW 
+		#define HCL_HAVE_BUILTIN_SADDL_OVERFLOW
 	#endif
 	#if __has_builtin(__builtin_saddll_overflow)
-		#define HCL_HAVE_BUILTIN_SADDLL_OVERFLOW 
+		#define HCL_HAVE_BUILTIN_SADDLL_OVERFLOW
 	#endif
 	#if __has_builtin(__builtin_smul_overflow)
-		#define HCL_HAVE_BUILTIN_SMUL_OVERFLOW 
+		#define HCL_HAVE_BUILTIN_SMUL_OVERFLOW
 	#endif
 	#if __has_builtin(__builtin_smull_overflow)
-		#define HCL_HAVE_BUILTIN_SMULL_OVERFLOW 
+		#define HCL_HAVE_BUILTIN_SMULL_OVERFLOW
 	#endif
 	#if __has_builtin(__builtin_smulll_overflow)
-		#define HCL_HAVE_BUILTIN_SMULLL_OVERFLOW 
+		#define HCL_HAVE_BUILTIN_SMULLL_OVERFLOW
 	#endif
 
 	#if __has_builtin(__builtin_expect)
@@ -1017,7 +1017,7 @@ typedef struct hcl_t hcl_t;
 
 #elif defined(__GNUC__) && defined(__GNUC_MINOR__)
 
-	#if (__GNUC__ >= 4) 
+	#if (__GNUC__ >= 4)
 		#define HCL_HAVE_SYNC_LOCK_TEST_AND_SET
 		#define HCL_HAVE_SYNC_LOCK_RELEASE
 

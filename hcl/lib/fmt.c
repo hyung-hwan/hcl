@@ -76,6 +76,9 @@
 #	if !defined(HAVE_SNPRINTF)
 #		define HAVE_SNPRINTF
 #	endif
+#	if defined(__OS2__) && defined(__BORLANDC__)
+#		undef HAVE_SNPRINTF
+#	endif
 #endif
 #if defined(HAVE_QUADMATH_H)
 #	include <quadmath.h> /* for quadmath_snprintf() */
@@ -87,7 +90,7 @@
  * hcl_intmax_t in base 2, plus NUL byte. */
 #define MAXNBUF (HCL_SIZEOF(hcl_intmax_t) * HCL_BITS_PER_BYTE + 1)
 
-enum
+enum fmt_spec_t
 {
 	/* integer */
 	LF_C = (1 << 0),

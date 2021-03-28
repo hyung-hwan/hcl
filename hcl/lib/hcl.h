@@ -51,25 +51,25 @@ enum hcl_errnum_t
 	HCL_ENOIMPL,  /**< not implemented */
 	HCL_ESYSERR,  /**< subsystem error */
 	HCL_EINTERN,  /**< internal error */
-	
+
 	HCL_ESYSMEM,  /**< insufficient system memory */
 	HCL_EOOMEM,   /**< insufficient object memory */
 	HCL_ETYPE,    /**< invalid class/type */
 	HCL_EINVAL,   /**< invalid parameter or data */
 	HCL_ENOENT,   /**< data not found */
-	
+
 	HCL_EEXIST,   /**< existing/duplicate data */
-	HCL_EBUSY, 
+	HCL_EBUSY,
 	HCL_EACCES,
 	HCL_EPERM,
 	HCL_ENOTDIR,
-	
+
 	HCL_EINTR,
 	HCL_EPIPE,
 	HCL_EAGAIN,
 	HCL_EBADHND,
 	HCL_EFRMFLOOD, /**< too many frames */
-	
+
 	HCL_EMSGRCV,   /**< mesasge receiver error */
 	HCL_EMSGSND,   /**< message sending error. even doesNotUnderstand: is not found */
 	HCL_ENUMARGS,  /**< wrong number of arguments */
@@ -192,7 +192,7 @@ enum hcl_trait_t
 
 	HCL_TRAIT_INTERACTIVE = (1u << 7),
 
-	/* perform no garbage collection when the heap is full. 
+	/* perform no garbage collection when the heap is full.
 	 * you still can use hcl_gc() explicitly. */
 	HCL_TRAIT_NOGC = (1u << 8),
 
@@ -239,7 +239,7 @@ typedef struct hcl_obj_word_t*     hcl_oop_word_t;
 #	define HCL_SIZEOF_LIW_T    HCL_SIZEOF_OOW_T
 #	define HCL_SIZEOF_LIDW_T   HCL_SIZEOF_UINTMAX_T
 #	define HCL_LIW_BITS        HCL_OOW_BITS
-#	define HCL_LIDW_BITS       (HCL_SIZEOF_UINTMAX_T * HCL_BITS_PER_BYTE) 
+#	define HCL_LIDW_BITS       (HCL_SIZEOF_UINTMAX_T * HCL_BITS_PER_BYTE)
 
 	typedef hcl_oop_word_t     hcl_oop_liword_t;
 #	define HCL_OBJ_TYPE_LIWORD HCL_OBJ_TYPE_WORD
@@ -287,7 +287,7 @@ enum hcl_obj_type_t
 */
 
 /* NOTE: you can have HCL_OBJ_SHORT, HCL_OBJ_INT
- * HCL_OBJ_LONG, HCL_OBJ_FLOAT, HCL_OBJ_DOUBLE, etc 
+ * HCL_OBJ_LONG, HCL_OBJ_FLOAT, HCL_OBJ_DOUBLE, etc
  * type type field being 6 bits long, you can have up to 64 different types.
 
 	HCL_OBJ_TYPE_SHORT,
@@ -299,20 +299,20 @@ enum hcl_obj_type_t
 typedef enum hcl_obj_type_t hcl_obj_type_t;
 
 /* =========================================================================
- * Object header structure 
- * 
+ * Object header structure
+ *
  * _flags:
- *   type: the type of a payload item. 
- *         one of HCL_OBJ_TYPE_OOP, HCL_OBJ_TYPE_CHAR, 
+ *   type: the type of a payload item.
+ *         one of HCL_OBJ_TYPE_OOP, HCL_OBJ_TYPE_CHAR,
  *                HCL_OBJ_TYPE_BYTE, HCL_OBJ_TYPE_HALFWORD, HCL_OBJ_TYPE_WORD
- *   unit: the size of a payload item in bytes. 
+ *   unit: the size of a payload item in bytes.
  *   extra: 0 or 1. 1 indicates that the payload contains 1 more
- *          item than the value of the size field. used for a 
+ *          item than the value of the size field. used for a
  *          terminating null in a variable-char object. internel
  *          use only.
  *   kernel: 0 - ordinary object.
  *           1 - kernel object. can survive hcl_reset().
- *           2 - kernel object. can survive hcl_reset(). 
+ *           2 - kernel object. can survive hcl_reset().
  *               a symbol object with 2 in the kernel bits cannot be assigned a
  *               value with the 'set' special form.
  *   moved: 0 or 1. used by GC. internal use only.
@@ -322,27 +322,27 @@ typedef enum hcl_obj_type_t hcl_obj_type_t;
  *
  * _size: the number of payload items in an object.
  *        it doesn't include the header size.
- * 
+ *
  * The total number of bytes occupied by an object can be calculated
  * with this fomula:
  *    sizeof(hcl_obj_t) + ALIGN((size + extra) * unit), sizeof(hcl_oop_t))
- * 
- * If the type is known to be not HCL_OBJ_TYPE_CHAR, you can assume that 
+ *
+ * If the type is known to be not HCL_OBJ_TYPE_CHAR, you can assume that
  * 'extra' is 0. So you can simplify the fomula in such a context.
  *    sizeof(hcl_obj_t) + ALIGN(size * unit), sizeof(hcl_oop_t))
  *
  * The ALIGN() macro is used above since allocation adjusts the payload
  * size to a multiple of sizeof(hcl_oop_t). it assumes that sizeof(hcl_obj_t)
  * is a multiple of sizeof(hcl_oop_t). See the HCL_BYTESOF() macro.
- * 
+ *
  * Due to the header structure, an object can only contain items of
- * homogeneous data types in the payload. 
+ * homogeneous data types in the payload.
  *
  * It's actually possible to split the size field into 2. For example,
  * the upper half contains the number of oops and the lower half contains
  * the number of bytes/chars. This way, a variable-byte class or a variable-char
  * class can have normal instance variables. On the contrary, the actual byte
- * size calculation and the access to the payload fields become more complex. 
+ * size calculation and the access to the payload fields become more complex.
  * Therefore, i've dropped the idea.
  * ========================================================================= */
 #define HCL_OBJ_FLAGS_TYPE_BITS     6
@@ -403,7 +403,7 @@ typedef enum hcl_obj_type_t hcl_obj_type_t;
 
 
 /* [NOTE] this macro doesn't check the range of the actual value.
- *        make sure that the value of each bit fields given falls within the 
+ *        make sure that the value of each bit fields given falls within the
  *        possible range of the defined bits */
 #define HCL_OBJ_MAKE_FLAGS(t,u,e,k,m,g,r,b) ( \
 	(((hcl_oow_t)(t)) << HCL_OBJ_FLAGS_TYPE_SHIFT) | \
@@ -548,7 +548,7 @@ struct hcl_fpdec_t
 typedef struct hcl_function_t hcl_function_t;
 typedef struct hcl_function_t* hcl_oop_function_t;
 
-#define HCL_BLOCK_NAMED_INSTVARS 4 
+#define HCL_BLOCK_NAMED_INSTVARS 4
 typedef struct hcl_block_t hcl_block_t;
 typedef struct hcl_block_t* hcl_oop_block_t;
 
@@ -573,7 +573,7 @@ struct hcl_function_t
 };
 
 /* hcl_function_t copies the byte codes and literal frames into itself
- * hlc_block_t contains minimal information(ip) for referening byte codes 
+ * hlc_block_t contains minimal information(ip) for referening byte codes
  * and literal frames available in home->origin.
  */
 struct hcl_block_t
@@ -590,7 +590,7 @@ struct hcl_context_t
 	HCL_OBJ_HEADER;
 
 	/* SmallInteger, context flags */
-	hcl_oop_t         flags; 
+	hcl_oop_t         flags;
 
 	/* it points to the active context at the moment when
 	 * this context object has been activated. a new method context
@@ -614,16 +614,16 @@ struct hcl_context_t
 	hcl_oop_t          receiver_or_base; /* when used as a base, it's either a block or a function */
 
 	/* it is set to nil for a method context.
-	 * for a block context, it points to the active context at the 
-	 * moment the block context was created. that is, it points to 
-	 * a method context where the base block has been defined. 
+	 * for a block context, it points to the active context at the
+	 * moment the block context was created. that is, it points to
+	 * a method context where the base block has been defined.
 	 * an activated block context copies this field from the base block context. */
 	hcl_oop_context_t home; /* context or nil */
 
 	/* a function context is created with itself in this field. The function
 	 * context creation is based on a function object(initial or lambda/defun).
 	 *
-	 * a block context is created over a block object. it stores 
+	 * a block context is created over a block object. it stores
 	 * a function context points to itself in this field. a block context
 	 * points to the function context where it is created. another block context
 	 * created within the block context also points to the same function context.
@@ -631,11 +631,11 @@ struct hcl_context_t
 	 * take note of the following points:
 	 *   ctx->origin: function context
 	 *   ctx->origin->receiver_or_base: actual function containing byte codes pertaining to ctx.
-	 * 
+	 *
 	 * a base of a block context is a block object but ctx->origin is guaranteed to be
 	 * a function context. so its base is also a function object all the time.
 	 */
-	hcl_oop_context_t  origin; 
+	hcl_oop_context_t  origin;
 
 	/* variable indexed part */
 	hcl_oop_t          slot[1]; /* stack */
@@ -719,13 +719,13 @@ struct hcl_semaphore_t
 
 	hcl_oop_t count; /* SmallInteger */
 
-	/* nil for normal. SmallInteger if associated with 
+	/* nil for normal. SmallInteger if associated with
 	 * timer(HCL_SEMAPHORE_SUBTYPE_TIMED) or IO(HCL_SEMAPHORE_SUBTYPE_IO). */
-	hcl_oop_t subtype; 
+	hcl_oop_t subtype;
 
 	union
 	{
-		struct 
+		struct
 		{
 			hcl_oop_t index; /* index to the heap that stores timed semaphores */
 			hcl_oop_t ftime_sec; /* firing time */
@@ -762,7 +762,7 @@ struct hcl_semaphore_group_t
 	struct
 	{
 		hcl_oop_process_t first;
-		hcl_oop_process_t last; 
+		hcl_oop_process_t last;
 	} waiting; /* list of processes waiting on this semaphore group */
 	/* [END IMPORTANT] */
 
@@ -810,7 +810,7 @@ struct hcl_process_scheduler_t
 
 /**
  * The HCL_BYTESOF() macro returns the size of the payload of
- * an object in bytes. If the pointer given encodes a numeric value, 
+ * an object in bytes. If the pointer given encodes a numeric value,
  * it returns the size of #hcl_oow_t in bytes.
  */
 #define HCL_BYTESOF(hcl,oop) \
@@ -1039,7 +1039,7 @@ struct hcl_vmprim_t
 
 	/* If you customize the heap allocator by providing the alloc_heap
 	 * callback, you should implement the heap freer. otherwise the default
-	 * implementation doesn't know how to free the heap allocated by 
+	 * implementation doesn't know how to free the heap allocated by
 	 * the allocator callback. */
 	hcl_free_heap_t        free_heap; /* optional */
 
@@ -1096,15 +1096,15 @@ typedef struct hcl_iolxc_t hcl_iolxc_t;
 typedef struct hcl_ioinarg_t hcl_ioinarg_t;
 struct hcl_ioinarg_t
 {
-	/** 
+	/**
 	 * [IN] I/O object name.
 	 * It is #HCL_NULL for the main stream and points to a non-NULL string
 	 * for an included stream.
 	 */
-	const hcl_ooch_t* name;   
+	const hcl_ooch_t* name;
 
-	/** 
-	 * [OUT] I/O handle set by a handler. 
+	/**
+	 * [OUT] I/O handle set by a handler.
 	 * The source stream handler can set this field when it opens a stream.
 	 * All subsequent operations on the stream see this field as set
 	 * during opening.
@@ -1147,8 +1147,8 @@ struct hcl_ioinarg_t
 typedef struct hcl_iooutarg_t hcl_iooutarg_t;
 struct hcl_iooutarg_t
 {
-	/** 
-	 * [OUT] I/O handle set by a handler. 
+	/**
+	 * [OUT] I/O handle set by a handler.
 	 * The source stream handler can set this field when it opens a stream.
 	 * All subsequent operations on the stream see this field as set
 	 * during opening.
@@ -1164,7 +1164,7 @@ struct hcl_iooutarg_t
 	/**
 	 * [IN] total number of characters to write
 	 */
-	hcl_oow_t    len; 
+	hcl_oow_t    len;
 
 	/**
 	 * [OUT] place the number of characters written here for HCL_IO_WRITE
@@ -1172,14 +1172,14 @@ struct hcl_iooutarg_t
 	hcl_oow_t    xlen;
 };
 
-/** 
+/**
  * The hcl_ioimpl_t type defines a callback function prototype
  * for I/O operations.
  */
 typedef int (*hcl_ioimpl_t) (
 	hcl_t*        hcl,
 	hcl_iocmd_t   cmd,
-	void*         arg /* hcl_ioinarg_t* or hcl_iooutarg_t* */ 
+	void*         arg /* hcl_ioinarg_t* or hcl_iooutarg_t* */
 );
 
 /* =========================================================================
@@ -1290,7 +1290,7 @@ struct hcl_mod_t
 	void*            ctx;
 };
 
-struct hcl_mod_data_t 
+struct hcl_mod_data_t
 {
 	void*           handle;
 	hcl_rbt_pair_t* pair; /* internal backreference to hcl->modtab */
@@ -1370,7 +1370,7 @@ struct hcl_t
 	#endif
 		hcl_oow_t dfl_symtab_size;
 		hcl_oow_t dfl_sysdic_size;
-		hcl_oow_t dfl_procstk_size; 
+		hcl_oow_t dfl_procstk_size;
 		void* mod_inctx;
 
 	#if defined(HCL_BUILD_DEBUG)
@@ -1433,7 +1433,7 @@ struct hcl_t
 	hcl_oow_t sem_list_count;
 	hcl_oow_t sem_list_capa;
 
-	/* semaphores sorted according to time-out. 
+	/* semaphores sorted according to time-out.
 	 * organize entries using heap as the earliest entry
 	 * needs to be checked first */
 	hcl_oop_semaphore_t* sem_heap;
@@ -1614,7 +1614,7 @@ struct hcl_t
 #define HCL_STACK_GETRCV(hcl,nargs) HCL_STACK_GET(hcl, (hcl)->sp - nargs)
 
 
-/* you can't access arguments and receiver after this macro. 
+/* you can't access arguments and receiver after this macro.
  * also you must not call this macro more than once */
 
 #define HCL_STACK_SETRET(hcl,nargs,retv) \
@@ -1812,7 +1812,7 @@ static HCL_INLINE hcl_errnum_t hcl_geterrnum (hcl_t* hcl) { return hcl->errnum; 
 #endif
 
 HCL_EXPORT void hcl_seterrnum (
-	hcl_t*       hcl, 
+	hcl_t*       hcl,
 	hcl_errnum_t errnum
 );
 
@@ -1823,16 +1823,16 @@ HCL_EXPORT void hcl_seterrwithsyserr (
 );
 
 void hcl_seterrbfmtwithsyserr (
-	hcl_t*           hcl, 
-	int              syserr_type, 
+	hcl_t*           hcl,
+	int              syserr_type,
 	int              syserr_code,
 	const hcl_bch_t* fmt,
        	...
 );
 
 void hcl_seterrufmtwithsyserr (
-	hcl_t*           hcl, 
-	int              syserr_type, 
+	hcl_t*           hcl,
+	int              syserr_type,
 	int              syserr_code,
 	const hcl_uch_t* fmt,
        	...
@@ -1895,7 +1895,7 @@ HCL_EXPORT int hcl_getoption (
 );
 
 /**
- * The hcl_setoption() function sets the value of an option 
+ * The hcl_setoption() function sets the value of an option
  * specified by \a id to the value pointed to by \a value.
  *
  * \return 0 on success, -1 on failure
@@ -1992,6 +1992,10 @@ HCL_EXPORT hcl_cnode_t* hcl_read (
 	hcl_t*       hcl
 );
 
+HCL_EXPORT void hcl_freecnode (
+	hcl_t*       hcl,
+	hcl_cnode_t* cnode
+);
 
 HCL_EXPORT int hcl_print (
 	hcl_t*       hcl,
@@ -2018,9 +2022,9 @@ HCL_EXPORT int hcl_compile (
 );
 
 /**
- * The hcl_decode() function decodes instructions from the position 
+ * The hcl_decode() function decodes instructions from the position
  * \a start to the position \a end - 1, and prints the decoded instructions
- * in the textual form. 
+ * in the textual form.
  */
 HCL_EXPORT int hcl_decode (
 	hcl_t*       hcl,
@@ -2039,14 +2043,14 @@ HCL_EXPORT int hcl_decode (
 #endif
 
 
-/* if you should read charcters from the input stream before hcl_read(), 
+/* if you should read charcters from the input stream before hcl_read(),
  * you can call hcl_readchar() */
 HCL_EXPORT hcl_iolxc_t* hcl_readchar (
 	hcl_t* hcl
 );
 
-/* If you use hcl_readchar() to read the input stream, you may use 
- * hcl_unreadchar() to put back characters read for hcl_readchar() 
+/* If you use hcl_readchar() to read the input stream, you may use
+ * hcl_unreadchar() to put back characters read for hcl_readchar()
  * to return before reading the stream again. */
 HCL_EXPORT int hcl_unreadchar (
 	hcl_t*             hcl,
@@ -2265,12 +2269,12 @@ HCL_EXPORT hcl_oop_t hcl_makefpdec (
 );
 
 HCL_EXPORT hcl_oop_t hcl_makedic (
-	hcl_t*            hcl, 
+	hcl_t*            hcl,
 	hcl_oow_t         inisize /* initial bucket size */
 );
 
 HCL_EXPORT hcl_oop_t hcl_makeprocess (
-	hcl_t*            hcl, 
+	hcl_t*            hcl,
 	hcl_oow_t         stksize
 );
 
@@ -2318,18 +2322,11 @@ HCL_EXPORT hcl_oop_t hcl_makeprim (
 
 
 HCL_EXPORT hcl_oop_t hcl_makebigint (
-	hcl_t*           hcl, 
+	hcl_t*           hcl,
 	int              brand,
 	const hcl_liw_t* ptr,
 	hcl_oow_t        len
 );
-
-#if (HCL_SIZEOF_UINTMAX_T == HCL_SIZEOF_OOW_T)
-#	define hcl_inttouintmax hcl_inttooow
-#	define hcl_inttointmax hcl_inttoooi
-#	define hcl_uintmaxtoint hcl_oowtoint
-#	define hcl_intmaxtoint hcl_ooitoint
-#else
 
 HCL_EXPORT hcl_oop_t hcl_oowtoint (
 	hcl_t*     hcl,
@@ -2352,6 +2349,13 @@ HCL_EXPORT int hcl_inttoooi (
 	hcl_oop_t  x,
 	hcl_ooi_t* i
 );
+
+#if (HCL_SIZEOF_UINTMAX_T == HCL_SIZEOF_OOW_T)
+#   define hcl_inttouintmax hcl_inttooow
+#   define hcl_inttointmax hcl_inttoooi
+#   define hcl_uintmaxtoint hcl_oowtoint
+#   define hcl_intmaxtoint hcl_ooitoint
+#else
 
 HCL_EXPORT hcl_oop_t hcl_intmaxtoint (
 	hcl_t*       hcl,
@@ -2458,8 +2462,8 @@ HCL_EXPORT int hcl_walkdic (
  * ========================================================================= */
 
 HCL_EXPORT int hcl_hashobj (
-	hcl_t*     hcl, 
-	hcl_oop_t  obj, 
+	hcl_t*     hcl,
+	hcl_oop_t  obj,
 	hcl_oow_t* xhv
 );
 
@@ -2504,7 +2508,7 @@ HCL_EXPORT int hcl_convutobchars (
 
 
 /**
- * The hcl_convbtoucstr() function converts a null-terminated byte string 
+ * The hcl_convbtoucstr() function converts a null-terminated byte string
  * to a wide string.
  */
 HCL_EXPORT int hcl_convbtoucstr (

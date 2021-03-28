@@ -24,8 +24,9 @@
     THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include "hcl-prv.h"
-#include "hcl-opt.h"
+#include <hcl.h>
+#include <hcl-utl.h>
+#include <hcl-opt.h>
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -47,6 +48,7 @@
 #	define INCL_DOSPROCESS
 #	define INCL_DOSERRORS
 #	include <os2.h>
+#	include <signal.h>
 
 #elif defined(__DOS__)
 #	include <dos.h>
@@ -87,11 +89,11 @@ typedef struct xtn_t xtn_t;
 struct xtn_t
 {
 	const char* read_path; /* main source file */
-	const char* print_path; 
+	const char* print_path;
 
 	int vm_running;
 	int reader_istty;
-	hcl_oop_t sym_errstr;
+	/*hcl_oop_t sym_errstr;*/
 };
 
 
@@ -178,7 +180,7 @@ static HCL_INLINE int open_input (hcl_t* hcl, hcl_ioinarg_t* arg)
 	arg->handle = bb;
 
 /* HACK */
-	if (!arg->includer) 
+	if (!arg->includer)
 	{
 		HCL_ASSERT (hcl, arg->name == HCL_NULL);
 		arg->name = hcl_dupbtooocstr(hcl, xtn->read_path, HCL_NULL);
@@ -191,7 +193,7 @@ static HCL_INLINE int open_input (hcl_t* hcl, hcl_ioinarg_t* arg)
 	return 0;
 
 oops:
-	if (bb) 
+	if (bb)
 	{
 		if (bb->fp) fclose (bb->fp);
 		hcl_freemem (hcl, bb);
@@ -276,7 +278,7 @@ static int read_handler (hcl_t* hcl, hcl_iocmd_t cmd, void* arg)
 	{
 		case HCL_IO_OPEN:
 			return open_input(hcl, (hcl_ioinarg_t*)arg);
-			
+
 		case HCL_IO_CLOSE:
 			return close_input(hcl, (hcl_ioinarg_t*)arg);
 
@@ -314,7 +316,7 @@ static HCL_INLINE int open_output (hcl_t* hcl, hcl_iooutarg_t* arg)
 	arg->handle = fp;
 	return 0;
 }
-  
+
 static HCL_INLINE int close_output (hcl_t* hcl, hcl_iooutarg_t* arg)
 {
 	/*xtn_t* xtn = (xtn_t*)hcl_getxtn(hcl);*/
@@ -338,7 +340,7 @@ static HCL_INLINE int write_output (hcl_t* hcl, hcl_iooutarg_t* arg)
 
 	donelen = 0;
 
-	do 
+	do
 	{
 	#if defined(HCL_OOCH_IS_UCH)
 		bcslen = HCL_COUNTOF(bcsbuf);
@@ -424,7 +426,7 @@ static void vm_checkbc (hcl_t* hcl, hcl_oob_t bcode)
 static void gc_hcl (hcl_t* hcl)
 {
 	xtn_t* xtn = (xtn_t*)hcl_getxtn(hcl);
-	if (xtn->sym_errstr) xtn->sym_errstr = hcl_moveoop(hcl, xtn->sym_errstr);
+	/*if (xtn->sym_errstr) xtn->sym_errstr = hcl_moveoop(hcl, xtn->sym_errstr);*/
 }
 
 /* ========================================================================= */
@@ -435,16 +437,16 @@ static int handle_logopt (hcl_t* hcl, const hcl_bch_t* str)
 	hcl_bitmask_t logmask;
 
 	xstr = hcl_dupbtooochars(hcl, str, hcl_count_bcstr(str), HCL_NULL);
-	if (!xstr) 
+	if (!xstr)
 	{
 		fprintf (stderr, "ERROR: out of memory in duplicating %s\n", str);
 		return -1;
 	}
 
 	cm = hcl_find_oochar_in_oocstr(xstr, ',');
-	if (cm) 
+	if (cm)
 	{
-		/* i duplicate this string for open() below as open() doesn't 
+		/* i duplicate this string for open() below as open() doesn't
 		 * accept a length-bounded string */
 		cm = hcl_find_oochar_in_oocstr(xstr, ',');
 		*cm = '\0';
@@ -555,7 +557,7 @@ typedef void(*signal_handler_t)(int);
 #endif
 
 
-#if defined(_WIN32) || defined(__MSDOS__) || defined(__OS2__) 
+#if defined(_WIN32) || defined(__MSDOS__) || defined(__OS2__)
 static void handle_sigint (int sig)
 {
 	if (g_hcl) hcl_abort (g_hcl);
@@ -576,7 +578,7 @@ static void handle_sigint (int sig)
 
 static void set_signal (int sig, signal_handler_t handler)
 {
-#if defined(_WIN32) || defined(__MSDOS__) || defined(__OS2__) 
+#if defined(_WIN32) || defined(__MSDOS__) || defined(__OS2__)
 	signal (sig, handler);
 #elif defined(macintosh)
 	/* TODO: implement this */
@@ -599,12 +601,12 @@ static void set_signal (int sig, signal_handler_t handler)
 
 static void set_signal_to_default (int sig)
 {
-#if defined(_WIN32) || defined(__MSDOS__) || defined(__OS2__) 
+#if defined(_WIN32) || defined(__MSDOS__) || defined(__OS2__)
 	signal (sig, SIG_DFL);
 #elif defined(macintosh)
 	/* TODO: implement this */
 #else
-	struct sigaction sa; 
+	struct sigaction sa;
 
 	memset (&sa, 0, sizeof(sa));
 	sa.sa_handler = SIG_DFL;
@@ -635,7 +637,7 @@ static void print_synerr (hcl_t* hcl)
 		hcl_logbfmt (hcl, HCL_LOG_STDERR, "%s", xtn->read_path);
 	}
 
-	hcl_logbfmt (hcl, HCL_LOG_STDERR, "[%zu,%zu] %js", 
+	hcl_logbfmt (hcl, HCL_LOG_STDERR, "[%zu,%zu] %js",
 		synerr.loc.line, synerr.loc.colm,
 		(hcl_geterrmsg(hcl) != hcl_geterrstr(hcl)? hcl_geterrmsg(hcl): hcl_geterrstr(hcl))
 	);
@@ -649,7 +651,7 @@ static void print_synerr (hcl_t* hcl)
 }
 
 #define DEFAULT_HEAPSIZE 512000ul
- 
+
 int main (int argc, char* argv[])
 {
 	hcl_t* hcl = HCL_NULL;
@@ -807,6 +809,7 @@ int main (int argc, char* argv[])
 		goto oops;
 	}
 
+	/*
 	{
 		hcl_ooch_t errstr[] =  { 'E', 'R', 'R', 'S', 'T', 'R' };
 		xtn->sym_errstr = hcl_makesymbol(hcl, errstr, 6);
@@ -817,8 +820,9 @@ int main (int argc, char* argv[])
 		}
 		HCL_OBJ_SET_FLAGS_KERNEL (xtn->sym_errstr, 1);
 	}
+	*/
 
-	/* -- from this point onward, any failure leads to jumping to the oops label 
+	/* -- from this point onward, any failure leads to jumping to the oops label
 	 * -- instead of returning -1 immediately. --*/
 	set_signal (SIGINT, handle_sigint);
 
@@ -865,9 +869,9 @@ count++;
 			else if (hcl->errnum == HCL_ESYNERR)
 			{
 				print_synerr (hcl);
-				if (xtn->reader_istty && hcl_getsynerrnum(hcl) != HCL_SYNERR_EOF) 
+				if (xtn->reader_istty && hcl_getsynerrnum(hcl) != HCL_SYNERR_EOF)
 				{
-					/* TODO: drain remaining data in the reader including the actual inputstream and buffered data in hcl */	
+					/* TODO: drain remaining data in the reader including the actual inputstream and buffered data in hcl */
 					continue;
 				}
 			}
@@ -913,12 +917,12 @@ count++;
 			hcl_decode (hcl, 0, hcl_getbclen(hcl));
 			HCL_LOG0 (hcl, HCL_LOG_MNEMONIC, "------------------------------------------\n");
 			g_hcl = hcl;
-			//setup_tick ();
+			/*setup_tick ();*/
 
 			retv = hcl_execute(hcl);
 
 			/* flush pending output data in the interactive mode(e.g. printf without a newline) */
-			hcl_flushio (hcl); 
+			hcl_flushio (hcl);
 
 			if (!retv)
 			{
@@ -940,7 +944,7 @@ count++;
 				}
 				*/
 			}
-			//cancel_tick();
+			/*cancel_tick();*/
 			g_hcl = HCL_NULL;
 		}
 	}
