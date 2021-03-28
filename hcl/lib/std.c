@@ -71,9 +71,22 @@
 #	include <time.h>
 #	include <fcntl.h>
 #	include <io.h>
-
 #	include <errno.h>
 
+#	include <types.h> /* some types for socket.h */
+#	include <sys/socket.h> /* for socketpair */
+#	include <sys/time.h>
+#	include <sys/ioctl.h> /* FIONBIO */
+#   include <nerrno.h> /* for SOCEXXX error codes */
+
+#	define BSD_SELECT
+#	if defined(TCPV40HDRS)
+#	include <sys/select.h>
+#	else
+#	include <unistd.h>
+#	endif
+
+#	define USE_SELECT
 	/* fake XPOLLXXX values */
 #	define XPOLLIN  (1 << 0)
 #	define XPOLLOUT (1 << 1)
@@ -252,6 +265,13 @@
 #	define MUTEX_UNLOCK(x)
 #endif
 
+#if defined(USE_SELECT)
+struct select_fd_t
+{
+	int fd;
+	int events;
+};
+#endif
 
 typedef struct xtn_t xtn_t;
 struct xtn_t
@@ -548,8 +568,9 @@ static void log_write (hcl_t* hcl, hcl_bitmask_t mask, const hcl_ooch_t* msg, hc
 		tmp = localtime(&now);
 		#endif
 
-		#if defined(__BORLANDC__)
-		/* the borland compiler doesn't handle %z properly - it showed 00 all the time */
+		#if defined(__BORLANDC__) || defined(__IBMC__)
+		/* the borland compiler doesn't handle %z properly - it showed 00 all the time.
+		 * the visualage compiler 3.0 doesn't support %z */
 		tslen = strftime(ts, sizeof(ts), "%Y-%m-%d %H:%M:%S %Z ", tmp);
 		#else
 		tslen = strftime(ts, sizeof(ts), "%Y-%m-%d %H:%M:%S %z ", tmp);
@@ -758,6 +779,19 @@ static hcl_errnum_t os2err_to_errnum (APIRET errcode)
 			return HCL_ESYSERR;
 	}
 }
+static hcl_errnum_t os2sockerr_to_errnum (int errcode)
+{
+	switch (errcode)
+	{
+		case SOCEPERM:  return HCL_EPERM;
+		case SOCENOENT: return HCL_ENOENT;
+		case SOCEINTR:  return HCL_EINTR;
+		case SOCEACCES: return HCL_EACCES;
+		case SOCEINVAL: return HCL_EINVAL;
+		case SOCENOMEM: return HCL_ESYSMEM;
+		case SOCEPIPE:  return HCL_EPIPE;
+	}
+}
 #endif
 
 #if defined(macintosh)
@@ -789,6 +823,13 @@ static hcl_errnum_t _syserrstrb (hcl_t* hcl, int syserr_type, int syserr_code, h
 {
 	switch (syserr_type)
 	{
+		case 2:
+		#if defined(__OS2__)
+			if (buf) hcl_copy_bcstr (buf, len, sock_strerror(syserr_code));
+			return os2sockerr_to_errnum(syserr_code);
+		#endif
+			/* fall thru for other platforms */
+
 		case 1:
 		#if defined(_WIN32)
 			if (buf)
@@ -804,12 +845,17 @@ static hcl_errnum_t _syserrstrb (hcl_t* hcl, int syserr_type, int syserr_code, h
 			return winerr_to_errnum(syserr_code);
 		#elif defined(__OS2__)
 			/* TODO: convert code to string */
-			if (buf) hcl_copy_bcstr (buf, len, "system error");
+			if (buf)
+			{
+				char tmp[64];
+				sprintf (tmp, "system error %d\n", (int)syserr_code);
+				hcl_copy_bcstr (buf, len, tmp);
+			}
 			return os2err_to_errnum(syserr_code);
 		#elif defined(macintosh)
 			/* TODO: convert code to string */
 			if (buf) hcl_copy_bcstr (buf, len, "system error");
-			return os2err_to_errnum(syserr_code);
+			return macerr_to_errnum(syserr_code);
 		#else
 			/* in other systems, errno is still the native system error code.
 			 * fall thru */
@@ -2127,8 +2173,13 @@ static void vm_muxwait (hcl_t* hcl, const hcl_ntime_t* dur, hcl_vmprim_muxwait_c
 
 	if (n <= -1)
 	{
+	#if defined(__OS2__)
+		hcl_seterrwithsyserr (hcl, 2, sock_errno());
+		HCL_DEBUG2 (hcl, "Warning: multiplexer wait failure - %d, %js\n", sock_errno(), hcl_geterrmsg(hcl));
+	#else
 		hcl_seterrwithsyserr (hcl, 0, errno);
 		HCL_DEBUG2 (hcl, "Warning: multiplexer wait failure - %d, %js\n", errno, hcl_geterrmsg(hcl));
+	#endif
 	}
 	else
 	{
@@ -2704,12 +2755,16 @@ static void cb_opt_set (hcl_t* hcl, hcl_option_t id, const void* value)
 
 static int open_pipes (hcl_t* hcl, int p[2])
 {
+#if defined(_WIN32)
+	u_long flags;
+#else
 	int flags;
+#endif
 
 #if defined(_WIN32)
 	if (_pipe(p, 256, _O_BINARY | _O_NOINHERIT) == -1)
 #elif defined(__OS2__)
-	if (_pipe(p, 256, 10) == -1)
+	if (socketpair(AF_LOCAL, SOCK_STREAM, 0, p) == -1)
 #elif defined(HAVE_PIPE2) && defined(O_CLOEXEC) && defined(O_NONBLOCK)
 	if (pipe2(p, O_CLOEXEC | O_NONBLOCK) == -1)
 #else
@@ -2720,7 +2775,15 @@ static int open_pipes (hcl_t* hcl, int p[2])
 		return -1;
 	}
 
-#if defined(HAVE_PIPE2) && defined(O_CLOEXEC) && defined(O_NONBLOCK)
+#if defined(_WIN32)
+	flags = 1;
+	ioctl (p[0], FIONBIO, &flags);
+	ioctl (p[1], FIONBIO, &flags);
+#elif defined(__OS2__)
+	flags = 1; /* don't block */
+	ioctl (p[0], FIONBIO, &flags, HCL_SIZEOF(flags));
+	ioctl (p[1], FIONBIO, &flags, HCL_SIZEOF(flags));
+#elif defined(HAVE_PIPE2) && defined(O_CLOEXEC) && defined(O_NONBLOCK)
 		/* do nothing */
 #else
 	#if defined(FD_CLOEXEC)
@@ -2745,6 +2808,9 @@ static void close_pipes (hcl_t* hcl, int p[2])
 #if defined(_WIN32)
 	_close (p[0]);
 	_close (p[1]);
+#elif defined(__OS2__)
+	soclose (p[0]);
+	soclose (p[1]);
 #else
 	close (p[0]);
 	close (p[1]);

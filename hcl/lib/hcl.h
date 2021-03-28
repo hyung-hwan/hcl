@@ -2542,6 +2542,9 @@ HCL_EXPORT int hcl_convutobcstr (
 #	define hcl_dupbtooocstrwithheadroom(hcl,hrb,bcs,oocslen) hcl_dupbtoucstrwithheadroom(hcl,hrb,bcs,oocslen)
 #	define hcl_dupootobcstr(hcl,oocs,bcslen) hcl_duputobcstr(hcl,oocs,bcslen)
 #	define hcl_dupbtooocstr(hcl,bcs,oocslen) hcl_dupbtoucstr(hcl,bcs,oocslen)
+
+#   define hcl_dupootoucstr(hcl,oocs,ucslen) hcl_dupucstr(hcl,oocs,ucslen)
+#   define hcl_duputooocstr(hcl,ucs,oocslen) hcl_dupucstr(hcl,ucs,oocslen)
 #else
 #	define hcl_dupootoucharswithheadroom(hcl,hrb,oocs,oocslen,ucslen) hcl_dupbtoucharswithheadroom(hcl,hrb,oocs,oocslen,ucslen)
 #	define hcl_duputooocharswithheadroom(hcl,hrb,ucs,ucslen,oocslen) hcl_duputobcharswithheadroom(hcl,hrb,ucs,ucslen,oocslen)
@@ -2552,6 +2555,9 @@ HCL_EXPORT int hcl_convutobcstr (
 #	define hcl_duputooocstrwithheadroom(hcl,hrb,ucs,oocslen) hcl_duputobcstrwithheadroom(hcl,hrb,ucs,oocslen)
 #	define hcl_dupootoucstr(hcl,oocs,ucslen) hcl_dupbtoucstr(hcl,oocs,ucslen)
 #	define hcl_duputooocstr(hcl,ucs,oocslen) hcl_duputobcstr(hcl,ucs,oocslen)
+
+#	define hcl_dupootobcstr(hcl,oocs,bcslen) hcl_dupbcstr(hcl,oocs,bcslen)
+#	define hcl_dupbtooocstr(hcl,bcs,oocslen) hcl_dupbcstr(hcl,bcs,oocslen)
 #endif
 
 
@@ -2615,20 +2621,34 @@ HCL_EXPORT hcl_bch_t* hcl_duputobcstr (
 
 #if defined(HCL_OOCH_IS_UCH)
 #	define hcl_dupoochars(hcl,oocs,oocslen) hcl_dupuchars(hcl,oocs,oocslen)
+#	define hcl_dupoocstr(hcl,oocs,oocslen) hcl_dupucstr(hcl,oocs,oocslen)
 #else
 #	define hcl_dupoochars(hcl,oocs,oocslen) hcl_dupbchars(hcl,oocs,oocslen)
+#   define hcl_dupoocstr(hcl,oocs,oocslen) hcl_dupbcstr(hcl,oocs,oocslen)
 #endif
 
 HCL_EXPORT hcl_uch_t* hcl_dupuchars (
-	hcl_t*           hcl,
-	const hcl_uch_t* ucs,
-	hcl_oow_t        ucslen
+    hcl_t*           hcl,
+    const hcl_uch_t* ucs,
+    hcl_oow_t        ucslen
 );
 
 HCL_EXPORT hcl_bch_t* hcl_dupbchars (
-	hcl_t*           hcl,
-	const hcl_bch_t* bcs,
-	hcl_oow_t        bcslen
+    hcl_t*           hcl,
+    const hcl_bch_t* bcs,
+    hcl_oow_t        bcslen
+);
+
+HCL_EXPORT hcl_uch_t* hcl_dupucstr (
+    hcl_t*           hcl,
+    const hcl_uch_t* ucs,
+    hcl_oow_t*       ucslen
+);
+
+HCL_EXPORT hcl_bch_t* hcl_dupbcstr (
+    hcl_t*           hcl,
+    const hcl_bch_t* bcs,
+    hcl_oow_t*       bcslen
 );
 
 /* =========================================================================

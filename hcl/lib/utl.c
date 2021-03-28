@@ -83,7 +83,7 @@ int hcl_comp_uchars (const hcl_uch_t* str1, hcl_oow_t len1, const hcl_uch_t* str
 	while (str1 < end1)
 	{
 		c1 = *str1;
-		if (str2 < end2) 
+		if (str2 < end2)
 		{
 			c2 = *str2;
 			if (c1 > c2) return 1;
@@ -105,7 +105,7 @@ int hcl_comp_bchars (const hcl_bch_t* str1, hcl_oow_t len1, const hcl_bch_t* str
 	while (str1 < end1)
 	{
 		c1 = *str1;
-		if (str2 < end2) 
+		if (str2 < end2)
 		{
 			c2 = *str2;
 			if (c1 > c2) return 1;
@@ -155,10 +155,10 @@ int hcl_comp_uchars_ucstr (const hcl_uch_t* str1, hcl_oow_t len, const hcl_uch_t
 {
 	/* for "abc\0" of length 4 vs "abc", the fourth character
 	 * of the first string is equal to the terminating null of
-	 * the second string. the first string is still considered 
+	 * the second string. the first string is still considered
 	 * bigger */
 	const hcl_uch_t* end = str1 + len;
-	while (str1 < end && *str2 != '\0') 
+	while (str1 < end && *str2 != '\0')
 	{
 		if (*str1 != *str2) return ((hcl_uchu_t)*str1 > (hcl_uchu_t)*str2)? 1: -1;
 		str1++; str2++;
@@ -169,7 +169,7 @@ int hcl_comp_uchars_ucstr (const hcl_uch_t* str1, hcl_oow_t len, const hcl_uch_t
 int hcl_comp_uchars_bcstr (const hcl_uch_t* str1, hcl_oow_t len, const hcl_bch_t* str2)
 {
 	const hcl_uch_t* end = str1 + len;
-	while (str1 < end && *str2 != '\0') 
+	while (str1 < end && *str2 != '\0')
 	{
 		if (*str1 != *str2) return ((hcl_uchu_t)*str1 > (hcl_bchu_t)*str2)? 1: -1;
 		str1++; str2++;
@@ -180,7 +180,7 @@ int hcl_comp_uchars_bcstr (const hcl_uch_t* str1, hcl_oow_t len, const hcl_bch_t
 int hcl_comp_bchars_bcstr (const hcl_bch_t* str1, hcl_oow_t len, const hcl_bch_t* str2)
 {
 	const hcl_bch_t* end = str1 + len;
-	while (str1 < end && *str2 != '\0') 
+	while (str1 < end && *str2 != '\0')
 	{
 		if (*str1 != *str2) return ((hcl_bchu_t)*str1 > (hcl_bchu_t)*str2)? 1: -1;
 		str1++; str2++;
@@ -191,7 +191,7 @@ int hcl_comp_bchars_bcstr (const hcl_bch_t* str1, hcl_oow_t len, const hcl_bch_t
 int hcl_comp_bchars_ucstr (const hcl_bch_t* str1, hcl_oow_t len, const hcl_uch_t* str2)
 {
 	const hcl_bch_t* end = str1 + len;
-	while (str1 < end && *str2 != '\0') 
+	while (str1 < end && *str2 != '\0')
 	{
 		if (*str1 != *str2) return ((hcl_bchu_t)*str1 > (hcl_uchu_t)*str2)? 1: -1;
 		str1++; str2++;
@@ -429,18 +429,18 @@ hcl_oow_t hcl_byte_to_bcstr (hcl_uint8_t byte, hcl_bch_t* buf, hcl_oow_t size, i
 	radix_char = (flagged_radix & HCL_BYTE_TO_BCSTR_LOWERCASE)? 'a': 'A';
 	if (radix < 2 || radix > 36 || size <= 0) return 0;
 
-	do 
+	do
 	{
-		hcl_uint8_t digit = byte % radix;	
+		hcl_uint8_t digit = byte % radix;
 		if (digit < 10) *p++ = digit + '0';
 		else *p++ = digit + radix_char - 10;
 		byte /= radix;
 	}
 	while (byte > 0);
 
-	if (fill != '\0') 
+	if (fill != '\0')
 	{
-		while (size - 1 > p - tmp) 
+		while (size - 1 > p - tmp)
 		{
 			*bp++ = fill;
 			size--;
@@ -462,7 +462,7 @@ HCL_INLINE int hcl_conv_bchars_to_uchars_with_cmgr (const hcl_bch_t* bcs, hcl_oo
 
 	if (ucs)
 	{
-		/* destination buffer is specified. 
+		/* destination buffer is specified.
 		 * copy the conversion result to the buffer */
 
 		hcl_uch_t* q, * qend;
@@ -526,7 +526,7 @@ HCL_INLINE int hcl_conv_bchars_to_uchars_with_cmgr (const hcl_bch_t* bcs, hcl_oo
 		/* no destination buffer is specified. perform conversion
 		 * but don't copy the result. the caller can call this function
 		 * without a buffer to find the required buffer size, allocate
-		 * a buffer with the size and call this function again with 
+		 * a buffer with the size and call this function again with
 		 * the buffer. */
 
 		hcl_uch_t w;
@@ -598,13 +598,13 @@ HCL_INLINE int hcl_conv_uchars_to_bchars_with_cmgr (const hcl_uch_t* ucs, hcl_oo
 {
 	const hcl_uch_t* p = ucs;
 	const hcl_uch_t* end = ucs + *ucslen;
-	int ret = 0; 
+	int ret = 0;
 
 	if (bcs)
 	{
 		hcl_oow_t rem = *bcslen;
 
-		while (p < end) 
+		while (p < end)
 		{
 			hcl_oow_t n;
 
@@ -615,12 +615,12 @@ HCL_INLINE int hcl_conv_uchars_to_bchars_with_cmgr (const hcl_uch_t* ucs, hcl_oo
 			}
 
 			n = cmgr->uctobc (*p, bcs, rem);
-			if (n == 0) 
+			if (n == 0)
 			{
 				ret = -1;
 				break; /* illegal character */
 			}
-			if (n > rem) 
+			if (n > rem)
 			{
 				ret = -2; /* buffer too small */
 				break;
@@ -628,7 +628,7 @@ HCL_INLINE int hcl_conv_uchars_to_bchars_with_cmgr (const hcl_uch_t* ucs, hcl_oo
 			bcs += n; rem -= n; p++;
 		}
 
-		*bcslen -= rem; 
+		*bcslen -= rem;
 	}
 	else
 	{
@@ -640,7 +640,7 @@ HCL_INLINE int hcl_conv_uchars_to_bchars_with_cmgr (const hcl_uch_t* ucs, hcl_oo
 			hcl_oow_t n;
 
 			n = cmgr->uctobc (*p, bcsbuf, HCL_COUNTOF(bcsbuf));
-			if (n == 0) 
+			if (n == 0)
 			{
 				ret = -1;
 				break; /* illegal character */
@@ -652,7 +652,7 @@ HCL_INLINE int hcl_conv_uchars_to_bchars_with_cmgr (const hcl_uch_t* ucs, hcl_oo
 			p++; mlen += n;
 		}
 
-		/* this length excludes the terminating null character. 
+		/* this length excludes the terminating null character.
 		 * this function doesn't even null-terminate the result. */
 		*bcslen = mlen;
 	}
@@ -679,14 +679,14 @@ HCL_INLINE int hcl_conv_ucstr_to_bcstr_with_cmgr (const hcl_uch_t* ucs, hcl_oow_
 				ret = -2;
 				break;
 			}
-			
+
 			n = cmgr->uctobc (*p, bcs, rem);
-			if (n == 0) 
+			if (n == 0)
 			{
 				ret = -1;
 				break; /* illegal character */
 			}
-			if (n > rem) 
+			if (n > rem)
 			{
 				ret = -2;
 				break; /* buffer too small */
@@ -697,13 +697,13 @@ HCL_INLINE int hcl_conv_ucstr_to_bcstr_with_cmgr (const hcl_uch_t* ucs, hcl_oow_
 
 		/* update bcslen to the length of the bcs string converted excluding
 		 * terminating null */
-		*bcslen -= rem; 
+		*bcslen -= rem;
 
 		/* null-terminate the multibyte sequence if it has sufficient space */
 		if (rem > 0) *bcs = '\0';
-		else 
+		else
 		{
-			/* if ret is -2 and cs[cslen] == '\0', 
+			/* if ret is -2 and cs[cslen] == '\0',
 			 * this means that the bcs buffer was lacking one
 			 * slot for the terminating null */
 			ret = -2; /* buffer too small */
@@ -719,7 +719,7 @@ HCL_INLINE int hcl_conv_ucstr_to_bcstr_with_cmgr (const hcl_uch_t* ucs, hcl_oow_
 			hcl_oow_t n;
 
 			n = cmgr->uctobc (*p, bcsbuf, HCL_COUNTOF(bcsbuf));
-			if (n == 0) 
+			if (n == 0)
 			{
 				ret = -1;
 				break; /* illegal character */
@@ -731,7 +731,7 @@ HCL_INLINE int hcl_conv_ucstr_to_bcstr_with_cmgr (const hcl_uch_t* ucs, hcl_oow_
 			p++; mlen += n;
 		}
 
-		/* this length holds the number of resulting multi-byte characters 
+		/* this length holds the number of resulting multi-byte characters
 		 * excluding the terminating null character */
 		*bcslen = mlen;
 	}
@@ -848,7 +848,7 @@ HCL_INLINE hcl_uch_t* hcl_dupbtoucharswithheadroom (hcl_t* hcl, hcl_oow_t headro
 	hcl_uch_t* ptr;
 
 	inlen = bcslen;
-	if (hcl_convbtouchars (hcl, bcs, &inlen, HCL_NULL, &outlen) <= -1) 
+	if (hcl_convbtouchars (hcl, bcs, &inlen, HCL_NULL, &outlen) <= -1)
 	{
 		/* note it's also an error if no full conversion is made in this function */
 		return HCL_NULL;
@@ -862,10 +862,10 @@ HCL_INLINE hcl_uch_t* hcl_dupbtoucharswithheadroom (hcl_t* hcl, hcl_oow_t headro
 	ptr = (hcl_uch_t*)((hcl_oob_t*)ptr + headroom_bytes);
 	hcl_convbtouchars (hcl, bcs, &inlen, ptr, &outlen);
 
-	/* hcl_convbtouchars() doesn't null-terminate the target. 
+	/* hcl_convbtouchars() doesn't null-terminate the target.
 	 * but in hcl_dupbtouchars(), i allocate space. so i don't mind
 	 * null-terminating it with 1 extra character overhead */
-	ptr[outlen] = '\0'; 
+	ptr[outlen] = '\0';
 	if (ucslen) *ucslen = outlen;
 	return ptr;
 }
@@ -881,7 +881,7 @@ HCL_INLINE hcl_bch_t* hcl_duputobcharswithheadroom (hcl_t* hcl, hcl_oow_t headro
 	hcl_bch_t* ptr;
 
 	inlen = ucslen;
-	if (hcl_convutobchars(hcl, ucs, &inlen, HCL_NULL, &outlen) <= -1) 
+	if (hcl_convutobchars(hcl, ucs, &inlen, HCL_NULL, &outlen) <= -1)
 	{
 		/* note it's also an error if no full conversion is made in this function */
 		return HCL_NULL;
@@ -912,7 +912,7 @@ HCL_INLINE hcl_uch_t* hcl_dupbtoucstrwithheadroom (hcl_t* hcl, hcl_oow_t headroo
 	hcl_oow_t inlen, outlen;
 	hcl_uch_t* ptr;
 
-	if (hcl_convbtoucstr(hcl, bcs, &inlen, HCL_NULL, &outlen) <= -1) 
+	if (hcl_convbtoucstr(hcl, bcs, &inlen, HCL_NULL, &outlen) <= -1)
 	{
 		/* note it's also an error if no full conversion is made in this function */
 		return HCL_NULL;
@@ -937,7 +937,7 @@ HCL_INLINE hcl_bch_t* hcl_duputobcstrwithheadroom (hcl_t* hcl, hcl_oow_t headroo
 	hcl_oow_t inlen, outlen;
 	hcl_bch_t* ptr;
 
-	if (hcl_convutobcstr (hcl, ucs, &inlen, HCL_NULL, &outlen) <= -1) 
+	if (hcl_convutobcstr (hcl, ucs, &inlen, HCL_NULL, &outlen) <= -1)
 	{
 		/* note it's also an error if no full conversion is made in this function */
 		return HCL_NULL;
@@ -981,6 +981,32 @@ hcl_bch_t* hcl_dupbchars (hcl_t* hcl, const hcl_bch_t* bcs, hcl_oow_t bcslen)
 
 	hcl_copy_bchars (ptr, bcs, bcslen);
 	ptr[bcslen] = '\0';
+	return ptr;
+}
+
+hcl_uch_t* hcl_dupucstr (hcl_t* hcl, const hcl_uch_t* ucs, hcl_oow_t* ucslen)
+{
+	hcl_oow_t len;
+	hcl_uch_t* ptr;
+
+	len = hcl_count_ucstr(ucs);
+	ptr = hcl_dupuchars(hcl, ucs, len);
+	if (HCL_UNLIKELY(!ptr)) return HCL_NULL;
+
+	if (ucslen) *ucslen = len;
+	return ptr;
+}
+
+hcl_bch_t* hcl_dupbcstr (hcl_t* hcl, const hcl_bch_t* bcs, hcl_oow_t* bcslen)
+{
+	hcl_oow_t len;
+	hcl_bch_t* ptr;
+
+	len = hcl_count_bcstr(bcs);
+	ptr = hcl_dupbchars(hcl, bcs, len);
+	if (HCL_UNLIKELY(!ptr)) return HCL_NULL;
+
+	if (bcslen) *bcslen = len;
 	return ptr;
 }
 
@@ -1084,7 +1110,7 @@ void hcl_sub_ntime (hcl_ntime_t* z, const hcl_ntime_t* x, const hcl_ntime_t* y)
 			xs = HCL_TYPE_MIN(hcl_ntime_sec_t);
 			ns = 0;
 		}
-	} 
+	}
 	else
 	{
 		xs = xs - ys;
