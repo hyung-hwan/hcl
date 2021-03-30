@@ -2841,3 +2841,189 @@ int hcl_logfmtcallstack (hcl_t* hcl, hcl_ooi_t nargs)
 
 	return format_stack_args(&fo, nargs, 0);
 }
+
+
+
+/* --------------------------------------------------------------------------
+ * DYNAMIC STRING FORMATTING
+ * -------------------------------------------------------------------------- */
+
+struct fmt_uch_buf_t
+{
+	hcl_t* hcl;
+	hcl_uch_t* ptr;
+	hcl_oow_t len;
+	hcl_oow_t capa;
+};
+typedef struct fmt_uch_buf_t fmt_uch_buf_t;
+
+static int fmt_put_bchars_to_uch_buf (hcl_fmtout_t* fmtout, const hcl_bch_t* ptr, hcl_oow_t len)
+{
+	fmt_uch_buf_t* b = (fmt_uch_buf_t*)fmtout->ctx;
+	hcl_oow_t bcslen, ucslen;
+	int n;
+
+	bcslen = len;
+	ucslen = b->capa - b->len;
+	n = hcl_conv_bchars_to_uchars_with_cmgr(ptr, &bcslen, &b->ptr[b->len], &ucslen, b->hcl->_cmgr, 1);
+	b->len += ucslen;
+	if (n <= -1) 
+	{
+		if (n == -2) 
+		{
+			return 0; /* buffer full. stop */
+		}
+		else
+		{
+			hcl_seterrnum (b->hcl, HCL_EECERR);
+			return -1;
+		}
+	}
+
+	return 1; /* success. carry on */
+}
+
+static int fmt_put_uchars_to_uch_buf (hcl_fmtout_t* fmtout, const hcl_uch_t* ptr, hcl_oow_t len)
+{
+	fmt_uch_buf_t* b = (fmt_uch_buf_t*)fmtout->ctx;
+	hcl_oow_t n;
+
+	/* this function null-terminates the destination. so give the restored buffer size */
+	n = hcl_copy_uchars_to_ucstr(&b->ptr[b->len], b->capa - b->len + 1, ptr, len);
+	b->len += n;
+	if (n < len)
+	{
+		hcl_seterrnum (b->hcl, HCL_EBUFFULL);
+		return 0; /* stop. insufficient buffer */
+	}
+
+	return 1; /* success */
+}
+
+hcl_oow_t hcl_vfmttoucstr (hcl_t* hcl, hcl_uch_t* buf, hcl_oow_t bufsz, const hcl_uch_t* fmt, va_list ap)
+{
+	hcl_fmtout_t fo;
+	fmt_uch_buf_t fb;
+
+	if (bufsz <= 0) return 0;
+
+	HCL_MEMSET (&fo, 0, HCL_SIZEOF(fo));
+	fo.mmgr = hcl->_mmgr;
+	fo.putbchars = fmt_put_bchars_to_uch_buf;
+	fo.putuchars = fmt_put_uchars_to_uch_buf;
+	fo.ctx = &fb;
+
+	HCL_MEMSET (&fb, 0, HCL_SIZEOF(fb));
+	fb.hcl = hcl;
+	fb.ptr = buf;
+	fb.capa = bufsz - 1;
+
+	if (hcl_ufmt_outv(&fo, fmt, ap) <= -1) return -1;
+
+	buf[fb.len] = '\0';
+	return fb.len;
+}
+
+hcl_oow_t hcl_fmttoucstr (hcl_t* hcl, hcl_uch_t* buf, hcl_oow_t bufsz, const hcl_uch_t* fmt, ...)
+{
+	hcl_oow_t x;
+	va_list ap;
+
+	va_start (ap, fmt);
+	x = hcl_vfmttoucstr(hcl, buf, bufsz, fmt, ap);
+	va_end (ap);
+
+	return x;
+}
+
+/* ------------------------------------------------------------------------ */
+
+struct fmt_bch_buf_t
+{
+	hcl_t* hcl;
+	hcl_bch_t* ptr;
+	hcl_oow_t len;
+	hcl_oow_t capa;
+};
+typedef struct fmt_bch_buf_t fmt_bch_buf_t;
+
+
+static int fmt_put_bchars_to_bch_buf (hcl_fmtout_t* fmtout, const hcl_bch_t* ptr, hcl_oow_t len)
+{
+	fmt_bch_buf_t* b = (fmt_bch_buf_t*)fmtout->ctx;
+	hcl_oow_t n;
+
+	/* this function null-terminates the destination. so give the restored buffer size */
+	n = hcl_copy_bchars_to_bcstr(&b->ptr[b->len], b->capa - b->len + 1, ptr, len);
+	b->len += n;
+	if (n < len)
+	{
+		hcl_seterrnum (b->hcl, HCL_EBUFFULL);
+		return 0; /* stop. insufficient buffer */
+	}
+
+	return 1; /* success */
+}
+
+
+static int fmt_put_uchars_to_bch_buf (hcl_fmtout_t* fmtout, const hcl_uch_t* ptr, hcl_oow_t len)
+{
+	fmt_bch_buf_t* b = (fmt_bch_buf_t*)fmtout->ctx;
+	hcl_oow_t bcslen, ucslen;
+	int n;
+
+	bcslen = b->capa - b->len;
+	ucslen = len;
+	n = hcl_conv_uchars_to_bchars_with_cmgr(ptr, &ucslen, &b->ptr[b->len], &bcslen, b->hcl->_cmgr);
+	b->len += bcslen;
+	if (n <= -1)
+	{
+		if (n == -2)
+		{
+			return 0; /* buffer full. stop */
+		}
+		else
+		{
+			hcl_seterrnum (b->hcl, HCL_EECERR);
+			return -1;
+		}
+	}
+
+	return 1; /* success. carry on */
+}
+
+hcl_oow_t hcl_vfmttobcstr (hcl_t* hcl, hcl_bch_t* buf, hcl_oow_t bufsz, const hcl_bch_t* fmt, va_list ap)
+{
+	hcl_fmtout_t fo;
+	fmt_bch_buf_t fb;
+
+	if (bufsz <= 0) return 0;
+
+	HCL_MEMSET (&fo, 0, HCL_SIZEOF(fo));
+	fo.mmgr = hcl->_mmgr;
+	fo.putbchars = fmt_put_bchars_to_bch_buf;
+	fo.putuchars = fmt_put_uchars_to_bch_buf;
+	fo.ctx = &fb;
+
+	HCL_MEMSET (&fb, 0, HCL_SIZEOF(fb));
+	fb.hcl = hcl;
+	fb.ptr = buf;
+	fb.capa = bufsz - 1;
+
+	if (hcl_bfmt_outv(&fo, fmt, ap) <= -1) return -1;
+
+	buf[fb.len] = '\0';
+	return fb.len;
+}
+
+hcl_oow_t hcl_fmttobcstr (hcl_t* hcl, hcl_bch_t* buf, hcl_oow_t bufsz, const hcl_bch_t* fmt, ...)
+{
+	hcl_oow_t x;
+	va_list ap;
+
+	va_start (ap, fmt);
+	x = hcl_vfmttobcstr(hcl, buf, bufsz, fmt, ap);
+	va_end (ap);
+
+	return x;
+}

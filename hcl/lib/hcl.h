@@ -2221,6 +2221,53 @@ HCL_EXPORT hcl_ooi_t hcl_prufmtv (
 #	define hcl_proofmt hcl_prbfmt
 #	define hcl_proofmtv hcl_prbfmtv
 #endif
+
+
+/* =========================================================================
+ * STRING FORMATTING
+ * ========================================================================= */
+
+HCL_EXPORT hcl_oow_t hcl_vfmttoucstr (
+	hcl_t*           hcl,
+	hcl_uch_t*       buf,
+	hcl_oow_t        bufsz,
+	const hcl_uch_t* fmt,
+	va_list           ap
+);
+
+HCL_EXPORT hcl_oow_t hcl_fmttoucstr (
+	hcl_t*           hcl,
+	hcl_uch_t*       buf,
+	hcl_oow_t        bufsz,
+	const hcl_uch_t* fmt,
+	...
+);
+
+HCL_EXPORT hcl_oow_t hcl_vfmttobcstr (
+	hcl_t*           hcl,
+	hcl_bch_t*       buf,
+	hcl_oow_t        bufsz,
+	const hcl_bch_t* fmt,
+	va_list           ap
+);
+
+HCL_EXPORT hcl_oow_t hcl_fmttobcstr (
+	hcl_t*           hcl,
+	hcl_bch_t*       buf,
+	hcl_oow_t        bufsz,
+	const hcl_bch_t* fmt,
+	...
+);
+
+#if defined(HCL_OOCH_IS_UCH)
+#	define hcl_vfmttooocstr hcl_vfmttoucstr
+#	define hcl_fmttooocstr hcl_fmttoucstr
+#else
+#	define hcl_vfmttooocstr hcl_vfmttobcstr
+#	define hcl_fmttooocstr hcl_fmttobcstr
+#endif
+
+
 /* =========================================================================
  * OBJECT MANAGEMENT
  * ========================================================================= */

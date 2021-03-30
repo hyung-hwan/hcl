@@ -200,7 +200,7 @@ static int store_temporary_variable_count_for_block (hcl_t* hcl, hcl_oow_t tmpr_
 
 		newcapa = HCL_ALIGN(hcl->c->blk.depth + 1, BLK_INFO_BUFFER_ALIGN);
 		tmp = (hcl_blk_info_t*)hcl_reallocmem(hcl, hcl->c->blk.info, newcapa * HCL_SIZEOF(*tmp));
-		if (!tmp) return -1;
+		if (HCL_UNLIKELY(!tmp)) return -1;
 
 		hcl->c->blk.info_capa = newcapa;
 		hcl->c->blk.info = tmp;
@@ -1755,6 +1755,7 @@ static int compile_try (hcl_t* hcl, hcl_cnode_t* src)
 	/* (try
 	 *   (perform this)
 	 *   (perform that)
+	 *   (throw 10)
 	 *  catch (x)
 	 *   (perform xxx)
 	 *   (perform yyy)

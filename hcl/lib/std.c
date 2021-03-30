@@ -2771,23 +2771,40 @@ static void cb_opt_set (hcl_t* hcl, hcl_option_t id, const void* value)
 #if defined(__OS2__) && defined(TCPV40HDRS)
 static int os2_socket_pair (int p[2])
 {
-	int x, y, z;
+	int x = -1, y = -1, z;
 	struct sockaddr_un sa;
+	PTIB tib;
+	PPIB pib;
+	ULONG pid, tid, msec;
+
+        DosGetInfoBlocks(&tib, &pib);
+	DosQuerySysInfo (QSV_MS_COUNT, QSV_MS_COUNT, &msec, HCL_SIZEOF(msec));
 
 	x = socket(PF_OS2, SOCK_STREAM, 0);
+	if (x <= -1) goto oops;
+
+	for (i = 0; i < 10000; i++)
+	{
+		HCL_MEMSET (&sa, 0, HCL_SIZEOF(sa));
+		sa.sun_family = AF_OS2;
+
+		/* OS/2 mandates the socket name should begin with \socket\ */
+		sprintf (sa.sun_path, "\\socket\\hcl-%lu-%lu-%lu", (unsigned long int)pib->pib_ulpid, (unsigned long int)tib->tib_ultid, (unsigned long int)msec);
+
+		if (bind(x, &sa, HCL_SIZEOF(sa)) <= -1) 
+		{
+			msec++;
+			continue;
+			goto oops;
+		}
+		if (listen(x, 1) <= -1) goto oops;
+	}
+
 	y = socket(PF_OS2, SOCK_STREAM, 0);
-	if (x == -1 || y == -1)  goto oops;
-
-	HCL_MEMSET (&sa, 0, HCL_SIZEOF(sa));
-	sa.sun_family = AF_OS2;
-	hcl_copy_bcstr (sa.sun_path, HCL_SIZEOF(sa.sun_path), "\\socket\\XXXXX"); /* TODO: make this address unique*/
-
-	if (bind(x, &sa, HCL_SIZEOF(sa)) == -1) goto oops;
-	if (listen(x, 1) == -1) goto oops;
-
-	if (connect(y, &sa, HCL_SIZEOF(sa)) == -1) goto oops;
+	if (y <= -1) goto oops;
+	if (connect(y, &sa, HCL_SIZEOF(sa)) <= -1) goto oops;
 	z = accept(x, HCL_NULL, HCL_NULL);
-	if (z == -1) goto oops;
+	if (z <= -1) goto oops;
 
 	soclose (x);
 	p[0] = z;
