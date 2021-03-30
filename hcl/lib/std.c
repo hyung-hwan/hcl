@@ -82,6 +82,7 @@
 #	define BSD_SELECT
 #	if defined(TCPV40HDRS)
 #	include <sys/select.h>
+#	include <sys/un.h> /* for sockaddr_un */
 #	else
 #	include <unistd.h>
 #	endif
@@ -779,6 +780,8 @@ static hcl_errnum_t os2err_to_errnum (APIRET errcode)
 			return HCL_ESYSERR;
 	}
 }
+
+#if !defined(TCPV40HDRS)
 static hcl_errnum_t os2sockerr_to_errnum (int errcode)
 {
 	switch (errcode)
@@ -790,9 +793,11 @@ static hcl_errnum_t os2sockerr_to_errnum (int errcode)
 		case SOCEINVAL: return HCL_EINVAL;
 		case SOCENOMEM: return HCL_ESYSMEM;
 		case SOCEPIPE:  return HCL_EPIPE;
+		default: return HCL_ESYSERR;
 	}
 }
-#endif
+#endif /* TCPV40HDRS */
+#endif /* __OS2__ */
 
 #if defined(macintosh)
 static hcl_errnum_t macerr_to_errnum (int errcode)
@@ -825,8 +830,19 @@ static hcl_errnum_t _syserrstrb (hcl_t* hcl, int syserr_type, int syserr_code, h
 	{
 		case 2:
 		#if defined(__OS2__)
+			#if defined(TCPV40HDRS)
+			if (buf) 
+			{
+				char tmp[64];
+				sprintf (tmp, "socket error %d\n", (int)syserr_code);
+				hcl_copy_bcstr (buf, len, tmp);
+			}
+			return HCL_ESYSERR;
+			#else
+			/* sock_strerror() available in tcpip32.dll only */
 			if (buf) hcl_copy_bcstr (buf, len, sock_strerror(syserr_code));
 			return os2sockerr_to_errnum(syserr_code);
+			#endif
 		#endif
 			/* fall thru for other platforms */
 
@@ -844,7 +860,6 @@ static hcl_errnum_t _syserrstrb (hcl_t* hcl, int syserr_type, int syserr_code, h
 			}
 			return winerr_to_errnum(syserr_code);
 		#elif defined(__OS2__)
-			/* TODO: convert code to string */
 			if (buf)
 			{
 				char tmp[64];
@@ -2753,6 +2768,39 @@ static void cb_opt_set (hcl_t* hcl, hcl_option_t id, const void* value)
 	}
 }
 
+#if defined(__OS2__) && defined(TCPV40HDRS)
+static int os2_socket_pair (int p[2])
+{
+	int x, y, z;
+	struct sockaddr_un sa;
+
+	x = socket(PF_OS2, SOCK_STREAM, 0);
+	y = socket(PF_OS2, SOCK_STREAM, 0);
+	if (x == -1 || y == -1)  goto oops;
+
+	HCL_MEMSET (&sa, 0, HCL_SIZEOF(sa));
+	sa.sun_family = AF_OS2;
+	hcl_copy_bcstr (sa.sun_path, HCL_SIZEOF(sa.sun_path), "\\socket\\XXXXX"); /* TODO: make this address unique*/
+
+	if (bind(x, &sa, HCL_SIZEOF(sa)) == -1) goto oops;
+	if (listen(x, 1) == -1) goto oops;
+
+	if (connect(y, &sa, HCL_SIZEOF(sa)) == -1) goto oops;
+	z = accept(x, HCL_NULL, HCL_NULL);
+	if (z == -1) goto oops;
+
+	soclose (x);
+	p[0] = z;
+	p[1] = y;
+	return 0;
+	
+oops:
+	if (y >= 0) soclose (y);
+	if (x >= 0) soclose (x);
+	return -1;
+}
+#endif
+
 static int open_pipes (hcl_t* hcl, int p[2])
 {
 #if defined(_WIN32)
@@ -2764,14 +2812,19 @@ static int open_pipes (hcl_t* hcl, int p[2])
 #if defined(_WIN32)
 	if (_pipe(p, 256, _O_BINARY | _O_NOINHERIT) == -1)
 #elif defined(__OS2__)
+	#if defined(TCPV40HDRS)
+	/* neither pipe nor socketpair available */
+	if (os2_socket_pair(p) == -1)
+	#else
 	if (socketpair(AF_LOCAL, SOCK_STREAM, 0, p) == -1)
+	#endif
 #elif defined(HAVE_PIPE2) && defined(O_CLOEXEC) && defined(O_NONBLOCK)
 	if (pipe2(p, O_CLOEXEC | O_NONBLOCK) == -1)
 #else
 	if (pipe(p) == -1)
 #endif
 	{
-		hcl_seterrbfmtwithsyserr (hcl, 0, errno, "unable to create pipes for iothr management");
+		hcl_seterrbfmtwithsyserr (hcl, 0, errno, "unable to create pipes");
 		return -1;
 	}
 
@@ -2781,8 +2834,8 @@ static int open_pipes (hcl_t* hcl, int p[2])
 	ioctl (p[1], FIONBIO, &flags);
 #elif defined(__OS2__)
 	flags = 1; /* don't block */
-	ioctl (p[0], FIONBIO, &flags, HCL_SIZEOF(flags));
-	ioctl (p[1], FIONBIO, &flags, HCL_SIZEOF(flags));
+	ioctl (p[0], FIONBIO, (char*)&flags, HCL_SIZEOF(flags));
+	ioctl (p[1], FIONBIO, (char*)&flags, HCL_SIZEOF(flags));
 #elif defined(HAVE_PIPE2) && defined(O_CLOEXEC) && defined(O_NONBLOCK)
 		/* do nothing */
 #else
