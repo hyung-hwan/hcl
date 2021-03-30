@@ -834,7 +834,7 @@ static hcl_errnum_t _syserrstrb (hcl_t* hcl, int syserr_type, int syserr_code, h
 			if (buf) 
 			{
 				char tmp[64];
-				sprintf (tmp, "socket error %d\n", (int)syserr_code);
+				sprintf (tmp, "socket error %d", (int)syserr_code);
 				hcl_copy_bcstr (buf, len, tmp);
 			}
 			return HCL_ESYSERR;
@@ -863,7 +863,7 @@ static hcl_errnum_t _syserrstrb (hcl_t* hcl, int syserr_type, int syserr_code, h
 			if (buf)
 			{
 				char tmp[64];
-				sprintf (tmp, "system error %d\n", (int)syserr_code);
+				sprintf (tmp, "system error %d", (int)syserr_code);
 				hcl_copy_bcstr (buf, len, tmp);
 			}
 			return os2err_to_errnum(syserr_code);
@@ -2775,34 +2775,36 @@ static int os2_socket_pair (int p[2])
 	struct sockaddr_un sa;
 	PTIB tib;
 	PPIB pib;
-	ULONG pid, tid, msec;
+	ULONG msec, idx;
 
-        DosGetInfoBlocks(&tib, &pib);
+	DosGetInfoBlocks(&tib, &pib);
 	DosQuerySysInfo (QSV_MS_COUNT, QSV_MS_COUNT, &msec, HCL_SIZEOF(msec));
 
 	x = socket(PF_OS2, SOCK_STREAM, 0);
 	if (x <= -1) goto oops;
 
-	for (i = 0; i < 10000; i++)
+	idx = msec;
+
+attempt_to_bind:
+	HCL_MEMSET (&sa, 0, HCL_SIZEOF(sa));
+	sa.sun_family = AF_OS2;
+
+	/* OS/2 mandates the socket name should begin with \socket\ */
+	sprintf (sa.sun_path, "\\socket\\hcl-%08lx-%08lx-%08lx", (unsigned long int)pib->pib_ulpid, (unsigned long int)tib->tib_ptib2->tib2_ultid, (unsigned long int)idx);
+
+	if (bind(x, (struct sockaddr*)&sa, HCL_SIZEOF(sa)) <= -1) 
 	{
-		HCL_MEMSET (&sa, 0, HCL_SIZEOF(sa));
-		sa.sun_family = AF_OS2;
+		if (sock_errno() != SOCEADDRINUSE) goto oops;
+		if (idx - msec > 9999) goto oops; /* failure after many attempts */
 
-		/* OS/2 mandates the socket name should begin with \socket\ */
-		sprintf (sa.sun_path, "\\socket\\hcl-%lu-%lu-%lu", (unsigned long int)pib->pib_ulpid, (unsigned long int)tib->tib_ultid, (unsigned long int)msec);
-
-		if (bind(x, &sa, HCL_SIZEOF(sa)) <= -1) 
-		{
-			msec++;
-			continue;
-			goto oops;
-		}
-		if (listen(x, 1) <= -1) goto oops;
+		idx++;
+		goto attempt_to_bind;
 	}
+	if (listen(x, 1) <= -1) goto oops;
 
 	y = socket(PF_OS2, SOCK_STREAM, 0);
 	if (y <= -1) goto oops;
-	if (connect(y, &sa, HCL_SIZEOF(sa)) <= -1) goto oops;
+	if (connect(y, (struct sockaddr*)&sa, HCL_SIZEOF(sa)) <= -1) goto oops;
 	z = accept(x, HCL_NULL, HCL_NULL);
 	if (z <= -1) goto oops;
 
@@ -2828,6 +2830,11 @@ static int open_pipes (hcl_t* hcl, int p[2])
 
 #if defined(_WIN32)
 	if (_pipe(p, 256, _O_BINARY | _O_NOINHERIT) == -1)
+	{
+		hcl_seterrbfmtwithsyserr (hcl, 0, errno, "unable to create pipes");
+		return -1;
+	}
+
 #elif defined(__OS2__)
 	#if defined(TCPV40HDRS)
 	/* neither pipe nor socketpair available */
@@ -2835,15 +2842,24 @@ static int open_pipes (hcl_t* hcl, int p[2])
 	#else
 	if (socketpair(AF_LOCAL, SOCK_STREAM, 0, p) == -1)
 	#endif
+	{
+		hcl_seterrbfmtwithsyserr (hcl, 2, sock_errno(), "unable to create pipes");
+		return -1;
+	}
 #elif defined(HAVE_PIPE2) && defined(O_CLOEXEC) && defined(O_NONBLOCK)
 	if (pipe2(p, O_CLOEXEC | O_NONBLOCK) == -1)
-#else
-	if (pipe(p) == -1)
-#endif
 	{
 		hcl_seterrbfmtwithsyserr (hcl, 0, errno, "unable to create pipes");
 		return -1;
 	}
+
+#else
+	if (pipe(p) == -1)
+	{
+		hcl_seterrbfmtwithsyserr (hcl, 0, errno, "unable to create pipes");
+		return -1;
+	}
+#endif
 
 #if defined(_WIN32)
 	flags = 1;
