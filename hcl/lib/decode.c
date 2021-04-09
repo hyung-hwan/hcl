@@ -350,8 +350,12 @@ int hcl_decode (hcl_t* hcl, hcl_oow_t start, hcl_oow_t end)
 				break;
 
 			/* -------------------------------------------------------- */
-			case HCL_CODE_TRY_CATCH:
-				LOG_INST_0 (hcl, "try_catch");
+			case HCL_CODE_TRY_ENTER:
+				LOG_INST_0 (hcl, "try_enter");
+				break;
+
+			case HCL_CODE_TRY_EXIT:
+				LOG_INST_0 (hcl, "try_exit");
 				break;
 
 			case HCL_CODE_THROW:

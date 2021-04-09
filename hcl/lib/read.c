@@ -2130,12 +2130,19 @@ static void fini_compiler (hcl_t* hcl)
 		HCL_ASSERT (hcl, hcl->c->tv.capa == 0);
 		HCL_ASSERT (hcl, hcl->c->tv.wcount == 0);
 
-		if (hcl->c->blk.info)
+		if (hcl->c->cblk.info)
 		{
-			hcl_freemem (hcl, hcl->c->blk.info);
-			hcl->c->blk.info = HCL_NULL;
-			hcl->c->blk.info_capa = 0;
-			hcl->c->blk.depth = -1;
+			hcl_freemem (hcl, hcl->c->cblk.info);
+			hcl->c->cblk.info = HCL_NULL;
+			hcl->c->cblk.info_capa = 0;
+			hcl->c->cblk.depth = -1;
+		}
+		if (hcl->c->fnblk.info)
+		{
+			hcl_freemem (hcl, hcl->c->fnblk.info);
+			hcl->c->fnblk.info = HCL_NULL;
+			hcl->c->fnblk.info_capa = 0;
+			hcl->c->fnblk.depth = -1;
 		}
 
 		clear_io_names (hcl);
@@ -2183,7 +2190,8 @@ int hcl_attachio (hcl_t* hcl, hcl_ioimpl_t reader, hcl_ioimpl_t printer)
 		hcl->c->r.e = hcl->_nil;
 
 		hcl->c->cfs.top = -1;
-		hcl->c->blk.depth = -1;
+		hcl->c->cblk.depth = -1;
+		hcl->c->fnblk.depth = -1;
 	}
 	else if (hcl->c->reader || hcl->c->printer)
 	{

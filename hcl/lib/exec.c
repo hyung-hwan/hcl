@@ -3119,13 +3119,19 @@ static int execute (hcl_t* hcl)
 			}
 
 			/* -------------------------------------------------------- */
-			case HCL_CODE_TRY_CATCH:
-				LOG_INST_0 (hcl, "try_catch");
+			case HCL_CODE_TRY_ENTER:
+				LOG_INST_0 (hcl, "try_enter");
+#if 0
 				if (call_try_catch(hcl) <= -1) 
 				{
 					supplement_errmsg (hcl, fetched_instruction_pointer);
 					goto oops;
 				}
+#endif
+				break;
+				
+			case HCL_CODE_TRY_EXIT:
+				LOG_INST_0 (hcl, "try_exit");
 				break;
 
 			case HCL_CODE_THROW:

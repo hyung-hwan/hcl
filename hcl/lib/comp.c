@@ -189,25 +189,24 @@ static int find_temporary_variable_backward (hcl_t* hcl, const hcl_oocs_t* name,
 	return __find_word_in_string(&hcl->c->tv.s, name, 1, index);
 }
 
-static int push_fnblk (hcl_t* hcl, hcl_cnode_t* cmd, hcl_oow_t tmpr_count, hcl_oow_t tmpr_len, hcl_oow_t lfbase)
+static int push_fnblk (hcl_t* hcl, const hcl_ioloc_t* errloc, hcl_oow_t tmpr_count, hcl_oow_t tmpr_len, hcl_oow_t lfbase)
 {
-	HCL_ASSERT (hcl, hcl->c->fnblk.depth >= 0);
+	hcl_oow_t new_depth;
 
+	HCL_ASSERT (hcl, hcl->c->fnblk.depth >= -1);
 	if (hcl->c->fnblk.depth == HCL_TYPE_MAX(hcl_ooi_t))
 	{
-		if (cmd)
-			hcl_setsynerrbfmt (hcl, HCL_SYNERR_BLKDEPTH, HCL_CNODE_GET_LOC(src), HCL_NULL, "function block depth too deep in %.*js", HCL_CNODE_GET_TOKLEN(cmd), HCL_CNODE_GET_TOKPTR(cmd)); 
-		else
-			hcl_setsynerrbfmt (hcl, HCL_SYNERR_BLKDEPTH, HCL_NULL, HCL_NULL, "function block depth too deep");
+		hcl_setsynerrbfmt (hcl, HCL_SYNERR_BLKDEPTH, errloc, HCL_NULL, "function block depth too deep"); 
 		return -1;
 	}
 
+	new_depth = hcl->c->fnblk.depth + 1;
 	if (hcl->c->fnblk.depth >= hcl->c->fnblk.info_capa)
 	{
 		hcl_fnblk_info_t* tmp;
 		hcl_oow_t newcapa;
 
-		newcapa = HCL_ALIGN(hcl->c->fnblk.depth + 1, BLK_INFO_BUFFER_ALIGN);
+		newcapa = HCL_ALIGN(new_depth + 1, BLK_INFO_BUFFER_ALIGN);
 		tmp = (hcl_fnblk_info_t*)hcl_reallocmem(hcl, hcl->c->fnblk.info, newcapa * HCL_SIZEOF(*tmp));
 		if (HCL_UNLIKELY(!tmp)) return -1;
 
@@ -215,13 +214,16 @@ static int push_fnblk (hcl_t* hcl, hcl_cnode_t* cmd, hcl_oow_t tmpr_count, hcl_o
 		hcl->c->fnblk.info = tmp;
 	}
 
-	HCL_MEMSET (&hcl->c->fnblk.info[hcl->c->fnblk.depth], 0, HCL_SIZEOF(hcl->c->fnblk.info[hcl->c->fnblk.depth]));
+	HCL_MEMSET (&hcl->c->fnblk.info[new_depth], 0, HCL_SIZEOF(hcl->c->fnblk.info[new_depth]));
 	
-	hcl->c->fnblk.info[hcl->c->fnblk.depth].tmprlen = tmpr_len;
-	hcl->c->fnblk.info[hcl->c->fnblk.depth].tmprcnt = tmpr_count;
-	hcl->c->fnblk.info[hcl->c->fnblk.depth].lfbase = lfbase;
+	hcl->c->fnblk.info[new_depth].tmprlen = tmpr_len;
+	hcl->c->fnblk.info[new_depth].tmprcnt = tmpr_count;
 
-	hcl->c->fnblk.info[hcl->c->fnblk.depth].cblk_base = hcl->c->cblk.depth;
+	/* remember the control block depth before the function block is entered */
+	hcl->c->fnblk.info[new_depth].cblk_base = hcl->c->cblk.depth; 
+
+	hcl->c->fnblk.info[new_depth].lfbase = lfbase;
+	hcl->c->fnblk.depth = new_depth;
 	return 0;
 }
 
@@ -234,25 +236,34 @@ static void pop_fnblk (hcl_t* hcl)
 		hcl->c->tv.s.len = hcl->c->fnblk.info[hcl->c->fnblk.depth].tmprlen;
 		hcl->c->tv.wcount = hcl->c->fnblk.info[hcl->c->fnblk.depth].tmprcnt;
 		
+		/* if pop_cblk() has been called properly, the following assertion must be true
+		 * and the assignment on the next line isn't necessary */
+		HCL_ASSERT (hcl, hcl->c->cblk.depth == hcl->c->fnblk.info[hcl->c->fnblk.depth].cblk_base); 
 		hcl->c->cblk.depth = hcl->c->fnblk.info[hcl->c->fnblk.depth].cblk_base;
+
+		/* keep hcl->code.lit.len without restoration */
 	}
 }
 
-static int push_cblk (hcl_t* hcl, hcl_cnode_t* cmd, hcl_cblk_type_t type)
+static int push_cblk (hcl_t* hcl, const hcl_ioloc_t* errloc, hcl_cblk_type_t type)
 {
+	hcl_oow_t new_depth;
+
+	HCL_ASSERT (hcl, hcl->c->cblk.depth >= -1);
+
 	if (hcl->c->cblk.depth == HCL_TYPE_MAX(hcl_ooi_t))
 	{
-		hcl_setsynerrbfmt (hcl, HCL_SYNERR_BLKDEPTH, HCL_CNODE_GET_LOC(src), HCL_NULL, "control block depth too deep in %.*js", HCL_CNODE_GET_TOKLEN(cmd), HCL_CNODE_GET_TOKPTR(cmd)); 
+		hcl_setsynerrbfmt (hcl, HCL_SYNERR_BLKDEPTH, errloc, HCL_NULL, "control block depth too deep"); 
 		return -1;
 	}
 
+	new_depth = hcl->c->cblk.depth + 1;
 	if (hcl->c->cblk.depth >= hcl->c->cblk.info_capa)
 	{
 		hcl_cblk_info_t* tmp;
 		hcl_oow_t newcapa;
 		
-		/* +2 to indicate +1 after increment */
-		newcapa = HCL_ALIGN(hcl->c->cblk.depth + 2, BLK_INFO_BUFFER_ALIGN);
+		newcapa = HCL_ALIGN(new_depth + 1, BLK_INFO_BUFFER_ALIGN);
 		tmp = (hcl_cblk_info_t*)hcl_reallocmem(hcl, hcl->c->cblk.info, newcapa * HCL_SIZEOF(*tmp));
 		if (HCL_UNLIKELY(!tmp)) return -1;
 		
@@ -260,18 +271,22 @@ static int push_cblk (hcl_t* hcl, hcl_cnode_t* cmd, hcl_cblk_type_t type)
 		hcl->c->cblk.info = tmp;
 	}
 
-	
-	hcl->c->cblk.depth++;
-	
-	HCL_MEMSET (&hcl->c->cblk.info[hcl->c->cblk.depth], 0, HCL_SIZEOF(hcl->c->fnblk.info[hcl->c->cblk.depth]));
-	hcl->c->cblk.info[hcl->c->cblk.depth]._type = type;
+	HCL_MEMSET (&hcl->c->cblk.info[new_depth], 0, HCL_SIZEOF(hcl->c->cblk.info[new_depth]));
+	hcl->c->cblk.info[new_depth]._type = type;
+	hcl->c->cblk.depth = new_depth;
 	return 0;
 }
 
 static void pop_cblk (hcl_t* hcl)
 {
 	HCL_ASSERT (hcl, hcl->c->cblk.depth >= 0);
+	
+	/* a control block stays inside a function block.
+	 * the control block stack must not be popped past the starting base 
+	 * of the owning function block */
+	HCL_ASSERT (hcl, hcl->c->cblk.depth - 1 >= hcl->c->fnblk.info[hcl->c->fnblk.depth].cblk_base);
 	hcl->c->cblk.depth--;
+	
 }
 /* ========================================================================= */
 
@@ -1113,6 +1128,25 @@ static int compile_break (hcl_t* hcl, hcl_cnode_t* src)
 		return -1;
 	}
 
+
+	for (i = hcl->c->cblk.depth; i > hcl->c->fnblk.info[hcl->c->fnblk.depth].cblk_base; --i)
+	{
+		if (hcl->c->cblk.info[i]._type == HCL_CBLK_TYPE_LOOP)
+		{
+			goto inside_loop;
+		}
+		else if (hcl->c->cblk.info[i]._type == HCL_CBLK_TYPE_TRY)
+		{
+			//must emit an instruction to exit from the try loop.
+			/* TODO: do something for finally 
+			if (emit_byte_instruction(hcl, HCL_CODE_EXIT_TRY, HCL_CNODE_GET_LOC(src)) <= -1) return -1;*/
+		}
+	}
+
+	hcl_setsynerrbfmt (hcl, HCL_SYNERR_BREAK, HCL_CNODE_GET_LOC(src), HCL_NULL, "%.*js outside loop", HCL_CNODE_GET_TOKLEN(cmd), HCL_CNODE_GET_TOKPTR(cmd));
+	return -1;
+
+inside_loop:
 	for (i = hcl->c->cfs.top; i >= 0; --i)
 	{
 		const hcl_cframe_t* tcf;
@@ -1145,7 +1179,9 @@ static int compile_break (hcl_t* hcl, hcl_cnode_t* src)
 		}
 	}
 
-	hcl_setsynerrbfmt (hcl, HCL_SYNERR_BREAK, HCL_CNODE_GET_LOC(src), HCL_NULL, "%.*js outside loop", HCL_CNODE_GET_TOKLEN(cmd), HCL_CNODE_GET_TOKPTR(cmd));
+	/* this part must no be reached. if a loop control block is found, 
+	 * there must exist a COP_POST_UNTIL_BODY or COP_POST_WHILE_BODY frame */
+	hcl_setsynerrbfmt (hcl, HCL_SYNERR_INTERN, HCL_CNODE_GET_LOC(src), HCL_NULL, "internal error in compiling %.*js", HCL_CNODE_GET_TOKLEN(cmd), HCL_CNODE_GET_TOKPTR(cmd));
 	return -1;
 }
 
@@ -1199,6 +1235,24 @@ static int compile_continue (hcl_t* hcl, hcl_cnode_t* src)
 		return -1;
 	}
 
+	for (i = hcl->c->cblk.depth; i > hcl->c->fnblk.info[hcl->c->fnblk.depth].cblk_base; --i)
+	{
+		if (hcl->c->cblk.info[i]._type == HCL_CBLK_TYPE_LOOP)
+		{
+			goto inside_loop;
+		}
+		else if (hcl->c->cblk.info[i]._type == HCL_CBLK_TYPE_TRY)
+		{
+			//must emit an instruction to exit from the try loop.
+			/* TODO: do something for finally 
+			if (emit_byte_instruction(hcl, HCL_CODE_EXIT_TRY, HCL_CNODE_GET_LOC(src)) <= -1) return -1;*/
+		}
+	}
+
+	hcl_setsynerrbfmt (hcl, HCL_SYNERR_BREAK, HCL_CNODE_GET_LOC(src), HCL_NULL, "%.*js outside loop", HCL_CNODE_GET_TOKLEN(cmd), HCL_CNODE_GET_TOKPTR(cmd));
+	return -1;
+
+inside_loop:
 	for (i = hcl->c->cfs.top; i >= 0; --i)
 	{
 		const hcl_cframe_t* tcf;
@@ -1220,7 +1274,9 @@ static int compile_continue (hcl_t* hcl, hcl_cnode_t* src)
 		}
 	}
 
-	hcl_setsynerrbfmt (hcl, HCL_SYNERR_BREAK, HCL_CNODE_GET_LOC(src), HCL_NULL, "%.*js outside loop", HCL_CNODE_GET_TOKLEN(cmd), HCL_CNODE_GET_TOKPTR(cmd));
+	/* this part must no be reached. if a loop control block is found, 
+	 * there must exist a COP_POST_UNTIL_BODY or COP_POST_WHILE_BODY frame */
+	hcl_setsynerrbfmt (hcl, HCL_SYNERR_INTERN, HCL_CNODE_GET_LOC(src), HCL_NULL, "internal error in compiling %.*js", HCL_CNODE_GET_TOKLEN(cmd), HCL_CNODE_GET_TOKPTR(cmd));
 	return -1;
 }
 
@@ -1632,16 +1688,7 @@ static int compile_lambda (hcl_t* hcl, hcl_cnode_t* src, int defun)
 		return -1;
 	}
 
-	if (push_fnblk(hcl) <= -1) return -1;
-	
-	if (hcl->c->fnblk.depth == HCL_TYPE_MAX(hcl_ooi_t))
-	{
-		hcl_setsynerrbfmt (hcl, HCL_SYNERR_BLKDEPTH, HCL_CNODE_GET_LOC(src), HCL_NULL, "block depth too deep in %.*js", HCL_CNODE_GET_TOKLEN(cmd), HCL_CNODE_GET_TOKPTR(cmd)); 
-		return -1;
-	}
-	hcl->c->fnblk.depth++;
-	if (store_temporary_variable_count_for_fnblk(hcl, hcl->c->tv.wcount, hcl->c->tv.s.len, hcl->code.lit.len) <= -1) return -1;
-
+	if (push_fnblk(hcl, HCL_CNODE_GET_LOC(src), hcl->c->tv.wcount, hcl->c->tv.s.len, hcl->code.lit.len) <= -1) return -1;
 
 	if (hcl->option.trait & HCL_TRAIT_INTERACTIVE)
 	{
@@ -1850,6 +1897,8 @@ static int compile_try (hcl_t* hcl, hcl_cnode_t* src)
 	}
 	hcl->c->fnblk.depth++; 
 	if (store_temporary_variable_count_for_block(hcl, hcl->c->tv.wcount, hcl->c->tv.s.len, hcl->code.lit.len) <= -1) return -1;
+#else
+	/*push_cblk ....*/
 #endif
 
 /* TODO: HCL_TRAIT_INTERACTIVE??? */
@@ -2008,7 +2057,9 @@ static HCL_INLINE int post_catch (hcl_t* hcl)
 	}
 	patch_long_jump (hcl, jip, block_code_size);
 
+#if 0
 	if (emit_byte_instruction(hcl, HCL_CODE_TRY_CATCH, HCL_CNODE_GET_LOC(cf->operand)) <= -1) return -1;
+#endif
 
 #if 0
 	/*hcl->c->fnblk.depth--; */
@@ -2090,6 +2141,8 @@ static int compile_while (hcl_t* hcl, hcl_cnode_t* src, int next_cop)
 		hcl_setsynerrbfmt (hcl, HCL_SYNERR_DOTBANNED, HCL_CNODE_GET_LOC(obj), HCL_CNODE_GET_TOK(obj), "redundant cdr in %*.js", HCL_CNODE_GET_TOKLEN(cmd), HCL_CNODE_GET_TOKPTR(cmd));
 		return -1;
 	}
+
+	if (push_cblk(hcl, HCL_CNODE_GET_LOC(src), HCL_CBLK_TYPE_LOOP) <= -1) return -1;
 
 	HCL_ASSERT (hcl, hcl->code.bc.len < HCL_SMOOI_MAX);
 	cond_pos = hcl->code.bc.len; /* position where the bytecode for the conditional is emitted */
@@ -3244,6 +3297,10 @@ static HCL_INLINE int post_while_body (hcl_t* hcl)
 	patch_long_jump (hcl, jip, jump_offset);
 
 	POP_CFRAME (hcl);
+
+	HCL_ASSERT (hcl, hcl->c->cblk.info[hcl->c->cblk.depth]._type == HCL_CBLK_TYPE_LOOP);
+	pop_cblk (hcl);
+
 	return 0;
 }
 
@@ -3585,6 +3642,7 @@ int hcl_compile (hcl_t* hcl, hcl_cnode_t* obj)
 	HCL_ASSERT (hcl, hcl->c->tv.s.len == 0);
 	HCL_ASSERT (hcl, hcl->c->tv.wcount == 0);
 	HCL_ASSERT (hcl, hcl->c->fnblk.depth == -1);
+	HCL_ASSERT (hcl, hcl->c->cblk.depth == -1);
 
 /* TODO: in case i implement all global variables as block arguments at the top level...what should i do? */
 
@@ -3620,12 +3678,7 @@ int hcl_compile (hcl_t* hcl, hcl_cnode_t* obj)
 	 *  @0         (a)
 	 *  @1         (set-a) 
 	 */
-#if 0
-	 hcl->c->fnblk.depth++; /* this must be 0 here */
-	if (store_temporary_variable_count_for_fnblk(hcl, hcl->c->tv.wcount, hcl->c->tv.s.len, 0) <= -1) return -1;
-#else
 	if (push_fnblk(hcl, HCL_NULL, hcl->c->tv.wcount, hcl->c->tv.s.len, 0) <= -1) return -1;
-#endif
 
 	PUSH_CFRAME (hcl, COP_COMPILE_OBJECT, obj);
 
@@ -3806,8 +3859,9 @@ int hcl_compile (hcl_t* hcl, hcl_cnode_t* obj)
 	HCL_ASSERT (hcl, GET_TOP_CFRAME_INDEX(hcl) < 0);
 	HCL_ASSERT (hcl, hcl->c->tv.s.len == 0);
 	HCL_ASSERT (hcl, hcl->c->tv.wcount == 0);
+	HCL_ASSERT (hcl, hcl->c->cblk.depth == -1); /* no control blocks expected at this point */
 	HCL_ASSERT (hcl, hcl->c->fnblk.depth == 0);
-	pop_fnblk (hcl); /*hcl->c->fnblk.depth--;*/
+	pop_fnblk (hcl);
 
 	hcl ->log.default_type_mask = log_default_type_mask;
 	return 0;
@@ -3821,8 +3875,11 @@ oops:
 	hcl->code.bc.len = saved_bc_len;
 	hcl->code.lit.len = saved_lit_len;
 
+	/* quick way to call pop_cblk() and pop_fnblk() as many times as necessary */
 	hcl->c->tv.s.len = 0;
 	hcl->c->tv.wcount = 0;
 	hcl->c->fnblk.depth = -1;
+	hcl->c->cblk.depth = -1;
+
 	return -1;
 }

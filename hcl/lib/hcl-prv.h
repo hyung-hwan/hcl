@@ -384,7 +384,7 @@ struct hcl_fnblk_info_t
 	hcl_oow_t tmprcnt;
 	hcl_oow_t lfbase;
 
-	hcl_oow_t cblk_base;
+	hcl_ooi_t cblk_base;
 };
 typedef struct hcl_fnblk_info_t hcl_fnblk_info_t;
 
@@ -776,9 +776,9 @@ enum hcl_bcode_t
 	HCL_CODE_JUMP2_BACKWARD_IF_FALSE  = 0xD3, /* 211 */
 
 	HCL_CODE_CALL_X                   = 0xD4, /* 212 */
-	HCL_CODE_TRY_CATCH                = 0xD5, /* 213 */
-	HCL_CODE_THROW                    = 0xD6, /* 214 */
-	/* UNUSED - 0xD7 */
+	HCL_CODE_TRY_ENTER                = 0xD5, /* 213 ## */ 
+	HCL_CODE_TRY_EXIT                 = 0xD6, /* 214 */
+	HCL_CODE_THROW                    = 0xD7, /* 215 */
 
 	HCL_CODE_STORE_INTO_CTXTEMPVAR_X  = 0xD8, /* 216 ## */
 	/* UNUSED - 0xD9 - 0xDB */
