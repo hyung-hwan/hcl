@@ -363,13 +363,30 @@ struct hcl_cframe_t
 };
 typedef struct hcl_cframe_t hcl_cframe_t;
 
-struct hcl_blk_info_t
+enum hcl_cblk_type_t
+{
+	HCL_CBLK_TYPE_LOOP,
+	HCL_CBLK_TYPE_TRY
+};
+typedef enum hcl_cblk_type_t hcl_cblk_type_t;
+
+/* control block information */
+struct hcl_cblk_info_t
+{
+	hcl_cblk_type_t _type;
+};
+typedef struct hcl_cblk_info_t hcl_cblk_info_t;
+
+/* function block information */
+struct hcl_fnblk_info_t
 {
 	hcl_oow_t tmprlen;
 	hcl_oow_t tmprcnt;
 	hcl_oow_t lfbase;
+
+	hcl_oow_t cblk_base;
 };
-typedef struct hcl_blk_info_t hcl_blk_info_t;
+typedef struct hcl_fnblk_info_t hcl_fnblk_info_t;
 
 typedef struct hcl_rstl_t hcl_rstl_t;
 struct hcl_rstl_t /* reader stack for list reading */
@@ -445,10 +462,17 @@ struct hcl_compiler_t
 
 	struct
 	{
-		hcl_ooi_t depth;
-		hcl_blk_info_t* info;
+		hcl_ooi_t depth; /* signed because it starts with -1 */
+		hcl_cblk_info_t* info;
+		hcl_oow_t info_capa;
+	} cblk; /* control block - loop, try-catch */
+
+	struct
+	{
+		hcl_ooi_t depth; /* signed because it starts with -1 */
+		hcl_fnblk_info_t* info;
 		hcl_oow_t  info_capa;
-	} blk; /* lambda block */
+	} fnblk; /* lambda/function block */
 };
 #endif
 
