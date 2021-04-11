@@ -777,11 +777,12 @@ enum hcl_bcode_t
 
 	HCL_CODE_CALL_X                   = 0xD4, /* 212 */
 	HCL_CODE_TRY_ENTER                = 0xD5, /* 213 ## */ 
-	HCL_CODE_TRY_EXIT                 = 0xD6, /* 214 */
-	HCL_CODE_THROW                    = 0xD7, /* 215 */
-
+	HCL_CODE_TRY_ENTER2               = 0xD6, /* 214  */ 
+	HCL_CODE_TRY_EXIT                 = 0xD7, /* 215 */
+	
 	HCL_CODE_STORE_INTO_CTXTEMPVAR_X  = 0xD8, /* 216 ## */
-	/* UNUSED - 0xD9 - 0xDB */
+	HCL_CODE_THROW                    = 0xD9, /* 217 */
+	/* UNUSED - 0xDA - 0xDB */
 
 	HCL_CODE_POP_INTO_CTXTEMPVAR_X    = 0xDC, /* 220 ## */
 	/* UNUSED - 0xDD - 0xDF */

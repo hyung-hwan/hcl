@@ -351,7 +351,13 @@ int hcl_decode (hcl_t* hcl, hcl_oow_t start, hcl_oow_t end)
 
 			/* -------------------------------------------------------- */
 			case HCL_CODE_TRY_ENTER:
-				LOG_INST_0 (hcl, "try_enter");
+				FETCH_PARAM_CODE_TO (hcl, b1);
+				LOG_INST_1 (hcl, "try_enter %zu", b1);
+				break;
+
+			case HCL_CODE_TRY_ENTER2:
+				FETCH_PARAM_CODE_TO (hcl, b1);
+				LOG_INST_1 (hcl, "try_enter2 %zu", b1);
 				break;
 
 			case HCL_CODE_TRY_EXIT:

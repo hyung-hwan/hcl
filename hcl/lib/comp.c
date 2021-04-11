@@ -463,6 +463,8 @@ static int emit_single_param_instruction (hcl_t* hcl, int cmd, hcl_oow_t param_1
 		case HCL_CODE_JUMP2_BACKWARD_IF_TRUE:
 		case HCL_CODE_JUMP2_BACKWARD_IF_FALSE:
 		case HCL_CODE_JUMP2_BACKWARD:
+		case HCL_CODE_TRY_ENTER:
+		case HCL_CODE_TRY_ENTER2:
 		case HCL_CODE_PUSH_INTLIT:
 		case HCL_CODE_PUSH_NEGINTLIT:
 		case HCL_CODE_PUSH_CHARLIT:
@@ -664,7 +666,8 @@ static HCL_INLINE void patch_long_jump (hcl_t* hcl, hcl_ooi_t jip, hcl_ooi_t jum
 		                 hcl->code.bc.ptr[jip] == HCL_CODE_JUMP_FORWARD_IF_FALSE ||
 		                 hcl->code.bc.ptr[jip] == HCL_CODE_JUMP_BACKWARD_X ||
 		                 hcl->code.bc.ptr[jip] == HCL_CODE_JUMP_BACKWARD_IF_TRUE ||
-		                 hcl->code.bc.ptr[jip] == HCL_CODE_JUMP_BACKWARD_IF_FALSE);
+		                 hcl->code.bc.ptr[jip] == HCL_CODE_JUMP_BACKWARD_IF_FALSE ||
+		                 hcl->code.bc.ptr[jip] == HCL_CODE_TRY_ENTER);
 
 		/* JUMP2 instructions are chosen to be greater than its JUMP counterpart by 1 */
 		patch_instruction (hcl, jip, hcl->code.bc.ptr[jip] + 1); 
@@ -1040,8 +1043,6 @@ static int compile_or (hcl_t* hcl, hcl_cnode_t* src)
 }
 
 
-
-
 static HCL_INLINE int compile_or_expr (hcl_t* hcl)
 {
 	hcl_cnode_t* obj, * expr;
@@ -1137,9 +1138,8 @@ static int compile_break (hcl_t* hcl, hcl_cnode_t* src)
 		}
 		else if (hcl->c->cblk.info[i]._type == HCL_CBLK_TYPE_TRY)
 		{
-			//must emit an instruction to exit from the try loop.
-			/* TODO: do something for finally 
-			if (emit_byte_instruction(hcl, HCL_CODE_EXIT_TRY, HCL_CNODE_GET_LOC(src)) <= -1) return -1;*/
+			/*must emit an instruction to exit from the try loop.*/
+			if (emit_byte_instruction(hcl, HCL_CODE_TRY_EXIT, HCL_CNODE_GET_LOC(src)) <= -1) return -1;
 		}
 	}
 
@@ -1243,9 +1243,8 @@ static int compile_continue (hcl_t* hcl, hcl_cnode_t* src)
 		}
 		else if (hcl->c->cblk.info[i]._type == HCL_CBLK_TYPE_TRY)
 		{
-			//must emit an instruction to exit from the try loop.
-			/* TODO: do something for finally 
-			if (emit_byte_instruction(hcl, HCL_CODE_EXIT_TRY, HCL_CNODE_GET_LOC(src)) <= -1) return -1;*/
+			/*must emit an instruction to exit from the try loop.*/
+			if (emit_byte_instruction(hcl, HCL_CODE_TRY_EXIT, HCL_CNODE_GET_LOC(src)) <= -1) return -1;
 		}
 	}
 
@@ -1885,27 +1884,16 @@ static int compile_try (hcl_t* hcl, hcl_cnode_t* src)
 		hcl_setsynerrbfmt (hcl, HCL_SYNERR_DOTBANNED, HCL_CNODE_GET_LOC(obj), HCL_CNODE_GET_TOK(obj), "redundant cdr in %.*js", HCL_CNODE_GET_TOKLEN(cmd), HCL_CNODE_GET_TOKPTR(cmd));
 		return -1;
 	}
-
-
-/* TODO: allow local temporary variables?? */
-
-#if 0
-	if (hcl->c->fnblk.depth == HCL_TYPE_MAX(hcl_ooi_t))
-	{
-		hcl_setsynerrbfmt (hcl, HCL_SYNERR_BLKDEPTH, HCL_CNODE_GET_LOC(src), HCL_NULL, "block depth too deep in %.*js", HCL_CNODE_GET_TOKLEN(cmd), HCL_CNODE_GET_TOKPTR(cmd));
-		return -1;
-	}
-	hcl->c->fnblk.depth++; 
-	if (store_temporary_variable_count_for_block(hcl, hcl->c->tv.wcount, hcl->c->tv.s.len, hcl->code.lit.len) <= -1) return -1;
-#else
-	/*push_cblk ....*/
-#endif
+	
+	if (push_cblk(hcl, HCL_CNODE_GET_LOC(src), HCL_CBLK_TYPE_TRY) <= -1) return -1;
 
 /* TODO: HCL_TRAIT_INTERACTIVE??? */
+#if 0
 	if (emit_double_param_instruction(hcl, HCL_CODE_MAKE_BLOCK, 0, 0, HCL_CNODE_GET_LOC(cmd)) <= -1) return -1;
+	#endif
 
 	jump_inst_pos = hcl->code.bc.len;
-	if (emit_single_param_instruction(hcl, HCL_CODE_JUMP_FORWARD_0, MAX_CODE_JUMP, HCL_CNODE_GET_LOC(cmd)) <= -1) return -1;
+	if (emit_single_param_instruction(hcl, HCL_CODE_TRY_ENTER, MAX_CODE_JUMP, HCL_CNODE_GET_LOC(cmd)) <= -1) return -1;
 
 	SWITCH_TOP_CFRAME (hcl, COP_COMPILE_TRY_OBJECT_LIST, obj);  /* 1*/
 	PUSH_SUBCFRAME (hcl, COP_POST_TRY, cmd); /* 2 */
@@ -1927,7 +1915,6 @@ static HCL_INLINE int patch_nearest_post_try (hcl_t* hcl)
 
 	jip = cf->u.post_try_catch.jump_inst_pos;
 
-
 	/* HCL_CODE_LONG_PARAM_SIZE + 1 => size of the long JUMP_FORWARD instruction */
 	block_code_size = hcl->code.bc.len - jip - (HCL_CODE_LONG_PARAM_SIZE + 1);
 
@@ -1936,18 +1923,21 @@ static HCL_INLINE int patch_nearest_post_try (hcl_t* hcl)
 		/* no body in try */
 /* TODO: is this correct??? */
 		if (emit_byte_instruction(hcl, HCL_CODE_PUSH_NIL, HCL_CNODE_GET_LOC(cf->operand)) <= -1) return -1;
-		block_code_size++;
 	}
 
-	if (emit_byte_instruction(hcl, HCL_CODE_RETURN_FROM_BLOCK, HCL_CNODE_GET_LOC(cf->operand)) <= -1) return -1;
-	block_code_size++;
+	/*jump_inst_pos = hcl-.code.bc.len; */
+	if (emit_byte_instruction(hcl, HCL_CODE_TRY_EXIT, HCL_CNODE_GET_LOC(cf->operand)) <= -1)
+	if (emit_single_param_instruction(hcl, HCL_CODE_JUMP_FORWARD_0,  MAX_CODE_JUMP, HCL_CNODE_GET_LOC(cmd)) <= -1) return -1;
 
+	/* HCL_CODE_LONG_PARAM_SIZE + 1 => size of the long JUMP_FORWARD instruction */
+	block_code_size = hcl->code.bc.len - jip - (HCL_CODE_LONG_PARAM_SIZE + 1);
+	
 	if (block_code_size > MAX_CODE_JUMP * 2)
 	{
 		hcl_setsynerrbfmt (hcl, HCL_SYNERR_BLKFLOOD, HCL_CNODE_GET_LOC(cf->operand), HCL_NULL, "code too big - size %zu", block_code_size);
 		return -1;
 	}
-	patch_long_jump (hcl, jip, block_code_size);
+	patch_long_jump (hcl, jip, block_code_size); /* patch TRY_ENTER */
 
 #if 0
 	/* beginning of the elif/else block code */
@@ -1991,7 +1981,7 @@ static HCL_INLINE int compile_catch (hcl_t* hcl)
 		hcl_setsynerrbfmt (hcl, HCL_SYNERR_ARGCOUNT, HCL_CNODE_GET_LOC(src), HCL_NULL, "no condition in %.*js", HCL_CNODE_GET_TOKLEN(cmd), HCL_CNODE_GET_TOKPTR(cmd));
 		return -1;
 	}
-	else	if (!HCL_CNODE_IS_CONS(obj))
+	else if (!HCL_CNODE_IS_CONS(obj))
 	{
 		hcl_setsynerrbfmt (hcl, HCL_SYNERR_DOTBANNED, HCL_CNODE_GET_LOC(obj), HCL_CNODE_GET_TOK(obj), "redundant cdr in %.*js", HCL_CNODE_GET_TOKLEN(cmd), HCL_CNODE_GET_TOKPTR(cmd));
 		return -1;
