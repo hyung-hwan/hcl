@@ -3121,7 +3121,7 @@ static int execute (hcl_t* hcl)
 			/* -------------------------------------------------------- */
 			case HCL_CODE_TRY_ENTER:
 				FETCH_PARAM_CODE_TO (hcl, b1);
-				LOG_INST_0 (hcl, "try_enter %zu", b1);
+				LOG_INST_1 (hcl, "try_enter %zu", b1);
 #if 0
 				if (call_try_catch(hcl) <= -1) 
 				{
@@ -3133,7 +3133,7 @@ static int execute (hcl_t* hcl)
 				
 			case HCL_CODE_TRY_ENTER2:
 				FETCH_PARAM_CODE_TO (hcl, b1);
-				LOG_INST_0 (hcl, "try_enter2 %zu", b1);
+				LOG_INST_1 (hcl, "try_enter2 %zu", b1);
 
 			case HCL_CODE_TRY_EXIT:
 				LOG_INST_0 (hcl, "try_exit");

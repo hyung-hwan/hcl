@@ -1129,7 +1129,6 @@ static int compile_break (hcl_t* hcl, hcl_cnode_t* src)
 		return -1;
 	}
 
-
 	for (i = hcl->c->cblk.depth; i > hcl->c->fnblk.info[hcl->c->fnblk.depth].cblk_base; --i)
 	{
 		if (hcl->c->cblk.info[i]._type == HCL_CBLK_TYPE_LOOP)
@@ -1139,6 +1138,7 @@ static int compile_break (hcl_t* hcl, hcl_cnode_t* src)
 		else if (hcl->c->cblk.info[i]._type == HCL_CBLK_TYPE_TRY)
 		{
 			/*must emit an instruction to exit from the try loop.*/
+
 			if (emit_byte_instruction(hcl, HCL_CODE_TRY_EXIT, HCL_CNODE_GET_LOC(src)) <= -1) return -1;
 		}
 	}
@@ -1903,7 +1903,7 @@ static int compile_try (hcl_t* hcl, hcl_cnode_t* src)
 	return 0;
 }
 
-static HCL_INLINE int patch_nearest_post_try (hcl_t* hcl)
+static HCL_INLINE int patch_nearest_post_try (hcl_t* hcl, hcl_ooi_t* catch_skip_jip)
 {
 	hcl_ooi_t jip, block_code_size;
 	hcl_cframe_t* cf;
@@ -1925,9 +1925,11 @@ static HCL_INLINE int patch_nearest_post_try (hcl_t* hcl)
 		if (emit_byte_instruction(hcl, HCL_CODE_PUSH_NIL, HCL_CNODE_GET_LOC(cf->operand)) <= -1) return -1;
 	}
 
-	/*jump_inst_pos = hcl-.code.bc.len; */
-	if (emit_byte_instruction(hcl, HCL_CODE_TRY_EXIT, HCL_CNODE_GET_LOC(cf->operand)) <= -1)
-	if (emit_single_param_instruction(hcl, HCL_CODE_JUMP_FORWARD_0,  MAX_CODE_JUMP, HCL_CNODE_GET_LOC(cmd)) <= -1) return -1;
+	
+	if (emit_byte_instruction(hcl, HCL_CODE_TRY_EXIT, HCL_CNODE_GET_LOC(cf->operand)) <= -1) return -1;
+
+	*catch_skip_jip = hcl->code.bc.len; 
+	if (emit_single_param_instruction(hcl, HCL_CODE_JUMP_FORWARD_0,  MAX_CODE_JUMP, HCL_CNODE_GET_LOC(cf->operand)) <= -1) return -1;
 
 	/* HCL_CODE_LONG_PARAM_SIZE + 1 => size of the long JUMP_FORWARD instruction */
 	block_code_size = hcl->code.bc.len - jip - (HCL_CODE_LONG_PARAM_SIZE + 1);
@@ -1987,15 +1989,10 @@ static HCL_INLINE int compile_catch (hcl_t* hcl)
 		return -1;
 	}
 
-	patch_nearest_post_try (hcl);
+	patch_nearest_post_try (hcl, &jump_inst_pos);
 
 /* TODO: HCL_TRAIT_INTERACTIVE??? */
 /* TODO: nargs -> 1 ntmprs  -> 1 */
-	if (emit_double_param_instruction(hcl, HCL_CODE_MAKE_BLOCK, 0, 0, HCL_CNODE_GET_LOC(cmd)) <= -1) return -1;
-
-	jump_inst_pos = hcl->code.bc.len;
-	if (emit_single_param_instruction(hcl, HCL_CODE_JUMP_FORWARD_0, MAX_CODE_JUMP, HCL_CNODE_GET_LOC(cmd)) <= -1) return -1;
-
 
 	SWITCH_TOP_CFRAME (hcl, COP_COMPILE_OBJECT_LIST, obj);
 
@@ -2008,8 +2005,8 @@ static HCL_INLINE int compile_catch (hcl_t* hcl)
 
 static HCL_INLINE int post_try (hcl_t* hcl)
 {
-
 /* TODO: */
+	pop_cblk (hcl);
 	POP_CFRAME (hcl);
 	return 0;
 }
@@ -2024,7 +2021,7 @@ static HCL_INLINE int post_catch (hcl_t* hcl)
 	HCL_ASSERT (hcl, cf->opcode == COP_POST_CATCH);
 	HCL_ASSERT (hcl, cf->operand != HCL_NULL);
 
-	jip = cf->u.post_try_catch.jump_inst_pos;
+	jip = cf->u.post_try_catch.jump_inst_pos; /* jump instruction position between the try block and the catch block */
 
 	/* HCL_CODE_LONG_PARAM_SIZE + 1 => size of the long JUMP_FORWARD instruction */
 	block_code_size = hcl->code.bc.len - jip - (HCL_CODE_LONG_PARAM_SIZE + 1);
@@ -2037,24 +2034,13 @@ static HCL_INLINE int post_catch (hcl_t* hcl)
 		block_code_size++;
 	}
 
-	if (emit_byte_instruction(hcl, HCL_CODE_RETURN_FROM_BLOCK, HCL_CNODE_GET_LOC(cf->operand)) <= -1) return -1;
-	block_code_size++;
-
 	if (block_code_size > MAX_CODE_JUMP * 2)
 	{
 		hcl_setsynerrbfmt (hcl, HCL_SYNERR_BLKFLOOD, HCL_CNODE_GET_LOC(cf->operand), HCL_NULL, "code too big - size %zu", block_code_size);
 		return -1;
 	}
-	patch_long_jump (hcl, jip, block_code_size);
 
-#if 0
-	if (emit_byte_instruction(hcl, HCL_CODE_TRY_CATCH, HCL_CNODE_GET_LOC(cf->operand)) <= -1) return -1;
-#endif
-
-#if 0
-	/*hcl->c->fnblk.depth--; */
-	pop_cblk (hcl);
-#endif
+	patch_long_jump (hcl, jip, block_code_size); /* patch the jump between the try block and the catch block */
 	
 	POP_CFRAME (hcl);
 	return 0;
