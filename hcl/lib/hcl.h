@@ -88,7 +88,8 @@ enum hcl_errnum_t
 	HCL_ESYNERR,   /**< syntax error */
 	HCL_ECALL,     /**< runtime error - cannot call */
 	HCL_ECALLARG,  /**< runtime error - wrong number of arguments to call */
-	HCL_ESEMFLOOD  /**< runtime error - too many semaphores */
+	HCL_ESEMFLOOD, /**< runtime error - too many semaphores */
+	HCL_EEXCEPT    /**< runtime error - exception not handled */
 };
 typedef enum hcl_errnum_t hcl_errnum_t;
 
@@ -641,7 +642,7 @@ struct hcl_context_t
 	hcl_oop_t          slot[1]; /* stack */
 };
 
-#define HCL_PROCESS_NAMED_INSTVARS 10
+#define HCL_PROCESS_NAMED_INSTVARS 12
 typedef struct hcl_process_t hcl_process_t;
 typedef struct hcl_process_t* hcl_oop_process_t;
 
@@ -662,6 +663,9 @@ struct hcl_process_t
 	hcl_oop_t         id; /* SmallInteger */
 	hcl_oop_t         state; /* SmallInteger */
 	hcl_oop_t         sp;    /* stack pointer. SmallInteger */
+	hcl_oop_t         ss;    /* process stack size. SmallInteger */
+	hcl_oop_t         exsp;  /* exception stack pointer. SmallInteger */
+	hcl_oop_t         exss;  /* exception stack size. SmallInteger */
 
 	struct
 	{
@@ -679,6 +683,13 @@ struct hcl_process_t
 
 	/* == variable indexed part == */
 	hcl_oop_t slot[1]; /* process stack */
+	
+	/* after the process stack comes the exception stack.
+	 * the exception stack is composed of instruction pointers and some context values.
+	 * the instruction pointers are OOPs of small integers. safe without GC.
+	 * the context values must be referenced by the active call chain. GC doesn't need to scan this area.
+	 * If this assumption is not correct, GC code must be modified.
+	 * so the garbage collector is free to ignore the exception stack */
 };
 
 enum hcl_semaphore_subtype_t
@@ -1587,12 +1598,12 @@ struct hcl_t
 /* TODO: stack bound check when pushing */
 #define HCL_STACK_PUSH(hcl,v) \
 	do { \
-		(hcl)->sp = (hcl)->sp + 1; \
-		if ((hcl)->sp >= (hcl_ooi_t)(HCL_OBJ_GET_SIZE((hcl)->processor->active) - HCL_PROCESS_NAMED_INSTVARS)) \
+		if ((hcl)->sp >= HCL_OOP_TO_SMOOI((hcl)->processor->active->ss) - 1) \
 		{ \
 			hcl_seterrbfmt (hcl, HCL_EOOMEM, "process stack overflow"); \
 			(hcl)->abort_req = -1; \
 		} \
+		(hcl)->sp = (hcl)->sp + 1; \
 		(hcl)->processor->active->slot[(hcl)->sp] = v; \
 	} while (0)
 
@@ -2320,16 +2331,10 @@ HCL_EXPORT hcl_oop_t hcl_makedic (
 	hcl_oow_t         inisize /* initial bucket size */
 );
 
-HCL_EXPORT hcl_oop_t hcl_makeprocess (
-	hcl_t*            hcl,
-	hcl_oow_t         stksize
-);
-
 HCL_EXPORT hcl_oop_t hcl_makecontext (
 	hcl_t*            hcl,
 	hcl_ooi_t         ntmprs
 );
-
 
 HCL_EXPORT void hcl_freengcobj (
 	hcl_t*           hcl,

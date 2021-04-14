@@ -132,6 +132,44 @@ static hcl_ooch_t oocstr_dash[] = { '-', '\0' };
 
 static int delete_sem_from_sem_io_tuple (hcl_t* hcl, hcl_oop_semaphore_t sem, int force);
 static void signal_io_semaphore (hcl_t* hcl, hcl_ooi_t io_handle, hcl_ooi_t mask);
+static void terminate_all_processes (hcl_t* hcl);
+
+/* ------------------------------------------------------------------------- */
+
+#define HCL_EXSTACK_PUSH(hcl, ctx, ip) \
+	do { \
+		hcl_oop_process_t ap = (hcl)->processor->active; \
+		hcl_ooi_t exsp = HCL_OOP_TO_SMOOI(ap->exsp); \
+		hcl_ooi_t ss = HCL_OOP_TO_SMOOI(ap->ss); \
+		if (exsp >= HCL_OOP_TO_SMOOI(ap->exss) - 2) \
+		{ \
+			hcl_seterrbfmt (hcl, HCL_EOOMEM, "process exception stack overflow"); \
+			(hcl)->abort_req = -1; \
+		} \
+		exsp++; ap->slot[ss + exsp] = (ctx); \
+		exsp++; ap->slot[ss + exsp] = HCL_SMOOI_TO_OOP(ip); \
+		ap->exsp = HCL_SMOOI_TO_OOP(exsp); \
+	} while (0)
+		
+#define HCL_EXSTACK_POP(hcl) \
+	do { \
+		hcl_oop_process_t ap = (hcl)->processor->active; \
+		hcl_ooi_t exsp = HCL_OOP_TO_SMOOI(ap->exsp); \
+		exsp -= 2; \
+		ap->exsp = HCL_SMOOI_TO_OOP(exsp); \
+	} while (0)
+
+#define HCL_EXSTACK_POP_TO(hcl, ctx, ip) \
+	do { \
+		hcl_oop_process_t ap = (hcl)->processor->active; \
+		hcl_ooi_t exsp = HCL_OOP_TO_SMOOI(ap->exsp); \
+		hcl_ooi_t ss = HCL_OOP_TO_SMOOI(ap->ss); \
+		ip = HCL_OOP_TO_SMOOI(ap->slot[ss + exsp]); exsp--; \
+		ctx = ap->slot[ss + exsp]; exsp--; \
+		ap->exsp = HCL_SMOOI_TO_OOP(exsp); \
+	} while (0)
+		
+#define HCL_EXSTACK_ISEMPTY(hcl) (HCL_OOP_TO_SMOOI(((hcl)->processor->active)->exsp) <= -1)
 
 /* ------------------------------------------------------------------------- */
 
@@ -173,6 +211,23 @@ static void vm_cleanup (hcl_t* hcl)
 {
 	hcl_cb_t* cb;
 	hcl_oow_t i;
+
+	if (hcl->processor->total_count != HCL_SMOOI_TO_OOP(0))
+	{
+		/* if there is a suspended process, your program is probably wrong */
+		HCL_LOG3 (hcl, HCL_LOG_WARN, "Warning - non-zero number of processes upon VM clean-up - total: %zd runnable: %zd suspended: %zd\n", 
+			(hcl_ooi_t)HCL_OOP_TO_SMOOI(hcl->processor->total_count),
+			(hcl_ooi_t)HCL_OOP_TO_SMOOI(hcl->processor->runnable.count),
+			(hcl_ooi_t)HCL_OOP_TO_SMOOI(hcl->processor->suspended.count));
+		
+		HCL_LOG0 (hcl, HCL_LOG_WARN, "Warning - terminating all residue processes\n");
+		terminate_all_processes (hcl);
+	}
+
+	HCL_ASSERT (hcl, hcl->processor->active == hcl->nil_process);
+	HCL_ASSERT (hcl, HCL_OOP_TO_SMOOI(hcl->processor->total_count) == 0);
+	HCL_ASSERT (hcl, HCL_OOP_TO_SMOOI(hcl->processor->runnable.count) == 0);
+	HCL_ASSERT (hcl, HCL_OOP_TO_SMOOI(hcl->processor->suspended.count) == 0);
 
 	for (i = 0; i < hcl->sem_io_map_capa;)
 	{
@@ -409,7 +464,7 @@ static HCL_INLINE void free_pid (hcl_t* hcl, hcl_oop_process_t proc)
 static hcl_oop_process_t make_process (hcl_t* hcl, hcl_oop_context_t c)
 {
 	hcl_oop_process_t proc;
-	hcl_oow_t stksize;
+	hcl_oow_t stksize, exstksize;
 	hcl_ooi_t total_count;
 	hcl_ooi_t suspended_count;
 
@@ -426,11 +481,23 @@ static hcl_oop_process_t make_process (hcl_t* hcl, hcl_oop_context_t c)
 	if (hcl->proc_map_free_first <= -1 && prepare_to_alloc_pid(hcl) <= -1) return HCL_NULL;
 
 	stksize = hcl->option.dfl_procstk_size;
-	if (stksize > HCL_TYPE_MAX(hcl_oow_t) - HCL_PROCESS_NAMED_INSTVARS)
-		stksize = HCL_TYPE_MAX(hcl_oow_t) - HCL_PROCESS_NAMED_INSTVARS;
+	exstksize = 128; /* exception stack size */ /* TODO: make it configurable */
+
+#if 0	
+	if (stksize > HCL_TYPE_MAX(hcl_ooi_t) - HCL_PROCESS_NAMED_INSTVARS)
+		stksize = HCL_TYPE_MAX(hcl_ooi_t) - HCL_PROCESS_NAMED_INSTVARS;
+	else if (stksize < 128) stksize = 128;
+#else
+	if (stksize > (HCL_TYPE_MAX(hcl_ooi_t) - HCL_PROCESS_NAMED_INSTVARS) / 2)
+		stksize = (HCL_TYPE_MAX(hcl_ooi_t) - HCL_PROCESS_NAMED_INSTVARS) / 2;
+	else if (stksize < 128) stksize = 128;
+	if (exstksize > (HCL_TYPE_MAX(hcl_ooi_t) - HCL_PROCESS_NAMED_INSTVARS) / 2)
+		exstksize = (HCL_TYPE_MAX(hcl_ooi_t) - HCL_PROCESS_NAMED_INSTVARS) / 2;
+	else if (exstksize < 128) exstksize = 128;
+#endif
 
 	hcl_pushvolat (hcl, (hcl_oop_t*)&c);
-	proc = (hcl_oop_process_t)hcl_allocoopobj(hcl, HCL_BRAND_PROCESS, HCL_PROCESS_NAMED_INSTVARS + stksize);
+	proc = (hcl_oop_process_t)hcl_allocoopobj(hcl, HCL_BRAND_PROCESS, HCL_PROCESS_NAMED_INSTVARS + stksize + exstksize);
 	hcl_popvolat (hcl);
 	if (HCL_UNLIKELY(!proc)) return HCL_NULL;
 
@@ -439,6 +506,7 @@ static hcl_oop_process_t make_process (hcl_t* hcl, hcl_oop_context_t c)
 ////	HCL_OBJ_SET_FLAGS_PROC (proc, proc_flags); /* a special flag to indicate an object is a process instance */
 ////////////////////
 #endif
+	
 	proc->state = HCL_SMOOI_TO_OOP(PROC_STATE_SUSPENDED);
 
 	/* assign a process id to the process */
@@ -447,6 +515,9 @@ static hcl_oop_process_t make_process (hcl_t* hcl, hcl_oop_context_t c)
 	proc->initial_context = c;
 	proc->current_context = c;
 	proc->sp = HCL_SMOOI_TO_OOP(-1);
+	proc->ss = HCL_SMOOI_TO_OOP(stksize);
+	proc->exsp = HCL_SMOOI_TO_OOP(-1);
+	proc->exss = HCL_SMOOI_TO_OOP(exstksize);
 
 	HCL_ASSERT (hcl, (hcl_oop_t)c->sender == hcl->_nil);
 
@@ -873,6 +944,22 @@ static void terminate_process (hcl_t* hcl, hcl_oop_process_t proc)
 		/* TODO: */
 	}
 #endif
+}
+
+static void terminate_all_processes (hcl_t* hcl)
+{
+	while (HCL_OOP_TO_SMOOI(hcl->processor->suspended.count) > 0)
+	{
+		terminate_process (hcl, hcl->processor->suspended.first);
+	}
+	
+	while (HCL_OOP_TO_SMOOI(hcl->processor->runnable.count) > 0)
+	{
+		terminate_process (hcl, hcl->processor->runnable.first);
+	}
+	
+	HCL_ASSERT (hcl, HCL_OOP_TO_SMOOI(hcl->processor->total_count) == 0);
+	HCL_ASSERT (hcl, hcl->processor->active == hcl->nil_process);
 }
 
 static void resume_process (hcl_t* hcl, hcl_oop_process_t proc)
@@ -1986,7 +2073,10 @@ static HCL_INLINE int activate_block_for_throw_catch (hcl_t* hcl, hcl_oop_block_
 
 static HCL_INLINE int do_throw (hcl_t* hcl, hcl_oop_t val, hcl_ooi_t ip)
 {
-	hcl_oop_context_t ctx;
+	hcl_oop_context_t catch_ctx;
+	hcl_ooi_t catch_ip;
+
+#if 0
 	hcl_ooi_t flags;
 
 	ctx = hcl->active_context;
@@ -2001,8 +2091,7 @@ static HCL_INLINE int do_throw (hcl_t* hcl, hcl_oop_t val, hcl_ooi_t ip)
 
 		ctx = ctx->sender;
 	}
-
-
+	
 	if (hcl->active_function->dbgi != hcl->_nil)
 	{
 		hcl_dbgi_t* dbgi;
@@ -2017,6 +2106,40 @@ static HCL_INLINE int do_throw (hcl_t* hcl, hcl_oop_t val, hcl_ooi_t ip)
 	/* exception not handled. terminate the active process */
 	terminate_process (hcl, hcl->processor->active);
 	return 0;
+#else
+	if (HCL_EXSTACK_ISEMPTY(hcl))
+	{
+		if (hcl->active_function->dbgi != hcl->_nil)
+		{
+			hcl_dbgi_t* dbgi;
+			dbgi = (hcl_dbgi_t*)HCL_OBJ_GET_BYTE_SLOT(hcl->active_function->dbgi);
+			HCL_LOG2 (hcl, HCL_LOG_IC | HCL_LOG_WARN, "Warning - exception not handled %js:%zu", (dbgi[ip].fname? dbgi[ip].fname: oocstr_dash), dbgi[ip].sline);
+			hcl_seterrbfmt (hcl, HCL_EEXCEPT, "exception not handled in %js:%zu", (dbgi[ip].fname? dbgi[ip].fname: oocstr_dash), dbgi[ip].sline);
+		}
+		else
+		{
+			HCL_LOG0 (hcl, HCL_LOG_IC | HCL_LOG_WARN, "Warning - exception not handled");
+			hcl_seterrbfmt (hcl, HCL_EEXCEPT, "exception not handled");
+		}
+		
+		/* exception not handled. terminate the active process */
+		/*terminate_process (hcl, hcl->processor->active); <- the vm cleanup code will do this */
+		
+		
+		
+		return -1;
+	}
+
+	// must rewind context....
+	HCL_EXSTACK_POP_TO(hcl, catch_ctx, catch_ip);
+
+
+/* the below code is similar to do_return_from_block() */
+	hcl->ip = -1; /* mark context dead. saved into hcl->active_context->ip in SWITCH_ACTIVE_CONTEXT */
+	SWITCH_ACTIVE_CONTEXT (hcl, catch_ctx);
+	hcl->ip = catch_ip; /* override the instruction pointer */
+	return 0;
+#endif
 }
 
 /* ------------------------------------------------------------------------- */
@@ -2395,16 +2518,15 @@ static HCL_INLINE int switch_process_if_needed (hcl_t* hcl)
 			hcl_ntime_t ft;
 
 			HCL_ASSERT (hcl, hcl->processor->runnable.count == HCL_SMOOI_TO_OOP(0));
+			/* no running process while there is an io semaphore being waited for */
 
 #if defined(ENABLE_GCFIN)
-			/* no runnable process while there is an io semaphore being waited for */
 			if ((hcl_oop_t)hcl->sem_gcfin != hcl->_nil && hcl->sem_gcfin_sigreq) goto signal_sem_gcfin;
 #endif
 
 			if (hcl->processor->suspended.count == HCL_SMOOI_TO_OOP(0))
 			{
-				/* no suspended process. the program is buggy or is probably being
-				 * terminated forcibly. 
+				/* no suspended process. the program is buggy or is probably being terminated forcibly. 
 				 * the default signal handler may lead to this situation. */
 				hcl->abort_req = 1;
 			}
@@ -2528,7 +2650,7 @@ static HCL_INLINE int switch_process_if_needed (hcl_t* hcl)
 			/* there exist suspended processes while no processes are runnable.
 			 * most likely, the running program contains process/semaphore related bugs */
 			HCL_LOG1 (hcl, HCL_LOG_IC | HCL_LOG_WARN, 
-				"%zd suspended process(es) found - check your program\n",
+				"Warning - %zd suspended process(es) found in process switcher - check your program\n",
 				HCL_OOP_TO_SMOOI(hcl->processor->suspended.count));
 		}
 		return 0;
@@ -2674,6 +2796,7 @@ static HCL_INLINE void do_return_from_block (hcl_t* hcl)
 		SWITCH_ACTIVE_CONTEXT (hcl, (hcl_oop_context_t)hcl->active_context->sender);
 	}
 }
+
 /* ------------------------------------------------------------------------- */
 
 static void xma_dumper (void* ctx, const char* fmt, ...)
@@ -2725,11 +2848,8 @@ static int execute (hcl_t* hcl)
 	while (1)
 	{
 		/* stop requested or no more runnable process */
-		if (hcl->abort_req || (!hcl->no_proc_switch && switch_process_if_needed(hcl) == 0)) 
-		{
-/* TODO: if aborting, ensure to terminate all ongoing processes */
-			break;
-		}
+		if (hcl->abort_req <= -1) goto oops;
+		if (hcl->abort_req && !hcl->no_proc_switch && switch_process_if_needed(hcl) == 0) break;
 
 		if (HCL_UNLIKELY(hcl->ip >= HCL_FUNCTION_GET_CODE_SIZE(hcl->active_function)))
 		{
@@ -3120,30 +3240,41 @@ static int execute (hcl_t* hcl)
 
 			/* -------------------------------------------------------- */
 			case HCL_CODE_TRY_ENTER:
+			{
+				hcl_ooi_t catch_ip;
+				
 				FETCH_PARAM_CODE_TO (hcl, b1);
 				LOG_INST_1 (hcl, "try_enter %zu", b1);
-#if 0
-				if (call_try_catch(hcl) <= -1) 
-				{
-					supplement_errmsg (hcl, fetched_instruction_pointer);
-					goto oops;
-				}
-#endif
+
+				catch_ip = hcl->ip + b1;
+				/* TODO: ip overflow check? */
+				HCL_EXSTACK_PUSH (hcl, hcl->active_context, catch_ip);
 				break;
+			}
 				
 			case HCL_CODE_TRY_ENTER2:
+			{
+				hcl_oow_t catch_ip;
 				FETCH_PARAM_CODE_TO (hcl, b1);
 				LOG_INST_1 (hcl, "try_enter2 %zu", b1);
+				catch_ip = hcl->ip + MAX_CODE_JUMP + b1;
+				/* TODO: ip overflow check? */
+				HCL_EXSTACK_PUSH (hcl, hcl->active_context, catch_ip);
+				break;
+			}
 
 			case HCL_CODE_TRY_EXIT:
 				LOG_INST_0 (hcl, "try_exit");
+				/* TODO: stack underflow check? */
+				HCL_EXSTACK_POP (hcl);
 				break;
 
 			case HCL_CODE_THROW:
 				LOG_INST_0 (hcl, "throw");
 				return_value = HCL_STACK_GETTOP(hcl);
 				HCL_STACK_POP (hcl);
-				do_throw (hcl, return_value, fetched_instruction_pointer);
+
+				if (do_throw (hcl, return_value, fetched_instruction_pointer) <= -1) goto oops;
 				break;
 			/* -------------------------------------------------------- */
 
@@ -3300,7 +3431,7 @@ static int execute (hcl_t* hcl)
 
 				LOG_INST_3 (hcl, "send_message%hs %zu @%zu", (((bcode >> 2) & 1)? "_to_super": ""), b1, b2);
 
-				if (send_message (hcl, selector, ((bcode >> 2) & 1), b1) <= -1) goto oops;
+				if (send_message(hcl, selector, ((bcode >> 2) & 1), b1) <= -1) goto oops;
 				break; /* CMD_SEND_MESSAGE */
 			}
 #endif
@@ -3635,11 +3766,13 @@ static int execute (hcl_t* hcl)
 				break;
 
 			case HCL_CODE_RETURN_STACKTOP:
+/* this implements the non-local return. the non-local return is not compatible with stack based try-catch implementation. */
 				LOG_INST_0 (hcl, "return_stacktop");
 				return_value = HCL_STACK_GETTOP(hcl);
 				HCL_STACK_POP (hcl);
 				goto handle_return;
-
+				
+/* the current HCL compiler doesn't produce HCL_CODE_RETURN_RECEIVER as the receiver concept is not implemented */
 			case HCL_CODE_RETURN_RECEIVER:
 				LOG_INST_0 (hcl, "return_receiver");
 				return_value = hcl->active_context->origin->receiver_or_base;
@@ -3653,9 +3786,9 @@ static int execute (hcl_t* hcl)
 				LOG_INST_0 (hcl, "return_from_block");
 
 				HCL_ASSERT(hcl, HCL_IS_CONTEXT(hcl, hcl->active_context));
-				hcl->last_retv = HCL_STACK_GETTOP(hcl);
-
+				hcl->last_retv = HCL_STACK_GETTOP(hcl); /* get the stack top */
 				do_return_from_block (hcl);
+
 				break;
 
 			case HCL_CODE_MAKE_FUNCTION:
@@ -3748,19 +3881,18 @@ done:
 
 	vm_cleanup (hcl);
 #if defined(HCL_PROFILE_VM)
-	HCL_LOG1 (hcl, HCL_LOG_IC | HCL_LOG_INFO, "TOTAL INST COUTNER = %zu\n", inst_counter);
+	HCL_LOG1 (hcl, HCL_LOG_IC | HCL_LOG_INFO, "EXEC OK - TOTAL INST COUTNER = %zu\n", inst_counter);
 #endif
 	return 0;
 
 oops:
 	hcl->gci.lazy_sweep = 1;
 
-	/* TODO: anything to do here? */
-	if (hcl->processor->active != hcl->nil_process) 
-	{
-		HCL_LOG2 (hcl, HCL_LOG_IC | HCL_LOG_INFO, "TERMINATING ACTIVE PROCESS %zd for execution error - %js\n", HCL_OOP_TO_SMOOI(hcl->processor->active->id), hcl_geterrmsg(hcl));
-		terminate_process (hcl, hcl->processor->active);
-	}
+	vm_cleanup (hcl);
+#if defined(HCL_PROFILE_VM)
+	HCL_LOG1 (hcl, HCL_LOG_IC | HCL_LOG_INFO, "EXEC ERROR - TOTAL INST COUTNER = %zu\n", inst_counter);
+#endif
+
 	return -1;
 }
 
@@ -3841,16 +3973,12 @@ hcl_oop_t hcl_execute (hcl_t* hcl)
 
 	hcl->initial_context = HCL_NULL;
 	hcl->active_context = HCL_NULL;
-	if (hcl->processor->total_count != HCL_SMOOI_TO_OOP(0))
-	{
-		/* if there is a suspended process, your program is probably wrong */
-		HCL_LOG3 (hcl, HCL_LOG_WARN, "Warning - non-zero number of processes - total: %zd runnable: %zd suspended: %zd\n", 
-			(hcl_ooi_t)HCL_OOP_TO_SMOOI(hcl->processor->total_count),
-			(hcl_ooi_t)HCL_OOP_TO_SMOOI(hcl->processor->runnable.count),
-			(hcl_ooi_t)HCL_OOP_TO_SMOOI(hcl->processor->suspended.count));
-	}
 
 	HCL_ASSERT (hcl, hcl->processor->active == hcl->nil_process);
+	HCL_ASSERT (hcl, HCL_OOP_TO_SMOOI(hcl->processor->total_count) == 0);
+	HCL_ASSERT (hcl, HCL_OOP_TO_SMOOI(hcl->processor->runnable.count) == 0);
+	HCL_ASSERT (hcl, HCL_OOP_TO_SMOOI(hcl->processor->suspended.count) == 0);
+
 	LOAD_ACTIVE_SP (hcl); /* sync hcl->nil_process->sp with hcl->sp */
 	HCL_ASSERT (hcl, hcl->sp == -1);
 

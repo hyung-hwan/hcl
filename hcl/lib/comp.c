@@ -219,6 +219,7 @@ static int push_fnblk (hcl_t* hcl, const hcl_ioloc_t* errloc, hcl_oow_t tmpr_cou
 	hcl->c->fnblk.info[new_depth].tmprlen = tmpr_len;
 	hcl->c->fnblk.info[new_depth].tmprcnt = tmpr_count;
 
+
 	/* remember the control block depth before the function block is entered */
 	hcl->c->fnblk.info[new_depth].cblk_base = hcl->c->cblk.depth; 
 
@@ -230,18 +231,25 @@ static int push_fnblk (hcl_t* hcl, const hcl_ioloc_t* errloc, hcl_oow_t tmpr_cou
 static void pop_fnblk (hcl_t* hcl)
 {
 	HCL_ASSERT (hcl, hcl->c->fnblk.depth >= 0);
+	/* if pop_cblk() has been called properly, the following assertion must be true
+	 * and the assignment on the next line isn't necessary */
+
+	HCL_ASSERT (hcl, hcl->c->cblk.depth == hcl->c->fnblk.info[hcl->c->fnblk.depth].cblk_base); 
+	hcl->c->cblk.depth = hcl->c->fnblk.info[hcl->c->fnblk.depth].cblk_base;
+	/* keep hcl->code.lit.len without restoration */
+
 	hcl->c->fnblk.depth--;
+	
 	if (hcl->c->fnblk.depth >= 0)
 	{
 		hcl->c->tv.s.len = hcl->c->fnblk.info[hcl->c->fnblk.depth].tmprlen;
 		hcl->c->tv.wcount = hcl->c->fnblk.info[hcl->c->fnblk.depth].tmprcnt;
-		
-		/* if pop_cblk() has been called properly, the following assertion must be true
-		 * and the assignment on the next line isn't necessary */
-		HCL_ASSERT (hcl, hcl->c->cblk.depth == hcl->c->fnblk.info[hcl->c->fnblk.depth].cblk_base); 
-		hcl->c->cblk.depth = hcl->c->fnblk.info[hcl->c->fnblk.depth].cblk_base;
 
-		/* keep hcl->code.lit.len without restoration */
+	}
+	else
+	{
+		hcl->c->tv.s.len = 0;
+		hcl->c->tv.wcount = 0;
 	}
 }
 
@@ -286,7 +294,6 @@ static void pop_cblk (hcl_t* hcl)
 	 * of the owning function block */
 	HCL_ASSERT (hcl, hcl->c->cblk.depth - 1 >= hcl->c->fnblk.info[hcl->c->fnblk.depth].cblk_base);
 	hcl->c->cblk.depth--;
-	
 }
 /* ========================================================================= */
 
@@ -2081,6 +2088,8 @@ static int compile_throw (hcl_t* hcl, hcl_cnode_t* src)
 		return -1;
 	}
 
+	/* throw can be located anywhere, however, 
+	 * if there is no outer try-catch, it ends up with a fatal runtime error */
 	SWITCH_TOP_CFRAME (hcl, COP_COMPILE_OBJECT, val);
 
 	PUSH_SUBCFRAME (hcl, COP_EMIT_THROW, src);
