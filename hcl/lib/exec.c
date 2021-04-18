@@ -2124,15 +2124,12 @@ static HCL_INLINE int do_throw (hcl_t* hcl, hcl_oop_t val, hcl_ooi_t ip)
 		
 		/* exception not handled. terminate the active process */
 		/*terminate_process (hcl, hcl->processor->active); <- the vm cleanup code will do this */
-		
-		
-		
+
 		return -1;
 	}
 
-	// must rewind context....
+	/* must rewind context */
 	HCL_EXSTACK_POP_TO(hcl, catch_ctx, catch_ip);
-
 
 /* the below code is similar to do_return_from_block() */
 	hcl->ip = -1; /* mark context dead. saved into hcl->active_context->ip in SWITCH_ACTIVE_CONTEXT */
@@ -2848,8 +2845,8 @@ static int execute (hcl_t* hcl)
 	while (1)
 	{
 		/* stop requested or no more runnable process */
-		if (hcl->abort_req <= -1) goto oops;
-		if (hcl->abort_req && !hcl->no_proc_switch && switch_process_if_needed(hcl) == 0) break;
+		if (hcl->abort_req < 0) goto oops;
+		if (hcl->abort_req > 0 || (!hcl->no_proc_switch && switch_process_if_needed(hcl) == 0)) break;
 
 		if (HCL_UNLIKELY(hcl->ip >= HCL_FUNCTION_GET_CODE_SIZE(hcl->active_function)))
 		{
@@ -3787,6 +3784,7 @@ static int execute (hcl_t* hcl)
 
 				HCL_ASSERT(hcl, HCL_IS_CONTEXT(hcl, hcl->active_context));
 				hcl->last_retv = HCL_STACK_GETTOP(hcl); /* get the stack top */
+				do_return_from_block (hcl);
 				do_return_from_block (hcl);
 
 				break;

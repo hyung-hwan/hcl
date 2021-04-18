@@ -1499,6 +1499,68 @@ static HCL_INLINE int compile_else (hcl_t* hcl)
 
 /* ========================================================================= */
 
+static hcl_cnode_t* collect_local_vardcl (hcl_t* hcl, hcl_cnode_t* obj, hcl_oow_t tv_dup_check_start, hcl_oow_t* nvardcls)
+{
+	hcl_oow_t ndcls = 0;
+
+	while (obj && HCL_CNODE_IS_CONS(obj))
+	{
+		hcl_cnode_t* dcl;
+
+		dcl = HCL_CNODE_CONS_CAR(obj);
+		if (HCL_CNODE_IS_CONS_CONCODED(dcl, HCL_CONCODE_VLIST))
+		{
+			hcl_cnode_t* var;
+			do
+			{
+				var = HCL_CNODE_CONS_CAR(dcl);
+			#if 0
+				if (!HCL_CNODE_IS_SYMBOL(var))
+				{
+					hcl_setsynerrbfmt (hcl, HCL_SYNERR_ARGNAME, HCL_CNODE_GET_LOC(var), HCL_CNODE_GET_TOK(var), "local variable not a symbol");
+					return HCL_NULL;
+				}
+
+				if (HCL_CNODE_IS_SYMBOL(var) && HCL_CNODE_SYMBOL_SYNCODE(var) /* || HCL_OBJ_GET_FLAGS_KERNEL(var) >= 2 */)
+				{
+					hcl_setsynerrbfmt (hcl, HCL_SYNERR_BANNEDARGNAME, HCL_CNODE_GET_LOC(var), HCL_CNODE_GET_TOK(var), "special symbol not to be declared as a local variable");
+					return HCL_NULL;
+				}
+			#else
+				/* the above checks are not needed as the reader guarantees the followings */
+				HCL_ASSERT (hcl, HCL_CNODE_IS_SYMBOL(var) && !HCL_CNODE_SYMBOL_SYNCODE(var));
+			#endif
+
+				if (add_temporary_variable(hcl, HCL_CNODE_GET_TOK(var), tv_dup_check_start) <= -1) 
+				{
+					if (hcl->errnum == HCL_EEXIST)
+					{
+						hcl_setsynerrbfmt (hcl, HCL_SYNERR_ARGNAMEDUP, HCL_CNODE_GET_LOC(var), HCL_CNODE_GET_TOK(var), "duplicate local variable");
+					}
+					return HCL_NULL;
+				}
+				ndcls++;
+
+				dcl = HCL_CNODE_CONS_CDR(dcl);
+				if (!dcl) break;
+
+				if (!HCL_CNODE_IS_CONS(dcl)) 
+				{
+					hcl_setsynerrbfmt (hcl, HCL_SYNERR_DOTBANNED, HCL_CNODE_GET_LOC(dcl), HCL_CNODE_GET_TOK(dcl), "redundant cdr in local variable list");
+					return HCL_NULL;
+				}
+			}
+			while (1);
+
+			obj = HCL_CNODE_CONS_CDR(obj);
+		}
+		else break;
+	}
+
+	*nvardcls = ndcls;
+	return obj;
+}
+
 static int compile_lambda (hcl_t* hcl, hcl_cnode_t* src, int defun)
 {
 	hcl_cnode_t* cmd, * obj, * args;
@@ -1565,7 +1627,7 @@ static int compile_lambda (hcl_t* hcl, hcl_cnode_t* src, int defun)
 	HCL_ASSERT (hcl, args != HCL_NULL);
 	if (HCL_CNODE_IS_ELIST_CONCODED(args, HCL_CONCODE_XLIST))
 	{
-		/* no argument - (lambda () (+ 10 20)) */
+		/* empty list - no argument - (lambda () (+ 10 20)) */
 		nargs = 0;
 	}
 	else if (!HCL_CNODE_IS_CONS(args))
@@ -1628,65 +1690,12 @@ static int compile_lambda (hcl_t* hcl, hcl_cnode_t* src, int defun)
 		return -1;
 	}
 
-	ntmprs = nargs;  
 	obj = HCL_CNODE_CONS_CDR(obj);
-
 	tv_dup_start = hcl->c->tv.s.len;
-	while (obj && HCL_CNODE_IS_CONS(obj))
-	{
-		hcl_cnode_t* dcl;
+	obj = collect_local_vardcl(hcl, obj, tv_dup_start, &ntmprs);
+	if (!obj) return -1;
 
-		dcl = HCL_CNODE_CONS_CAR(obj);
-		if (HCL_CNODE_IS_CONS_CONCODED(dcl, HCL_CONCODE_VLIST))
-		{
-			hcl_cnode_t* var;
-			do
-			{
-				var = HCL_CNODE_CONS_CAR(dcl);
-			#if 0
-				if (!HCL_CNODE_IS_SYMBOL(var))
-				{
-					hcl_setsynerrbfmt (hcl, HCL_SYNERR_ARGNAME, HCL_CNODE_GET_LOC(var), HCL_CNODE_GET_TOK(var), "local variable not a symbol");
-					return -1;
-				}
-
-				if (HCL_CNODE_IS_SYMBOL(var) && HCL_CNODE_SYMBOL_SYNCODE(var) /* || HCL_OBJ_GET_FLAGS_KERNEL(var) >= 2 */)
-				{
-					hcl_setsynerrbfmt (hcl, HCL_SYNERR_BANNEDARGNAME, HCL_CNODE_GET_LOC(var), HCL_CNODE_GET_TOK(var), "special symbol not to be declared as a local variable");
-					return -1;
-				}
-			#else
-				/* the above checks are not needed as the reader guarantees the followings */
-				HCL_ASSERT (hcl, HCL_CNODE_IS_SYMBOL(var) && !HCL_CNODE_SYMBOL_SYNCODE(var));
-			#endif
-
-				if (add_temporary_variable(hcl, HCL_CNODE_GET_TOK(var), tv_dup_start) <= -1) 
-				{
-					if (hcl->errnum == HCL_EEXIST)
-					{
-						hcl_setsynerrbfmt (hcl, HCL_SYNERR_ARGNAMEDUP, HCL_CNODE_GET_LOC(var), HCL_CNODE_GET_TOK(var), "duplicate local variable");
-					}
-					return -1;
-				}
-				ntmprs++;
-
-				dcl = HCL_CNODE_CONS_CDR(dcl);
-				if (!dcl) break;
-
-				if (!HCL_CNODE_IS_CONS(dcl)) 
-				{
-					hcl_setsynerrbfmt (hcl, HCL_SYNERR_DOTBANNED, HCL_CNODE_GET_LOC(dcl), HCL_CNODE_GET_TOK(dcl), "redundant cdr in local variable list");
-					return -1;
-				}
-			}
-			while (1);
-
-			obj = HCL_CNODE_CONS_CDR(obj);
-		}
-		else break;
-	}
-
-	/* ntmprs: number of temporary variables including arguments */
+	ntmprs += nargs; /* ntmprs: number of temporary variables including arguments */
 	HCL_ASSERT (hcl, ntmprs == hcl->c->tv.wcount - saved_tv_wcount);
 	if (ntmprs > MAX_CODE_NBLKTMPRS)
 	{
@@ -1996,11 +2005,12 @@ static HCL_INLINE int compile_catch (hcl_t* hcl)
 		return -1;
 	}
 
-	patch_nearest_post_try (hcl, &jump_inst_pos);
+	/* jump_inst_pos hold the instruction pointer that skips the catch block at the end of the try block */
+	patch_nearest_post_try (hcl, &jump_inst_pos); 
 
 /* TODO: HCL_TRAIT_INTERACTIVE??? */
 /* TODO: nargs -> 1 ntmprs  -> 1 */
-
+		
 	SWITCH_TOP_CFRAME (hcl, COP_COMPILE_OBJECT_LIST, obj);
 
 	PUSH_SUBCFRAME (hcl, COP_POST_CATCH, cmd);
