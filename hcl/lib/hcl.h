@@ -642,7 +642,7 @@ struct hcl_context_t
 	hcl_oop_t          slot[1]; /* stack */
 };
 
-#define HCL_PROCESS_NAMED_INSTVARS 12
+#define HCL_PROCESS_NAMED_INSTVARS 13
 typedef struct hcl_process_t hcl_process_t;
 typedef struct hcl_process_t* hcl_oop_process_t;
 

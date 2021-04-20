@@ -1904,9 +1904,6 @@ static int compile_try (hcl_t* hcl, hcl_cnode_t* src)
 	if (push_cblk(hcl, HCL_CNODE_GET_LOC(src), HCL_CBLK_TYPE_TRY) <= -1) return -1;
 
 /* TODO: HCL_TRAIT_INTERACTIVE??? */
-#if 0
-	if (emit_double_param_instruction(hcl, HCL_CODE_MAKE_BLOCK, 0, 0, HCL_CNODE_GET_LOC(cmd)) <= -1) return -1;
-	#endif
 
 	jump_inst_pos = hcl->code.bc.len;
 	if (emit_single_param_instruction(hcl, HCL_CODE_TRY_ENTER, MAX_CODE_JUMP, HCL_CNODE_GET_LOC(cmd)) <= -1) return -1;
@@ -1941,7 +1938,6 @@ static HCL_INLINE int patch_nearest_post_try (hcl_t* hcl, hcl_ooi_t* catch_skip_
 		if (emit_byte_instruction(hcl, HCL_CODE_PUSH_NIL, HCL_CNODE_GET_LOC(cf->operand)) <= -1) return -1;
 	}
 
-	
 	if (emit_byte_instruction(hcl, HCL_CODE_TRY_EXIT, HCL_CNODE_GET_LOC(cf->operand)) <= -1) return -1;
 
 	*catch_skip_jip = hcl->code.bc.len; 
@@ -1956,24 +1952,6 @@ static HCL_INLINE int patch_nearest_post_try (hcl_t* hcl, hcl_ooi_t* catch_skip_
 		return -1;
 	}
 	patch_long_jump (hcl, jip, block_code_size); /* patch TRY_ENTER */
-
-#if 0
-	/* beginning of the elif/else block code */
-	/* to drop the result of the conditional when the conditional is false */
-	if (emit_byte_instruction (hcl, HCL_CODE_POP_STACKTOP, HCL_CNODE_GET_LOC(cf->operand)) <= -1) return -1; 
-#endif
-
-#if 0
-	/* this is the actual beginning */
-	HCL_ASSERT (hcl, hcl->code.bc.len < HCL_SMOOI_MAX);
-	body_pos = hcl->code.bc.len;
-
-	/* modify the POST_TRY frame */
-	HCL_ASSERT (hcl, cf->opcode == COP_POST_TRY);
-	HCL_ASSERT (hcl, cf->operand != HCL_NULL);
-	cf->u.post_try_catch.body_pos = body_pos;
-	cf->u.post_try_catch.jump_inst_pos = jump_inst_pos;
-#endif
 
 	return 0;
 }
