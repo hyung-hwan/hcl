@@ -555,7 +555,6 @@ static HCL_INLINE void sleep_active_process (hcl_t* hcl, int state)
 
 static HCL_INLINE void wake_process (hcl_t* hcl, hcl_oop_process_t proc)
 {
-
 #if defined(HCL_DEBUG_VM_PROCESSOR)
 	HCL_LOG2 (hcl, HCL_LOG_IC | HCL_LOG_DEBUG, "Processor - process[%zd] %hs->RUNNING in wake_process\n", HCL_OOP_TO_SMOOI(proc->id), proc_state_to_string(HCL_OOP_TO_SMOOI(proc->state)));
 #endif
@@ -3784,7 +3783,6 @@ static int execute (hcl_t* hcl)
 
 				HCL_ASSERT(hcl, HCL_IS_CONTEXT(hcl, hcl->active_context));
 				hcl->last_retv = HCL_STACK_GETTOP(hcl); /* get the stack top */
-				do_return_from_block (hcl);
 				do_return_from_block (hcl);
 
 				break;
