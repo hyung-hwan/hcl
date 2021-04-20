@@ -1499,7 +1499,7 @@ static HCL_INLINE int compile_else (hcl_t* hcl)
 
 /* ========================================================================= */
 
-static hcl_cnode_t* collect_local_vardcl (hcl_t* hcl, hcl_cnode_t* obj, hcl_oow_t tv_dup_check_start, hcl_oow_t* nvardcls)
+static int collect_local_vardcl (hcl_t* hcl, hcl_cnode_t* obj, hcl_cnode_t** nextobj, hcl_oow_t tv_dup_check_start, hcl_oow_t* nvardcls)
 {
 	hcl_oow_t ndcls = 0;
 
@@ -1518,13 +1518,13 @@ static hcl_cnode_t* collect_local_vardcl (hcl_t* hcl, hcl_cnode_t* obj, hcl_oow_
 				if (!HCL_CNODE_IS_SYMBOL(var))
 				{
 					hcl_setsynerrbfmt (hcl, HCL_SYNERR_ARGNAME, HCL_CNODE_GET_LOC(var), HCL_CNODE_GET_TOK(var), "local variable not a symbol");
-					return HCL_NULL;
+					return -1;
 				}
 
 				if (HCL_CNODE_IS_SYMBOL(var) && HCL_CNODE_SYMBOL_SYNCODE(var) /* || HCL_OBJ_GET_FLAGS_KERNEL(var) >= 2 */)
 				{
 					hcl_setsynerrbfmt (hcl, HCL_SYNERR_BANNEDARGNAME, HCL_CNODE_GET_LOC(var), HCL_CNODE_GET_TOK(var), "special symbol not to be declared as a local variable");
-					return HCL_NULL;
+					return -1;
 				}
 			#else
 				/* the above checks are not needed as the reader guarantees the followings */
@@ -1537,7 +1537,7 @@ static hcl_cnode_t* collect_local_vardcl (hcl_t* hcl, hcl_cnode_t* obj, hcl_oow_
 					{
 						hcl_setsynerrbfmt (hcl, HCL_SYNERR_ARGNAMEDUP, HCL_CNODE_GET_LOC(var), HCL_CNODE_GET_TOK(var), "duplicate local variable");
 					}
-					return HCL_NULL;
+					return -1;
 				}
 				ndcls++;
 
@@ -1547,7 +1547,7 @@ static hcl_cnode_t* collect_local_vardcl (hcl_t* hcl, hcl_cnode_t* obj, hcl_oow_
 				if (!HCL_CNODE_IS_CONS(dcl)) 
 				{
 					hcl_setsynerrbfmt (hcl, HCL_SYNERR_DOTBANNED, HCL_CNODE_GET_LOC(dcl), HCL_CNODE_GET_TOK(dcl), "redundant cdr in local variable list");
-					return HCL_NULL;
+					return -1;
 				}
 			}
 			while (1);
@@ -1558,7 +1558,8 @@ static hcl_cnode_t* collect_local_vardcl (hcl_t* hcl, hcl_cnode_t* obj, hcl_oow_
 	}
 
 	*nvardcls = ndcls;
-	return obj;
+	*nextobj = obj;
+	return 0;
 }
 
 static int compile_lambda (hcl_t* hcl, hcl_cnode_t* src, int defun)
@@ -1692,8 +1693,7 @@ static int compile_lambda (hcl_t* hcl, hcl_cnode_t* src, int defun)
 
 	obj = HCL_CNODE_CONS_CDR(obj);
 	tv_dup_start = hcl->c->tv.s.len;
-	obj = collect_local_vardcl(hcl, obj, tv_dup_start, &ntmprs);
-	if (!obj) return -1;
+	if (collect_local_vardcl(hcl, obj, &obj, tv_dup_start, &ntmprs) <= -1) return -1;
 
 	ntmprs += nargs; /* ntmprs: number of temporary variables including arguments */
 	HCL_ASSERT (hcl, ntmprs == hcl->c->tv.wcount - saved_tv_wcount);
@@ -1958,7 +1958,7 @@ static HCL_INLINE int patch_nearest_post_try (hcl_t* hcl, hcl_ooi_t* catch_skip_
 
 static HCL_INLINE int compile_catch (hcl_t* hcl)
 {
-	hcl_cnode_t* cmd, * obj, * src;
+	hcl_cnode_t* cmd, * obj, * src, * exarg;
 	hcl_cframe_t* cf;
 	hcl_ooi_t jump_inst_pos;
 
@@ -1974,7 +1974,8 @@ static HCL_INLINE int compile_catch (hcl_t* hcl)
 
 	if (!obj)
 	{
-		hcl_setsynerrbfmt (hcl, HCL_SYNERR_ARGCOUNT, HCL_CNODE_GET_LOC(src), HCL_NULL, "no condition in %.*js", HCL_CNODE_GET_TOKLEN(cmd), HCL_CNODE_GET_TOKPTR(cmd));
+/* TODO: change error code */
+		hcl_setsynerrbfmt (hcl, HCL_SYNERR_VARNAME, HCL_CNODE_GET_LOC(src), HCL_NULL, "no exception variable in %.*js", HCL_CNODE_GET_TOKLEN(cmd), HCL_CNODE_GET_TOKPTR(cmd));
 		return -1;
 	}
 	else if (!HCL_CNODE_IS_CONS(obj))
@@ -1983,12 +1984,26 @@ static HCL_INLINE int compile_catch (hcl_t* hcl)
 		return -1;
 	}
 
+	exarg = HCL_CNODE_CONS_CAR(obj);
+	if (HCL_CNODE_IS_ELIST_CONCODED(exarg, HCL_CONCODE_XLIST) || !HCL_CNODE_IS_CONS(exarg) || hcl_countcnodecons(hcl, exarg) != 1)
+	{
+		hcl_setsynerrbfmt (hcl, HCL_SYNERR_VARNAME, HCL_CNODE_GET_LOC(exarg), HCL_NULL, "not single exception variable in %.*js", HCL_CNODE_GET_TOKLEN(cmd), HCL_CNODE_GET_TOKPTR(cmd));
+		return -1;
+	}
+
+	exarg = HCL_CNODE_CONS_CAR(exarg);
+	if (!HCL_CNODE_IS_SYMBOL(exarg) || HCL_CNODE_SYMBOL_SYNCODE(exarg))
+	{
+		hcl_setsynerrbfmt (hcl, HCL_SYNERR_VARNAME, HCL_CNODE_GET_LOC(exarg), HCL_CNODE_GET_TOK(exarg), "invalid exception variable name in %.*js", HCL_CNODE_GET_TOKLEN(cmd), HCL_CNODE_GET_TOKPTR(cmd));
+		return -1;
+	}
+/* TODO: add the exception variable to the local variable list... increase the number of local variables ... etc */
+
+	obj = HCL_CNODE_CONS_CDR(obj);
+
 	/* jump_inst_pos hold the instruction pointer that skips the catch block at the end of the try block */
 	patch_nearest_post_try (hcl, &jump_inst_pos); 
 
-/* TODO: HCL_TRAIT_INTERACTIVE??? */
-/* TODO: nargs -> 1 ntmprs  -> 1 */
-		
 	SWITCH_TOP_CFRAME (hcl, COP_COMPILE_OBJECT_LIST, obj);
 
 	PUSH_SUBCFRAME (hcl, COP_POST_CATCH, cmd);
