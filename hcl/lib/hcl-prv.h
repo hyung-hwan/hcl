@@ -315,11 +315,18 @@ struct hcl_cframe_t
 			hcl_ooi_t jump_inst_pos;
 		} post_or;
 
-		/* COP_POST_TRY, COP_POST_CATCH */
+		/* COP_POST_TRY */
 		struct
 		{
 			hcl_oow_t jump_inst_pos;
-		} post_try_catch;
+		} post_try;
+
+		/* COP_POST_CATCH */
+		struct
+		{
+			hcl_oow_t jump_inst_pos;
+			hcl_oow_t exarg_offset;
+		} post_catch;
 
 		/* COP_COMPILE_ARRAY_LIST, COP_POP_INTO_ARRAY, COP_EMIT_MAKE_ARRAY */
 		struct
@@ -382,6 +389,7 @@ struct hcl_fnblk_info_t
 {
 	hcl_oow_t tmprlen;
 	hcl_oow_t tmprcnt;
+	hcl_oow_t make_inst_pos;
 	hcl_oow_t lfbase;
 
 	hcl_ooi_t cblk_base;
