@@ -159,7 +159,7 @@ static int __find_word_in_string (const hcl_oocs_t* haystack, const hcl_oocs_t* 
 	if (found != HCL_TYPE_MAX(hcl_oow_t)) 
 	{
 		if (xindex) *xindex = found;
-		return 0; /* foudn */
+		return 0; /* found */
 	}
 
 	return -1; /* not found */
@@ -181,6 +181,16 @@ static int add_temporary_variable (hcl_t* hcl, const hcl_oocs_t* name, hcl_oow_t
 	x = copy_string_to(hcl, name, &hcl->c->tv.s, &hcl->c->tv.capa, 1, ' ');
 	if (HCL_LIKELY(x >= 0)) hcl->c->tv.wcount++;
 	return x;
+}
+
+static int kill_temporary_variable (hcl_t* hcl, hcl_oow_t start_wpos, hcl_oow_t end_wpos)
+{
+	/* this function doesn't remove the added temporary variable nor does it lower the word count.
+	 * it simply changes a word at the given postion to some garbage characters so that
+	 * the variable can't be found in the search */
+
+/* TODO: .... */
+	 return 0;
 }
 
 static int find_temporary_variable_backward (hcl_t* hcl, const hcl_oocs_t* name, hcl_oow_t* index)
@@ -1997,7 +2007,16 @@ static HCL_INLINE int compile_catch (hcl_t* hcl)
 		hcl_setsynerrbfmt (hcl, HCL_SYNERR_VARNAME, HCL_CNODE_GET_LOC(exarg), HCL_CNODE_GET_TOK(exarg), "invalid exception variable name in %.*js", HCL_CNODE_GET_TOKLEN(cmd), HCL_CNODE_GET_TOKPTR(cmd));
 		return -1;
 	}
-/* TODO: add the exception variable to the local variable list... increase the number of local variables ... etc */
+
+/* -------------------------------------------- */
+/*
+ TODO: do implement this part
+	/* add the exception variable to the local variable list... increase the number of local variables */
+	if (add_temporary_variable(hcl, HCL_CNODE_GET_TOK(exarg), hcl->c->tv.s.len) <= -1) return -1;
+	hcl->c->fnblk.info[hcl->c->fnblk.depth].tmprlen = hcl->c->tv.s.len;
+	hcl->c->fnblk.info[hcl->c->fnblk.depth].tmprcnt =  hcl->c->tv.wcount;
+/*
+/* -------------------------------------------- */
 
 	obj = HCL_CNODE_CONS_CDR(obj);
 
