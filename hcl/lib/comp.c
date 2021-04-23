@@ -633,31 +633,34 @@ static HCL_INLINE void patch_double_long_params (hcl_t* hcl, hcl_ooi_t ip, hcl_o
 
 static int emit_indexed_variable_access (hcl_t* hcl, hcl_oow_t index, hcl_oob_t baseinst1, hcl_oob_t baseinst2, const hcl_ioloc_t* srcloc)
 {
-	if (hcl->c->fnblk.depth >= 0)
-	{
-		hcl_oow_t i;
+	hcl_oow_t i;
 
-		/* if a temporary variable is accessed inside a block,
-		 * use a special instruction to indicate it */
-		HCL_ASSERT (hcl, index < hcl->c->fnblk.info[hcl->c->fnblk.depth].tmprcnt);
-		for (i = hcl->c->fnblk.depth; i > 0; i--) /* excluded the top level -- TODO: change this code depending on global variable handling */
+	HCL_ASSERT (hcl, hcl->c->fnblk.depth >= 0);
+
+	/* if a temporary variable is accessed inside a block,
+	 * use a special instruction to indicate it */
+	HCL_ASSERT (hcl, index < hcl->c->fnblk.info[hcl->c->fnblk.depth].tmprcnt);
+	for (i = hcl->c->fnblk.depth; i >= 0; i--)
+	{
+		hcl_oow_t parent_tmprcnt;
+
+		parent_tmprcnt = (i > 0)? hcl->c->fnblk.info[i - 1].tmprcnt: 0;
+		if (index >= parent_tmprcnt)
 		{
-			if (index >= hcl->c->fnblk.info[i - 1].tmprcnt)
-			{
-				hcl_oow_t ctx_offset, index_in_ctx;
-				ctx_offset = hcl->c->fnblk.depth - i;
-				index_in_ctx = index - hcl->c->fnblk.info[i - 1].tmprcnt;
-				/* ctx_offset 0 means the current context.
-				 *            1 means current->home.
-				 *            2 means current->home->home. 
-				 * index_in_ctx is a relative index within the context found.
-				 */
-				if (emit_double_param_instruction(hcl, baseinst1, ctx_offset, index_in_ctx, srcloc) <= -1) return -1;
-				return 0;
-			}
+			hcl_oow_t ctx_offset, index_in_ctx;
+			ctx_offset = hcl->c->fnblk.depth - i;
+			index_in_ctx = index - parent_tmprcnt;
+			/* ctx_offset 0 means the current context.
+			 *            1 means current->home.
+			 *            2 means current->home->home. 
+			 * index_in_ctx is a relative index within the context found.
+			 */
+			if (emit_double_param_instruction(hcl, baseinst1, ctx_offset, index_in_ctx, srcloc) <= -1) return -1;
+			return 0;
 		}
 	}
 
+/* THIS PART MUST NOT BE REACHED */
 	/* TODO: top-level... verify this. this will vary depending on how i implement the top-level and global variables... */
 	if (emit_single_param_instruction(hcl, baseinst2, index, srcloc) <= -1) return -1;
 	return 0;

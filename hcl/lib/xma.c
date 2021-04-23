@@ -26,7 +26,7 @@
 
 #include <hcl-xma.h>
 #include "hcl-prv.h"
-#include <assert.h> /* TODO: replace assert() with builtin substition */
+#include <assert.h> /* TODO: replace assert() with HCL_ASSERT() or something */
 
 
 /* 
