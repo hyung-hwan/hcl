@@ -659,7 +659,7 @@ static int emit_indexed_variable_access (hcl_t* hcl, hcl_oow_t index, hcl_oob_t 
 	}
 
 	/* TODO: top-level... verify this. this will vary depending on how i implement the top-level and global variables... */
-	if (emit_single_param_instruction (hcl, baseinst2, index, srcloc) <= -1) return -1;
+	if (emit_single_param_instruction(hcl, baseinst2, index, srcloc) <= -1) return -1;
 	return 0;
 }
 
@@ -2012,7 +2012,7 @@ static HCL_INLINE int compile_catch (hcl_t* hcl)
 	hcl_cnode_t* cmd, * obj, * src, * exarg;
 	hcl_cframe_t* cf;
 	hcl_ooi_t jump_inst_pos;
-	hcl_oow_t exarg_offset;
+	hcl_oow_t exarg_offset, exarg_index;
 
 	cf = GET_TOP_CFRAME(hcl);
 	HCL_ASSERT (hcl, cf->opcode == COP_COMPILE_CATCH);
@@ -2053,9 +2053,10 @@ static HCL_INLINE int compile_catch (hcl_t* hcl)
 /* -------------------------------------------- */
 	/* add the exception variable to the local variable list... increase the number of local variables */
 	exarg_offset = hcl->c->tv.s.len + 1; /* when the variable name is added, its offset will be the current length + 1 for a space character added */
+	exarg_index = hcl->c->tv.wcount;
 	if (add_temporary_variable(hcl, HCL_CNODE_GET_TOK(exarg), hcl->c->tv.s.len) <= -1) return -1;
 	HCL_ASSERT (hcl, hcl->c->fnblk.info[hcl->c->fnblk.depth].tmprlen == hcl->c->tv.s.len - HCL_CNODE_GET_TOKLEN(exarg) - 1);
-	HCL_ASSERT (hcl, hcl->c->fnblk.info[hcl->c->fnblk.depth].tmprcnt == hcl->c->tv.wcount - 1);
+	HCL_ASSERT (hcl, hcl->c->fnblk.info[hcl->c->fnblk.depth].tmprcnt == exarg_index);
 	hcl->c->fnblk.info[hcl->c->fnblk.depth].tmprlen = hcl->c->tv.s.len;
 	hcl->c->fnblk.info[hcl->c->fnblk.depth].tmprcnt = hcl->c->tv.wcount;
 /* -------------------------------------------- */
@@ -2064,6 +2065,9 @@ static HCL_INLINE int compile_catch (hcl_t* hcl)
 
 	/* jump_inst_pos hold the instruction pointer that skips the catch block at the end of the try block */
 	patch_nearest_post_try (hcl, &jump_inst_pos); 
+
+	/* produce an instruction to store the exception value to an exception variable pushed by the 'throw' instruction */
+	if (emit_indexed_variable_access(hcl, exarg_index, HCL_CODE_POP_INTO_CTXTEMPVAR_0, HCL_CODE_POP_INTO_TEMPVAR_0, HCL_CNODE_GET_LOC(src)) <= -1) return -1;
 
 	SWITCH_TOP_CFRAME (hcl, COP_COMPILE_OBJECT_LIST, obj);
 
@@ -3682,6 +3686,7 @@ int hcl_compile (hcl_t* hcl, hcl_cnode_t* obj)
 {
 	hcl_oow_t saved_bc_len, saved_lit_len;
 	hcl_bitmask_t log_default_type_mask;
+	hcl_fnblk_info_t top_fnblk_saved;
 
 	HCL_ASSERT (hcl, GET_TOP_CFRAME_INDEX(hcl) < 0);
 
@@ -3690,15 +3695,6 @@ int hcl_compile (hcl_t* hcl, hcl_cnode_t* obj)
 
 	log_default_type_mask = hcl->log.default_type_mask;
 	hcl->log.default_type_mask |= HCL_LOG_COMPILER;
-
-	HCL_ASSERT (hcl, hcl->c->tv.s.len == 0);
-	HCL_ASSERT (hcl, hcl->c->tv.wcount == 0);
-	HCL_ASSERT (hcl, hcl->c->fnblk.depth == -1);
-	HCL_ASSERT (hcl, hcl->c->cblk.depth == -1);
-
-/* TODO: in case i implement all global variables as block arguments at the top level...what should i do? */
-
-	
 
 	/* 
 	 * In the non-INTERACTIVE mode, the literal frame base doesn't matter.
@@ -3730,9 +3726,23 @@ int hcl_compile (hcl_t* hcl, hcl_cnode_t* obj)
 	 *  @0         (a)
 	 *  @1         (set-a) 
 	 */
+
+/* TODO: in case i implement all global variables as block arguments at the top level...what should i do? */
+	HCL_ASSERT (hcl, hcl->c->cblk.depth == -1);
+
+	if (hcl->c->fnblk.depth <= -1)
+	{
+		HCL_ASSERT (hcl, hcl->c->fnblk.depth == -1);
+		HCL_ASSERT (hcl, hcl->c->tv.s.len == 0);
+		HCL_ASSERT (hcl, hcl->c->tv.wcount == 0);
+
 /* TODO: HCL_TYPE_MAX(hcl_oow_t) as make_inst_pos is wrong for this top-level. fix it later ... 
  * finxing it is needed to support exception variable at the top-level... */
-	if (push_fnblk(hcl, HCL_NULL, hcl->c->tv.wcount, hcl->c->tv.s.len, HCL_TYPE_MAX(hcl_oow_t), 0) <= -1) return -1;
+		/* keep a virtual function block for the top-level compilation */
+		if (push_fnblk(hcl, HCL_NULL, hcl->c->tv.wcount, hcl->c->tv.s.len, HCL_TYPE_MAX(hcl_oow_t), 0) <= -1) return -1;
+	}
+	top_fnblk_saved = hcl->c->fnblk.info[0];
+	HCL_ASSERT (hcl, hcl->c->fnblk.depth == 0); /* ensure the virtual function block is added */
 
 	PUSH_CFRAME (hcl, COP_COMPILE_OBJECT, obj);
 
@@ -3911,11 +3921,13 @@ int hcl_compile (hcl_t* hcl, hcl_cnode_t* obj)
 	if (emit_byte_instruction(hcl, HCL_CODE_POP_STACKTOP, HCL_NULL) <= -1) goto oops;
 
 	HCL_ASSERT (hcl, GET_TOP_CFRAME_INDEX(hcl) < 0);
-	HCL_ASSERT (hcl, hcl->c->tv.s.len == 0);
-	HCL_ASSERT (hcl, hcl->c->tv.wcount == 0);
+	HCL_ASSERT (hcl, hcl->c->tv.s.len >= hcl->c->fnblk.info[0].tmprlen);
+	HCL_ASSERT (hcl, hcl->c->tv.wcount >= hcl->c->fnblk.info[0].tmprcnt);
 	HCL_ASSERT (hcl, hcl->c->cblk.depth == -1); /* no control blocks expected at this point */
-	HCL_ASSERT (hcl, hcl->c->fnblk.depth == 0);
-	pop_fnblk (hcl);
+
+	HCL_ASSERT (hcl, hcl->c->fnblk.depth == 0); /* ensure the virtual function block be the only one left */
+	hcl->code.ngtmprs = hcl->c->fnblk.info[0].tmprcnt; /* populate the number of global temporary variables */
+	/*pop_fnblk (hcl);  keep the top-level virtual function block by keeping this line commented out */
 
 	hcl ->log.default_type_mask = log_default_type_mask;
 	return 0;
@@ -3932,8 +3944,15 @@ oops:
 	/* quick way to call pop_cblk() and pop_fnblk() as many times as necessary */
 	hcl->c->tv.s.len = 0;
 	hcl->c->tv.wcount = 0;
-	hcl->c->fnblk.depth = -1;
 	hcl->c->cblk.depth = -1;
+
+	/*hcl->c->fnblk.depth = -1;*/
+	if (hcl->c->fnblk.depth > 0) 
+	{
+		hcl->c->fnblk.depth = 0;
+		hcl->c->fnblk.info[0] = top_fnblk_saved;
+	}
+	
 
 	return -1;
 }

@@ -2075,37 +2075,6 @@ static HCL_INLINE int do_throw (hcl_t* hcl, hcl_oop_t val, hcl_ooi_t ip)
 	hcl_oop_context_t catch_ctx;
 	hcl_ooi_t catch_ip;
 
-#if 0
-	hcl_ooi_t flags;
-
-	ctx = hcl->active_context;
-	while ((hcl_oop_t)ctx != hcl->_nil)
-	{
-		flags = HCL_OOP_TO_SMOOI(ctx->flags);
-		if (flags &  1) /* TODO: use an enumerator instead of 1 */
-		{
-			return activate_block_for_throw_catch (hcl, (hcl_oop_block_t)ctx->slot[0], val, ctx->sender);
-/* TOOD: arrange to unwind.... */
-		}
-
-		ctx = ctx->sender;
-	}
-	
-	if (hcl->active_function->dbgi != hcl->_nil)
-	{
-		hcl_dbgi_t* dbgi;
-		dbgi = (hcl_dbgi_t*)HCL_OBJ_GET_BYTE_SLOT(hcl->active_function->dbgi);
-		HCL_LOG2 (hcl, HCL_LOG_IC | HCL_LOG_WARN, "exception not handled %js:%zu", (dbgi[ip].fname? dbgi[ip].fname: oocstr_dash), dbgi[ip].sline);
-	}
-	else
-	{
-		HCL_LOG0 (hcl, HCL_LOG_IC | HCL_LOG_WARN, "exception not handled");
-	}
-	
-	/* exception not handled. terminate the active process */
-	terminate_process (hcl, hcl->processor->active);
-	return 0;
-#else
 	if (HCL_EXSTACK_ISEMPTY(hcl))
 	{
 		if (hcl->active_function->dbgi != hcl->_nil)
@@ -2134,8 +2103,10 @@ static HCL_INLINE int do_throw (hcl_t* hcl, hcl_oop_t val, hcl_ooi_t ip)
 	hcl->ip = -1; /* mark context dead. saved into hcl->active_context->ip in SWITCH_ACTIVE_CONTEXT */
 	SWITCH_ACTIVE_CONTEXT (hcl, catch_ctx);
 	hcl->ip = catch_ip; /* override the instruction pointer */
+
+	/* push the exception value to the stack */
+	HCL_STACK_PUSH (hcl, val);
 	return 0;
-#endif
 }
 
 /* ------------------------------------------------------------------------- */
@@ -3270,7 +3241,7 @@ static int execute (hcl_t* hcl)
 				return_value = HCL_STACK_GETTOP(hcl);
 				HCL_STACK_POP (hcl);
 
-				if (do_throw (hcl, return_value, fetched_instruction_pointer) <= -1) goto oops;
+				if (do_throw(hcl, return_value, fetched_instruction_pointer) <= -1) goto oops;
 				break;
 			/* -------------------------------------------------------- */
 
@@ -3929,7 +3900,7 @@ hcl_oop_t hcl_execute (hcl_t* hcl)
 	if (HCL_UNLIKELY(!func)) return HCL_NULL;
 
 	/* pass nil for the home context of the initial function */
-	fill_function_data (hcl, func, 0, 0, (hcl_oop_context_t)hcl->_nil, hcl->code.lit.arr->slot, hcl->code.lit.len);
+	fill_function_data (hcl, func, 0, hcl->code.ngtmprs, (hcl_oop_context_t)hcl->_nil, hcl->code.lit.arr->slot, hcl->code.lit.len);
 
 	hcl->initial_function = func; /* the initial function is ready */
 

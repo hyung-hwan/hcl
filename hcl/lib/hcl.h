@@ -1543,8 +1543,10 @@ struct hcl_t
 			hcl_oow_t len;
 		} lit;
 
-		/* array that hold the location of the byte code emitted */
+		/* the cumulative number of temporaries collected at the global(top-level) level */
+		hcl_oow_t ngtmprs; 
 
+		/* array that holds the location of the byte code emitted */
 		hcl_dbgi_t* dbgi;
 	} code;
 
