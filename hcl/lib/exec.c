@@ -339,7 +339,7 @@ static HCL_INLINE hcl_oop_function_t make_function (hcl_t* hcl, hcl_oow_t lfsize
 	return func;
 }
 
-static HCL_INLINE void fill_function_data (hcl_t* hcl, hcl_oop_function_t func, hcl_ooi_t nargs, hcl_ooi_t ntmprs, hcl_oop_context_t homectx, const hcl_oop_t* lfptr, hcl_oow_t lfsize)
+static HCL_INLINE void fill_function_data (hcl_t* hcl, hcl_oop_function_t func, hcl_ooi_t ntmprs, hcl_ooi_t nargs, hcl_oop_context_t homectx, const hcl_oop_t* lfptr, hcl_oow_t lfsize)
 {
 	/* Although this function could be integrated into make_function(),
 	 * this function has been separated from make_function() to make GC handling simpler */
@@ -2313,13 +2313,13 @@ static hcl_oop_process_t start_initial_process (hcl_t* hcl, hcl_oop_context_t ct
 	return proc;
 }
 
-static int start_initial_process_and_context (hcl_t* hcl, hcl_ooi_t initial_ip)
+static int start_initial_process_and_context (hcl_t* hcl, hcl_ooi_t initial_ip, hcl_ooi_t ntmprs)
 {
 	hcl_oop_context_t ctx;
 	hcl_oop_process_t proc;
 
 	/* create the initial context over the initial function */
-	ctx = make_context(hcl, 0); /* no temporary variables */
+	ctx = make_context(hcl, ntmprs); /* no temporary variables */
 	if (HCL_UNLIKELY(!ctx)) return -1;
 
 	hcl->ip = initial_ip;
@@ -2328,7 +2328,7 @@ static int start_initial_process_and_context (hcl_t* hcl, hcl_ooi_t initial_ip)
 	ctx->flags = HCL_SMOOI_TO_OOP(0);
 	ctx->ip = HCL_SMOOI_TO_OOP(initial_ip);
 	ctx->nargs = HCL_SMOOI_TO_OOP(0);
-	ctx->ntmprs = HCL_SMOOI_TO_OOP(0);
+	ctx->ntmprs = HCL_SMOOI_TO_OOP(ntmprs);
 	ctx->origin = ctx; /* the origin of the initial context is itself as this is created over the initial function */
 	ctx->home = hcl->initial_function->home; /* this should be nil */
 	ctx->sender = (hcl_oop_context_t)hcl->_nil;
@@ -2946,7 +2946,7 @@ static int execute (hcl_t* hcl)
 				b1 = bcode & 0x7; /* low 3 bits */
 			handle_tempvar:
 
-				/* when CTXTEMPVAR inststructions are used, the above 
+				/* when CTXTEMPVAR instructions are used, the above 
 				 * instructions are used only for temporary access 
 				 * outside a block. i can assume that the temporary
 				 * variable index is pointing to one of temporaries
@@ -3795,7 +3795,7 @@ static int execute (hcl_t* hcl)
 			#endif
 				if (HCL_UNLIKELY(!func)) goto oops;
 
-				fill_function_data (hcl, func, b1, b2, hcl->active_context, &hcl->active_function->literal_frame[b3], b4);
+				fill_function_data (hcl, func, b2, b1, hcl->active_context, &hcl->active_function->literal_frame[b3], b4);
 
 				/* push the new function to the stack of the active context */
 				HCL_STACK_PUSH (hcl, (hcl_oop_t)func);
@@ -3900,7 +3900,7 @@ hcl_oop_t hcl_execute (hcl_t* hcl)
 	if (HCL_UNLIKELY(!func)) return HCL_NULL;
 
 	/* pass nil for the home context of the initial function */
-	fill_function_data (hcl, func, 0, hcl->code.ngtmprs, (hcl_oop_context_t)hcl->_nil, hcl->code.lit.arr->slot, hcl->code.lit.len);
+	fill_function_data (hcl, func, hcl->code.ngtmprs, 0, (hcl_oop_context_t)hcl->_nil, hcl->code.lit.arr->slot, hcl->code.lit.len);
 
 	hcl->initial_function = func; /* the initial function is ready */
 
@@ -3929,7 +3929,7 @@ hcl_oop_t hcl_execute (hcl_t* hcl)
 	}
 #endif
 
-	n = start_initial_process_and_context(hcl, 0); /*  set up the initial context over the initial function */
+	n = start_initial_process_and_context(hcl, 0, hcl->code.ngtmprs); /*  set up the initial context over the initial function */
 	if (n >= 0) 
 	{
 		hcl->last_retv = hcl->_nil;
