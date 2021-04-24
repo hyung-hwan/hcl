@@ -1396,7 +1396,7 @@ int hcl_server_proto_handle_request (hcl_server_proto_t* proto)
 			}
 
 			proto->worker->opstate = HCL_SERVER_WORKER_OPSTATE_COMPILE;
-			n = hcl_compile(proto->hcl, obj);
+			n = hcl_compile(proto->hcl, obj, HCL_COMPILE_CLEAR_CODE | HCL_COMPILE_CLEAR_FNBLK);
 			hcl_freecnode (proto->hcl, obj);
 			if (n <= -1)
 			{

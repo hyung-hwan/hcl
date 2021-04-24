@@ -1344,6 +1344,16 @@ struct hcl_dbgi_t
 #if defined(HCL_INCLUDE_COMPILER)
 typedef struct hcl_compiler_t hcl_compiler_t;
 typedef struct hcl_cnode_t hcl_cnode_t;
+
+enum hcl_compile_flag_t
+{
+	/* clear byte codes at the beginnign of hcl_compile() */
+	HCL_COMPILE_CLEAR_CODE  = (1 << 0),
+
+	/* clear the top-level function block at the end of hcl_compile() */
+	HCL_COMPILE_CLEAR_FNBLK = (1 << 1)
+};
+typedef enum hcl_compile_flag_t hcl_compile_flag_t;
 #endif
 
 #define HCL_ERRMSG_CAPA (2048)
@@ -2029,10 +2039,13 @@ HCL_EXPORT hcl_ooi_t hcl_proutufmt (
 	...
 );
 
+#if defined(HCL_INCLUDE_COMPILER)
 HCL_EXPORT int hcl_compile (
 	hcl_t*       hcl,
-	hcl_cnode_t* obj
+	hcl_cnode_t* obj,
+	int          flags
 );
+#endif
 
 /**
  * The hcl_decode() function decodes instructions from the position

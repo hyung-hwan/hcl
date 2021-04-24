@@ -83,9 +83,9 @@ static void fill_bigint_tables (hcl_t* hcl)
 	}
 }
 
-static void* alloc_heap (hcl_t* hcl, hcl_oow_t size)
+static void* alloc_heap (hcl_t* hcl, hcl_oow_t* size)
 {
-	return hcl_allocmem(hcl, size);
+	return hcl_allocmem(hcl, *size);
 }
 
 static void free_heap (hcl_t* hcl, void* ptr)

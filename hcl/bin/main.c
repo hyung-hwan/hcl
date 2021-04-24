@@ -677,6 +677,7 @@ int main (int argc, char* argv[])
 
 	const char* logopt = HCL_NULL;
 	hcl_oow_t heapsize = DEFAULT_HEAPSIZE;
+	int cflags;
 	int verbose = 0;
 
 #if defined(HCL_BUILD_DEBUG)
@@ -847,6 +848,8 @@ hcl_logufmt (hcl, HCL_LOG_WARN, fmt, ustr, 0x6789);
 	hcl_setoption (hcl, HCL_TRAIT, &trait);
 }
 #endif
+	cflags = 0;
+	if (xtn->reader_istty) cflags = HCL_COMPILE_CLEAR_CODE | HCL_COMPILE_CLEAR_FNBLK;
 
 	while (1)
 	{
@@ -882,17 +885,8 @@ count++;
 			goto oops;
 		}
 
-		if (xtn->reader_istty)
-		{
-			/* clear the byte code buffer */
-			/* TODO: create a proper function for this and call it */
-			hcl->code.bc.len = 0;
-			hcl->code.lit.len = 0;
-		}
-
 		if (verbose) hcl_prbfmt (hcl, "\n"); /* flush the output buffer by hcl_print above */
-
-		n = hcl_compile(hcl, obj);
+		n = hcl_compile(hcl, obj, cflags);
 		hcl_freecnode (hcl, obj); /* not needed any more */
 
 		if (n <= -1)

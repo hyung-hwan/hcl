@@ -3685,13 +3685,18 @@ static HCL_INLINE int emit_throw (hcl_t* hcl)
 
 /* ========================================================================= */
 
-int hcl_compile (hcl_t* hcl, hcl_cnode_t* obj)
+int hcl_compile (hcl_t* hcl, hcl_cnode_t* obj, int flags) 
 {
 	hcl_oow_t saved_bc_len, saved_lit_len;
 	hcl_bitmask_t log_default_type_mask;
 	hcl_fnblk_info_t top_fnblk_saved;
 
 	HCL_ASSERT (hcl, GET_TOP_CFRAME_INDEX(hcl) < 0);
+	if (flags & HCL_COMPILE_CLEAR_CODE)
+	{
+		hcl->code.bc.len = 0;
+		hcl->code.lit.len = 0;
+	}
 
 	saved_bc_len = hcl->code.bc.len;
 	saved_lit_len = hcl->code.lit.len;
@@ -3930,7 +3935,11 @@ int hcl_compile (hcl_t* hcl, hcl_cnode_t* obj)
 
 	HCL_ASSERT (hcl, hcl->c->fnblk.depth == 0); /* ensure the virtual function block be the only one left */
 	hcl->code.ngtmprs = hcl->c->fnblk.info[0].tmprcnt; /* populate the number of global temporary variables */
-	/*pop_fnblk (hcl);  keep the top-level virtual function block by keeping this line commented out */
+	if (flags & HCL_COMPILE_CLEAR_FNBLK)
+	{
+		pop_fnblk (hcl);
+		HCL_ASSERT (hcl, hcl->c->fnblk.depth == -1);
+	}
 
 	hcl ->log.default_type_mask = log_default_type_mask;
 	return 0;
