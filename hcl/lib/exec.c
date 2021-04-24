@@ -3761,7 +3761,7 @@ static int execute (hcl_t* hcl)
 			case HCL_CODE_MAKE_FUNCTION:
 			{
 				hcl_oop_function_t func;
-				hcl_oow_t b3, b4, i, j;
+				hcl_oow_t b3, b4;
 				hcl_oow_t joff;
 
 				/* b1 - number of block arguments
