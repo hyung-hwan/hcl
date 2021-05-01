@@ -1808,9 +1808,8 @@ void hcl_releaseiohandle (hcl_t* hcl, hcl_ooi_t io_handle)
 
 static int prepare_new_context (hcl_t* hcl, hcl_oop_block_t rcv_blk, hcl_ooi_t nargs, int nargs_offset, hcl_ooi_t extra_slots, int copy_args, hcl_oop_context_t* pnewctx)
 {
-	/* prepare a new block context for activation.
-	 * the receiver must be a block context which becomes the base
-	 * for a new block context. */
+	/* prepare a new block context for activation. the receiver must be a block
+	 * context which becomes the base for a new block context. */
 
 	hcl_oop_context_t blkctx;
 	hcl_ooi_t local_ntmprs, i;
@@ -1867,9 +1866,9 @@ static int prepare_new_context (hcl_t* hcl, hcl_oop_block_t rcv_blk, hcl_ooi_t n
 	if (HCL_LIKELY(copy_args))
 	{
 		/* copy the arguments to the stack */
-		for (i = 0; i < nargs; i++)
+		for (i = nargs_offset; i < nargs; i++)
 		{
-			blkctx->slot[i] = HCL_STACK_GETARG(hcl, nargs, i);
+			blkctx->slot[i - nargs_offset] = HCL_STACK_GETARG(hcl, nargs, i);
 		}
 	}
 
@@ -1889,7 +1888,9 @@ static HCL_INLINE int activate_block (hcl_t* hcl, hcl_ooi_t nargs)
 	rcv = (hcl_oop_block_t)HCL_STACK_GETRCV(hcl, nargs);
 	HCL_ASSERT (hcl, HCL_IS_BLOCK(hcl, rcv));
 
-	x = prepare_new_context(hcl, rcv,
+	x = prepare_new_context(
+		hcl,
+		rcv,
 		nargs, /* nargs */
 		0, /* nargs_offset */
 		0, /* extra_slots */
@@ -2006,69 +2007,6 @@ static HCL_INLINE int call_primitive (hcl_t* hcl, hcl_ooi_t nargs)
 }
 
 /* ------------------------------------------------------------------------- */
-
-static HCL_INLINE int call_try_catch (hcl_t* hcl)
-{
-	int x;
-	hcl_oop_block_t rcv, catch_blk;
-	hcl_oop_context_t newctx;
-	hcl_ooi_t nargs = 1;
-
-	/* try is called after two pushes to the stack.
-	 * it is one receiver and one argument */
-
-	rcv = (hcl_oop_block_t)HCL_STACK_GETRCV(hcl, nargs);
-	HCL_ASSERT (hcl, HCL_IS_BLOCK(hcl, rcv));
-
-	/* this is the catch block HCL_STACK_GETARG(hcl, nargs, 0); 
-	 * this is the finally block? HCL_STACK_GETARG(hcl, nargs, 1) */
-	x = prepare_new_context(hcl, rcv,
-		0, /* nargs - 0 because the block itself doesn't have an argument */
-		0, /* nargs_offset */
-		1, /* extra_slots - secure 1 extra slot to remember the catch block */
-		0, /* copy_args */
-		&newctx);
-	if (HCL_UNLIKELY(x <= -1)) return -1;
-
-	catch_blk = (hcl_oop_block_t)HCL_STACK_GETARG(hcl, nargs, 0);
-	HCL_ASSERT (hcl, HCL_IS_BLOCK(hcl, catch_blk));
-/* TODO: finally block */
-
-	HCL_STACK_POPS (hcl, nargs + 1); /* pop arguments and receiver */
-	newctx->sender = hcl->active_context;
-	newctx->flags = HCL_SMOOI_TO_OOP(1);
-	newctx->slot[0] = (hcl_oop_t)catch_blk; /* remember the catch block */
-
-	SWITCH_ACTIVE_CONTEXT (hcl, newctx);
-	return 0;
-}
-
-
-static HCL_INLINE int activate_block_for_throw_catch (hcl_t* hcl, hcl_oop_block_t rcv, hcl_oop_t throw_v, hcl_oop_context_t sender)
-{
-	int x;
-	hcl_oop_context_t newctx;
-
-	HCL_ASSERT (hcl, HCL_IS_BLOCK(hcl, rcv));
-
-	hcl_pushvolat (hcl, &throw_v);
-	hcl_pushvolat (hcl, &sender);
-	x = prepare_new_context(hcl, rcv,
-		0, /* nargs TODO: set this to 1...*/
-		0, /* nargs_offset */
-		1, /* extra space */  /* TODO: MOVE THIS TO nargs, set this to 0 */
-		0, /* copy args */
-		&newctx);
-	hcl_popvolats (hcl, 2);
-	if (HCL_UNLIKELY(x <= -1)) return -1;
-
-	/*newctx->sender = hcl->active_context;*/
-	newctx->sender = sender;
-	newctx->slot[0] = throw_v;
-
-	SWITCH_ACTIVE_CONTEXT (hcl, newctx);
-	return 0;
-}
 
 static HCL_INLINE int do_throw (hcl_t* hcl, hcl_oop_t val, hcl_ooi_t ip)
 {
@@ -3982,7 +3920,15 @@ hcl_pfrc_t hcl_pf_process_fork (hcl_t* hcl, hcl_mod_t* mod, hcl_ooi_t nargs)
 		return HCL_PF_FAILURE;
 	}
 
-	x = prepare_new_context(hcl, blk,
+	/* (defun x(a b) ...)
+	 * (fork x 1 2)
+	 * among three arguments to fork, the first is the function block.
+	 * the remaining two should become arguments to the function block.
+	 * pass nargs_offset of 1 to prepare_new_context() to achieve it.
+	 */
+	x = prepare_new_context(
+		hcl,
+		blk,
 		nargs, /* nargs */
 		1, /* nargs_offset */
 		0, /* extra_slots */

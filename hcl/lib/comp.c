@@ -1678,6 +1678,7 @@ static int compile_lambda (hcl_t* hcl, hcl_cnode_t* src, int defun)
 		return -1;
 	}
 
+	/* process the argument list */
 	args = HCL_CNODE_CONS_CAR(obj);
 	HCL_ASSERT (hcl, args != HCL_NULL);
 	if (HCL_CNODE_IS_ELIST_CONCODED(args, HCL_CONCODE_XLIST))
@@ -1700,7 +1701,11 @@ static int compile_lambda (hcl_t* hcl, hcl_cnode_t* src, int defun)
 		do
 		{
 			arg = HCL_CNODE_CONS_CAR(dcl);
-			if (!HCL_CNODE_IS_SYMBOL(arg))
+			if (HCL_CNODE_IS_CONS(arg))
+			{
+				
+			}
+			else if (!HCL_CNODE_IS_SYMBOL(arg))
 			{
 				hcl_setsynerrbfmt (hcl, HCL_SYNERR_ARGNAME, HCL_CNODE_GET_LOC(arg), HCL_CNODE_GET_TOK(arg), "argument not a symbol in %.*js", HCL_CNODE_GET_TOKLEN(cmd), HCL_CNODE_GET_TOKPTR(cmd));
 				return -1;
