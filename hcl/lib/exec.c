@@ -361,6 +361,7 @@ static HCL_INLINE void fill_function_data (hcl_t* hcl, hcl_oop_function_t func, 
 
 	/* initialize other fields */
 	func->home = homectx;
+	func->flags = HCL_SMOOI_TO_OOP(0);
 	func->nargs = HCL_SMOOI_TO_OOP(nargs);
 	func->ntmprs = HCL_SMOOI_TO_OOP(ntmprs);
 }
@@ -379,9 +380,10 @@ static HCL_INLINE void fill_block_data (hcl_t* hcl, hcl_oop_block_t blk, hcl_ooi
 	HCL_ASSERT (hcl, ip >= 0 && nargs <= HCL_SMOOI_MAX);
 
 	blk->home = homectx;
+	blk->ip = HCL_SMOOI_TO_OOP(ip);
+	blk->flags = HCL_SMOOI_TO_OOP(0);
 	blk->nargs = HCL_SMOOI_TO_OOP(nargs);
 	blk->ntmprs = HCL_SMOOI_TO_OOP(ntmprs);
-	blk->ip = HCL_SMOOI_TO_OOP(ip);
 }
 
 static HCL_INLINE int prepare_to_alloc_pid (hcl_t* hcl)
@@ -1812,37 +1814,32 @@ static int prepare_new_context (hcl_t* hcl, hcl_oop_block_t rcv_blk, hcl_ooi_t n
 	 * context which becomes the base for a new block context. */
 
 	hcl_oop_context_t blkctx;
-	hcl_ooi_t local_ntmprs, i;
-
-	/* TODO: find a better way to support a reentrant block context. */
-
-	/* | sum |
-	 * sum := [ :n | (n < 2) ifTrue: [1] ifFalse: [ n + (sum value: (n - 1))] ].
-	 * (sum value: 10).
-	 * 
-	 * For the code above, sum is a block context and it is sent value: inside
-	 * itself. Let me simply clone a block context to allow reentrancy like this
-	 * while the block context is active
-	 */
+	hcl_ooi_t local_ntmprs, flags;
+	hcl_ooi_t fixed_nargs, actual_nargs, excess_nargs;
 
 	/* the receiver must be a block context */
 	HCL_ASSERT (hcl, HCL_IS_BLOCK(hcl, rcv_blk));
 
-	if (HCL_OOP_TO_SMOOI(rcv_blk->nargs) != nargs - nargs_offset)
+	flags = HCL_OOP_TO_SMOOI(rcv_blk->flags);
+	local_ntmprs = HCL_OOP_TO_SMOOI(rcv_blk->ntmprs);
+	fixed_nargs = HCL_OOP_TO_SMOOI(rcv_blk->nargs);
+	actual_nargs = nargs - nargs_offset;
+	excess_nargs = actual_nargs - fixed_nargs;
+
+	if (actual_nargs < fixed_nargs || /*!(flags & HCL_BLOCK_FLAG_VA) ||*/ actual_nargs > fixed_nargs)
 	{
 		HCL_LOG3 (hcl, HCL_LOG_IC | HCL_LOG_ERROR, 
 			"Error - wrong number of arguments to a block %O - expecting %zd, got %zd\n",
-			rcv_blk, HCL_OOP_TO_SMOOI(rcv_blk->nargs), nargs);
+			rcv_blk, fixed_nargs, actual_nargs);
 		hcl_seterrnum (hcl, HCL_ECALLARG);
 		return -1;
 	}
 
-	local_ntmprs = HCL_OOP_TO_SMOOI(rcv_blk->ntmprs);
-	HCL_ASSERT (hcl, local_ntmprs >= nargs);
+	HCL_ASSERT (hcl, local_ntmprs >= actual_nargs);
 
 	/* create a new block context to clone rcv_blk */
 	hcl_pushvolat (hcl, (hcl_oop_t*)&rcv_blk);
-	blkctx = make_context(hcl, local_ntmprs + extra_slots); 
+	blkctx = make_context(hcl, local_ntmprs + excess_nargs + extra_slots); 
 	hcl_popvolat (hcl);
 	if (HCL_UNLIKELY(!blkctx)) return -1;
 
@@ -1853,8 +1850,8 @@ static int prepare_new_context (hcl_t* hcl, hcl_oop_block_t rcv_blk, hcl_ooi_t n
 		((hcl_oop_oop_t)blkctx)->slot[i] = ((hcl_oop_oop_t)rcv_blk)->slot[i];
 	}
 #else
-	blkctx->flags = HCL_SMOOI_TO_OOP(0);
 	blkctx->ip = rcv_blk->ip;
+	blkctx->flags = rcv_blk->flags;
 	blkctx->ntmprs = rcv_blk->ntmprs;
 	blkctx->nargs = rcv_blk->nargs;
 	blkctx->receiver_or_base = (hcl_oop_t)rcv_blk;
@@ -1865,10 +1862,18 @@ static int prepare_new_context (hcl_t* hcl, hcl_oop_block_t rcv_blk, hcl_ooi_t n
 
 	if (HCL_LIKELY(copy_args))
 	{
-		/* copy the arguments to the stack */
-		for (i = nargs_offset; i < nargs; i++)
+		hcl_ooi_t i, j;
+
+		/* copy the fixed arguments to the beginning of the variable part of the context block */
+		for (i = 0, j = nargs_offset; i < fixed_nargs; i++, j++)
 		{
-			blkctx->slot[i - nargs_offset] = HCL_STACK_GETARG(hcl, nargs, i);
+			blkctx->slot[i] = HCL_STACK_GETARG(hcl, nargs, j);
+		}
+
+		/* variable arguments. place them behind after local variables. */
+		for (i = local_ntmprs; j < nargs; i++, j++)
+		{
+			blkctx->slot[i] = HCL_STACK_GETARG(hcl, nargs, j);
 		}
 	}
 
@@ -1944,8 +1949,8 @@ static int __activate_function (hcl_t* hcl, hcl_oop_function_t rcv_func, hcl_ooi
 	hcl_popvolat (hcl);
 	if (HCL_UNLIKELY(!functx)) return -1;
 
-	functx->flags = HCL_SMOOI_TO_OOP(0);
 	functx->ip = HCL_SMOOI_TO_OOP(0);
+	functx->flags = rcv_func->flags;
 	functx->ntmprs = rcv_func->ntmprs;
 	functx->nargs = rcv_func->nargs;
 	functx->receiver_or_base = (hcl_oop_t)rcv_func;
@@ -2263,8 +2268,8 @@ static int start_initial_process_and_context (hcl_t* hcl, hcl_ooi_t initial_ip, 
 	hcl->ip = initial_ip;
 	hcl->sp = -1;
 
-	ctx->flags = HCL_SMOOI_TO_OOP(0);
 	ctx->ip = HCL_SMOOI_TO_OOP(initial_ip);
+	ctx->flags = HCL_SMOOI_TO_OOP(0);
 	ctx->nargs = HCL_SMOOI_TO_OOP(0);
 	ctx->ntmprs = HCL_SMOOI_TO_OOP(ntmprs);
 	ctx->origin = ctx; /* the origin of the initial context is itself as this is created over the initial function */
