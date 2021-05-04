@@ -1619,7 +1619,7 @@ static int collect_local_vardcl (hcl_t* hcl, hcl_cnode_t* obj, hcl_cnode_t** nex
 static int compile_lambda (hcl_t* hcl, hcl_cnode_t* src, int defun)
 {
 	hcl_cnode_t* cmd, * obj, * args;
-	hcl_oow_t nargs, ntmprs;
+	hcl_oow_t nargs, nlvars, tmpr_mask;
 	hcl_ooi_t jump_inst_pos, lfbase_pos, lfsize_pos;
 	hcl_oow_t saved_tv_wcount, tv_dup_start;
 	hcl_cnode_t* defun_name;
@@ -1752,22 +1752,24 @@ static int compile_lambda (hcl_t* hcl, hcl_cnode_t* src, int defun)
 
 	obj = HCL_CNODE_CONS_CDR(obj);
 	tv_dup_start = hcl->c->tv.s.len;
-	if (collect_local_vardcl(hcl, obj, &obj, tv_dup_start, &ntmprs) <= -1) return -1;
-
-	ntmprs += nargs; /* ntmprs: number of temporary variables including arguments */
-	HCL_ASSERT (hcl, ntmprs == hcl->c->tv.wcount - saved_tv_wcount);
-	if (ntmprs > MAX_CODE_NBLKTMPRS)
+	if (collect_local_vardcl(hcl, obj, &obj, tv_dup_start, &nlvars) <= -1) return -1;
+	
+	if (nlvars > MAX_CODE_NBLKLVARS)
 	{
-		hcl_setsynerrbfmt (hcl, HCL_SYNERR_VARFLOOD, HCL_CNODE_GET_LOC(args), HCL_NULL, "too many(%zu) variables in %.*js", ntmprs, HCL_CNODE_GET_TOKLEN(cmd), HCL_CNODE_GET_TOKPTR(cmd)); 
+		hcl_setsynerrbfmt (hcl, HCL_SYNERR_VARFLOOD, HCL_CNODE_GET_LOC(args), HCL_NULL, "too many(%zu) variables in %.*js", nlvars, HCL_CNODE_GET_TOKLEN(cmd), HCL_CNODE_GET_TOKPTR(cmd)); 
 		return -1;
 	}
 
+	HCL_ASSERT (hcl, nargs + nlvars == hcl->c->tv.wcount - saved_tv_wcount);
+
 	if (push_fnblk(hcl, HCL_CNODE_GET_LOC(src), hcl->c->tv.wcount, hcl->c->tv.s.len, hcl->code.bc.len, hcl->code.lit.len) <= -1) return -1;
 
+	tmpr_mask = ENCODE_BLK_TMPR_MASK(0, nargs, 0, nlvars);
+	
 	if (hcl->option.trait & HCL_TRAIT_INTERACTIVE)
 	{
-		/* make_function nargs ntmprs lfbase lfsize */
-		if (emit_double_param_instruction(hcl, HCL_CODE_MAKE_FUNCTION, nargs, ntmprs, HCL_CNODE_GET_LOC(cmd)) <= -1) return -1;
+		/* make_function tmpr_mask lfbase lfsize */
+		if (emit_single_param_instruction(hcl, HCL_CODE_MAKE_FUNCTION, tmpr_mask, HCL_CNODE_GET_LOC(cmd)) <= -1) return -1;
 		lfbase_pos = hcl->code.bc.len;
 		if (emit_long_param(hcl, hcl->code.lit.len - hcl->c->fnblk.info[hcl->c->fnblk.depth - 1].lfbase) <= -1) return -1; /* literal frame base */
 		lfsize_pos = hcl->code.bc.len; /* literal frame size */
@@ -1775,7 +1777,7 @@ static int compile_lambda (hcl_t* hcl, hcl_cnode_t* src, int defun)
 	}
 	else
 	{
-		if (emit_double_param_instruction(hcl, HCL_CODE_MAKE_BLOCK, nargs, ntmprs, HCL_CNODE_GET_LOC(cmd)) <= -1) return -1;
+		if (emit_single_param_instruction(hcl, HCL_CODE_MAKE_BLOCK, tmpr_mask, HCL_CNODE_GET_LOC(cmd)) <= -1) return -1;
 	}
 
 	HCL_ASSERT (hcl, hcl->code.bc.len < HCL_SMOOI_MAX);  /* guaranteed in emit_byte_instruction() */

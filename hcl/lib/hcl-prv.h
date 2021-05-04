@@ -485,27 +485,52 @@ struct hcl_compiler_t
 #endif
 
 
+
+/* hcl_context_t, hcl_block_t, hcl_function_t stores the local variable information
+ * 
+ * Use up to 29 bits in a 32-bit hcl_ooi_t. Exclude the tag bit and the sign bit.
+ * | SIGN | VA | NARGS | NRVARS | NLVARS | TAG |
+ *     1    1     8       8        12        2    <= 32
+ * -----------------------------------------------------------
+ * Parameters to MAKE_BLOCK or MAKE_FUNCTION.
+ *  | VA | NARGS | NRVARS | NLVARS 
+ *    1      4      4        7         <= 16 (HCL_CODE_LONG_PARAM_SIZE 1, two params)
+ *    1      8      8        12        <= 32 (HCL_CODE_LONG_PARAM_SIZE 2, two params, use 29 bits to avoid collection when converted to a smooi)
+ */
+ 
 #if defined(HCL_CODE_LONG_PARAM_SIZE) && (HCL_CODE_LONG_PARAM_SIZE == 1)
-#	define MAX_CODE_INDEX               (0xFFu)
-#	define MAX_CODE_NTMPRS              (0xFFu)
-#	define MAX_CODE_NARGS               (0xFFu)
+/*
 #	define MAX_CODE_NBLKARGS            (0xFFu)
 #	define MAX_CODE_NBLKTMPRS           (0xFFu)
+*/
+#	define MAX_CODE_NBLKARGS            (0xFu) /* 15 */
+#	define MAX_CODE_NBLKRVARS           (0xFu) /* 15 */
+#	define MAX_CODE_NBLKLVARS           (0x7Fu) /* 127 */
+
+#	define ENCODE_BLK_TMPR_MASK(v,nargs,nrvars,nlvars) \
+		((((v) & 1) << 15) | (((nargs) & 0xF) << 11) | (((nrvars) & 0xF) << 7) | (((nlvars) & 0x7F)))
+
 #	define MAX_CODE_JUMP                (0xFFu)
 #	define MAX_CODE_PARAM               (0xFFu)
 #	define MAX_CODE_PARAM2              (0xFFFFu)
 #elif defined(HCL_CODE_LONG_PARAM_SIZE) && (HCL_CODE_LONG_PARAM_SIZE == 2)
-#	define MAX_CODE_INDEX               (0xFFFFu)
-#	define MAX_CODE_NTMPRS              (0xFFFFu)
-#	define MAX_CODE_NARGS               (0xFFFFu)
+/*
 #	define MAX_CODE_NBLKARGS            (0xFFFFu)
 #	define MAX_CODE_NBLKTMPRS           (0xFFFFu)
+*/
+#	define MAX_CODE_NBLKARGS            (0xFFu) /* 255 */
+#	define MAX_CODE_NBLKRVARS           (0xFFu) /* 255 */
+#	define MAX_CODE_NBLKLVARS           (0xFFFu) /* 4095 */
+#	define ENCODE_BLK_TMPR_MASK(v,nargs,nrvars,nlvars) \
+		((((v) & 1) << 28) | (((nargs) & 0xFF) << 20) | (((nrvars) & 0xFF) << 12) | (((nlvars) & 0xFFF)))
+	
 #	define MAX_CODE_JUMP                (0xFFFFu)
 #	define MAX_CODE_PARAM               (0xFFFFu)
 #	define MAX_CODE_PARAM2              (0xFFFFFFFFu)
 #else
 #	error Unsupported HCL_CODE_LONG_PARAM_SIZE
 #endif
+
 
 
 /*
