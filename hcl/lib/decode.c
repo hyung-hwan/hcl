@@ -61,7 +61,7 @@ int hcl_decode (hcl_t* hcl, hcl_oow_t start, hcl_oow_t end)
 {
 	hcl_oob_t bcode, * cdptr;
 	hcl_ooi_t ip = start, fetched_instruction_pointer;
-	hcl_oow_t b1, b2, b3, b4;
+	hcl_oow_t b1, b2, b3;
 
 	/* the instruction at the offset 'end' is not decoded.
 	 * decoding offset range is from start to end - 1. */
@@ -606,31 +606,25 @@ int hcl_decode (hcl_t* hcl, hcl_oow_t start, hcl_oow_t end)
 				break;
 
 			case HCL_CODE_MAKE_FUNCTION:
-				/* b1 - number of block arguments
-				 * b2 - number of block temporaries
-				 * b3 - base literal frame start
-				 * b4 - base literal frame end */
+				/* b1 - block temporaries mask 
+				 * b2 - base literal frame start
+				 * b3 - base literal frame end */
 				FETCH_PARAM_CODE_TO (hcl, b1);
 				FETCH_PARAM_CODE_TO (hcl, b2);
 				FETCH_PARAM_CODE_TO (hcl, b3);
-				FETCH_PARAM_CODE_TO (hcl, b4);
 
-				LOG_INST_4 (hcl, "make_function %zu %zu %zu %zu", b1, b2, b3, b4);
+				LOG_INST_3 (hcl, "make_function %zu %zu %zu", b1, b2, b3);
 
 				HCL_ASSERT (hcl, b1 >= 0);
-				HCL_ASSERT (hcl, b2 >= b1);
 				break;
 
 			case HCL_CODE_MAKE_BLOCK:
-				/* b1 - number of block arguments
-				 * b2 - number of block temporaries */
+				/* b1 - block temporaries mask */
 				FETCH_PARAM_CODE_TO (hcl, b1);
-				FETCH_PARAM_CODE_TO (hcl, b2);
 
-				LOG_INST_2 (hcl, "make_block %zu %zu", b1, b2);
+				LOG_INST_1 (hcl, "make_block %zu", b1);
 
 				HCL_ASSERT (hcl, b1 >= 0);
-				HCL_ASSERT (hcl, b2 >= b1);
 				break;
 
 			case HCL_CODE_NOOP:

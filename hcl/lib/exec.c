@@ -339,15 +339,13 @@ static HCL_INLINE hcl_oop_function_t make_function (hcl_t* hcl, hcl_oow_t lfsize
 	return func;
 }
 
-static HCL_INLINE void fill_function_data (hcl_t* hcl, hcl_oop_function_t func, hcl_ooi_t ntmprs, hcl_ooi_t nargs, hcl_oop_context_t homectx, const hcl_oop_t* lfptr, hcl_oow_t lfsize)
+static HCL_INLINE void fill_function_data (hcl_t* hcl, hcl_oop_function_t func, hcl_ooi_t tmpr_mask, hcl_oop_context_t homectx, const hcl_oop_t* lfptr, hcl_oow_t lfsize)
 {
 	/* Although this function could be integrated into make_function(),
 	 * this function has been separated from make_function() to make GC handling simpler */
 	hcl_oow_t i;
 
-	HCL_ASSERT (hcl, nargs >= 0 && nargs <= HCL_SMOOI_MAX);
-	HCL_ASSERT (hcl, ntmprs >= 0 && ntmprs <= HCL_SMOOI_MAX);
-	HCL_ASSERT (hcl, nargs <= ntmprs);
+	HCL_ASSERT (hcl, tmpr_mask >= 0 && tmpr_mask <= HCL_SMOOI_MAX);
 
 	/* copy literal frames */
 	HCL_ASSERT (hcl, lfsize <= HCL_OBJ_GET_SIZE(func) - HCL_FUNCTION_NAMED_INSTVARS);
@@ -362,8 +360,7 @@ static HCL_INLINE void fill_function_data (hcl_t* hcl, hcl_oop_function_t func, 
 	/* initialize other fields */
 	func->home = homectx;
 	func->flags = HCL_SMOOI_TO_OOP(0);
-	func->nargs = HCL_SMOOI_TO_OOP(nargs);
-	func->ntmprs = HCL_SMOOI_TO_OOP(ntmprs);
+	func->tmpr_mask = HCL_SMOOI_TO_OOP(tmpr_mask);
 }
 
 static HCL_INLINE hcl_oop_block_t make_block (hcl_t* hcl)
@@ -372,18 +369,15 @@ static HCL_INLINE hcl_oop_block_t make_block (hcl_t* hcl)
 	return (hcl_oop_block_t)hcl_allocoopobj(hcl, HCL_BRAND_BLOCK, HCL_BLOCK_NAMED_INSTVARS);
 }
 
-static HCL_INLINE void fill_block_data (hcl_t* hcl, hcl_oop_block_t blk, hcl_ooi_t nargs, hcl_ooi_t ntmprs, hcl_ooi_t ip, hcl_oop_context_t homectx)
+static HCL_INLINE void fill_block_data (hcl_t* hcl, hcl_oop_block_t blk, hcl_ooi_t tmpr_mask, hcl_ooi_t ip, hcl_oop_context_t homectx)
 {
-	HCL_ASSERT (hcl, nargs >= 0 && nargs <= HCL_SMOOI_MAX);
-	HCL_ASSERT (hcl, ntmprs >= 0 && ntmprs <= HCL_SMOOI_MAX);
-	HCL_ASSERT (hcl, nargs <= ntmprs);
-	HCL_ASSERT (hcl, ip >= 0 && nargs <= HCL_SMOOI_MAX);
+	HCL_ASSERT (hcl, tmpr_mask >= 0 && tmpr_mask <= HCL_SMOOI_MAX);
+	HCL_ASSERT (hcl, ip >= 0 && ip <= HCL_SMOOI_MAX);
 
 	blk->home = homectx;
 	blk->ip = HCL_SMOOI_TO_OOP(ip);
 	blk->flags = HCL_SMOOI_TO_OOP(0);
-	blk->nargs = HCL_SMOOI_TO_OOP(nargs);
-	blk->ntmprs = HCL_SMOOI_TO_OOP(ntmprs);
+	blk->tmpr_mask = HCL_SMOOI_TO_OOP(tmpr_mask);
 }
 
 static HCL_INLINE int prepare_to_alloc_pid (hcl_t* hcl)
@@ -1814,19 +1808,23 @@ static int prepare_new_context (hcl_t* hcl, hcl_oop_block_t rcv_blk, hcl_ooi_t n
 	 * context which becomes the base for a new block context. */
 
 	hcl_oop_context_t blkctx;
-	hcl_ooi_t local_ntmprs, flags;
+	hcl_ooi_t tmpr_mask;
+	hcl_ooi_t nrvars, nlvars, flags;
 	hcl_ooi_t fixed_nargs, actual_nargs, excess_nargs;
 
 	/* the receiver must be a block context */
 	HCL_ASSERT (hcl, HCL_IS_BLOCK(hcl, rcv_blk));
 
 	flags = HCL_OOP_TO_SMOOI(rcv_blk->flags);
-	local_ntmprs = HCL_OOP_TO_SMOOI(rcv_blk->ntmprs);
-	fixed_nargs = HCL_OOP_TO_SMOOI(rcv_blk->nargs);
+	tmpr_mask = HCL_OOP_TO_SMOOI(rcv_blk->tmpr_mask);
+
+	nrvars = GET_BLKTMPR_MASK_NRVARS(tmpr_mask);	
+	nlvars = GET_BLKTMPR_MASK_NLVARS(tmpr_mask);	
+	fixed_nargs = GET_BLKTMPR_MASK_NARGS(tmpr_mask);
 	actual_nargs = nargs - nargs_offset;
 	excess_nargs = actual_nargs - fixed_nargs;
 
-	if (actual_nargs < fixed_nargs || /*!(flags & HCL_BLOCK_FLAG_VA) ||*/ actual_nargs > fixed_nargs)
+	if (actual_nargs < fixed_nargs || (!GET_BLKTMPR_MASK_VA(tmpr_mask) && actual_nargs > fixed_nargs))
 	{
 		HCL_LOG3 (hcl, HCL_LOG_IC | HCL_LOG_ERROR, 
 			"Error - wrong number of arguments to a block %O - expecting %zd, got %zd\n",
@@ -1835,11 +1833,9 @@ static int prepare_new_context (hcl_t* hcl, hcl_oop_block_t rcv_blk, hcl_ooi_t n
 		return -1;
 	}
 
-	HCL_ASSERT (hcl, local_ntmprs >= actual_nargs);
-
 	/* create a new block context to clone rcv_blk */
 	hcl_pushvolat (hcl, (hcl_oop_t*)&rcv_blk);
-	blkctx = make_context(hcl, local_ntmprs + excess_nargs + extra_slots); 
+	blkctx = make_context(hcl, fixed_nargs + nrvars + nlvars + excess_nargs + extra_slots); 
 	hcl_popvolat (hcl);
 	if (HCL_UNLIKELY(!blkctx)) return -1;
 
@@ -1852,8 +1848,7 @@ static int prepare_new_context (hcl_t* hcl, hcl_oop_block_t rcv_blk, hcl_ooi_t n
 #else
 	blkctx->ip = rcv_blk->ip;
 	blkctx->flags = rcv_blk->flags;
-	blkctx->ntmprs = rcv_blk->ntmprs;
-	blkctx->nargs = rcv_blk->nargs;
+	blkctx->tmpr_mask = rcv_blk->tmpr_mask;
 	blkctx->receiver_or_base = (hcl_oop_t)rcv_blk;
 	blkctx->home = rcv_blk->home;
 	/* blkctx->origin = rcv_blk->origin; */
@@ -1871,7 +1866,7 @@ static int prepare_new_context (hcl_t* hcl, hcl_oop_block_t rcv_blk, hcl_ooi_t n
 		}
 
 		/* variable arguments. place them behind after local variables. */
-		for (i = local_ntmprs; j < nargs; i++, j++)
+		for (i = fixed_nargs + nrvars + nlvars ; j < nargs; i++, j++)
 		{
 			blkctx->slot[i] = HCL_STACK_GETARG(hcl, nargs, j);
 		}
@@ -1919,7 +1914,10 @@ static int __activate_function (hcl_t* hcl, hcl_oop_function_t rcv_func, hcl_ooi
 	 * for a new block context. */
 
 	hcl_oop_context_t functx;
-	hcl_ooi_t local_ntmprs, i;
+	hcl_ooi_t i, j;
+	hcl_ooi_t tmpr_mask;
+	hcl_ooi_t nrvars, nlvars, fixed_nargs, actual_nargs, excess_nargs;
+	hcl_ooi_t nargs_offset = 0;
 
 	/*
 	  (defun sum (x)
@@ -1931,37 +1929,45 @@ static int __activate_function (hcl_t* hcl, hcl_oop_function_t rcv_func, hcl_ooi
 	/* the receiver must be a function */
 	HCL_ASSERT (hcl, HCL_IS_FUNCTION(hcl, rcv_func));
 
-	if (HCL_OOP_TO_SMOOI(rcv_func->nargs) != nargs)
+	tmpr_mask = HCL_OOP_TO_SMOOI(rcv_func->tmpr_mask);
+	nrvars = GET_BLKTMPR_MASK_NRVARS(tmpr_mask);	
+	nlvars = GET_BLKTMPR_MASK_NLVARS(tmpr_mask);	
+	fixed_nargs = GET_BLKTMPR_MASK_NARGS(tmpr_mask);
+	actual_nargs = nargs - nargs_offset;
+	excess_nargs = actual_nargs - fixed_nargs;
+
+	if (actual_nargs < fixed_nargs || (!GET_BLKTMPR_MASK_VA(tmpr_mask) && actual_nargs > fixed_nargs))
 	{
 		HCL_LOG3 (hcl, HCL_LOG_IC | HCL_LOG_ERROR, 
 			"Error - wrong number of arguments to a function %O - expecting %zd, got %zd\n",
-			rcv_func, HCL_OOP_TO_SMOOI(rcv_func->nargs), nargs);
+			rcv_func, fixed_nargs, nargs);
 		hcl_seterrnum (hcl, HCL_ECALLARG);
 		return -1;
 	}
 
-	local_ntmprs = HCL_OOP_TO_SMOOI(rcv_func->ntmprs);
-	HCL_ASSERT (hcl, local_ntmprs >= nargs);
-
 	/* create a new block context to clone rcv_func */
 	hcl_pushvolat (hcl, (hcl_oop_t*)&rcv_func);
-	functx = make_context(hcl, local_ntmprs); 
+	functx = make_context(hcl, fixed_nargs + nrvars + nlvars + excess_nargs); 
 	hcl_popvolat (hcl);
 	if (HCL_UNLIKELY(!functx)) return -1;
 
 	functx->ip = HCL_SMOOI_TO_OOP(0);
 	functx->flags = rcv_func->flags;
-	functx->ntmprs = rcv_func->ntmprs;
-	functx->nargs = rcv_func->nargs;
+	functx->tmpr_mask = rcv_func->tmpr_mask;
 	functx->receiver_or_base = (hcl_oop_t)rcv_func;
 	functx->home = rcv_func->home;
 	functx->origin = functx; /* the origin of the context over a function should be itself */
 
-/* TODO: check the stack size of a block context to see if it's large enough to hold arguments */
-	/* copy the arguments to the stack */
-	for (i = 0; i < nargs; i++)
+	/* copy the fixed arguments to the beginning of the variable part of the context block */
+	for (i = 0, j = nargs_offset; i < fixed_nargs; i++, j++)
 	{
-		functx->slot[i] = HCL_STACK_GETARG(hcl, nargs, i);
+		functx->slot[i] = HCL_STACK_GETARG(hcl, nargs, j);
+	}
+
+	/* variable arguments. place them behind after local variables. */
+	for (i = fixed_nargs + nrvars + nlvars ; j < nargs; i++, j++)
+	{
+		functx->slot[i] = HCL_STACK_GETARG(hcl, nargs, j);
 	}
 
 	HCL_STACK_POPS (hcl, nargs + 1); /* pop arguments and receiver */
@@ -2256,13 +2262,15 @@ static hcl_oop_process_t start_initial_process (hcl_t* hcl, hcl_oop_context_t ct
 	return proc;
 }
 
-static int start_initial_process_and_context (hcl_t* hcl, hcl_ooi_t initial_ip, hcl_ooi_t ntmprs)
+static int start_initial_process_and_context (hcl_t* hcl, hcl_ooi_t initial_ip, hcl_ooi_t nlvars)
 {
 	hcl_oop_context_t ctx;
 	hcl_oop_process_t proc;
+	hcl_ooi_t tmpr_mask;
 
+	tmpr_mask = ENCODE_BLKTMPR_MASK(0, 0, 0, nlvars);
 	/* create the initial context over the initial function */
-	ctx = make_context(hcl, ntmprs); /* no temporary variables */
+	ctx = make_context(hcl, nlvars);
 	if (HCL_UNLIKELY(!ctx)) return -1;
 
 	hcl->ip = initial_ip;
@@ -2270,8 +2278,7 @@ static int start_initial_process_and_context (hcl_t* hcl, hcl_ooi_t initial_ip, 
 
 	ctx->ip = HCL_SMOOI_TO_OOP(initial_ip);
 	ctx->flags = HCL_SMOOI_TO_OOP(0);
-	ctx->nargs = HCL_SMOOI_TO_OOP(0);
-	ctx->ntmprs = HCL_SMOOI_TO_OOP(ntmprs);
+	ctx->tmpr_mask = HCL_SMOOI_TO_OOP(tmpr_mask);
 	ctx->origin = ctx; /* the origin of the initial context is itself as this is created over the initial function */
 	ctx->home = hcl->initial_function->home; /* this should be nil */
 	ctx->sender = (hcl_oop_context_t)hcl->_nil;
@@ -3704,22 +3711,19 @@ static int execute (hcl_t* hcl)
 			case HCL_CODE_MAKE_FUNCTION:
 			{
 				hcl_oop_function_t func;
-				hcl_oow_t b3, b4;
+				hcl_oow_t b3;
 				hcl_oow_t joff;
 
-				/* b1 - number of block arguments
-				 * b2 - number of block temporaries
-				 * b3 - literal frame base
-				 * b4 - literal frame size */
+				/* b1 - block temporaries mask
+				 * b2 - literal frame base
+				 * b3 - literal frame size */
 				FETCH_PARAM_CODE_TO (hcl, b1);
 				FETCH_PARAM_CODE_TO (hcl, b2);
 				FETCH_PARAM_CODE_TO (hcl, b3);
-				FETCH_PARAM_CODE_TO (hcl, b4);
 
-				LOG_INST_4 (hcl, "make_function %zu %zu %zu %zu", b1, b2, b3, b4);
+				LOG_INST_3 (hcl, "make_function %zu %zu %zu", b1, b2, b3);
 
 				HCL_ASSERT (hcl, b1 >= 0);
-				HCL_ASSERT (hcl, b2 >= b1);
 
 				/* the MAKE_FUNCTION instruction is followed by the long JUMP_FORWARD_X instruction.
 				* i can decode the instruction and get the size of instructions
@@ -3732,13 +3736,13 @@ static int execute (hcl_t* hcl)
 
 				/* copy the byte codes from the active context to the new context */
 			#if (HCL_CODE_LONG_PARAM_SIZE == 2)
-				func = make_function(hcl, b4, &hcl->active_code[hcl->ip + 3], joff, HCL_NULL);
+				func = make_function(hcl, b3, &hcl->active_code[hcl->ip + 3], joff, HCL_NULL);
 			#else
-				func = make_function(hcl, b4, &hcl->active_code[hcl->ip + 2], joff, HCL_NULL);
+				func = make_function(hcl, b3, &hcl->active_code[hcl->ip + 2], joff, HCL_NULL);
 			#endif
 				if (HCL_UNLIKELY(!func)) goto oops;
 
-				fill_function_data (hcl, func, b2, b1, hcl->active_context, &hcl->active_function->literal_frame[b3], b4);
+				fill_function_data (hcl, func, b1, hcl->active_context, &hcl->active_function->literal_frame[b2], b3);
 
 				/* push the new function to the stack of the active context */
 				HCL_STACK_PUSH (hcl, (hcl_oop_t)func);
@@ -3749,15 +3753,12 @@ static int execute (hcl_t* hcl)
 			{
 				hcl_oop_block_t blkobj;
 
-				/* b1 - number of block arguments
-				 * b2 - number of block temporaries */
+				/* b1 - block temporaries mask */
 				FETCH_PARAM_CODE_TO (hcl, b1);
-				FETCH_PARAM_CODE_TO (hcl, b2);
 
-				LOG_INST_2 (hcl, "make_block %zu %zu", b1, b2);
+				LOG_INST_1 (hcl, "make_block %zu", b1);
 
 				HCL_ASSERT (hcl, b1 >= 0);
-				HCL_ASSERT (hcl, b2 >= b1);
 
 				blkobj = make_block(hcl);
 				if (HCL_UNLIKELY(!blkobj)) goto oops;
@@ -3766,7 +3767,7 @@ static int execute (hcl_t* hcl)
 				 *   11000100 KKKKKKKK or 11000100 KKKKKKKK KKKKKKKK 
 				 * depending on HCL_CODE_LONG_PARAM_SIZE. change 'ip' to point to
 				 * the instruction after the jump. */
-				fill_block_data (hcl, blkobj, b1, b2, hcl->ip + HCL_CODE_LONG_PARAM_SIZE + 1, hcl->active_context);
+				fill_block_data (hcl, blkobj, b1, hcl->ip + HCL_CODE_LONG_PARAM_SIZE + 1, hcl->active_context);
 
 				/* push the new block context to the stack of the active context */
 				HCL_STACK_PUSH (hcl, (hcl_oop_t)blkobj);
@@ -3843,7 +3844,7 @@ hcl_oop_t hcl_execute (hcl_t* hcl)
 	if (HCL_UNLIKELY(!func)) return HCL_NULL;
 
 	/* pass nil for the home context of the initial function */
-	fill_function_data (hcl, func, hcl->code.ngtmprs, 0, (hcl_oop_context_t)hcl->_nil, hcl->code.lit.arr->slot, hcl->code.lit.len);
+	fill_function_data (hcl, func, ENCODE_BLKTMPR_MASK(0,0,0,hcl->code.ngtmprs), (hcl_oop_context_t)hcl->_nil, hcl->code.lit.arr->slot, hcl->code.lit.len);
 
 	hcl->initial_function = func; /* the initial function is ready */
 

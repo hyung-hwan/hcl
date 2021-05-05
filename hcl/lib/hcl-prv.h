@@ -507,8 +507,12 @@ struct hcl_compiler_t
 #	define MAX_CODE_NBLKRVARS           (0xFu) /* 15 */
 #	define MAX_CODE_NBLKLVARS           (0x7Fu) /* 127 */
 
-#	define ENCODE_BLK_TMPR_MASK(v,nargs,nrvars,nlvars) \
-		((((v) & 1) << 15) | (((nargs) & 0xF) << 11) | (((nrvars) & 0xF) << 7) | (((nlvars) & 0x7F)))
+#	define ENCODE_BLKTMPR_MASK(va,nargs,nrvars,nlvars) \
+		((((va) & 0x1) << 15) | (((nargs) & 0xF) << 11) | (((nrvars) & 0xF) << 7) | (((nlvars) & 0x7F)))
+#	define GET_BLKTMPR_MASK_VA(x) (((x) >> 15) & 0x1)
+#	define GET_BLKTMPR_MASK_NARGS(x) (((x) >> 11) & 0xF)
+#	define GET_BLKTMPR_MASK_NRVARS(x) (((x) >> 7) & 0xF)
+#	define GET_BLKTMPR_MASK_NLVARS(x) ((x) & 0x7F)
 
 #	define MAX_CODE_JUMP                (0xFFu)
 #	define MAX_CODE_PARAM               (0xFFu)
@@ -521,8 +525,12 @@ struct hcl_compiler_t
 #	define MAX_CODE_NBLKARGS            (0xFFu) /* 255 */
 #	define MAX_CODE_NBLKRVARS           (0xFFu) /* 255 */
 #	define MAX_CODE_NBLKLVARS           (0xFFFu) /* 4095 */
-#	define ENCODE_BLK_TMPR_MASK(v,nargs,nrvars,nlvars) \
-		((((v) & 1) << 28) | (((nargs) & 0xFF) << 20) | (((nrvars) & 0xFF) << 12) | (((nlvars) & 0xFFF)))
+#	define ENCODE_BLKTMPR_MASK(va,nargs,nrvars,nlvars) \
+		((((va) & 0x1) << 28) | (((nargs) & 0xFF) << 20) | (((nrvars) & 0xFF) << 12) | (((nlvars) & 0xFFF)))
+#	define GET_BLKTMPR_MASK_VA(x) (((x) >> 28) & 0x1)
+#	define GET_BLKTMPR_MASK_NARGS(x) (((x) >> 20) & 0xFF)
+#	define GET_BLKTMPR_MASK_NRVARS(x) (((x) >> 12) & 0xFF)
+#	define GET_BLKTMPR_MASK_NLVARS(x) ((x) & 0xFFF)
 	
 #	define MAX_CODE_JUMP                (0xFFFFu)
 #	define MAX_CODE_PARAM               (0xFFFFu)

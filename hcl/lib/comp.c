@@ -1764,7 +1764,7 @@ static int compile_lambda (hcl_t* hcl, hcl_cnode_t* src, int defun)
 
 	if (push_fnblk(hcl, HCL_CNODE_GET_LOC(src), hcl->c->tv.wcount, hcl->c->tv.s.len, hcl->code.bc.len, hcl->code.lit.len) <= -1) return -1;
 
-	tmpr_mask = ENCODE_BLK_TMPR_MASK(0, nargs, 0, nlvars);
+	tmpr_mask = ENCODE_BLKTMPR_MASK(0, nargs, 0, nlvars);
 	
 	if (hcl->option.trait & HCL_TRAIT_INTERACTIVE)
 	{
