@@ -389,6 +389,7 @@ static int emit_single_param_instruction (hcl_t* hcl, int cmd, hcl_oow_t param_1
 		case HCL_CODE_PUSH_NEGINTLIT:
 		case HCL_CODE_PUSH_CHARLIT:
 
+
 		case HCL_CODE_MAKE_DIC: /* TODO: don't these need write_long2? */
 		case HCL_CODE_MAKE_ARRAY:
 		case HCL_CODE_MAKE_BYTEARRAY:
@@ -396,6 +397,17 @@ static int emit_single_param_instruction (hcl_t* hcl, int cmd, hcl_oow_t param_1
 		case HCL_CODE_POP_INTO_BYTEARRAY:
 			bc = cmd;
 			goto write_long;
+
+		/* MAKE_FUNCTION is a quad-parameter instruction. 
+		 * The caller must emit two more parameters after the call to this function.
+		 * however the instruction format is the same up to the second
+		 * parameters between MAKE_FUNCTION and MAKE_BLOCK.
+		 */
+		case HCL_CODE_MAKE_FUNCTION:
+		case HCL_CODE_MAKE_BLOCK:
+			/* write_long2 produces two parameters */
+			bc = cmd;
+			goto write_long2;
 	}
 
 	hcl_seterrnum (hcl, HCL_EINVAL);
@@ -432,11 +444,11 @@ write_long2:
 	    emit_byte_instruction(hcl, (param_1 >> 24) & 0xFF, HCL_NULL) <= -1 ||
 	    emit_byte_instruction(hcl, (param_1 >> 16) & 0xFF, HCL_NULL) <= -1 ||
 	    emit_byte_instruction(hcl, (param_1 >>  8) & 0xFF, HCL_NULL) <= -1 ||
-	    emit_byte_instruction(hcl, param_1 & 0xFF, HCL_NULL) <= -1) return -1;
+	    emit_byte_instruction(hcl, (param_1 >>  0) & 0xFF, HCL_NULL) <= -1) return -1;
 #else
 	if (emit_byte_instruction(hcl, bc, srcloc) <= -1 ||
 	    emit_byte_instruction(hcl, (param_1 >> 8) & 0xFF, HCL_NULL) <= -1 ||
-	    emit_byte_instruction(hcl, param_1 & 0xFF, HCL_NULL) <= -1) return -1;
+	    emit_byte_instruction(hcl, (param_1 >> 0) & 0xFF, HCL_NULL) <= -1) return -1;
 #endif
 	return 0;
 }
@@ -467,16 +479,6 @@ static int emit_double_param_instruction (hcl_t* hcl, int cmd, hcl_oow_t param_1
 				bc = cmd | 0x80; 
 				goto write_long;
 			}
-
-		/* MAKE_FUNCTION is a quad-parameter instruction. 
-		 * The caller must emit two more parameters after the call to this function.
-		 * however the instruction format is the same up to the second
-		 * parameters between MAKE_FUNCTION and MAKE_BLOCK.
-		 */
-		case HCL_CODE_MAKE_FUNCTION: 
-		case HCL_CODE_MAKE_BLOCK:
-			bc = cmd;
-			goto write_long;
 	}
 
 	hcl_seterrnum (hcl, HCL_EINVAL);

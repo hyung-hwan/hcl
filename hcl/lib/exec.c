@@ -121,6 +121,8 @@ static hcl_ooch_t oocstr_dash[] = { '-', '\0' };
 #	define LOG_INST_2(hcl,fmt,a1,a2) HCL_LOG3(hcl, LOG_MASK_INST, "%010zd " fmt "\n", fetched_instruction_pointer, a1, a2)
 #	define LOG_INST_3(hcl,fmt,a1,a2,a3) HCL_LOG4(hcl, LOG_MASK_INST, "%010zd " fmt "\n", fetched_instruction_pointer, a1, a2, a3)
 #	define LOG_INST_4(hcl,fmt,a1,a2,a3,a4) HCL_LOG5(hcl, LOG_MASK_INST, "%010zd " fmt "\n", fetched_instruction_pointer, a1, a2, a3, a4)
+#	define LOG_INST_5(hcl,fmt,a1,a2,a3,a4,a5) HCL_LOG6(hcl, LOG_MASK_INST, "%010zd " fmt "\n", fetched_instruction_pointer, a1, a2, a3, a4, a5)
+#	define LOG_INST_6(hcl,fmt,a1,a2,a3,a4,a5,a6) HCL_LOG7(hcl, LOG_MASK_INST, "%010zd " fmt "\n", fetched_instruction_pointer, a1, a2, a3, a4, a5, a6)
 
 #else
 #	define LOG_INST_0(hcl,fmt)
@@ -128,6 +130,8 @@ static hcl_ooch_t oocstr_dash[] = { '-', '\0' };
 #	define LOG_INST_2(hcl,fmt,a1,a2)
 #	define LOG_INST_3(hcl,fmt,a1,a2,a3)
 #	define LOG_INST_4(hcl,fmt,a1,a2,a3,a4)
+#	define LOG_INST_5(hcl,fmt,a1,a2,a3,a4,a5)
+#	define LOG_INST_6(hcl,fmt,a1,a2,a3,a4,a5,a6)
 #endif
 
 static int delete_sem_from_sem_io_tuple (hcl_t* hcl, hcl_oop_semaphore_t sem, int force);
@@ -2935,11 +2939,7 @@ static int execute (hcl_t* hcl)
 			case HCL_CODE_PUSH_LITERAL_X2:
 				FETCH_PARAM_CODE_TO (hcl, b1);
 				FETCH_PARAM_CODE_TO (hcl, b2);
-		#if (HCL_CODE_LONG_PARAM_SIZE == 2)
-				b1 = (b1 << 16) | b2;
-		#else
-				b1 = (b1 << 8) | b2;
-		#endif
+				b1 = (b1 << (8 * HCL_CODE_LONG_PARAM_SIZE)) | b2;
 				goto push_literal;
 
 			case HCL_CODE_PUSH_LITERAL_X:
@@ -3711,17 +3711,25 @@ static int execute (hcl_t* hcl)
 			case HCL_CODE_MAKE_FUNCTION:
 			{
 				hcl_oop_function_t func;
-				hcl_oow_t b3;
+				hcl_oow_t b3, b4;
 				hcl_oow_t joff;
 
 				/* b1 - block temporaries mask
-				 * b2 - literal frame base
-				 * b3 - literal frame size */
+				 * b2 - block temporaries mask
+				 * b3 - literal frame base
+				 * b4 - literal frame size */
 				FETCH_PARAM_CODE_TO (hcl, b1);
 				FETCH_PARAM_CODE_TO (hcl, b2);
 				FETCH_PARAM_CODE_TO (hcl, b3);
+				FETCH_PARAM_CODE_TO (hcl, b4);
 
-				LOG_INST_3 (hcl, "make_function %zu %zu %zu", b1, b2, b3);
+				b1 = (b1 << (8 * HCL_CODE_LONG_PARAM_SIZE)) | b2;
+				LOG_INST_6 (hcl, "make_function %zu %zu %zu %zu %zu %zu", 
+					GET_BLKTMPR_MASK_VA(b1),
+					GET_BLKTMPR_MASK_NARGS(b1),
+					GET_BLKTMPR_MASK_NRVARS(b1),
+					GET_BLKTMPR_MASK_NLVARS(b1),
+					b3, b4);
 
 				HCL_ASSERT (hcl, b1 >= 0);
 
@@ -3736,13 +3744,13 @@ static int execute (hcl_t* hcl)
 
 				/* copy the byte codes from the active context to the new context */
 			#if (HCL_CODE_LONG_PARAM_SIZE == 2)
-				func = make_function(hcl, b3, &hcl->active_code[hcl->ip + 3], joff, HCL_NULL);
+				func = make_function(hcl, b4, &hcl->active_code[hcl->ip + 3], joff, HCL_NULL);
 			#else
-				func = make_function(hcl, b3, &hcl->active_code[hcl->ip + 2], joff, HCL_NULL);
+				func = make_function(hcl, b4, &hcl->active_code[hcl->ip + 2], joff, HCL_NULL);
 			#endif
 				if (HCL_UNLIKELY(!func)) goto oops;
 
-				fill_function_data (hcl, func, b1, hcl->active_context, &hcl->active_function->literal_frame[b2], b3);
+				fill_function_data (hcl, func, b1, hcl->active_context, &hcl->active_function->literal_frame[b3], b4);
 
 				/* push the new function to the stack of the active context */
 				HCL_STACK_PUSH (hcl, (hcl_oop_t)func);
@@ -3753,10 +3761,16 @@ static int execute (hcl_t* hcl)
 			{
 				hcl_oop_block_t blkobj;
 
-				/* b1 - block temporaries mask */
+				/* b1 - block temporaries mask
+				 * b2 - block temporaries mask */
 				FETCH_PARAM_CODE_TO (hcl, b1);
-
-				LOG_INST_1 (hcl, "make_block %zu", b1);
+				FETCH_PARAM_CODE_TO (hcl, b2);
+				b1 = (b1 << (8 * HCL_CODE_LONG_PARAM_SIZE)) | b2;
+				LOG_INST_4 (hcl, "make_block %zu %zu %zu %zu", 
+					GET_BLKTMPR_MASK_VA(b1),
+					GET_BLKTMPR_MASK_NARGS(b1),
+					GET_BLKTMPR_MASK_NRVARS(b1),
+					GET_BLKTMPR_MASK_NLVARS(b1));
 
 				HCL_ASSERT (hcl, b1 >= 0);
 
