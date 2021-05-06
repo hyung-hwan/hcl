@@ -670,7 +670,9 @@ static int emit_indexed_variable_access (hcl_t* hcl, hcl_oow_t index, hcl_oob_t 
 
 /* ========================================================================= */
 
-static int push_fnblk (hcl_t* hcl, const hcl_ioloc_t* errloc, hcl_ooi_t tmpr_mask, hcl_oow_t tmpr_count, hcl_oow_t tmpr_len, hcl_oow_t make_inst_pos, hcl_oow_t lfbase)
+static int push_fnblk (hcl_t* hcl, const hcl_ioloc_t* errloc, 
+	hcl_oow_t tmpr_va, hcl_oow_t tmpr_nargs, hcl_oow_t tmpr_nrvars, hcl_oow_t tmpr_nlvars,
+	hcl_oow_t tmpr_count, hcl_oow_t tmpr_len, hcl_oow_t make_inst_pos, hcl_oow_t lfbase)
 {
 	hcl_oow_t new_depth;
 
@@ -699,8 +701,10 @@ static int push_fnblk (hcl_t* hcl, const hcl_ioloc_t* errloc, hcl_ooi_t tmpr_mas
 
 	hcl->c->fnblk.info[new_depth].tmprlen = tmpr_len;
 	hcl->c->fnblk.info[new_depth].tmprcnt = tmpr_count;
-	hcl->c->fnblk.info[new_depth].tmprmask = tmpr_mask;
-	
+	hcl->c->fnblk.info[new_depth].tmpr_va = tmpr_va;
+	hcl->c->fnblk.info[new_depth].tmpr_nargs = tmpr_nargs;
+	hcl->c->fnblk.info[new_depth].tmpr_nrvars = tmpr_nrvars;
+	hcl->c->fnblk.info[new_depth].tmpr_nlvars = tmpr_nlvars;
 
 	/* remember the control block depth before the function block is entered */
 	hcl->c->fnblk.info[new_depth].cblk_base = hcl->c->cblk.depth; 
@@ -723,7 +727,8 @@ static void pop_fnblk (hcl_t* hcl)
 	mip = hcl->c->fnblk.info[hcl->c->fnblk.depth].make_inst_pos;
 	if (mip < hcl->code.bc.len)
 	{
-		HCL_ASSERT (hcl, hcl->code.bc.ptr[mip] == HCL_CODE_MAKE_BLOCK || hcl->code.bc.ptr[mip] == HCL_CODE_MAKE_FUNCTION); 
+		HCL_ASSERT (hcl, hcl->code.bc.ptr[mip] == HCL_CODE_MAKE_BLOCK || 
+		                 hcl->code.bc.ptr[mip] == HCL_CODE_MAKE_FUNCTION); 
 /* TODO: update the tmpr_mask... */
 		patch_double_long_params (hcl, mip + 1, -1, hcl->c->fnblk.info[hcl->c->fnblk.depth].tmprcnt);
 	}
@@ -1766,9 +1771,9 @@ static int compile_lambda (hcl_t* hcl, hcl_cnode_t* src, int defun)
 
 	HCL_ASSERT (hcl, nargs + nlvars == hcl->c->tv.wcount - saved_tv_wcount);
 
-	tmpr_mask = ENCODE_BLKTMPR_MASK(0, nargs, 0, nlvars);
-	if (push_fnblk(hcl, HCL_CNODE_GET_LOC(src), tmpr_mask, hcl->c->tv.wcount, hcl->c->tv.s.len, hcl->code.bc.len, hcl->code.lit.len) <= -1) return -1;
+	if (push_fnblk(hcl, HCL_CNODE_GET_LOC(src), 0, nargs, 0, nlvars, hcl->c->tv.wcount, hcl->c->tv.s.len, hcl->code.bc.len, hcl->code.lit.len) <= -1) return -1;
 	
+	tmpr_mask = ENCODE_BLKTMPR_MASK(0, nargs, 0, nlvars);
 	if (hcl->option.trait & HCL_TRAIT_INTERACTIVE)
 	{
 		/* make_function tmpr_mask lfbase lfsize */
@@ -2026,6 +2031,7 @@ static HCL_INLINE int compile_catch (hcl_t* hcl)
 	hcl_cframe_t* cf;
 	hcl_ooi_t jump_inst_pos;
 	hcl_oow_t exarg_offset, exarg_index;
+	hcl_fnblk_info_t* fbi;
 
 	cf = GET_TOP_CFRAME(hcl);
 	HCL_ASSERT (hcl, cf->opcode == COP_COMPILE_CATCH);
@@ -2063,16 +2069,18 @@ static HCL_INLINE int compile_catch (hcl_t* hcl)
 		return -1;
 	}
 
-/* -------------------------------------------- */
-	/* add the exception variable to the local variable list... increase the number of local variables */
+	/* add the exception variable to the local variable list. increase the number of local variables */
 	exarg_offset = hcl->c->tv.s.len + 1; /* when the variable name is added, its offset will be the current length + 1 for a space character added */
 	exarg_index = hcl->c->tv.wcount;
 	if (add_temporary_variable(hcl, HCL_CNODE_GET_TOK(exarg), hcl->c->tv.s.len) <= -1) return -1;
-	HCL_ASSERT (hcl, hcl->c->fnblk.info[hcl->c->fnblk.depth].tmprlen == hcl->c->tv.s.len - HCL_CNODE_GET_TOKLEN(exarg) - 1);
-	HCL_ASSERT (hcl, hcl->c->fnblk.info[hcl->c->fnblk.depth].tmprcnt == exarg_index);
-	hcl->c->fnblk.info[hcl->c->fnblk.depth].tmprlen = hcl->c->tv.s.len;
-	hcl->c->fnblk.info[hcl->c->fnblk.depth].tmprcnt = hcl->c->tv.wcount;
-/* -------------------------------------------- */
+
+	fbi = &hcl->c->fnblk.info[hcl->c->fnblk.depth];
+	HCL_ASSERT (hcl, fbi->tmprlen == hcl->c->tv.s.len - HCL_CNODE_GET_TOKLEN(exarg) - 1);
+	HCL_ASSERT (hcl, fbi->tmprcnt == exarg_index);
+	fbi->tmprlen = hcl->c->tv.s.len;
+	fbi->tmprcnt = hcl->c->tv.wcount;
+	fbi->tmpr_nlvars = fbi->tmpr_nlvars + 1;
+	HCL_ASSERT (hcl, fbi->tmpr_nargs + fbi->tmpr_nrvars + fbi->tmpr_nlvars == fbi->tmprcnt);
 
 	obj = HCL_CNODE_CONS_CDR(obj);
 
@@ -2087,7 +2095,7 @@ static HCL_INLINE int compile_catch (hcl_t* hcl)
 	PUSH_SUBCFRAME (hcl, COP_POST_CATCH, cmd);
 	cf = GET_SUBCFRAME(hcl);
 	cf->u.post_catch.jump_inst_pos = jump_inst_pos;
-	cf->u.post_catch.exarg_offset = exarg_offset; /* there is only 1 exception varilable. using the offset is easier that to use the variable position */
+	cf->u.post_catch.exarg_offset = exarg_offset; /* there is only 1 exception varilable. using the offset is easier than to use the variable position */
 
 	return 0;
 }
@@ -3750,8 +3758,6 @@ int hcl_compile (hcl_t* hcl, hcl_cnode_t* obj, int flags)
 
 	if (hcl->c->fnblk.depth <= -1)
 	{
-		hcl_ooi_t tmpr_mask;
-
 		HCL_ASSERT (hcl, hcl->c->fnblk.depth == -1);
 		HCL_ASSERT (hcl, hcl->c->tv.s.len == 0);
 		HCL_ASSERT (hcl, hcl->c->tv.wcount == 0);
@@ -3759,8 +3765,7 @@ int hcl_compile (hcl_t* hcl, hcl_cnode_t* obj, int flags)
 /* TODO: HCL_TYPE_MAX(hcl_oow_t) as make_inst_pos is wrong for this top-level. fix it later ... 
  * fixing it is needed to support exception variable at the top-level... */
 		/* keep a virtual function block for the top-level compilation */
-		tmpr_mask = ENCODE_BLKTMPR_MASK(0, 0, 0, hcl->c->tv.wcount);
-		if (push_fnblk(hcl, HCL_NULL, tmpr_mask, hcl->c->tv.wcount, hcl->c->tv.s.len, HCL_TYPE_MAX(hcl_oow_t), 0) <= -1) return -1;
+		if (push_fnblk(hcl, HCL_NULL, 0, 0, 0, hcl->c->tv.wcount, hcl->c->tv.wcount, hcl->c->tv.s.len, HCL_TYPE_MAX(hcl_oow_t), 0) <= -1) return -1;
 	}
 	top_fnblk_saved = hcl->c->fnblk.info[0];
 	HCL_ASSERT (hcl, hcl->c->fnblk.depth == 0); /* ensure the virtual function block is added */

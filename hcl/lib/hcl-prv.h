@@ -389,7 +389,10 @@ struct hcl_fnblk_info_t
 {
 	hcl_oow_t tmprlen;
 	hcl_oow_t tmprcnt;
-	hcl_oow_t tmprmask;
+	hcl_oow_t tmpr_va;
+	hcl_oow_t tmpr_nargs;
+	hcl_oow_t tmpr_nrvars;
+	hcl_oow_t tmpr_nlvars;
 	hcl_oow_t make_inst_pos;
 	hcl_oow_t lfbase;
 
