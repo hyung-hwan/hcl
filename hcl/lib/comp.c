@@ -397,17 +397,6 @@ static int emit_single_param_instruction (hcl_t* hcl, int cmd, hcl_oow_t param_1
 		case HCL_CODE_POP_INTO_BYTEARRAY:
 			bc = cmd;
 			goto write_long;
-
-		/* MAKE_FUNCTION is a quad-parameter instruction. 
-		 * The caller must emit two more parameters after the call to this function.
-		 * however the instruction format is the same up to the second
-		 * parameters between MAKE_FUNCTION and MAKE_BLOCK.
-		 */
-		case HCL_CODE_MAKE_FUNCTION:
-		case HCL_CODE_MAKE_BLOCK:
-			/* write_long2 produces two parameters */
-			bc = cmd;
-			goto write_long2;
 	}
 
 	hcl_seterrnum (hcl, HCL_EINVAL);
@@ -479,6 +468,16 @@ static int emit_double_param_instruction (hcl_t* hcl, int cmd, hcl_oow_t param_1
 				bc = cmd | 0x80; 
 				goto write_long;
 			}
+
+		/* MAKE_FUNCTION is a quad-parameter instruction. 
+		 * The caller must emit two more parameters after the call to this function.
+		 * however the instruction format is the same up to the second
+		 * parameters between MAKE_FUNCTION and MAKE_BLOCK.
+		 */
+		case HCL_CODE_MAKE_BLOCK:
+		case HCL_CODE_MAKE_FUNCTION:
+			bc = cmd;
+			goto write_long;
 	}
 
 	hcl_seterrnum (hcl, HCL_EINVAL);
@@ -497,9 +496,9 @@ write_long:
 	}
 #if (HCL_CODE_LONG_PARAM_SIZE == 2)
 	if (emit_byte_instruction(hcl, bc, srcloc) <= -1 ||
-	    emit_byte_instruction(hcl, param_1 >> 8, HCL_NULL) <= -1 ||
+	    emit_byte_instruction(hcl, (param_1 >> 8) & 0xFF, HCL_NULL) <= -1 ||
 	    emit_byte_instruction(hcl, param_1 & 0xFF, HCL_NULL) <= -1 ||
-	    emit_byte_instruction(hcl, param_2 >> 8, HCL_NULL) <= -1 ||
+	    emit_byte_instruction(hcl, (param_2 >> 8) & 0xFF, HCL_NULL) <= -1 ||
 	    emit_byte_instruction(hcl, param_2 & 0xFF, HCL_NULL) <= -1) return -1;
 #else
 	if (emit_byte_instruction(hcl, bc, srcloc) <= -1 ||
@@ -614,22 +613,29 @@ static HCL_INLINE void patch_long_param (hcl_t* hcl, hcl_ooi_t ip, hcl_oow_t par
 #endif
 }
 
-static HCL_INLINE void patch_double_long_params (hcl_t* hcl, hcl_ooi_t ip, hcl_ooi_t param_1, hcl_ooi_t param_2)
+static HCL_INLINE void patch_double_long_params (hcl_t* hcl, hcl_ooi_t ip, hcl_oow_t param_1, hcl_oow_t param_2)
 {
 #if (HCL_CODE_LONG_PARAM_SIZE == 2)
-	if (param_1 >= 0)
-	{
-		patch_instruction (hcl, ip, param_1 >> 8);
-		patch_instruction (hcl, ip + 1, param_1 & 0xFF);
-	}
-	if (param_2 >= 0)
-	{
-		patch_instruction (hcl, ip + 2, param_2 >> 8);
-		patch_instruction (hcl, ip + 3, param_2 & 0xFF);
-	}
+	patch_instruction (hcl, ip, param_1 >> 8);
+	patch_instruction (hcl, ip + 1, param_1 & 0xFF);
+	patch_instruction (hcl, ip + 2, param_2 >> 8);
+	patch_instruction (hcl, ip + 3, param_2 & 0xFF);
 #else
-	if (param_1 >= 0) patch_instruction (hcl, ip, param_1);
-	if (param_2 >= 0) patch_instruction (hcl, ip + 1, param_2);
+	patch_instruction (hcl, ip, param_1);
+	patch_instruction (hcl, ip + 1, param_2);
+#endif
+}
+
+static HCL_INLINE void patch_double_long_params_with_oow (hcl_t* hcl, hcl_ooi_t ip, hcl_oow_t param)
+{
+#if (HCL_CODE_LONG_PARAM_SIZE == 2)
+	patch_instruction (hcl, ip,     (param >> 24) & 0xFF);
+	patch_instruction (hcl, ip + 1, (param >> 16) & 0xFF);
+	patch_instruction (hcl, ip + 2, (param >> 8) & 0xFF);
+	patch_instruction (hcl, ip + 3, (param >> 0) & 0xFF);
+#else
+	patch_instruction (hcl, ip,     (param >> 8) & 9xFF);
+	patch_instruction (hcl, ip + 1, (param >> 0) & 0xFF);
 #endif
 }
 
@@ -717,24 +723,15 @@ static int push_fnblk (hcl_t* hcl, const hcl_ioloc_t* errloc,
 
 static void pop_fnblk (hcl_t* hcl)
 {
-	hcl_oow_t mip;
+	hcl_fnblk_info_t* fbi;
 	
 	HCL_ASSERT (hcl, hcl->c->fnblk.depth >= 0);
 	/* if pop_cblk() has been called properly, the following assertion must be true
 	 * and the assignment on the next line isn't necessary */
 
-	/* patch the temporary mask in the MAKE_BLOCK or MAKE_FUNCTION instruction */
-	mip = hcl->c->fnblk.info[hcl->c->fnblk.depth].make_inst_pos;
-	if (mip < hcl->code.bc.len)
-	{
-		HCL_ASSERT (hcl, hcl->code.bc.ptr[mip] == HCL_CODE_MAKE_BLOCK || 
-		                 hcl->code.bc.ptr[mip] == HCL_CODE_MAKE_FUNCTION); 
-/* TODO: update the tmpr_mask... */
-		patch_double_long_params (hcl, mip + 1, -1, hcl->c->fnblk.info[hcl->c->fnblk.depth].tmprcnt);
-	}
-
-	HCL_ASSERT (hcl, hcl->c->cblk.depth == hcl->c->fnblk.info[hcl->c->fnblk.depth].cblk_base); 
-	hcl->c->cblk.depth = hcl->c->fnblk.info[hcl->c->fnblk.depth].cblk_base;
+	fbi = &hcl->c->fnblk.info[hcl->c->fnblk.depth];
+	HCL_ASSERT (hcl, hcl->c->cblk.depth == fbi->cblk_base); 
+	hcl->c->cblk.depth = fbi->cblk_base;
 	/* keep hcl->code.lit.len without restoration */
 
 	hcl->c->fnblk.depth--;
@@ -748,6 +745,22 @@ static void pop_fnblk (hcl_t* hcl)
 	{
 		hcl->c->tv.s.len = 0;
 		hcl->c->tv.wcount = 0;
+	}
+
+	if (fbi->make_inst_pos < hcl->code.bc.len)
+	{
+		hcl_oow_t tmpr_mask;
+
+		/* patch the temporary mask parameter for the MAKE_BLOCK or MAKE_FUNCTION instruction */
+		HCL_ASSERT (hcl, hcl->code.bc.ptr[fbi->make_inst_pos] == HCL_CODE_MAKE_BLOCK || 
+		                 hcl->code.bc.ptr[fbi->make_inst_pos] == HCL_CODE_MAKE_FUNCTION); 
+
+		/* the total number of temporaries in this function block must be the sum of 
+		 * the number of arguments, return variables and local variables */
+		HCL_ASSERT (hcl, fbi->tmprcnt - hcl->c->tv.wcount == fbi->tmpr_nargs + fbi->tmpr_nrvars + fbi->tmpr_nlvars);
+
+		tmpr_mask = ENCODE_BLKTMPR_MASK(fbi->tmpr_va, fbi->tmpr_nargs, fbi->tmpr_nrvars, fbi->tmpr_nlvars);
+		patch_double_long_params_with_oow (hcl, fbi->make_inst_pos + 1, tmpr_mask);
 	}
 }
 
@@ -1628,7 +1641,7 @@ static int collect_local_vardcl (hcl_t* hcl, hcl_cnode_t* obj, hcl_cnode_t** nex
 static int compile_lambda (hcl_t* hcl, hcl_cnode_t* src, int defun)
 {
 	hcl_cnode_t* cmd, * obj, * args;
-	hcl_oow_t nargs, nlvars, tmpr_mask;
+	hcl_oow_t nargs, nrvars, nlvars;
 	hcl_ooi_t jump_inst_pos, lfbase_pos, lfsize_pos;
 	hcl_oow_t saved_tv_wcount, tv_dup_start;
 	hcl_cnode_t* defun_name;
@@ -1759,6 +1772,14 @@ static int compile_lambda (hcl_t* hcl, hcl_cnode_t* src, int defun)
 		return -1;
 	}
 
+	nrvars = 0; /* TODO: support return variables , */
+	if (nrvars > MAX_CODE_NBLKLVARS)
+	{
+		hcl_setsynerrbfmt (hcl, HCL_SYNERR_VARFLOOD, HCL_CNODE_GET_LOC(args), HCL_NULL, "too many(%zu) return variables in %.*js", nlvars, HCL_CNODE_GET_TOKLEN(cmd), HCL_CNODE_GET_TOKPTR(cmd)); 
+		return -1;
+	}
+	HCL_ASSERT (hcl, nargs + nrvars == hcl->c->tv.wcount - saved_tv_wcount);
+
 	obj = HCL_CNODE_CONS_CDR(obj);
 	tv_dup_start = hcl->c->tv.s.len;
 	if (collect_local_vardcl(hcl, obj, &obj, tv_dup_start, &nlvars) <= -1) return -1;
@@ -1769,15 +1790,14 @@ static int compile_lambda (hcl_t* hcl, hcl_cnode_t* src, int defun)
 		return -1;
 	}
 
-	HCL_ASSERT (hcl, nargs + nlvars == hcl->c->tv.wcount - saved_tv_wcount);
+	HCL_ASSERT (hcl, nargs + nrvars + nlvars == hcl->c->tv.wcount - saved_tv_wcount);
 
-	if (push_fnblk(hcl, HCL_CNODE_GET_LOC(src), 0, nargs, 0, nlvars, hcl->c->tv.wcount, hcl->c->tv.s.len, hcl->code.bc.len, hcl->code.lit.len) <= -1) return -1;
+	if (push_fnblk(hcl, HCL_CNODE_GET_LOC(src), 0, nargs, nrvars, nlvars, hcl->c->tv.wcount, hcl->c->tv.s.len, hcl->code.bc.len, hcl->code.lit.len) <= -1) return -1;
 	
-	tmpr_mask = ENCODE_BLKTMPR_MASK(0, nargs, 0, nlvars);
 	if (hcl->option.trait & HCL_TRAIT_INTERACTIVE)
 	{
-		/* make_function tmpr_mask lfbase lfsize */
-		if (emit_single_param_instruction(hcl, HCL_CODE_MAKE_FUNCTION, tmpr_mask, HCL_CNODE_GET_LOC(cmd)) <= -1) return -1;
+		/* MAKE_FUNCTION tmpr_mask_1 tmpr_mask_2 lfbase lfsize */
+		if (emit_double_param_instruction(hcl, HCL_CODE_MAKE_FUNCTION, 0, 0, HCL_CNODE_GET_LOC(cmd)) <= -1) return -1;
 		lfbase_pos = hcl->code.bc.len;
 		if (emit_long_param(hcl, hcl->code.lit.len - hcl->c->fnblk.info[hcl->c->fnblk.depth - 1].lfbase) <= -1) return -1; /* literal frame base */
 		lfsize_pos = hcl->code.bc.len; /* literal frame size */
@@ -1785,7 +1805,8 @@ static int compile_lambda (hcl_t* hcl, hcl_cnode_t* src, int defun)
 	}
 	else
 	{
-		if (emit_single_param_instruction(hcl, HCL_CODE_MAKE_BLOCK, tmpr_mask, HCL_CNODE_GET_LOC(cmd)) <= -1) return -1;
+		/* MAKE_BLOCK tmpr_mask_1 tmpr_mask_2 - will patch tmpr_mask in pop_fnblk() */
+		if (emit_double_param_instruction(hcl, HCL_CODE_MAKE_BLOCK, 0, 0, HCL_CNODE_GET_LOC(cmd)) <= -1) return -1;
 	}
 
 	HCL_ASSERT (hcl, hcl->code.bc.len < HCL_SMOOI_MAX);  /* guaranteed in emit_byte_instruction() */
