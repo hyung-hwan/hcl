@@ -670,7 +670,7 @@ static int emit_indexed_variable_access (hcl_t* hcl, hcl_oow_t index, hcl_oob_t 
 
 /* ========================================================================= */
 
-static int push_fnblk (hcl_t* hcl, const hcl_ioloc_t* errloc, hcl_oow_t tmpr_count, hcl_oow_t tmpr_len, hcl_oow_t make_inst_pos, hcl_oow_t lfbase)
+static int push_fnblk (hcl_t* hcl, const hcl_ioloc_t* errloc, hcl_ooi_t tmpr_mask, hcl_oow_t tmpr_count, hcl_oow_t tmpr_len, hcl_oow_t make_inst_pos, hcl_oow_t lfbase)
 {
 	hcl_oow_t new_depth;
 
@@ -699,7 +699,8 @@ static int push_fnblk (hcl_t* hcl, const hcl_ioloc_t* errloc, hcl_oow_t tmpr_cou
 
 	hcl->c->fnblk.info[new_depth].tmprlen = tmpr_len;
 	hcl->c->fnblk.info[new_depth].tmprcnt = tmpr_count;
-
+	hcl->c->fnblk.info[new_depth].tmprmask = tmpr_mask;
+	
 
 	/* remember the control block depth before the function block is entered */
 	hcl->c->fnblk.info[new_depth].cblk_base = hcl->c->cblk.depth; 
@@ -718,11 +719,12 @@ static void pop_fnblk (hcl_t* hcl)
 	/* if pop_cblk() has been called properly, the following assertion must be true
 	 * and the assignment on the next line isn't necessary */
 
-	/* patch the temporary count in the MAKE_BLOCK or MAKE_FUNCTION instruction */
+	/* patch the temporary mask in the MAKE_BLOCK or MAKE_FUNCTION instruction */
 	mip = hcl->c->fnblk.info[hcl->c->fnblk.depth].make_inst_pos;
 	if (mip < hcl->code.bc.len)
 	{
 		HCL_ASSERT (hcl, hcl->code.bc.ptr[mip] == HCL_CODE_MAKE_BLOCK || hcl->code.bc.ptr[mip] == HCL_CODE_MAKE_FUNCTION); 
+/* TODO: update the tmpr_mask... */
 		patch_double_long_params (hcl, mip + 1, -1, hcl->c->fnblk.info[hcl->c->fnblk.depth].tmprcnt);
 	}
 
@@ -1764,9 +1766,8 @@ static int compile_lambda (hcl_t* hcl, hcl_cnode_t* src, int defun)
 
 	HCL_ASSERT (hcl, nargs + nlvars == hcl->c->tv.wcount - saved_tv_wcount);
 
-	if (push_fnblk(hcl, HCL_CNODE_GET_LOC(src), hcl->c->tv.wcount, hcl->c->tv.s.len, hcl->code.bc.len, hcl->code.lit.len) <= -1) return -1;
-
 	tmpr_mask = ENCODE_BLKTMPR_MASK(0, nargs, 0, nlvars);
+	if (push_fnblk(hcl, HCL_CNODE_GET_LOC(src), tmpr_mask, hcl->c->tv.wcount, hcl->c->tv.s.len, hcl->code.bc.len, hcl->code.lit.len) <= -1) return -1;
 	
 	if (hcl->option.trait & HCL_TRAIT_INTERACTIVE)
 	{
@@ -3749,14 +3750,17 @@ int hcl_compile (hcl_t* hcl, hcl_cnode_t* obj, int flags)
 
 	if (hcl->c->fnblk.depth <= -1)
 	{
+		hcl_ooi_t tmpr_mask;
+
 		HCL_ASSERT (hcl, hcl->c->fnblk.depth == -1);
 		HCL_ASSERT (hcl, hcl->c->tv.s.len == 0);
 		HCL_ASSERT (hcl, hcl->c->tv.wcount == 0);
 
 /* TODO: HCL_TYPE_MAX(hcl_oow_t) as make_inst_pos is wrong for this top-level. fix it later ... 
- * finxing it is needed to support exception variable at the top-level... */
+ * fixing it is needed to support exception variable at the top-level... */
 		/* keep a virtual function block for the top-level compilation */
-		if (push_fnblk(hcl, HCL_NULL, hcl->c->tv.wcount, hcl->c->tv.s.len, HCL_TYPE_MAX(hcl_oow_t), 0) <= -1) return -1;
+		tmpr_mask = ENCODE_BLKTMPR_MASK(0, 0, 0, hcl->c->tv.wcount);
+		if (push_fnblk(hcl, HCL_NULL, tmpr_mask, hcl->c->tv.wcount, hcl->c->tv.s.len, HCL_TYPE_MAX(hcl_oow_t), 0) <= -1) return -1;
 	}
 	top_fnblk_saved = hcl->c->fnblk.info[0];
 	HCL_ASSERT (hcl, hcl->c->fnblk.depth == 0); /* ensure the virtual function block is added */
