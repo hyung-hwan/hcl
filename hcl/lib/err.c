@@ -125,6 +125,7 @@ static char* synerrstr[] =
 	"no separator between array/dictionary elements",
 	"#include error",
 
+	"... disallowed",
 	"loop body too big",
 	"if body too big",
 	"lambda block too big",

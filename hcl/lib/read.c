@@ -1078,6 +1078,35 @@ retry:
 			break;
 
 		case '.':
+			oldc = c;
+			GET_CHAR_TO (hcl, c);
+			if(c == '.')
+			{
+				hcl_iolxc_t sd;
+				hcl_ooci_t oldc2;
+
+				sd = hcl->c->lxc; /* back up '#' */
+
+				oldc2 = c;
+				GET_CHAR_TO (hcl, c);
+				if (c == '.')
+				{
+					SET_TOKEN_TYPE (hcl, HCL_IOTOK_ELLIPSIS);
+					ADD_TOKEN_CHAR (hcl, oldc);
+					ADD_TOKEN_CHAR (hcl, oldc2);
+					ADD_TOKEN_CHAR (hcl, c);
+					break;
+				}
+
+				unget_char (hcl, &hcl->c->lxc);
+				unget_char (hcl, &sd);
+			}
+			else
+			{
+				unget_char (hcl, &hcl->c->lxc);
+			}
+			c = oldc;
+
 			SET_TOKEN_TYPE (hcl, HCL_IOTOK_DOT);
 			ADD_TOKEN_CHAR (hcl, c);
 			break;
@@ -1910,6 +1939,10 @@ static hcl_cnode_t* read_object (hcl_t* hcl)
 				obj = hcl_makecnodefalse(hcl, TOKEN_LOC(hcl), TOKEN_NAME(hcl));
 				break;
 
+			case HCL_IOTOK_ELLIPSIS:
+				obj = hcl_makecnodeellipsis(hcl, TOKEN_LOC(hcl), TOKEN_NAME(hcl));
+				break;
+
 			case HCL_IOTOK_SMPTRLIT:
 			{
 				hcl_oow_t i;
@@ -1987,6 +2020,7 @@ static hcl_cnode_t* read_object (hcl_t* hcl)
 			case HCL_IOTOK_IDENT_DOTTED:
 				obj = hcl_makecnodedsymbol(hcl, TOKEN_LOC(hcl), TOKEN_NAME(hcl));
 				break;
+
 		}
 
 		if (!obj) goto oops;

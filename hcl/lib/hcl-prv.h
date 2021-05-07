@@ -148,6 +148,7 @@ enum hcl_iotok_type_t
 	HCL_IOTOK_IDENT,
 	HCL_IOTOK_IDENT_DOTTED,
 	HCL_IOTOK_DOT,
+	HCL_IOTOK_ELLIPSIS,
 	HCL_IOTOK_COLON,
 	HCL_IOTOK_COMMA,
 	HCL_IOTOK_LPAREN,
@@ -195,6 +196,7 @@ enum hcl_cnode_type_t
 	HCL_CNODE_NIL,
 	HCL_CNODE_TRUE,
 	HCL_CNODE_FALSE,
+	HCL_CNODE_ELLIPSIS,
 
 	HCL_CNODE_CONS,
 	HCL_CNODE_ELIST, /* empty list */
@@ -208,6 +210,8 @@ typedef enum hcl_cnode_type_t hcl_cnode_type_t;
 #define HCL_CNODE_GET_TOKPTR(x) ((x)->cn_tok.ptr)
 #define HCL_CNODE_GET_TOKLEN(x) ((x)->cn_tok.len)
 
+#define HCL_CNODE_IS_ELLIPSIS(x) ((x)->cn_type == HCL_CNODE_ELLIPSIS)
+
 #define HCL_CNODE_IS_SYMBOL(x) ((x)->cn_type == HCL_CNODE_SYMBOL)
 #define HCL_CNODE_IS_SYMBOL_SYNCODED(x, code) ((x)->cn_type == HCL_CNODE_SYMBOL && (x)->u.symbol.syncode == (code))
 #define HCL_CNODE_SYMBOL_SYNCODE(x) ((x)->u.symbol.syncode)
@@ -219,7 +223,6 @@ typedef enum hcl_cnode_type_t hcl_cnode_type_t;
 #define HCL_CNODE_CONS_CONCODE(x) ((x)->u.cons.concode)
 #define HCL_CNODE_CONS_CAR(x) ((x)->u.cons.car)
 #define HCL_CNODE_CONS_CDR(x) ((x)->u.cons.cdr)
-
 
 #define HCL_CNODE_IS_ELIST(x) ((x)->cn_type == HCL_CNODE_ELIST)
 #define HCL_CNODE_IS_ELIST_CONCODED(x, code) ((x)->cn_type == HCL_CNODE_ELIST && (x)->u.elist.concode == (code))
@@ -1404,6 +1407,7 @@ int hcl_emitbyteinstruction (
 hcl_cnode_t* hcl_makecnodenil (hcl_t* hcl, const hcl_ioloc_t* loc, const hcl_oocs_t* tok);
 hcl_cnode_t* hcl_makecnodetrue (hcl_t* hcl, const hcl_ioloc_t* loc, const  hcl_oocs_t* tok);
 hcl_cnode_t* hcl_makecnodefalse (hcl_t* hcl, const hcl_ioloc_t* loc, const  hcl_oocs_t* tok);
+hcl_cnode_t* hcl_makecnodeellipsis (hcl_t* hcl, const hcl_ioloc_t* loc, const  hcl_oocs_t* tok);
 hcl_cnode_t* hcl_makecnodecharlit (hcl_t* hcl, const hcl_ioloc_t* loc, const  hcl_oocs_t* tok, const hcl_ooch_t v);
 hcl_cnode_t* hcl_makecnodesymbol (hcl_t* hcl, const hcl_ioloc_t* loc, const  hcl_oocs_t* tok);
 hcl_cnode_t* hcl_makecnodedsymbol (hcl_t* hcl, const hcl_ioloc_t* loc, const  hcl_oocs_t* tok);

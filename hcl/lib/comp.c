@@ -751,7 +751,7 @@ static void pop_fnblk (hcl_t* hcl)
 	{
 		hcl_oow_t tmpr_mask;
 
-		/* patch the temporary mask parameter for the MAKE_BLOCK or MAKE_FUNCTION instruction */
+		/* patch the temporaries mask parameter for the MAKE_BLOCK or MAKE_FUNCTION instruction */
 		HCL_ASSERT (hcl, hcl->code.bc.ptr[fbi->make_inst_pos] == HCL_CODE_MAKE_BLOCK || 
 		                 hcl->code.bc.ptr[fbi->make_inst_pos] == HCL_CODE_MAKE_FUNCTION); 
 
@@ -759,6 +759,8 @@ static void pop_fnblk (hcl_t* hcl)
 		 * the number of arguments, return variables and local variables */
 		HCL_ASSERT (hcl, fbi->tmprcnt - hcl->c->tv.wcount == fbi->tmpr_nargs + fbi->tmpr_nrvars + fbi->tmpr_nlvars);
 
+		/* the temporaries mask is a bit-mask that encodes the counts of different temporary variables.
+		 * and it's split to two intruction parameters when used with MAKE_BLOCK and MAKE_FUNCTION */
 		tmpr_mask = ENCODE_BLKTMPR_MASK(fbi->tmpr_va, fbi->tmpr_nargs, fbi->tmpr_nrvars, fbi->tmpr_nlvars);
 		patch_double_long_params_with_oow (hcl, fbi->make_inst_pos + 1, tmpr_mask);
 	}
@@ -1641,7 +1643,7 @@ static int collect_local_vardcl (hcl_t* hcl, hcl_cnode_t* obj, hcl_cnode_t** nex
 static int compile_lambda (hcl_t* hcl, hcl_cnode_t* src, int defun)
 {
 	hcl_cnode_t* cmd, * obj, * args;
-	hcl_oow_t nargs, nrvars, nlvars;
+	hcl_oow_t va, nargs, nrvars, nlvars;
 	hcl_ooi_t jump_inst_pos, lfbase_pos, lfsize_pos;
 	hcl_oow_t saved_tv_wcount, tv_dup_start;
 	hcl_cnode_t* defun_name;
@@ -1701,6 +1703,7 @@ static int compile_lambda (hcl_t* hcl, hcl_cnode_t* src, int defun)
 	}
 
 	/* process the argument list */
+	va = 0;
 	args = HCL_CNODE_CONS_CAR(obj);
 	HCL_ASSERT (hcl, args != HCL_NULL);
 	if (HCL_CNODE_IS_ELIST_CONCODED(args, HCL_CONCODE_XLIST))
@@ -1723,9 +1726,10 @@ static int compile_lambda (hcl_t* hcl, hcl_cnode_t* src, int defun)
 		do
 		{
 			arg = HCL_CNODE_CONS_CAR(dcl);
-			if (HCL_CNODE_IS_CONS(arg))
+			if (HCL_CNODE_IS_ELLIPSIS(arg))
 			{
-				
+				va = 1;
+				break;
 			}
 			else if (!HCL_CNODE_IS_SYMBOL(arg))
 			{
@@ -1792,7 +1796,7 @@ static int compile_lambda (hcl_t* hcl, hcl_cnode_t* src, int defun)
 
 	HCL_ASSERT (hcl, nargs + nrvars + nlvars == hcl->c->tv.wcount - saved_tv_wcount);
 
-	if (push_fnblk(hcl, HCL_CNODE_GET_LOC(src), 0, nargs, nrvars, nlvars, hcl->c->tv.wcount, hcl->c->tv.s.len, hcl->code.bc.len, hcl->code.lit.len) <= -1) return -1;
+	if (push_fnblk(hcl, HCL_CNODE_GET_LOC(src), va, nargs, nrvars, nlvars, hcl->c->tv.wcount, hcl->c->tv.s.len, hcl->code.bc.len, hcl->code.lit.len) <= -1) return -1;
 	
 	if (hcl->option.trait & HCL_TRAIT_INTERACTIVE)
 	{
@@ -2880,7 +2884,7 @@ redo:
 					goto done;
 
 				case HCL_CONCODE_VLIST:
-					hcl_setsynerrbfmt (hcl, HCL_SYNERR_VARDCLBANNED, HCL_CNODE_GET_LOC(oprnd), HCL_NULL, "variable declaration disallowed");
+					hcl_setsynerrbfmt (hcl, HCL_SYNERR_ELLIPSISBANNED, HCL_CNODE_GET_LOC(oprnd), HCL_NULL, "variable declaration disallowed");
 					return -1;
 
 				default:
@@ -2896,6 +2900,10 @@ redo:
 			oprnd = oprnd->u.shell.obj;
 			goto redo;
 
+		case HCL_CNODE_ELLIPSIS:
+			hcl_setsynerrbfmt (hcl, HCL_SYNERR_INTERN, HCL_CNODE_GET_LOC(oprnd), HCL_CNODE_GET_TOK(oprnd), "ellipsis disallowed in this context", HCL_CNODE_GET_TYPE(oprnd));
+			return -1;
+			
 		default:
 			hcl_setsynerrbfmt (hcl, HCL_SYNERR_INTERN, HCL_CNODE_GET_LOC(oprnd), HCL_CNODE_GET_TOK(oprnd), "internal error - unexpected object type %d", HCL_CNODE_GET_TYPE(oprnd));
 			return -1;

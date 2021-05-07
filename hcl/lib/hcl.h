@@ -131,6 +131,7 @@ enum hcl_synerrnum_t
 	HCL_SYNERR_NOSEP,         /* no seperator between array/dictionary elements */
 	HCL_SYNERR_INCLUDE,       /* #include error */
 
+	HCL_SYNERR_ELLIPSISBANNED, /* ... disallowed */
 	HCL_SYNERR_LOOPFLOOD,     /* loop body too big */
 	HCL_SYNERR_IFFLOOD,       /* if body too big */
 	HCL_SYNERR_BLKFLOOD,      /* lambda block too big */
