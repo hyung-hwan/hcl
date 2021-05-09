@@ -1085,7 +1085,7 @@ retry:
 				hcl_iolxc_t sd;
 				hcl_ooci_t oldc2;
 
-				sd = hcl->c->lxc; /* back up '#' */
+				sd = hcl->c->lxc; 
 
 				oldc2 = c;
 				GET_CHAR_TO (hcl, c);
@@ -1117,9 +1117,39 @@ retry:
 			break;
 
 		case ':':
+			oldc = c;
+			GET_CHAR_TO (hcl, c);
+			if(c == ':')
+			{
+				hcl_iolxc_t sd;
+				hcl_ooci_t oldc2;
+
+				sd = hcl->c->lxc;
+
+				oldc2 = c;
+				GET_CHAR_TO (hcl, c);
+				if (c == ':')
+				{
+					SET_TOKEN_TYPE (hcl, HCL_IOTOK_TRPCOLONS);
+					ADD_TOKEN_CHAR (hcl, oldc);
+					ADD_TOKEN_CHAR (hcl, oldc2);
+					ADD_TOKEN_CHAR (hcl, c);
+					break;
+				}
+
+				unget_char (hcl, &hcl->c->lxc);
+				unget_char (hcl, &sd);
+			}
+			else
+			{
+				unget_char (hcl, &hcl->c->lxc);
+			}
+			c = oldc;
+
 			SET_TOKEN_TYPE (hcl, HCL_IOTOK_COLON);
 			ADD_TOKEN_CHAR (hcl, c);
 			break;
+
 
 		case '\"':
 			if (get_string(hcl, '\"', '\\', 0, 0) <= -1) return -1;
@@ -1941,6 +1971,10 @@ static hcl_cnode_t* read_object (hcl_t* hcl)
 
 			case HCL_IOTOK_ELLIPSIS:
 				obj = hcl_makecnodeellipsis(hcl, TOKEN_LOC(hcl), TOKEN_NAME(hcl));
+				break;
+
+			case HCL_IOTOK_TRPCOLONS:
+				obj = hcl_makecnodetrpcolons(hcl, TOKEN_LOC(hcl), TOKEN_NAME(hcl));
 				break;
 
 			case HCL_IOTOK_SMPTRLIT:

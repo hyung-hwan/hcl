@@ -91,6 +91,7 @@ static char* synerrstr[] =
 {
 	"no error",
 	"internal error",
+	"unexpected compiler node",
 	"illegal character",
 	"illegal token",
 	"comment not closed",
@@ -126,6 +127,7 @@ static char* synerrstr[] =
 	"#include error",
 
 	"... disallowed",
+	"::: disallowed",
 	"loop body too big",
 	"if body too big",
 	"lambda block too big",

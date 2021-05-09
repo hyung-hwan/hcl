@@ -642,12 +642,15 @@ static HCL_INLINE void patch_double_long_params_with_oow (hcl_t* hcl, hcl_ooi_t 
 static int emit_indexed_variable_access (hcl_t* hcl, hcl_oow_t index, hcl_oob_t baseinst1, hcl_oob_t baseinst2, const hcl_ioloc_t* srcloc)
 {
 	hcl_oow_t i;
+	hcl_fnblk_info_t* fbi;
+
 
 	HCL_ASSERT (hcl, hcl->c->fnblk.depth >= 0);
+	fbi = &hcl->c->fnblk.info[hcl->c->fnblk.depth];
 
 	/* if a temporary variable is accessed inside a block,
 	 * use a special instruction to indicate it */
-	HCL_ASSERT (hcl, index < hcl->c->fnblk.info[hcl->c->fnblk.depth].tmprcnt);
+	HCL_ASSERT (hcl, index < fbi->tmprcnt);
 	for (i = hcl->c->fnblk.depth; i >= 0; i--)
 	{
 		hcl_oow_t parent_tmprcnt;
@@ -664,6 +667,11 @@ static int emit_indexed_variable_access (hcl_t* hcl, hcl_oow_t index, hcl_oob_t 
 			 * index_in_ctx is a relative index within the context found.
 			 */
 			if (emit_double_param_instruction(hcl, baseinst1, ctx_offset, index_in_ctx, srcloc) <= -1) return -1;
+			if (ctx_offset > 0) 
+			{
+				fbi->access_outer = 1; /* the current function block accesses temporaries in an outer function block */
+				hcl->c->fnblk.info[i].accessed_by_inner = 1; /* temporaries in an outer function block is accessed by the current function block */
+			}
 			return 0;
 		}
 	}
@@ -717,6 +725,8 @@ static int push_fnblk (hcl_t* hcl, const hcl_ioloc_t* errloc,
 
 	hcl->c->fnblk.info[new_depth].make_inst_pos = make_inst_pos;
 	hcl->c->fnblk.info[new_depth].lfbase = lfbase;
+	hcl->c->fnblk.info[new_depth].access_outer = 0;
+	hcl->c->fnblk.info[new_depth].accessed_by_inner = 0;
 	hcl->c->fnblk.depth = new_depth;
 	return 0;
 }
@@ -1704,12 +1714,13 @@ static int compile_lambda (hcl_t* hcl, hcl_cnode_t* src, int defun)
 
 	/* process the argument list */
 	va = 0;
+	nargs = 0;
+	nrvars = 0;
 	args = HCL_CNODE_CONS_CAR(obj);
 	HCL_ASSERT (hcl, args != HCL_NULL);
 	if (HCL_CNODE_IS_ELIST_CONCODED(args, HCL_CONCODE_XLIST))
 	{
 		/* empty list - no argument - (lambda () (+ 10 20)) */
-		nargs = 0;
 	}
 	else if (!HCL_CNODE_IS_CONS(args))
 	{
@@ -1719,39 +1730,84 @@ static int compile_lambda (hcl_t* hcl, hcl_cnode_t* src, int defun)
 	else
 	{
 		hcl_cnode_t* arg, * dcl;
+		int in_ret_args = 0;
 
 		tv_dup_start = hcl->c->tv.s.len;
-		nargs = 0;
 		dcl = args;
 		do
 		{
 			arg = HCL_CNODE_CONS_CAR(dcl);
-			if (HCL_CNODE_IS_ELLIPSIS(arg))
-			{
-				va = 1;
-				break;
-			}
-			else if (!HCL_CNODE_IS_SYMBOL(arg))
-			{
-				hcl_setsynerrbfmt (hcl, HCL_SYNERR_ARGNAME, HCL_CNODE_GET_LOC(arg), HCL_CNODE_GET_TOK(arg), "argument not a symbol in %.*js", HCL_CNODE_GET_TOKLEN(cmd), HCL_CNODE_GET_TOKPTR(cmd));
-				return -1;
-			}
 
-			if (HCL_CNODE_IS_SYMBOL(arg) && HCL_CNODE_SYMBOL_SYNCODE(arg) /* || HCL_OBJ_GET_FLAGS_KERNEL(arg) >= 2 */)
+			if (in_ret_args)
 			{
-				hcl_setsynerrbfmt (hcl, HCL_SYNERR_BANNEDARGNAME, HCL_CNODE_GET_LOC(arg), HCL_CNODE_GET_TOK(arg), "special symbol not to be declared as an argument in %.*js", HCL_CNODE_GET_TOKLEN(cmd), HCL_CNODE_GET_TOKPTR(cmd));
-				return -1;
-			}
-
-			if (add_temporary_variable(hcl, HCL_CNODE_GET_TOK(arg), tv_dup_start) <= -1) 
-			{
-				if (hcl->errnum == HCL_EEXIST)
+				if (!HCL_CNODE_IS_SYMBOL(arg))
 				{
-					hcl_setsynerrbfmt (hcl, HCL_SYNERR_ARGNAMEDUP, HCL_CNODE_GET_LOC(arg), HCL_CNODE_GET_TOK(arg), "argument duplicate in %.*js", HCL_CNODE_GET_TOKLEN(cmd), HCL_CNODE_GET_TOKPTR(cmd));
+					hcl_setsynerrbfmt (hcl, HCL_SYNERR_VARNAME, HCL_CNODE_GET_LOC(arg), HCL_CNODE_GET_TOK(arg), "return variable not a symbol in %.*js", HCL_CNODE_GET_TOKLEN(cmd), HCL_CNODE_GET_TOKPTR(cmd));
+					return -1;
 				}
-				return -1;
+
+				if (HCL_CNODE_IS_SYMBOL(arg) && HCL_CNODE_SYMBOL_SYNCODE(arg) /* || HCL_OBJ_GET_FLAGS_KERNEL(arg) >= 2 */)
+				{
+					hcl_setsynerrbfmt (hcl, HCL_SYNERR_BANNEDVARNAME, HCL_CNODE_GET_LOC(arg), HCL_CNODE_GET_TOK(arg), "special symbol not to be declared as a return variable in %.*js", HCL_CNODE_GET_TOKLEN(cmd), HCL_CNODE_GET_TOKPTR(cmd));
+					return -1;
+				}
+
+				if (add_temporary_variable(hcl, HCL_CNODE_GET_TOK(arg), tv_dup_start) <= -1) 
+				{
+					if (hcl->errnum == HCL_EEXIST)
+					{
+						hcl_setsynerrbfmt (hcl, HCL_SYNERR_VARNAMEDUP, HCL_CNODE_GET_LOC(arg), HCL_CNODE_GET_TOK(arg), "return variable duplicate in %.*js", HCL_CNODE_GET_TOKLEN(cmd), HCL_CNODE_GET_TOKPTR(cmd));
+					}
+					return -1;
+				}
+				nrvars++;
 			}
-			nargs++;
+			else if (va)
+			{
+				if (HCL_CNODE_IS_TRPCOLONS(arg))
+				{
+					in_ret_args = 1;
+				}
+				else
+				{
+					hcl_setsynerrbfmt (hcl, HCL_SYNERR_CNODE, HCL_CNODE_GET_LOC(arg), HCL_CNODE_GET_TOK(arg), "unexpected element in %.*js", HCL_CNODE_GET_TOKLEN(cmd), HCL_CNODE_GET_TOKPTR(cmd));
+					return -1;
+				}
+			}
+			else
+			{
+				if (HCL_CNODE_IS_TRPCOLONS(arg)) 
+				{
+					in_ret_args = 1;
+				}
+				else if (HCL_CNODE_IS_ELLIPSIS(arg))
+				{
+					va = 1;
+				}
+				else if (!HCL_CNODE_IS_SYMBOL(arg))
+				{
+					hcl_setsynerrbfmt (hcl, HCL_SYNERR_ARGNAME, HCL_CNODE_GET_LOC(arg), HCL_CNODE_GET_TOK(arg), "argument not a symbol in %.*js", HCL_CNODE_GET_TOKLEN(cmd), HCL_CNODE_GET_TOKPTR(cmd));
+					return -1;
+				}
+				else
+				{
+					if (HCL_CNODE_IS_SYMBOL(arg) && HCL_CNODE_SYMBOL_SYNCODE(arg) /* || HCL_OBJ_GET_FLAGS_KERNEL(arg) >= 2 */)
+					{
+						hcl_setsynerrbfmt (hcl, HCL_SYNERR_BANNEDARGNAME, HCL_CNODE_GET_LOC(arg), HCL_CNODE_GET_TOK(arg), "special symbol not to be declared as an argument in %.*js", HCL_CNODE_GET_TOKLEN(cmd), HCL_CNODE_GET_TOKPTR(cmd));
+						return -1;
+					}
+
+					if (add_temporary_variable(hcl, HCL_CNODE_GET_TOK(arg), tv_dup_start) <= -1) 
+					{
+						if (hcl->errnum == HCL_EEXIST)
+						{
+							hcl_setsynerrbfmt (hcl, HCL_SYNERR_ARGNAMEDUP, HCL_CNODE_GET_LOC(arg), HCL_CNODE_GET_TOK(arg), "argument duplicate in %.*js", HCL_CNODE_GET_TOKLEN(cmd), HCL_CNODE_GET_TOKPTR(cmd));
+						}
+						return -1;
+					}
+					nargs++;
+				}
+			}
 
 			dcl = HCL_CNODE_CONS_CDR(dcl);
 			if (!dcl) break;
@@ -1765,7 +1821,6 @@ static int compile_lambda (hcl_t* hcl, hcl_cnode_t* src, int defun)
 		while (1);
 	}
 
-	HCL_ASSERT (hcl, nargs == hcl->c->tv.wcount - saved_tv_wcount);
 	if (nargs > MAX_CODE_NBLKARGS) /*TODO: change this limit to max call argument count */
 	{
 		/* while an integer object is pused to indicate the number of
@@ -1776,10 +1831,9 @@ static int compile_lambda (hcl_t* hcl, hcl_cnode_t* src, int defun)
 		return -1;
 	}
 
-	nrvars = 0; /* TODO: support return variables , */
 	if (nrvars > MAX_CODE_NBLKLVARS)
 	{
-		hcl_setsynerrbfmt (hcl, HCL_SYNERR_VARFLOOD, HCL_CNODE_GET_LOC(args), HCL_NULL, "too many(%zu) return variables in %.*js", nlvars, HCL_CNODE_GET_TOKLEN(cmd), HCL_CNODE_GET_TOKPTR(cmd)); 
+		hcl_setsynerrbfmt (hcl, HCL_SYNERR_VARFLOOD, HCL_CNODE_GET_LOC(args), HCL_NULL, "too many(%zu) return variables in %.*js", nrvars, HCL_CNODE_GET_TOKLEN(cmd), HCL_CNODE_GET_TOKPTR(cmd)); 
 		return -1;
 	}
 	HCL_ASSERT (hcl, nargs + nrvars == hcl->c->tv.wcount - saved_tv_wcount);
@@ -2884,7 +2938,7 @@ redo:
 					goto done;
 
 				case HCL_CONCODE_VLIST:
-					hcl_setsynerrbfmt (hcl, HCL_SYNERR_ELLIPSISBANNED, HCL_CNODE_GET_LOC(oprnd), HCL_NULL, "variable declaration disallowed");
+					hcl_setsynerrbfmt (hcl, HCL_SYNERR_VARDCLBANNED, HCL_CNODE_GET_LOC(oprnd), HCL_NULL, "variable declaration disallowed");
 					return -1;
 
 				default:
@@ -2901,8 +2955,13 @@ redo:
 			goto redo;
 
 		case HCL_CNODE_ELLIPSIS:
-			hcl_setsynerrbfmt (hcl, HCL_SYNERR_INTERN, HCL_CNODE_GET_LOC(oprnd), HCL_CNODE_GET_TOK(oprnd), "ellipsis disallowed in this context", HCL_CNODE_GET_TYPE(oprnd));
+			hcl_setsynerrbfmt (hcl, HCL_SYNERR_ELLIPSISBANNED, HCL_CNODE_GET_LOC(oprnd), HCL_CNODE_GET_TOK(oprnd), "ellipsis disallowed in this context", HCL_CNODE_GET_TYPE(oprnd));
 			return -1;
+
+		case HCL_CNODE_TRPCOLONS:
+			hcl_setsynerrbfmt (hcl, HCL_SYNERR_TRPCOLONSBANNED, HCL_CNODE_GET_LOC(oprnd), HCL_CNODE_GET_TOK(oprnd), "triple colons disallowed in this context", HCL_CNODE_GET_TYPE(oprnd));
+			return -1;
+
 			
 		default:
 			hcl_setsynerrbfmt (hcl, HCL_SYNERR_INTERN, HCL_CNODE_GET_LOC(oprnd), HCL_CNODE_GET_TOK(oprnd), "internal error - unexpected object type %d", HCL_CNODE_GET_TYPE(oprnd));

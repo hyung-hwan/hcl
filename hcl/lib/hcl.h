@@ -97,6 +97,7 @@ enum hcl_synerrnum_t
 {
 	HCL_SYNERR_NOERR,
 	HCL_SYNERR_INTERN,        /* internal error */
+	HCL_SYNERR_CNODE,         /* unexpected compiler node */
 	HCL_SYNERR_ILCHR,         /* illegal character */
 	HCL_SYNERR_ILTOK,         /* invalid token */
 	HCL_SYNERR_CMTNC,         /* comment not closed */
@@ -132,6 +133,7 @@ enum hcl_synerrnum_t
 	HCL_SYNERR_INCLUDE,       /* #include error */
 
 	HCL_SYNERR_ELLIPSISBANNED, /* ... disallowed */
+	HCL_SYNERR_TRPCOLONSBANNED, /* ::: disallowed */
 	HCL_SYNERR_LOOPFLOOD,     /* loop body too big */
 	HCL_SYNERR_IFFLOOD,       /* if body too big */
 	HCL_SYNERR_BLKFLOOD,      /* lambda block too big */

@@ -150,6 +150,7 @@ enum hcl_iotok_type_t
 	HCL_IOTOK_DOT,
 	HCL_IOTOK_ELLIPSIS,
 	HCL_IOTOK_COLON,
+	HCL_IOTOK_TRPCOLONS,
 	HCL_IOTOK_COMMA,
 	HCL_IOTOK_LPAREN,
 	HCL_IOTOK_RPAREN,
@@ -197,6 +198,7 @@ enum hcl_cnode_type_t
 	HCL_CNODE_TRUE,
 	HCL_CNODE_FALSE,
 	HCL_CNODE_ELLIPSIS,
+	HCL_CNODE_TRPCOLONS,
 
 	HCL_CNODE_CONS,
 	HCL_CNODE_ELIST, /* empty list */
@@ -211,6 +213,7 @@ typedef enum hcl_cnode_type_t hcl_cnode_type_t;
 #define HCL_CNODE_GET_TOKLEN(x) ((x)->cn_tok.len)
 
 #define HCL_CNODE_IS_ELLIPSIS(x) ((x)->cn_type == HCL_CNODE_ELLIPSIS)
+#define HCL_CNODE_IS_TRPCOLONS(x) ((x)->cn_type == HCL_CNODE_TRPCOLONS)
 
 #define HCL_CNODE_IS_SYMBOL(x) ((x)->cn_type == HCL_CNODE_SYMBOL)
 #define HCL_CNODE_IS_SYMBOL_SYNCODED(x, code) ((x)->cn_type == HCL_CNODE_SYMBOL && (x)->u.symbol.syncode == (code))
@@ -400,6 +403,9 @@ struct hcl_fnblk_info_t
 	hcl_oow_t lfbase;
 
 	hcl_ooi_t cblk_base;
+
+	unsigned int access_outer: 1;
+	unsigned int accessed_by_inner: 1;
 };
 typedef struct hcl_fnblk_info_t hcl_fnblk_info_t;
 
