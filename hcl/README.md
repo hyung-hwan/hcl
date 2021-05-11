@@ -78,6 +78,16 @@ A HCL program is composed of expressions.
 )
 ```
 
+## Redefining a primitive function
+
+```
+(set prim-plus +)
+(defun + (a b ...)
+	(prim-plus a b 9999)
+)
+
+(printf "%d\n" (+ 10 20))
+```
 
 ## HCL Exchange Protocol
 

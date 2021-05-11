@@ -88,6 +88,7 @@ enum hcl_errnum_t
 	HCL_ESYNERR,   /**< syntax error */
 	HCL_ECALL,     /**< runtime error - cannot call */
 	HCL_ECALLARG,  /**< runtime error - wrong number of arguments to call */
+	HCL_ECALLRET,  /**< runtime error - wrong number of return variables to call */
 	HCL_ESEMFLOOD, /**< runtime error - too many semaphores */
 	HCL_EEXCEPT    /**< runtime error - exception not handled */
 };

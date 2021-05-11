@@ -505,17 +505,20 @@ struct hcl_compiler_t
  * | SIGN | VA | NARGS | NRVARS | NLVARS | TAG |
  *     1    1     8       8        12        2    <= 32
  * -----------------------------------------------------------
- * Parameters to MAKE_BLOCK or MAKE_FUNCTION.
+ * Parameters to the MAKE_BLOCK or MAKE_FUNCTION instructions
  *  | VA | NARGS | NRVARS | NLVARS 
  *    1      4      4        7         <= 16 (HCL_CODE_LONG_PARAM_SIZE 1, two params)
  *    1      8      8        12        <= 32 (HCL_CODE_LONG_PARAM_SIZE 2, two params, use 29 bits to avoid collection when converted to a smooi)
+ *
+ *
+ * NARGS and NRVARS are also used for the CALL and CALL2 instructions.
+ * CALL encodes NARGS in one parameter.
+ * CALLR encodes NARGS in one parameter and NRVARS in another parameter.
+ * NARGS and NRVARS must not exceed a single parameter size. 
  */
  
 #if defined(HCL_CODE_LONG_PARAM_SIZE) && (HCL_CODE_LONG_PARAM_SIZE == 1)
-/*
-#	define MAX_CODE_NBLKARGS            (0xFFu)
-#	define MAX_CODE_NBLKTMPRS           (0xFFu)
-*/
+
 #	define MAX_CODE_NBLKARGS            (0xFu) /* 15 */
 #	define MAX_CODE_NBLKRVARS           (0xFu) /* 15 */
 #	define MAX_CODE_NBLKLVARS           (0x7Fu) /* 127 */
@@ -531,10 +534,7 @@ struct hcl_compiler_t
 #	define MAX_CODE_PARAM               (0xFFu)
 #	define MAX_CODE_PARAM2              (0xFFFFu)
 #elif defined(HCL_CODE_LONG_PARAM_SIZE) && (HCL_CODE_LONG_PARAM_SIZE == 2)
-/*
-#	define MAX_CODE_NBLKARGS            (0xFFFFu)
-#	define MAX_CODE_NBLKTMPRS           (0xFFFFu)
-*/
+
 #	define MAX_CODE_NBLKARGS            (0xFFu) /* 255 */
 #	define MAX_CODE_NBLKRVARS           (0xFFu) /* 255 */
 #	define MAX_CODE_NBLKLVARS           (0xFFFu) /* 4095 */
@@ -829,14 +829,15 @@ enum hcl_bcode_t
 	HCL_CODE_JUMP_BACKWARD_IF_FALSE   = 0xD2, /* 210 ## */
 	HCL_CODE_JUMP2_BACKWARD_IF_FALSE  = 0xD3, /* 211 */
 
-	HCL_CODE_CALL_X                   = 0xD4, /* 212 */
-	HCL_CODE_TRY_ENTER                = 0xD5, /* 213 ## */ 
-	HCL_CODE_TRY_ENTER2               = 0xD6, /* 214  */ 
-	HCL_CODE_TRY_EXIT                 = 0xD7, /* 215 */
-	
+	HCL_CODE_CALL_X                   = 0xD4, /* 212 ## */
+	HCL_CODE_CALL_R                   = 0xD5, /* 213 ## ##*/
+	HCL_CODE_TRY_ENTER                = 0xD6, /* 214 ## */ 
+	HCL_CODE_TRY_ENTER2               = 0xD7, /* 215 ## */ 
+
 	HCL_CODE_STORE_INTO_CTXTEMPVAR_X  = 0xD8, /* 216 ## */
-	HCL_CODE_THROW                    = 0xD9, /* 217 */
-	/* UNUSED - 0xDA - 0xDB */
+	HCL_CODE_TRY_EXIT                 = 0xD9, /* 217 */
+	HCL_CODE_THROW                    = 0xDA, /* 218 */
+	/* UNUSED - 0xDB - 0xDB */
 
 	HCL_CODE_POP_INTO_CTXTEMPVAR_X    = 0xDC, /* 220 ## */
 	/* UNUSED - 0xDD - 0xDF */

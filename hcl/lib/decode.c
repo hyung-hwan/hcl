@@ -335,6 +335,11 @@ int hcl_decode (hcl_t* hcl, hcl_oow_t start, hcl_oow_t end)
 				break;
 
 			/* -------------------------------------------------------- */
+			case HCL_CODE_CALL_R:
+				FETCH_PARAM_CODE_TO (hcl, b1); /* nargs */
+				FETCH_PARAM_CODE_TO (hcl, b2); /* nrvars */
+				LOG_INST_2 (hcl, "call %zu %zu", b1, b2);
+				break;
 
 			case HCL_CODE_CALL_X:
 				FETCH_PARAM_CODE_TO (hcl, b1);

@@ -1806,14 +1806,14 @@ void hcl_releaseiohandle (hcl_t* hcl, hcl_ooi_t io_handle)
 
 /* ------------------------------------------------------------------------- */
 
-static int prepare_new_context (hcl_t* hcl, hcl_oop_block_t rcv_blk, hcl_ooi_t nargs, int nargs_offset, hcl_ooi_t extra_slots, int copy_args, hcl_oop_context_t* pnewctx)
+static int prepare_new_context (hcl_t* hcl, hcl_oop_block_t rcv_blk, hcl_ooi_t nargs, int nargs_offset, hcl_ooi_t req_nrvars, int copy_args, hcl_oop_context_t* pnewctx)
 {
 	/* prepare a new block context for activation. the receiver must be a block
 	 * context which becomes the base for a new block context. */
 
 	hcl_oop_context_t blkctx;
 	hcl_ooi_t tmpr_mask;
-	hcl_ooi_t nrvars, nlvars, flags;
+	hcl_ooi_t fblk_nrvars, fblk_nlvars, flags;
 	hcl_ooi_t fixed_nargs, actual_nargs, excess_nargs;
 
 	/* the receiver must be a block context */
@@ -1822,8 +1822,8 @@ static int prepare_new_context (hcl_t* hcl, hcl_oop_block_t rcv_blk, hcl_ooi_t n
 	flags = HCL_OOP_TO_SMOOI(rcv_blk->flags);
 	tmpr_mask = HCL_OOP_TO_SMOOI(rcv_blk->tmpr_mask);
 
-	nrvars = GET_BLKTMPR_MASK_NRVARS(tmpr_mask);	
-	nlvars = GET_BLKTMPR_MASK_NLVARS(tmpr_mask);	
+	fblk_nrvars = GET_BLKTMPR_MASK_NRVARS(tmpr_mask);	
+	fblk_nlvars = GET_BLKTMPR_MASK_NLVARS(tmpr_mask);	
 	fixed_nargs = GET_BLKTMPR_MASK_NARGS(tmpr_mask);
 	actual_nargs = nargs - nargs_offset;
 	excess_nargs = actual_nargs - fixed_nargs;
@@ -1833,13 +1833,22 @@ static int prepare_new_context (hcl_t* hcl, hcl_oop_block_t rcv_blk, hcl_ooi_t n
 		HCL_LOG3 (hcl, HCL_LOG_IC | HCL_LOG_ERROR, 
 			"Error - wrong number of arguments to a block %O - expecting %zd, got %zd\n",
 			rcv_blk, fixed_nargs, actual_nargs);
-		hcl_seterrnum (hcl, HCL_ECALLARG);
+		hcl_seterrbfmt (hcl, HCL_ECALLARG, "wrong number of argument passed to function block - %zd expected, %zd passed", fixed_nargs, actual_nargs);
+		return -1;
+	}
+
+	if (fblk_nrvars != req_nrvars)
+	{
+		HCL_LOG3 (hcl, HCL_LOG_IC | HCL_LOG_ERROR, 
+			"Error - wrong number of returns specified of a block %O - expected %zd, requested %zd\n",
+			rcv_blk, fblk_nrvars, req_nrvars);
+		hcl_seterrbfmt (hcl, HCL_ECALLRET, "wrong number of returns requested of function block - %zd expected, %zd requested", fblk_nrvars, req_nrvars);
 		return -1;
 	}
 
 	/* create a new block context to clone rcv_blk */
 	hcl_pushvolat (hcl, (hcl_oop_t*)&rcv_blk);
-	blkctx = make_context(hcl, fixed_nargs + nrvars + nlvars + excess_nargs + extra_slots); 
+	blkctx = make_context(hcl, fixed_nargs + fblk_nrvars + fblk_nlvars + excess_nargs); 
 	hcl_popvolat (hcl);
 	if (HCL_UNLIKELY(!blkctx)) return -1;
 
@@ -1870,7 +1879,7 @@ static int prepare_new_context (hcl_t* hcl, hcl_oop_block_t rcv_blk, hcl_ooi_t n
 		}
 
 		/* variable arguments. place them behind after local variables. */
-		for (i = fixed_nargs + nrvars + nlvars ; j < nargs; i++, j++)
+		for (i = fixed_nargs + fblk_nrvars + fblk_nlvars ; j < nargs; i++, j++)
 		{
 			blkctx->slot[i] = HCL_STACK_GETARG(hcl, nargs, j);
 		}
@@ -1883,7 +1892,7 @@ static int prepare_new_context (hcl_t* hcl, hcl_oop_block_t rcv_blk, hcl_ooi_t n
 	return 0;
 }
 
-static HCL_INLINE int activate_block (hcl_t* hcl, hcl_ooi_t nargs)
+static HCL_INLINE int activate_block (hcl_t* hcl, hcl_ooi_t nargs, hcl_ooi_t nrvars)
 {
 	int x;
 	hcl_oop_block_t rcv;
@@ -1897,7 +1906,7 @@ static HCL_INLINE int activate_block (hcl_t* hcl, hcl_ooi_t nargs)
 		rcv,
 		nargs, /* nargs */
 		0, /* nargs_offset */
-		0, /* extra_slots */
+		nrvars,
 		1, /* copy_args */
 		&newctx);
 	if (HCL_UNLIKELY(x <= -1)) return -1;
@@ -3108,6 +3117,30 @@ static int execute (hcl_t* hcl)
 
 			/* -------------------------------------------------------- */
 
+			case HCL_CODE_CALL_R:
+			{
+				hcl_oop_t rcv;
+				FETCH_PARAM_CODE_TO (hcl, b1); /* nargs */
+				FETCH_PARAM_CODE_TO (hcl, b2); /* nrvars */
+				LOG_INST_2 (hcl, "call %zu %zu", b1, b2);
+
+				rcv = HCL_STACK_GETRCV(hcl, b1);
+				if (HCL_IS_BLOCK(hcl, rcv))
+				{
+					if (activate_block(hcl, b1, b2) <= -1) goto call2_failed;
+					break;
+				}
+				else
+				{
+					hcl_seterrbfmt (hcl, HCL_ECALL, "cannot call %O", rcv);
+				call2_failed:
+					supplement_errmsg (hcl, fetched_instruction_pointer);
+					goto oops;
+				}
+
+				break;
+			}
+
 			case HCL_CODE_CALL_X:
 				FETCH_PARAM_CODE_TO (hcl, b1);
 				goto handle_call;
@@ -3132,7 +3165,7 @@ static int execute (hcl_t* hcl)
 							break;
 
 						case HCL_BRAND_BLOCK:
-							if (activate_block(hcl, b1) <= -1) goto call_failed;
+							if (activate_block(hcl, b1, 0) <= -1) goto call_failed;
 							break;
 
 						case HCL_BRAND_PRIM:
@@ -3951,7 +3984,7 @@ hcl_pfrc_t hcl_pf_process_fork (hcl_t* hcl, hcl_mod_t* mod, hcl_ooi_t nargs)
 		blk,
 		nargs, /* nargs */
 		1, /* nargs_offset */
-		0, /* extra_slots */
+		0, /* number of return variables expected */
 		1, /* copy_args */
 		&newctx);
 	if (HCL_UNLIKELY(x <= -1)) return HCL_PF_FAILURE;
