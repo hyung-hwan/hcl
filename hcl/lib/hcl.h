@@ -549,11 +549,11 @@ struct hcl_fpdec_t
 #define HCL_FUNCTION_GET_CODE_BYTE(m) HCL_OBJ_GET_TRAILER_BYTE(m)
 #define HCL_FUNCTION_GET_CODE_SIZE(m) HCL_OBJ_GET_TRAILER_SIZE(m)
 
-#define HCL_FUNCTION_NAMED_INSTVARS 4   /* this excludes literal frames and byte codes */
+#define HCL_FUNCTION_NAMED_INSTVARS 3   /* this excludes literal frames and byte codes */
 typedef struct hcl_function_t hcl_function_t;
 typedef struct hcl_function_t* hcl_oop_function_t;
 
-#define HCL_BLOCK_NAMED_INSTVARS 4
+#define HCL_BLOCK_NAMED_INSTVARS 3
 typedef struct hcl_block_t hcl_block_t;
 typedef struct hcl_block_t* hcl_oop_block_t;
 
@@ -567,7 +567,6 @@ struct hcl_function_t
 {
 	HCL_OBJ_HEADER;
 
-	hcl_oop_t         flags;
 	hcl_oop_t         tmpr_mask; /* smooi */
 	hcl_oop_context_t home; /* home context. nil for the initial function */
 
@@ -587,7 +586,6 @@ struct hcl_block_t
 {
 	HCL_OBJ_HEADER;
 
-	hcl_oop_t         flags;
 	hcl_oop_t         tmpr_mask; /* smooi */
 	hcl_oop_context_t home; /* home context */
 	hcl_oop_t         ip; /* smooi. instruction pointer where the byte code begins in home->origin */
@@ -597,8 +595,8 @@ struct hcl_context_t
 {
 	HCL_OBJ_HEADER;
 
-	/* SmallInteger, context flags */
-	hcl_oop_t         flags;
+	/* SmallInteger */
+	hcl_oop_t          req_nrets;
 
 	/* SmallInteger. */
 	hcl_oop_t          tmpr_mask;

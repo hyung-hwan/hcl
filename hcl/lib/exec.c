@@ -363,7 +363,6 @@ static HCL_INLINE void fill_function_data (hcl_t* hcl, hcl_oop_function_t func, 
 
 	/* initialize other fields */
 	func->home = homectx;
-	func->flags = HCL_SMOOI_TO_OOP(0);
 	func->tmpr_mask = HCL_SMOOI_TO_OOP(tmpr_mask);
 }
 
@@ -380,7 +379,6 @@ static HCL_INLINE void fill_block_data (hcl_t* hcl, hcl_oop_block_t blk, hcl_ooi
 
 	blk->home = homectx;
 	blk->ip = HCL_SMOOI_TO_OOP(ip);
-	blk->flags = HCL_SMOOI_TO_OOP(0);
 	blk->tmpr_mask = HCL_SMOOI_TO_OOP(tmpr_mask);
 }
 
@@ -1819,7 +1817,6 @@ static int prepare_new_context (hcl_t* hcl, hcl_oop_block_t rcv_blk, hcl_ooi_t n
 	/* the receiver must be a block context */
 	HCL_ASSERT (hcl, HCL_IS_BLOCK(hcl, rcv_blk));
 
-	flags = HCL_OOP_TO_SMOOI(rcv_blk->flags);
 	tmpr_mask = HCL_OOP_TO_SMOOI(rcv_blk->tmpr_mask);
 
 	fblk_nrvars = GET_BLKTMPR_MASK_NRVARS(tmpr_mask);	
@@ -1837,12 +1834,12 @@ static int prepare_new_context (hcl_t* hcl, hcl_oop_block_t rcv_blk, hcl_ooi_t n
 		return -1;
 	}
 
-	if (fblk_nrvars != req_nrvars)
+	if (req_nrvars > fblk_nrvars)
 	{
 		HCL_LOG3 (hcl, HCL_LOG_IC | HCL_LOG_ERROR, 
-			"Error - wrong number of returns specified of a block %O - expected %zd, requested %zd\n",
+			"Error - wrong number of returns specified of a block %O - max expected %zd, requested %zd\n",
 			rcv_blk, fblk_nrvars, req_nrvars);
-		hcl_seterrbfmt (hcl, HCL_ECALLRET, "wrong number of returns requested of function block - %zd expected, %zd requested", fblk_nrvars, req_nrvars);
+		hcl_seterrbfmt (hcl, HCL_ECALLRET, "wrong number of returns requested of function block - %zd expected at most, %zd requested", fblk_nrvars, req_nrvars);
 		return -1;
 	}
 
@@ -1860,7 +1857,7 @@ static int prepare_new_context (hcl_t* hcl, hcl_oop_block_t rcv_blk, hcl_ooi_t n
 	}
 #else
 	blkctx->ip = rcv_blk->ip;
-	blkctx->flags = rcv_blk->flags;
+	blkctx->req_nrets = HCL_SMOOI_TO_OOP(req_nrvars);
 	blkctx->tmpr_mask = rcv_blk->tmpr_mask;
 	blkctx->receiver_or_base = (hcl_oop_t)rcv_blk;
 	blkctx->home = rcv_blk->home;
@@ -1965,7 +1962,7 @@ static int __activate_function (hcl_t* hcl, hcl_oop_function_t rcv_func, hcl_ooi
 	if (HCL_UNLIKELY(!functx)) return -1;
 
 	functx->ip = HCL_SMOOI_TO_OOP(0);
-	functx->flags = rcv_func->flags;
+	functx->req_nrets = HCL_SMOOI_TO_OOP(1);
 	functx->tmpr_mask = rcv_func->tmpr_mask;
 	functx->receiver_or_base = (hcl_oop_t)rcv_func;
 	functx->home = rcv_func->home;
@@ -2290,7 +2287,7 @@ static int start_initial_process_and_context (hcl_t* hcl, hcl_ooi_t initial_ip, 
 	hcl->sp = -1;
 
 	ctx->ip = HCL_SMOOI_TO_OOP(initial_ip);
-	ctx->flags = HCL_SMOOI_TO_OOP(0);
+	ctx->req_nrets = HCL_SMOOI_TO_OOP(1);
 	ctx->tmpr_mask = HCL_SMOOI_TO_OOP(tmpr_mask);
 	ctx->origin = ctx; /* the origin of the initial context is itself as this is created over the initial function */
 	ctx->home = hcl->initial_function->home; /* this should be nil */
@@ -3117,6 +3114,37 @@ static int execute (hcl_t* hcl)
 
 			/* -------------------------------------------------------- */
 
+			case HCL_CODE_PUSH_RETURN_R:
+			{
+				hcl_oop_context_t ctx;
+				hcl_oow_t i;
+				hcl_ooi_t tmpr_mask, fixed_nargs;
+
+				LOG_INST_0 (hcl, "push_return_r");
+
+				HCL_ASSERT(hcl, HCL_IS_CONTEXT(hcl, hcl->active_context));
+
+				ctx = hcl->active_context;
+				tmpr_mask = HCL_OOP_TO_SMOOI(ctx->tmpr_mask);
+				fixed_nargs = GET_BLKTMPR_MASK_NARGS(tmpr_mask);
+
+				i = HCL_OOP_TO_SMOOI(ctx->req_nrets); 
+
+				/* return variables are placed after the fixed arguments */
+				while (i > 0)
+				{
+					--i;
+					HCL_STACK_PUSH (hcl, ctx->slot[fixed_nargs + i]);
+				}
+
+				/* same as HCL_CODE_RETURN_FROM_BLOCK */
+				
+				hcl->last_retv = HCL_STACK_GETTOP(hcl); /* get the stack top */
+				do_return_from_block (hcl);
+
+				break;
+			}
+
 			case HCL_CODE_CALL_R:
 			{
 				hcl_oop_t rcv;
@@ -3165,7 +3193,7 @@ static int execute (hcl_t* hcl)
 							break;
 
 						case HCL_BRAND_BLOCK:
-							if (activate_block(hcl, b1, 0) <= -1) goto call_failed;
+							if (activate_block(hcl, b1, 1) <= -1) goto call_failed;
 							break;
 
 						case HCL_BRAND_PRIM:

@@ -831,13 +831,14 @@ enum hcl_bcode_t
 
 	HCL_CODE_CALL_X                   = 0xD4, /* 212 ## */
 	HCL_CODE_CALL_R                   = 0xD5, /* 213 ## ##*/
-	HCL_CODE_TRY_ENTER                = 0xD6, /* 214 ## */ 
-	HCL_CODE_TRY_ENTER2               = 0xD7, /* 215 ## */ 
+	HCL_CODE_PUSH_RETURN_R            = 0xD6, /* 214 */ 
+	HCL_CODE_TRY_ENTER                = 0xD7, /* 215 ## */ 
+	
 
 	HCL_CODE_STORE_INTO_CTXTEMPVAR_X  = 0xD8, /* 216 ## */
-	HCL_CODE_TRY_EXIT                 = 0xD9, /* 217 */
-	HCL_CODE_THROW                    = 0xDA, /* 218 */
-	/* UNUSED - 0xDB - 0xDB */
+	HCL_CODE_TRY_ENTER2               = 0xD9, /* 217 ## */ 
+	HCL_CODE_TRY_EXIT                 = 0xDA, /* 218 */
+	HCL_CODE_THROW                    = 0xDB, /* 219 */
 
 	HCL_CODE_POP_INTO_CTXTEMPVAR_X    = 0xDC, /* 220 ## */
 	/* UNUSED - 0xDD - 0xDF */

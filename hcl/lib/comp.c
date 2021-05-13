@@ -3618,11 +3618,13 @@ static HCL_INLINE int emit_lambda (hcl_t* hcl)
 	hcl_cframe_t* cf;
 	hcl_oow_t block_code_size, lfsize;
 	hcl_ooi_t jip;
+	hcl_fnblk_info_t* fbi;
 
 	cf = GET_TOP_CFRAME(hcl);
 	HCL_ASSERT (hcl, cf->opcode == COP_EMIT_LAMBDA);
 	HCL_ASSERT (hcl, cf->operand != HCL_NULL);
 
+	fbi = &hcl->c->fnblk.info[hcl->c->fnblk.depth];
 	jip = cf->u.lambda.jump_inst_pos;
 
 	if (hcl->option.trait & HCL_TRAIT_INTERACTIVE) 
@@ -3631,16 +3633,30 @@ static HCL_INLINE int emit_lambda (hcl_t* hcl)
 	/* HCL_CODE_LONG_PARAM_SIZE + 1 => size of the long JUMP_FORWARD instruction */
 	block_code_size = hcl->code.bc.len - jip - (HCL_CODE_LONG_PARAM_SIZE + 1);
 
-	if (block_code_size == 0)
- 	{
-		/* no body in lambda - (lambda (a b c)) */
-/* TODO: is this correct??? */
-		if (emit_byte_instruction(hcl, HCL_CODE_PUSH_NIL, HCL_CNODE_GET_LOC(cf->operand)) <= -1) return -1;
+	if (fbi->tmpr_nrvars > 0)
+	{
+		/* this function block defines one or more return variables */
+		if (block_code_size > 0)
+		{
+			if (emit_byte_instruction(hcl, HCL_CODE_POP_STACKTOP, HCL_CNODE_GET_LOC(cf->operand)) <= -1) return -1;
+			block_code_size++;
+		}
+		if (emit_byte_instruction(hcl, HCL_CODE_PUSH_RETURN_R, HCL_CNODE_GET_LOC(cf->operand)) <= -1) return -1;
 		block_code_size++;
 	}
+	else
+	{
+		if (block_code_size == 0)
+		{
+			/* no body in lambda - (lambda (a b c)) */
+	/* TODO: is this correct??? */
+			if (emit_byte_instruction(hcl, HCL_CODE_PUSH_NIL, HCL_CNODE_GET_LOC(cf->operand)) <= -1) return -1;
+			block_code_size++;
+		}
 
-	if (emit_byte_instruction(hcl, HCL_CODE_RETURN_FROM_BLOCK, HCL_CNODE_GET_LOC(cf->operand)) <= -1) return -1;
-	block_code_size++;
+		if (emit_byte_instruction(hcl, HCL_CODE_RETURN_FROM_BLOCK, HCL_CNODE_GET_LOC(cf->operand)) <= -1) return -1;
+		block_code_size++;
+	}
 
 	if (block_code_size > MAX_CODE_JUMP * 2)
 	{
