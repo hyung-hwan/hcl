@@ -1893,43 +1893,69 @@ static int compile_return (hcl_t* hcl, hcl_cnode_t* src, int ret_from_home)
 {
 	hcl_cnode_t* obj, * val;
 	hcl_cframe_t* cf;
+	hcl_fnblk_info_t* fbi;
 
 	HCL_ASSERT (hcl, HCL_CNODE_IS_CONS(src));
 	HCL_ASSERT (hcl, HCL_CNODE_IS_SYMBOL_SYNCODED(HCL_CNODE_CONS_CAR(src), HCL_SYNCODE_RETURN) || 
 	                 HCL_CNODE_IS_SYMBOL_SYNCODED(HCL_CNODE_CONS_CAR(src), HCL_SYNCODE_RETURN_FROM_HOME));
 
+	fbi = &hcl->c->fnblk.info[hcl->c->fnblk.depth];
 	obj = HCL_CNODE_CONS_CDR(src);
 
-	if (!obj)
-	{
-/* TODO: should i allow (return)? does it return the last value on the stack? */
-		/* no value */
-		hcl_cnode_t* tmp = HCL_CNODE_CONS_CAR(src);
-		hcl_setsynerrbfmt (hcl, HCL_SYNERR_ARGCOUNT, HCL_CNODE_GET_LOC(src), HCL_NULL, "no value specified in %.*js", HCL_CNODE_GET_TOKLEN(tmp), HCL_CNODE_GET_TOKPTR(tmp));
-		return -1;
-	}
-	else if (!HCL_CNODE_IS_CONS(obj))
+	if (fbi->tmpr_nrvars > 0)
 	{
 		hcl_cnode_t* tmp = HCL_CNODE_CONS_CAR(src);
-		hcl_setsynerrbfmt (hcl, HCL_SYNERR_DOTBANNED, HCL_CNODE_GET_LOC(obj), HCL_CNODE_GET_TOK(obj), "redundant cdr in %.*js", HCL_CNODE_GET_TOKLEN(tmp), HCL_CNODE_GET_TOKPTR(tmp));
-		return -1;
+
+		if (ret_from_home)
+		{
+			hcl_setsynerrbfmt (hcl, HCL_SYNERR_BANNED, HCL_CNODE_GET_LOC(src), HCL_NULL, "%.*js not compatible with return variables", HCL_CNODE_GET_TOKLEN(tmp), HCL_CNODE_GET_TOKPTR(tmp));
+			return -1;
+		}
+
+		/* if a return variable are specified in the current function block, the return statement must not be followed by a return value */
+		if (obj)
+		{
+			hcl_setsynerrbfmt (hcl, HCL_SYNERR_BANNED, HCL_CNODE_GET_LOC(src), HCL_NULL, "use of return value in %.*js not compatible with return variables", HCL_CNODE_GET_TOKLEN(tmp), HCL_CNODE_GET_TOKPTR(tmp));
+			return -1;
+		}
+
+/* TODO: pop stack if this is not the first statement... */
+		if (emit_byte_instruction(hcl, HCL_CODE_PUSH_RETURN_R, HCL_CNODE_GET_LOC(tmp)) <= -1) return -1;
+		POP_CFRAME (hcl);
 	}
-
-	val = HCL_CNODE_CONS_CAR(obj);
-
-	obj = HCL_CNODE_CONS_CDR(obj);
-	if (obj)
+	else
 	{
-		hcl_cnode_t* tmp = HCL_CNODE_CONS_CAR(src);
-		hcl_setsynerrbfmt (hcl, HCL_SYNERR_ARGCOUNT, HCL_CNODE_GET_LOC(obj), HCL_CNODE_GET_TOK(obj), "more than 1 argument in %.*js", HCL_CNODE_GET_TOKLEN(tmp), HCL_CNODE_GET_TOKPTR(tmp));
-		return -1;
+		if (!obj)
+		{
+	/* TODO: should i allow (return)? does it return the last value on the stack? */
+			/* no value */
+			hcl_cnode_t* tmp = HCL_CNODE_CONS_CAR(src);
+			hcl_setsynerrbfmt (hcl, HCL_SYNERR_ARGCOUNT, HCL_CNODE_GET_LOC(src), HCL_NULL, "no value specified in %.*js", HCL_CNODE_GET_TOKLEN(tmp), HCL_CNODE_GET_TOKPTR(tmp));
+			return -1;
+		}
+		else if (!HCL_CNODE_IS_CONS(obj))
+		{
+			hcl_cnode_t* tmp = HCL_CNODE_CONS_CAR(src);
+			hcl_setsynerrbfmt (hcl, HCL_SYNERR_DOTBANNED, HCL_CNODE_GET_LOC(obj), HCL_CNODE_GET_TOK(obj), "redundant cdr in %.*js", HCL_CNODE_GET_TOKLEN(tmp), HCL_CNODE_GET_TOKPTR(tmp));
+			return -1;
+		}
+
+		val = HCL_CNODE_CONS_CAR(obj);
+
+		obj = HCL_CNODE_CONS_CDR(obj);
+		if (obj)
+		{
+			hcl_cnode_t* tmp = HCL_CNODE_CONS_CAR(src);
+			hcl_setsynerrbfmt (hcl, HCL_SYNERR_ARGCOUNT, HCL_CNODE_GET_LOC(obj), HCL_CNODE_GET_TOK(obj), "more than 1 argument in %.*js", HCL_CNODE_GET_TOKLEN(tmp), HCL_CNODE_GET_TOKPTR(tmp));
+			return -1;
+		}
+
+		SWITCH_TOP_CFRAME (hcl, COP_COMPILE_OBJECT, val);
+
+		PUSH_SUBCFRAME (hcl, COP_EMIT_RETURN, src);
+		cf = GET_SUBCFRAME(hcl);
+		cf->u._return.from_home = ret_from_home;
 	}
-
-	SWITCH_TOP_CFRAME (hcl, COP_COMPILE_OBJECT, val);
-
-	PUSH_SUBCFRAME (hcl, COP_EMIT_RETURN, src);
-	cf = GET_SUBCFRAME(hcl);
-	cf->u._return.from_home = ret_from_home;
 
 	return 0;
 }

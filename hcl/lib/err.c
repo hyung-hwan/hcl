@@ -144,6 +144,7 @@ static char* synerrstr[] =
 	"duplicate variable name",
 	"disallowed variable name",
 	"disallowed argument name",
+	"disallowed",
 
 	"elif without if",
 	"else without if",
