@@ -839,10 +839,13 @@ static pf_t builtin_prims[] =
 	{ 1, HCL_TYPE_MAX(hcl_oow_t), pf_integer_mquo,     4,  { 'm','d','i','v' } },
 	{ 2, HCL_TYPE_MAX(hcl_oow_t), pf_integer_mod,      3,  { 'm','o','d' } },
 
-	{ 1, HCL_TYPE_MAX(hcl_oow_t), hcl_pf_process_fork,    4,  { 'f','o','r','k'} },
-	{ 1, 1,                       hcl_pf_process_resume,  6,  { 'r','e','s','u','m','e' } },
-	{ 0, 1,                       hcl_pf_process_suspend, 7,  { 's','u','s','p','e','n','d' } },
-	{ 0, 0,                       hcl_pf_process_yield,   5,  { 'y','i','e','l','d'} },
+	{ 0, 0,                       hcl_pf_process_current,   15, { 'c','u','r','r','e','n','t','-','p','r','o','c','e','s','s'} },
+	{ 1, HCL_TYPE_MAX(hcl_oow_t), hcl_pf_process_fork,      4,  { 'f','o','r','k'} },
+	{ 1, 1,                       hcl_pf_process_resume,    6,  { 'r','e','s','u','m','e' } },
+	{ 0, 1,                       hcl_pf_process_suspend,   7,  { 's','u','s','p','e','n','d' } },
+	{ 0, 1,                       hcl_pf_process_terminate, 9,  { 't','e','r','m','i','n','a','t','e' } },
+	{ 0, 0,                       hcl_pf_process_terminate_all, 13,  { 't','e','r','m','i','n','a','t','e','-','a','l','l' } },
+	{ 0, 0,                       hcl_pf_process_yield,     5,  { 'y','i','e','l','d'} },
 
 
 	{ 0, 0,                       hcl_pf_semaphore_new,      7,  { 's','e','m','-','n','e','w'} },

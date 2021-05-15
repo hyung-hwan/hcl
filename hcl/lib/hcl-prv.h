@@ -1443,9 +1443,12 @@ hcl_oow_t hcl_countcnodecons (hcl_t* hcl, hcl_cnode_t* cons);
 /* ========================================================================= */
 /* exec.c                                                                    */
 /* ========================================================================= */
+hcl_pfrc_t hcl_pf_process_current (hcl_t* hcl, hcl_mod_t* mod, hcl_ooi_t nargs);
 hcl_pfrc_t hcl_pf_process_fork (hcl_t* hcl, hcl_mod_t* mod, hcl_ooi_t nargs);
 hcl_pfrc_t hcl_pf_process_resume (hcl_t* hcl, hcl_mod_t* mod, hcl_ooi_t nargs);
 hcl_pfrc_t hcl_pf_process_suspend (hcl_t* hcl, hcl_mod_t* mod, hcl_ooi_t nargs);
+hcl_pfrc_t hcl_pf_process_terminate (hcl_t* hcl, hcl_mod_t* mod, hcl_ooi_t nargs);
+hcl_pfrc_t hcl_pf_process_terminate_all (hcl_t* hcl, hcl_mod_t* mod, hcl_ooi_t nargs);
 hcl_pfrc_t hcl_pf_process_yield (hcl_t* hcl, hcl_mod_t* mod, hcl_ooi_t nargs);
 
 hcl_pfrc_t hcl_pf_semaphore_new (hcl_t* hcl, hcl_mod_t* mod, hcl_ooi_t nargs);

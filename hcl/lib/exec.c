@@ -3993,6 +3993,12 @@ void hcl_abort (hcl_t* hcl)
 
 /* ------------------------------------------------------------------ */
 
+hcl_pfrc_t hcl_pf_process_current (hcl_t* hcl, hcl_mod_t* mod, hcl_ooi_t nargs)
+{
+	HCL_STACK_SETRET (hcl, nargs, (hcl_oop_t)hcl->processor->active);
+	return HCL_PF_SUCCESS;
+}
+
 hcl_pfrc_t hcl_pf_process_fork (hcl_t* hcl, hcl_mod_t* mod, hcl_ooi_t nargs)
 {
 	hcl_oop_block_t blk;
@@ -4052,12 +4058,6 @@ hcl_pfrc_t hcl_pf_process_resume (hcl_t* hcl, hcl_mod_t* mod, hcl_ooi_t nargs)
 	return  HCL_PF_SUCCESS;
 }
 
-hcl_pfrc_t hcl_pf_process_yield (hcl_t* hcl, hcl_mod_t* mod, hcl_ooi_t nargs)
-{
-	yield_process (hcl, hcl->processor->active);
-	return  HCL_PF_SUCCESS;
-}
-
 hcl_pfrc_t hcl_pf_process_suspend (hcl_t* hcl, hcl_mod_t* mod, hcl_ooi_t nargs)
 {
 	hcl_oop_process_t prc;
@@ -4077,6 +4077,40 @@ hcl_pfrc_t hcl_pf_process_suspend (hcl_t* hcl, hcl_mod_t* mod, hcl_ooi_t nargs)
 	}
 
 	suspend_process (hcl, prc);
+	return  HCL_PF_SUCCESS;
+}
+
+hcl_pfrc_t hcl_pf_process_terminate (hcl_t* hcl, hcl_mod_t* mod, hcl_ooi_t nargs)
+{
+	hcl_oop_process_t prc;
+
+	if (nargs >= 1)
+	{
+		prc = (hcl_oop_process_t)HCL_STACK_GETARG(hcl, nargs, 0);
+		if (!HCL_IS_PROCESS(hcl, prc))
+		{
+			hcl_seterrbfmt (hcl, HCL_EINVAL, "parameter not process - %O", prc);
+			return HCL_PF_FAILURE;
+		}
+	}
+	else
+	{
+		prc = hcl->processor->active;
+	}
+
+	terminate_process (hcl, prc);
+	return  HCL_PF_SUCCESS;
+}
+
+hcl_pfrc_t hcl_pf_process_terminate_all (hcl_t* hcl, hcl_mod_t* mod, hcl_ooi_t nargs)
+{
+	terminate_all_processes (hcl);
+	return  HCL_PF_SUCCESS;
+}
+
+hcl_pfrc_t hcl_pf_process_yield (hcl_t* hcl, hcl_mod_t* mod, hcl_ooi_t nargs)
+{
+	yield_process (hcl, hcl->processor->active);
 	return  HCL_PF_SUCCESS;
 }
 
