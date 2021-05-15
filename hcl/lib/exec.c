@@ -3118,28 +3118,34 @@ static int execute (hcl_t* hcl)
 			{
 				hcl_oop_context_t ctx;
 				hcl_oow_t i;
-				hcl_ooi_t tmpr_mask, fixed_nargs;
+				hcl_ooi_t tmpr_mask, fixed_nargs, req_nrets;
 
 				LOG_INST_0 (hcl, "push_return_r");
 
 				HCL_ASSERT(hcl, HCL_IS_CONTEXT(hcl, hcl->active_context));
 
 				ctx = hcl->active_context;
+
 				tmpr_mask = HCL_OOP_TO_SMOOI(ctx->tmpr_mask);
 				fixed_nargs = GET_BLKTMPR_MASK_NARGS(tmpr_mask);
 
-				i = HCL_OOP_TO_SMOOI(ctx->req_nrets); 
+				req_nrets = HCL_OOP_TO_SMOOI(ctx->req_nrets); 
+
+				if (req_nrets <= 0) 
+				{
+					/* if a function with return variables is called in the single-return value call style,
+					 * req_nrets becomes 0. but this instruction has to push one value in such a case */
+					req_nrets = 1;
+				}
 
 				/* return variables are placed after the fixed arguments */
-				while (i > 0)
+				for (i = 0; i < req_nrets; i++)
 				{
-					--i;
 					HCL_STACK_PUSH (hcl, ctx->slot[fixed_nargs + i]);
 				}
 
-				/* same as HCL_CODE_RETURN_FROM_BLOCK */
-				
-				hcl->last_retv = HCL_STACK_GETTOP(hcl); /* get the stack top */
+				/* similar to HCL_CODE_RETURN_FROM_BLOCK */
+				hcl->last_retv = ctx->slot[fixed_nargs]; /* remember the first pushed one as the last return value. currently no good way to hcl_execute() recognize multiple return values. */
 				do_return_from_block (hcl);
 
 				break;
@@ -3193,7 +3199,7 @@ static int execute (hcl_t* hcl)
 							break;
 
 						case HCL_BRAND_BLOCK:
-							if (activate_block(hcl, b1, 1) <= -1) goto call_failed;
+							if (activate_block(hcl, b1, 0) <= -1) goto call_failed;
 							break;
 
 						case HCL_BRAND_PRIM:

@@ -283,15 +283,23 @@ struct hcl_cframe_t
 
 	union
 	{
+		/* COP_COMPILE_OBJECT_R */
+		struct
+		{
+			hcl_ooi_t nrets;
+		} obj_r;
+
 		/* COP_EMIT_CALL */
 		struct
 		{
 			hcl_ooi_t index;
+			hcl_ooi_t nrets;
 		} call;
 
 		/* COP_EMIT_SET */
 		struct
 		{
+			int pop;
 			int var_type;
 			hcl_ooi_t index;
 		} set;
