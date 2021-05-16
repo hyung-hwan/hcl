@@ -46,7 +46,7 @@ static hcl_pfrc_t pf_arr_get (hcl_t* hcl, hcl_mod_t* mod, hcl_ooi_t nargs)
 
 	if (index >= HCL_OBJ_GET_SIZE(arr))
 	{
-		hcl_seterrbfmt (hcl, HCL_EINVAL, "array index(%zu) out of bounds(0-%zu)", index, HCL_OBJ_GET_SIZE(arr) - 1);
+		hcl_seterrbfmt (hcl, HCL_EINVAL, "array index(%zu) out of boundsfor array of size %zu", index, HCL_OBJ_GET_SIZE(arr));
 		return HCL_PF_FAILURE;
 	}
 
@@ -74,7 +74,7 @@ static hcl_pfrc_t pf_arr_put (hcl_t* hcl, hcl_mod_t* mod, hcl_ooi_t nargs)
 
 	if (index >= HCL_OBJ_GET_SIZE(arr))
 	{
-		hcl_seterrbfmt (hcl, HCL_EINVAL, "array index(%zu) out of bounds(0-%zu)", index, HCL_OBJ_GET_SIZE(arr) - 1);
+		hcl_seterrbfmt (hcl, HCL_EINVAL, "array index(%zu) out of bounds for array of size %zu", index, HCL_OBJ_GET_SIZE(arr));
 		return HCL_PF_FAILURE;
 	}
 

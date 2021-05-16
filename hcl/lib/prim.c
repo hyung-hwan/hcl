@@ -775,6 +775,97 @@ static hcl_pfrc_t pf_integer_bshift (hcl_t* hcl, hcl_mod_t* mod, hcl_ooi_t nargs
 }
 
 /* ------------------------------------------------------------------------- */
+static hcl_pfrc_t pf_va_context (hcl_t* hcl, hcl_mod_t* mod, hcl_ooi_t nargs)
+{
+	HCL_STACK_SETRET (hcl, nargs, hcl->active_context);
+	return HCL_PF_SUCCESS;
+}
+
+static hcl_pfrc_t pf_va_count (hcl_t* hcl, hcl_mod_t* mod, hcl_ooi_t nargs)
+{
+	hcl_context_t* ctx;
+	hcl_ooi_t tmpr_mask, va, fixed_nargs, nrvars, nlvars, nvaargs;
+
+	if (nargs >= 1) 
+	{
+		ctx = HCL_STACK_GETARG(hcl, nargs, 0);
+		if (!HCL_IS_CONTEXT(hcl, ctx))
+		{
+			hcl_seterrbfmt (hcl, HCL_EINVAL, "not a proper va context - %O", ctx);
+			return HCL_PF_FAILURE;
+		}
+	}
+	else
+	{
+		ctx = hcl->active_context;
+	}
+
+	tmpr_mask = HCL_OOP_TO_SMOOI(ctx->tmpr_mask);
+
+	va = GET_BLKTMPR_MASK_VA(tmpr_mask);
+	fixed_nargs = GET_BLKTMPR_MASK_NARGS(tmpr_mask);
+	nrvars = GET_BLKTMPR_MASK_NRVARS(tmpr_mask);
+	nlvars = GET_BLKTMPR_MASK_NLVARS(tmpr_mask);
+	
+	/*if (!va) TODO: need this check?
+	{
+	}*/
+
+	nvaargs = HCL_OBJ_GET_SIZE(ctx) - fixed_nargs - nrvars - nlvars - HCL_CONTEXT_NAMED_INSTVARS;
+	HCL_STACK_SETRET (hcl, nargs, HCL_SMOOI_TO_OOP(nvaargs));
+	return HCL_PF_SUCCESS;
+}
+
+static hcl_pfrc_t pf_va_get (hcl_t* hcl, hcl_mod_t* mod, hcl_ooi_t nargs)
+{
+	hcl_oop_t ret;
+	hcl_context_t* ctx;
+	hcl_ooi_t tmpr_mask, va, fixed_nargs, nrvars, nlvars, nvaargs;
+	hcl_oow_t index;
+
+	if (nargs >= 2) 
+	{
+		ctx = HCL_STACK_GETARG(hcl, nargs, 1);
+		if (!HCL_IS_CONTEXT(hcl, ctx))
+		{
+			hcl_seterrbfmt (hcl, HCL_EINVAL, "not a proper va context - %O", ctx);
+			return HCL_PF_FAILURE;
+		}
+	}
+	else
+	{
+		ctx = hcl->active_context;
+	}
+	tmpr_mask = HCL_OOP_TO_SMOOI(ctx->tmpr_mask);
+
+	va = GET_BLKTMPR_MASK_VA(tmpr_mask);
+	fixed_nargs = GET_BLKTMPR_MASK_NARGS(tmpr_mask);
+	nrvars = GET_BLKTMPR_MASK_NRVARS(tmpr_mask);
+	nlvars = GET_BLKTMPR_MASK_NLVARS(tmpr_mask);
+
+	if (hcl_inttooow(hcl, HCL_STACK_GETARG(hcl, nargs, 0), &index) == 0) 
+	{
+		return HCL_PF_FAILURE;
+	}
+
+	/*
+	if (!va) TODO: need this check?
+	{
+	}*/
+
+	nvaargs = HCL_OBJ_GET_SIZE(ctx) - fixed_nargs - nrvars - nlvars - HCL_CONTEXT_NAMED_INSTVARS;
+	if (index >= nvaargs)
+	{
+		hcl_seterrbfmt (hcl, HCL_EINVAL, "va index(%zu) out of bounds for va of size %zd", index, nvaargs);
+		return HCL_PF_FAILURE;
+	}
+
+	HCL_STACK_SETRET (hcl, nargs, ctx->slot[fixed_nargs + nrvars + nlvars + index]);
+	return HCL_PF_SUCCESS;
+}
+
+
+/* ------------------------------------------------------------------------- */
 
 static pf_t builtin_prims[] =
 {
@@ -834,10 +925,14 @@ static pf_t builtin_prims[] =
 	{ 1, 1,                       pf_integer_bnot,    7,  { 'b','i','t','-','n','o','t' } },
 	{ 2, 2,                       pf_integer_bshift,  9,  { 'b','i','t','-','s','h','i','f','t'  } },
 	
-	{ 1, HCL_TYPE_MAX(hcl_oow_t), pf_integer_quo,      3,  { 'd','i','v' } },
-	{ 2, HCL_TYPE_MAX(hcl_oow_t), pf_integer_rem,      3,  { 'r','e','m' } },
-	{ 1, HCL_TYPE_MAX(hcl_oow_t), pf_integer_mquo,     4,  { 'm','d','i','v' } },
-	{ 2, HCL_TYPE_MAX(hcl_oow_t), pf_integer_mod,      3,  { 'm','o','d' } },
+	{ 1, HCL_TYPE_MAX(hcl_oow_t), pf_integer_quo,     3,  { 'd','i','v' } },
+	{ 2, HCL_TYPE_MAX(hcl_oow_t), pf_integer_rem,     3,  { 'r','e','m' } },
+	{ 1, HCL_TYPE_MAX(hcl_oow_t), pf_integer_mquo,    4,  { 'm','d','i','v' } },
+	{ 2, HCL_TYPE_MAX(hcl_oow_t), pf_integer_mod,     3,  { 'm','o','d' } },
+
+	{ 0, 0,                       pf_va_context,      10, { 'v','a','-','c','o','n','t','e','x','t' } },
+	{ 0, 1,                       pf_va_count,        8,  { 'v','a','-','c','o','u','n','t' } },
+	{ 1, 2,                       pf_va_get,          6,  { 'v','a','-','g','e','t' } },
 
 	{ 0, 0,                       hcl_pf_process_current,   15, { 'c','u','r','r','e','n','t','-','p','r','o','c','e','s','s'} },
 	{ 1, HCL_TYPE_MAX(hcl_oow_t), hcl_pf_process_fork,      4,  { 'f','o','r','k'} },
